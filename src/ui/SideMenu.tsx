@@ -142,31 +142,45 @@ export function SideMenu({
   const sections = (
     <>
       {/* Namespaces switcher: tap a row to switch which set of notes is
-          shown; the heading's "+" opens the full manage dialog (add / rename
-          / icon / delete). */}
+          shown; the heading's cogwheel opens the full manage dialog (add /
+          rename / icon / delete) — a cog, not a "+", because it manages
+          rather than adds inline. */}
       <SectionHeader
         label="Namespaces"
         onAdd={() => pick(() => dispatch({ kind: "namespaces" }))}
         addLabel="Manage namespaces"
+        addIcon={<CogIcon className="h-4 w-4" />}
       />
-      {namespaces.map((ns) => (
-        <NavItem
-          key={ns.slug}
-          icon={
-            <NamespaceGlyph
-              name={ns.glyph}
-              className="h-5 w-5"
-              style={ns.color ? { color: ns.color } : undefined}
-            />
-          }
-          label={ns.name}
-          active={ns.slug === activeNamespace}
-          onClick={() => {
-            onSwitchNamespace(ns.slug);
-            close();
-          }}
-        />
-      ))}
+      {namespaces.map((ns) => {
+        // A namespace that picked an icon or colour shows its own glyph,
+        // tinted to that colour. One left untouched gets the plain check
+        // (active) / folder (inactive) treatment so the active set reads at a
+        // glance — the NamespaceGlyph fallback is itself a folder.
+        const customised = Boolean(ns.glyph || ns.color);
+        const icon = customised ? (
+          <NamespaceGlyph
+            name={ns.glyph}
+            className="h-5 w-5"
+            style={ns.color ? { color: ns.color } : undefined}
+          />
+        ) : ns.slug === activeNamespace ? (
+          <CheckIcon className="h-5 w-5" />
+        ) : (
+          <NamespaceGlyph className="h-5 w-5" />
+        );
+        return (
+          <NavItem
+            key={ns.slug}
+            icon={icon}
+            label={ns.name}
+            active={ns.slug === activeNamespace}
+            onClick={() => {
+              onSwitchNamespace(ns.slug);
+              close();
+            }}
+          />
+        );
+      })}
       <SectionHeader
         label="Notes"
         border
@@ -344,19 +358,22 @@ export function SideMenu({
 }
 
 // A section label with an optional trailing action pinned to its trailing
-// edge. For Notes the action is a "+" that starts a new note. The first
-// section omits the top border; every later one draws one to separate it
-// from the rows above.
+// edge. For Notes the action is a "+" that starts a new note; for Namespaces
+// it's a cogwheel that opens the manage dialog (passed via `addIcon`). The
+// first section omits the top border; every later one draws one to separate
+// it from the rows above.
 function SectionHeader({
   label,
   border = false,
   onAdd,
   addLabel,
+  addIcon = <PlusIcon className="h-4 w-4" />,
 }: {
   label: string;
   border?: boolean;
   onAdd?: () => void;
   addLabel?: string;
+  addIcon?: ReactNode;
 }) {
   return (
     <div
@@ -375,7 +392,7 @@ function SectionHeader({
           title={addLabel}
           className="-mr-1 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg-bright"
         >
-          <PlusIcon className="h-4 w-4" />
+          {addIcon}
         </button>
       )}
     </div>
