@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -67,6 +68,34 @@ export function MarkdownEditor({ body, onChange, wordWrap, maxWidth }: Props) {
     pendingCaret.current = caretCol;
   }
 
+  // The three structural edits, shared by the desktop key handler and the
+  // mobile `beforeinput` handler below. Each splices the line array and moves
+  // the caret; callers decide *when* to fire them from their own event.
+  function splitLine(start: number, end: number) {
+    const text = lines[clampedActive] ?? "";
+    const i = clampedActive;
+    const next = [...lines];
+    next.splice(i, 1, text.slice(0, start), text.slice(end));
+    commit(next, i + 1, 0);
+  }
+
+  function mergeWithPrev() {
+    const text = lines[clampedActive] ?? "";
+    const i = clampedActive;
+    const prev = lines[i - 1]!;
+    const next = [...lines];
+    next.splice(i - 1, 2, prev + text);
+    commit(next, i - 1, prev.length);
+  }
+
+  function mergeWithNext() {
+    const text = lines[clampedActive] ?? "";
+    const i = clampedActive;
+    const next = [...lines];
+    next.splice(i, 2, text + lines[i + 1]!);
+    commit(next, i, text.length);
+  }
+
   // Size the textarea to its content (so it never scrolls internally) and
   // install any pending caret. Runs after every value / active-line change.
   useLayoutEffect(() => {
@@ -88,6 +117,56 @@ export function MarkdownEditor({ body, onChange, wordWrap, maxWidth }: Props) {
     }
   }, [clampedActive, value, wordWrap]);
 
+  // Structural edits also arrive as `beforeinput` events, and on mobile this
+  // is the *only* place they show up: soft keyboards (and IME composition)
+  // deliver Enter / Backspace / Delete as `keyCode 229` "Unidentified"
+  // keystrokes that never match the `onKeyDown` cases above, but they always
+  // fire a `beforeinput` carrying a semantic `inputType`. We mirror the same
+  // three edits here, keyed off `inputType` instead of `key`. On desktop the
+  // key handler runs first and `preventDefault()`s, which suppresses the
+  // matching `beforeinput`, so the two paths never both fire for one keystroke.
+  //
+  // Attached natively (not via React's synthetic `onBeforeInput`, whose
+  // `inputType` coverage is unreliable) through a ref so the one-time listener
+  // always sees current state. The textarea keeps a stable identity (`key=
+  // "active"`) as the active line rolls, so binding once is enough.
+  const handleBeforeInput = useRef<(e: InputEvent) => void>(() => {});
+  handleBeforeInput.current = (e: InputEvent) => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = lines[clampedActive] ?? "";
+    const i = clampedActive;
+    switch (e.inputType) {
+      case "insertLineBreak":
+      case "insertParagraph":
+        e.preventDefault();
+        splitLine(start, end);
+        break;
+      case "deleteContentBackward":
+        if (start === 0 && end === 0 && i > 0) {
+          e.preventDefault();
+          mergeWithPrev();
+        }
+        break;
+      case "deleteContentForward":
+        if (start === text.length && end === text.length && i < lines.length - 1) {
+          e.preventDefault();
+          mergeWithNext();
+        }
+        break;
+    }
+  };
+
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const listener = (e: InputEvent) => handleBeforeInput.current(e);
+    ta.addEventListener("beforeinput", listener);
+    return () => ta.removeEventListener("beforeinput", listener);
+  }, []);
+
   function onTextChange(text: string) {
     const next = [...lines];
     next[clampedActive] = text;
@@ -105,18 +184,13 @@ export function MarkdownEditor({ body, onChange, wordWrap, maxWidth }: Props) {
 
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      const next = [...lines];
-      next.splice(i, 1, text.slice(0, start), text.slice(end));
-      commit(next, i + 1, 0);
+      splitLine(start, end);
       return;
     }
 
     if (e.key === "Backspace" && start === 0 && end === 0 && i > 0) {
       e.preventDefault();
-      const prev = lines[i - 1]!;
-      const next = [...lines];
-      next.splice(i - 1, 2, prev + text);
-      commit(next, i - 1, prev.length);
+      mergeWithPrev();
       return;
     }
 
@@ -127,9 +201,7 @@ export function MarkdownEditor({ body, onChange, wordWrap, maxWidth }: Props) {
       i < lines.length - 1
     ) {
       e.preventDefault();
-      const next = [...lines];
-      next.splice(i, 2, text + lines[i + 1]!);
-      commit(next, i, text.length);
+      mergeWithNext();
       return;
     }
 

@@ -62,4 +62,46 @@ describe("MarkdownEditor", () => {
     // The browser handles the delete; we don't splice lines.
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  // Mobile soft keyboards deliver Enter / Backspace / Delete as `beforeinput`
+  // events with a semantic `inputType` rather than as `keydown` "Enter" etc.,
+  // so the same structural edits must work off `inputType` too.
+  function beforeInput(ta: HTMLTextAreaElement, inputType: string) {
+    fireEvent(
+      ta,
+      new InputEvent("beforeinput", { inputType, cancelable: true, bubbles: true }),
+    );
+  }
+
+  it("splits the line on a mobile insertLineBreak", () => {
+    const { onChange } = renderEditor("hello");
+    const ta = activeTextarea();
+    caretAt(ta, 2);
+    beforeInput(ta, "insertLineBreak");
+    expect(onChange).toHaveBeenLastCalledWith("he\nllo");
+  });
+
+  it("splits the line on a mobile insertParagraph", () => {
+    const { onChange } = renderEditor("hello");
+    const ta = activeTextarea();
+    caretAt(ta, 2);
+    beforeInput(ta, "insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("he\nllo");
+  });
+
+  it("merges on a mobile deleteContentBackward at column 0", () => {
+    const { onChange } = renderEditor("a\nb");
+    const ta = activeTextarea();
+    caretAt(ta, 0);
+    beforeInput(ta, "deleteContentBackward");
+    expect(onChange).toHaveBeenLastCalledWith("ab");
+  });
+
+  it("does not hijack a mobile deleteContentBackward mid-line", () => {
+    const { onChange } = renderEditor("a\nbc");
+    const ta = activeTextarea();
+    caretAt(ta, 1);
+    beforeInput(ta, "deleteContentBackward");
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
