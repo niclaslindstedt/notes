@@ -13,7 +13,10 @@ import { createContext, useContext } from "react";
 // Refresh keeps a stable boundary.
 
 /** A request to open one of the app's modals. */
-export type ModalCommand = { kind: "settings" } | { kind: "namespaces" };
+export type ModalCommand =
+  | { kind: "settings" }
+  | { kind: "namespaces" }
+  | { kind: "changelog" };
 
 export type ModalKind = ModalCommand["kind"];
 

@@ -17,6 +17,7 @@ import {
   PlusIcon,
   RedoIcon,
   ShieldIcon,
+  SparklesIcon,
   TrashIcon,
   UndoIcon,
 } from "./icons.tsx";
@@ -252,6 +253,11 @@ export function SideMenu({
           label="Privacy"
           href={privacyUrl}
           onClick={close}
+        />
+        <MenuButton
+          icon={<SparklesIcon className="h-5 w-5" />}
+          label="What's new"
+          onClick={() => pick(() => dispatch({ kind: "changelog" }))}
         />
         <MenuButton
           icon={<CogIcon className="h-5 w-5" />}

@@ -95,6 +95,25 @@ export function ShieldIcon({ className }: IconProps) {
   );
 }
 
+export function SparklesIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z" />
+      <path d="M19 3v4M21 5h-4M5 17v3M6.5 18.5h-3" />
+    </svg>
+  );
+}
+
 export function ArrowLeftIcon({ className }: IconProps) {
   return (
     <svg

@@ -18,6 +18,7 @@ import { SideMenu } from "../ui/SideMenu.tsx";
 import { SyncIndicator } from "../ui/SyncIndicator.tsx";
 import { UnlockGate } from "../ui/UnlockGate.tsx";
 import { UpdateToast } from "../ui/UpdateToast.tsx";
+import { ChangelogModalHost } from "./modals/ChangelogModalHost.tsx";
 import { NamespacesModalHost } from "./modals/NamespacesModalHost.tsx";
 import { SettingsModalHost } from "./modals/SettingsModalHost.tsx";
 import { useNavState } from "./use-nav.ts";
@@ -161,6 +162,7 @@ export function App() {
 
         <SettingsModalHost storage={storage} />
         <NamespacesModalHost storage={storage} />
+        <ChangelogModalHost />
         <ConflictModal sync={sync} />
         <UpdateToast />
       </ModalBusProvider>
