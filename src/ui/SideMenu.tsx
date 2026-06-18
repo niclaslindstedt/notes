@@ -15,8 +15,10 @@ import {
   MenuIcon,
   NoteIcon,
   PlusIcon,
+  RedoIcon,
   ShieldIcon,
   TrashIcon,
+  UndoIcon,
 } from "./icons.tsx";
 import { useModalDispatch } from "./modal-bus.ts";
 import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
@@ -40,8 +42,9 @@ import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
 // and its verbs are passed as props from App, which owns the notes store.
 //
 // Note rows support swipe-to-remove: a left swipe latches open a trash
-// button (see `useSwipeReveal`). Deleting a note is permanent (notes has no
-// undo yet), so it asks for a second confirming tap.
+// button (see `useSwipeReveal`). A deletion is recorded on the undo timeline
+// (the Edit section's Undo brings it back), but it still asks for a second
+// confirming tap so a stray swipe doesn't silently drop a note.
 
 // notes is open source; the "source" link points at its repository.
 const SOURCE_URL = "https://github.com/niclaslindstedt/notes";
@@ -57,6 +60,14 @@ type Props = {
   onAddNote: () => void;
   /** Delete a note permanently. */
   onRemoveNote: (id: string) => void;
+  /** Revert the most recent recorded edit. */
+  onUndo: () => void;
+  /** Re-apply the most recently undone edit. */
+  onRedo: () => void;
+  /** Whether there is a recorded edit to revert. */
+  canUndo: boolean;
+  /** Whether there is an undone edit to re-apply. */
+  canRedo: boolean;
   /** Namespaces known on this device, default first. */
   namespaces: Namespace[];
   /** The active namespace's slug. */
@@ -71,6 +82,10 @@ export function SideMenu({
   onSelectNote,
   onAddNote,
   onRemoveNote,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
   namespaces,
   activeNamespace,
   onSwitchNamespace,
@@ -195,6 +210,23 @@ export function SideMenu({
           );
         })
       )}
+      <SectionHeader label="Edit" border />
+      {/* Undo / redo keep the drawer open so a burst of reverts can be
+          applied without reopening it each time. */}
+      <NavItem
+        icon={<UndoIcon className="h-5 w-5" />}
+        label="Undo"
+        active={false}
+        disabled={!canUndo}
+        onClick={onUndo}
+      />
+      <NavItem
+        icon={<RedoIcon className="h-5 w-5" />}
+        label="Redo"
+        active={false}
+        disabled={!canRedo}
+        onClick={onRedo}
+      />
       {/* The old top-right burger menu, pinned to the foot of the drawer
           with its order inverted so it reads bottom-up. */}
       <div className="mt-auto flex flex-col border-t border-line [padding-top:calc(1.25rem_-_var(--density-row-py))]">
@@ -348,11 +380,15 @@ function NavItem({
   icon,
   label,
   active,
+  disabled = false,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
   active: boolean;
+  // Renders the row inert and dimmed — used by undo / redo at the timeline
+  // ends, where there is nothing to revert or re-apply.
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -360,11 +396,14 @@ function NavItem({
       type="button"
       role="menuitem"
       aria-current={active ? "page" : undefined}
+      disabled={disabled}
       onClick={onClick}
       className={`flex w-full items-center gap-3 px-5 py-[var(--density-row-py)] text-left text-sm ${
-        active
-          ? "cursor-pointer bg-surface-2 font-semibold text-fg-bright"
-          : "cursor-pointer text-fg hover:bg-surface-2 hover:text-fg-bright"
+        disabled
+          ? "cursor-not-allowed text-muted opacity-40"
+          : active
+            ? "cursor-pointer bg-surface-2 font-semibold text-fg-bright"
+            : "cursor-pointer text-fg hover:bg-surface-2 hover:text-fg-bright"
       }`}
     >
       <span className={active ? "text-accent" : "text-muted"}>{icon}</span>
@@ -376,9 +415,9 @@ function NavItem({
 // Wraps a drawer row so a left swipe latches it open to reveal a trailing
 // trash button (see `useSwipeReveal`). The first tap on the trash arms a
 // confirming state (the button reads `confirmLabel`) and only the second
-// tap commits — the confirmation a permanent, un-undoable note deletion
-// warrants. The sliding foreground carries its own surface background so it
-// covers the action while closed.
+// tap commits — a guard against a stray swipe, even though the deletion is
+// itself undoable from the Edit section. The sliding foreground carries its
+// own surface background so it covers the action while closed.
 const REMOVE_ACTION_W = 96;
 
 function SwipeToRemove({

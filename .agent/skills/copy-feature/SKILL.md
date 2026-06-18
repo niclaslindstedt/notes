@@ -272,6 +272,23 @@ reuse them rather than re-porting:
   synced, link = unsaved/offline, danger = error/auth/conflict, muted = busy.
   English strings inlined (no i18n); a "Reload from backend" action is kept
   from notes' prior indicator. The browser backend renders nothing.
+- **Undo / redo** — `src/app/use-undo-redo.ts` (the in-memory snapshot
+  timeline) and `src/ui/hooks/useUndoRedoShortcuts.ts` (the global
+  Cmd/Ctrl+Z keyboard handler), ported near-verbatim from checklist plus the
+  `UndoIcon` / `RedoIcon` glyphs in `icons.tsx`. The timeline records whole
+  `Snapshot`s with a label; `useNotes` threads `record` through its `commit`
+  seam and exposes `undo`/`redo`/`canUndo`/`canRedo`, surfaced as an "Edit"
+  section in `SideMenu` and the keyboard shortcut wired in `App`. Two notes
+  adaptations: (1) there is **no toast/i18n**, so labels live in the timeline
+  for a future "What was undone" surface but nothing announces them today;
+  (2) a note's body is typed one keystroke at a time, so `record` takes an
+  optional **`mergeKey`** (`edit:<noteId>`) that coalesces a run of edits to
+  the same note into a single undo step — without it the per-keystroke
+  `update` would flood the 50-entry history *and* leave the timeline head
+  stale relative to the document. The reset-on-external-load wiring mirrors
+  checklist: `useNotesSync` takes a `resetHistory` ref and calls it after the
+  load / reload / conflict-adopt paths so the timeline re-seeds against a
+  document that arrived from outside the edit path.
 
 ### Privacy / clean-URL routing
 

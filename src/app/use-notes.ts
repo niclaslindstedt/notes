@@ -3,8 +3,9 @@
 // engine owns the active `StorageAdapter` — localStorage, a local folder, or
 // a cloud backend — and the debounced-save / conflict / offline machinery;
 // this hook only translates "create / edit / delete a note" into a whole-
-// document `Snapshot` swap and hands the sync state back up for the header
-// indicator and the unlock / conflict surfaces.
+// document `Snapshot` swap, records each onto the undo timeline, and hands
+// the sync state back up for the header indicator and the unlock / conflict
+// surfaces.
 
 import { useCallback, useMemo, useRef } from "react";
 
@@ -12,12 +13,14 @@ import {
   createNote,
   editNote,
   isBlank,
+  noteTitle,
   sortByUpdated,
   type Note,
   type Snapshot,
 } from "../domain/note.ts";
 import type { StorageAdapter } from "../storage/adapter.ts";
 import { useNotesSync, type NotesSync } from "./use-notes-sync.ts";
+import { useUndoRedo } from "./use-undo-redo.ts";
 
 export type NotesStore = {
   // Most-recently-edited first, with blank (never-typed) notes hidden — the
@@ -29,13 +32,28 @@ export type NotesStore = {
   create: () => string;
   update: (id: string, body: string) => void;
   remove: (id: string) => void;
+  /** Revert the most recent recorded edit (create / delete / edit session). */
+  undo: () => void;
+  /** Re-apply the most recently undone edit. */
+  redo: () => void;
+  /** Whether there is a recorded edit to revert. */
+  canUndo: boolean;
+  /** Whether there is an undone edit to re-apply. */
+  canRedo: boolean;
   // The persistence engine's live state — save status, conflict, offline —
   // for the header sync indicator and the conflict surface.
   sync: NotesSync;
 };
 
 export function useNotes(adapter: StorageAdapter): NotesStore {
-  const sync = useNotesSync({ active: adapter });
+  // The undo timeline is built after the sync engine (it needs the engine's
+  // `setDoc` / `scheduleSave` to apply a stepped-to snapshot), but the
+  // engine's load / reload / conflict-adopt paths must reset that timeline.
+  // Break the cycle with a ref the engine reads and the timeline fills once
+  // it exists.
+  const resetHistory = useRef<(seed: Snapshot) => void>(() => {});
+
+  const sync = useNotesSync({ active: adapter, resetHistory });
   const notes = sync.doc.notes;
 
   // Latest document, read from the mutation callbacks so a rapid
@@ -43,37 +61,84 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
   const docRef = useRef<Snapshot>(sync.doc);
   docRef.current = sync.doc;
 
-  // Apply a producer over the latest snapshot, render it immediately, and
-  // queue the debounced save. The single seam every mutation runs through.
-  const commit = useCallback(
-    (producer: (prev: Note[]) => Note[]): void => {
-      const next: Snapshot = { notes: producer(docRef.current.notes) };
-      docRef.current = next;
+  // Apply a snapshot stepped to off the undo / redo timeline: swap the visible
+  // document and persist it so the reverted state survives a reload, exactly
+  // as a normal edit would.
+  const applyHistorySnapshot = useCallback(
+    (next: Snapshot) => {
       sync.setDoc(next);
       sync.scheduleSave(next);
     },
     [sync],
   );
 
+  const {
+    record,
+    reset,
+    undo: undoTimeline,
+    redo: redoTimeline,
+    canUndo,
+    canRedo,
+  } = useUndoRedo({ initialSeed: sync.doc, setData: applyHistorySnapshot });
+  resetHistory.current = reset;
+
+  // Apply a producer over the latest snapshot, render it immediately, queue
+  // the debounced save, and record the result on the undo timeline. The
+  // single seam every mutation runs through. `mergeKey` coalesces a run of
+  // continuous edits (typing in one note) into a single undo step.
+  const commit = useCallback(
+    (
+      producer: (prev: Note[]) => Note[],
+      label: string,
+      mergeKey: string | null = null,
+    ): void => {
+      const next: Snapshot = { notes: producer(docRef.current.notes) };
+      docRef.current = next;
+      sync.setDoc(next);
+      sync.scheduleSave(next);
+      record(next, label, mergeKey);
+    },
+    [sync, record],
+  );
+
   const create = useCallback((): string => {
     const note = createNote();
-    commit((prev) => [note, ...prev]);
+    commit((prev) => [note, ...prev], "New note");
     return note.id;
   }, [commit]);
 
   const update = useCallback(
     (id: string, body: string): void => {
-      commit((prev) => prev.map((n) => (n.id === id ? editNote(n, body) : n)));
+      // Label off the new body — the title is just its first non-empty line.
+      const title = noteTitle({ id, body, createdAt: 0, updatedAt: 0 });
+      commit(
+        (prev) => prev.map((n) => (n.id === id ? editNote(n, body) : n)),
+        `Edited note “${title}”`,
+        `edit:${id}`,
+      );
     },
     [commit],
   );
 
   const remove = useCallback(
     (id: string): void => {
-      commit((prev) => prev.filter((n) => n.id !== id));
+      const target = docRef.current.notes.find((n) => n.id === id);
+      const title = target ? noteTitle(target) : "note";
+      commit(
+        (prev) => prev.filter((n) => n.id !== id),
+        `Deleted note “${title}”`,
+      );
     },
     [commit],
   );
+
+  const undo = useCallback(() => {
+    undoTimeline();
+  }, [undoTimeline]);
+
+  const redo = useCallback(() => {
+    redoTimeline();
+  }, [redoTimeline]);
 
   // List view always shows most-recently-edited first, with blank notes
   // (a freshly created, never-typed note) filtered out so they don't
@@ -83,5 +148,16 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
     [notes],
   );
 
-  return { notes: visible, allNotes: notes, create, update, remove, sync };
+  return {
+    notes: visible,
+    allNotes: notes,
+    create,
+    update,
+    remove,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    sync,
+  };
 }

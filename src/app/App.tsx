@@ -7,6 +7,7 @@ import { useApplyAppearance } from "../theme/useTheme.ts";
 import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
+import { useUndoRedoShortcuts } from "../ui/hooks/useUndoRedoShortcuts.ts";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
   applyFaviconHref,
@@ -38,9 +39,18 @@ export function App() {
   // so they travel with a synced folder too.
   const storage = useStorageBackend();
   useSettingsSync(storage.settingsStore);
-  const { notes, allNotes, create, update, remove, sync } = useNotes(
-    storage.adapter,
-  );
+  const {
+    notes,
+    allNotes,
+    create,
+    update,
+    remove,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    sync,
+  } = useNotes(storage.adapter);
   const [editingId, setEditingId] = useState<string | null>(null);
   const nav = useNavState();
 
@@ -54,6 +64,11 @@ export function App() {
     enabled: !nav.showButton && !nav.pinned && !nav.open,
     onOpen: nav.toggle,
   });
+
+  // Cmd/Ctrl+Z / Cmd/Ctrl+Shift+Z mirror the side-menu undo & redo. The hook
+  // stands down while focus is in a text field so the editor's native undo
+  // keeps working as you type.
+  useUndoRedoShortcuts({ canUndo, canRedo, onUndo: undo, onRedo: redo });
 
   // Re-badge the browser-tab favicon to the active namespace's glyph (in its
   // accent colour) so a glance tells you which namespace you're in. A
@@ -114,6 +129,10 @@ export function App() {
             onSelectNote={(id) => switchTo(id)}
             onAddNote={openNew}
             onRemoveNote={removeNote}
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
             namespaces={storage.namespaces}
             activeNamespace={storage.activeNamespace}
             onSwitchNamespace={switchNamespace}

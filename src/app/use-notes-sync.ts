@@ -6,7 +6,13 @@
 // notes — no default-document seeding, since an empty notes list is a valid,
 // rendered state).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 
 import { type Snapshot } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
@@ -85,8 +91,17 @@ export interface NotesSync {
   resolveConflict: (keep: "local" | "remote") => void;
 }
 
-export function useNotesSync(deps: { active: StorageAdapter }): NotesSync {
-  const { active } = deps;
+export function useNotesSync(deps: {
+  active: StorageAdapter;
+  // Called whenever the document is replaced wholesale from outside the edit
+  // path (initial / swap load, reload, conflict-adopt) so the undo timeline
+  // re-seeds against the new baseline instead of describing edits to a
+  // document that's gone. The parent (`useNotes`) builds the timeline *after*
+  // this engine — it needs the engine's `setDoc` / `scheduleSave` — so it
+  // passes an empty ref here and fills it once the timeline exists.
+  resetHistory?: MutableRefObject<(seed: Snapshot) => void>;
+}): NotesSync {
+  const { active, resetHistory } = deps;
 
   // Adapter and concurrency token survive re-renders.
   const adapterRef = useRef(active);
@@ -297,7 +312,9 @@ export function useNotesSync(deps: { active: StorageAdapter }): NotesSync {
         if (cancelled) return;
         revisionRef.current = stored?.revision;
         setOffline(stored?.offline ?? false);
-        setDoc(parse(stored?.text));
+        const loadedDoc = parse(stored?.text);
+        setDoc(loadedDoc);
+        resetHistory?.current(loadedDoc);
         setLoaded(true);
       })
       .catch((err: unknown) => {
@@ -309,7 +326,7 @@ export function useNotesSync(deps: { active: StorageAdapter }): NotesSync {
     return () => {
       cancelled = true;
     };
-  }, [active, flushSave, setDoc]);
+  }, [active, flushSave, setDoc, resetHistory]);
 
   // Flush any pending save on unmount so a debounced edit isn't lost, and
   // cancel any armed cooldown so the resume timer can't fire after teardown.
@@ -348,8 +365,10 @@ export function useNotesSync(deps: { active: StorageAdapter }): NotesSync {
     setStatus("idle");
     setStatusDetail(null);
     setDirty(false);
-    setDoc(parse(stored?.text));
-  }, [flushSave, setDoc]);
+    const reloaded = parse(stored?.text);
+    setDoc(reloaded);
+    resetHistory?.current(reloaded);
+  }, [flushSave, setDoc, resetHistory]);
 
   // When connectivity returns, flush whatever edit piled up offline so it
   // syncs to the backend without the user lifting a finger.
@@ -385,6 +404,7 @@ export function useNotesSync(deps: { active: StorageAdapter }): NotesSync {
           pendingDoc.current = null;
           revisionRef.current = current.remoteRevision;
           setDoc(current.remote);
+          resetHistory?.current(current.remote);
           setDirty(false);
           setStatus("saved");
           setStatusDetail(null);
@@ -392,7 +412,7 @@ export function useNotesSync(deps: { active: StorageAdapter }): NotesSync {
         return null;
       });
     },
-    [performSave, setDoc],
+    [performSave, setDoc, resetHistory],
   );
 
   return {
