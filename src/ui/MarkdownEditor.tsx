@@ -151,7 +151,11 @@ export function MarkdownEditor({ body, onChange, wordWrap, maxWidth }: Props) {
         }
         break;
       case "deleteContentForward":
-        if (start === text.length && end === text.length && i < lines.length - 1) {
+        if (
+          start === text.length &&
+          end === text.length &&
+          i < lines.length - 1
+        ) {
           e.preventDefault();
           mergeWithNext();
         }

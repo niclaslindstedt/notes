@@ -69,7 +69,11 @@ describe("MarkdownEditor", () => {
   function beforeInput(ta: HTMLTextAreaElement, inputType: string) {
     fireEvent(
       ta,
-      new InputEvent("beforeinput", { inputType, cancelable: true, bubbles: true }),
+      new InputEvent("beforeinput", {
+        inputType,
+        cancelable: true,
+        bubbles: true,
+      }),
     );
   }
 
