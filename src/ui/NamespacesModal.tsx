@@ -88,9 +88,9 @@ export function NamespacesModal({
 
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
         <p className="mb-4 text-xs text-muted">
-          A namespace is a self-contained group of notes. Switch between them
-          to keep, say, personal and shared notes apart. Each namespace can
-          carry its own icon and colour.
+          A namespace is a self-contained group of notes. Switch between them to
+          keep, say, personal and shared notes apart. Each namespace can carry
+          its own icon and colour.
         </p>
 
         <ul className="flex flex-col gap-1">

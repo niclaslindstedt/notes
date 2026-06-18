@@ -16,10 +16,7 @@ import { createLogger } from "../../dev/logger.ts";
 import { AuthError, RateLimitError, type StorageAdapter } from "../adapter.ts";
 import { createDirectoryAdapter } from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
-import {
-  DEFAULT_NAMESPACE_SLUG,
-  namespaceCloudFolder,
-} from "../namespaces.ts";
+import { DEFAULT_NAMESPACE_SLUG, namespaceCloudFolder } from "../namespaces.ts";
 import {
   fileNamespaceStore,
   type NamespaceRegistryStore,

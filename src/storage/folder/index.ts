@@ -26,10 +26,7 @@ import { createLogger } from "../../dev/logger.ts";
 import type { StorageAdapter } from "../adapter.ts";
 import { createDirectoryAdapter } from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
-import {
-  DEFAULT_NAMESPACE_SLUG,
-  namespaceCloudFolder,
-} from "../namespaces.ts";
+import { DEFAULT_NAMESPACE_SLUG, namespaceCloudFolder } from "../namespaces.ts";
 import {
   fileNamespaceStore,
   type NamespaceRegistryStore,
@@ -125,10 +122,7 @@ class FolderFileStore implements FileStore {
   // so directories — other namespaces' folders when listing at the root — are
   // skipped rather than descended into.
   async list(): Promise<FileEntry[]> {
-    const dir = await this.resolveDir(
-      this.base ? [this.base] : [],
-      false,
-    );
+    const dir = await this.resolveDir(this.base ? [this.base] : [], false);
     if (!dir) return [];
     const out: FileEntry[] = [];
     try {

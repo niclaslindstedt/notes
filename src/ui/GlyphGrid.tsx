@@ -49,7 +49,10 @@ export function GlyphGrid({
         }`}
         style={tintStyle(value === null)}
       >
-        <NamespaceGlyph name={DEFAULT_NAMESPACE_GLYPH} className="h-3.5 w-3.5" />
+        <NamespaceGlyph
+          name={DEFAULT_NAMESPACE_GLYPH}
+          className="h-3.5 w-3.5"
+        />
       </button>
       {glyphs.map((name) => {
         const selected = name === value;
