@@ -3,7 +3,11 @@
 > A local-first PWA for taking notes that works great on mobile and desktop.
 
 [![ci](https://github.com/niclaslindstedt/notes/actions/workflows/ci.yml/badge.svg)](https://github.com/niclaslindstedt/notes/actions/workflows/ci.yml)
+[![pages](https://github.com/niclaslindstedt/notes/actions/workflows/pages.yml/badge.svg)](https://github.com/niclaslindstedt/notes/actions/workflows/pages.yml)
+[![release](https://github.com/niclaslindstedt/notes/actions/workflows/release.yml/badge.svg)](https://github.com/niclaslindstedt/notes/actions/workflows/release.yml)
 [![license](https://img.shields.io/badge/license-PolyForm--Noncommercial--1.0.0-blue.svg)](LICENSE)
+
+Try it: **<https://notes.niclaslindstedt.se>**
 
 ## What
 

@@ -4,33 +4,236 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: "Optional branch to park in the stable /branch/ slot. Persists across regular deploys until the next branch_ref dispatch overwrites it."
+        required: false
+        type: string
+        default: ""
+  # Allow release.yml to chain into us after a tag is pushed. The tag
+  # passes in via `release_ref`; otherwise we resolve the highest `v*`
+  # semver tag in the repo. Before the first release ever exists, both
+  # lookups come up empty and we fall back to serving `main` at `/` —
+  # same as the pre-release-pipeline behaviour.
+  workflow_call:
+    inputs:
+      release_ref:
+        description: "Tag or sha to build for the production '/' slot."
+        required: false
+        type: string
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
-# Allow one concurrent deployment; don't cancel an in-progress one so a
-# half-published deploy never serves.
 concurrency:
   group: pages
   cancel-in-progress: false
+
+env:
+  # Stable orphan branch in this repo that stores the most recently
+  # dispatched /branch/ build. Created on demand by the first
+  # workflow_dispatch with a branch_ref. Every Pages run rehydrates
+  # the /branch/ slot from here, so regular deploys preserve the slot
+  # until the next dispatch overwrites it.
+  BRANCH_DEPLOY_REF: branch-deploy
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # Build under the repository's Pages subpath so asset URLs and the
-      # PWA scope resolve correctly when served from <user>.github.io/notes/.
-      - run: npm run build
+
+      # ---- Resolve which tag to serve at `/` (if any) ----
+      - name: Resolve production tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.release_ref }}" ]; then
+            REF="${{ inputs.release_ref }}"
+          else
+            # Highest semver tag, not the nearest reachable one: a
+            # release cut from an earlier commit (release.yml's `commit`
+            # input) tags a commit that is NOT an ancestor of main, so
+            # `git describe` would miss it and silently re-serve main at
+            # `/`. Sorting all `v*` tags by version keeps the released
+            # tag served regardless of ancestry. Only release.yml ever
+            # creates tags here, so the highest one is always the
+            # intended production release.
+            REF=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          fi
+          if [ -n "$REF" ]; then
+            echo "ref=$REF" >> "$GITHUB_OUTPUT"
+            echo "has_release=true" >> "$GITHUB_OUTPUT"
+            echo "Resolved production ref: $REF"
+          else
+            echo "ref=" >> "$GITHUB_OUTPUT"
+            echo "has_release=false" >> "$GITHUB_OUTPUT"
+            echo "No release tag found — will serve main at /."
+          fi
+
+      # ---- Resolve optional branch dispatch ----
+      # `branch_ref` is only set on workflow_dispatch. A push to main
+      # or a workflow_call from release.yml leaves it empty — the
+      # /branch/ slot then comes from whatever the BRANCH_DEPLOY_REF
+      # branch already holds (if anything), so previously-dispatched
+      # builds persist across regular deploys.
+      - name: Resolve branch dispatch
+        id: dispatch
+        run: |
+          REF="${{ inputs.branch_ref }}"
+          if [ -z "$REF" ]; then
+            echo "has_dispatch=false" >> "$GITHUB_OUTPUT"
+            echo "No branch_ref input — preserving any previously-dispatched /branch/ build."
+          else
+            echo "ref=$REF" >> "$GITHUB_OUTPUT"
+            echo "has_dispatch=true" >> "$GITHUB_OUTPUT"
+            echo "Dispatched: $REF -> /branch/"
+          fi
+
+      # ---- Production build (latest tag, root path) ----
+      - name: Checkout production tag
+        if: steps.tag.outputs.has_release == 'true'
+        run: git checkout ${{ steps.tag.outputs.ref }}
+
+      - name: Reinstall deps for production tag
+        if: steps.tag.outputs.has_release == 'true'
+        run: npm ci
+
+      - name: Build production
+        if: steps.tag.outputs.has_release == 'true'
+        run: npm run build
         env:
-          VITE_BASE: /notes/
+          VITE_BASE: /
+
+      - name: Stash production dist
+        if: steps.tag.outputs.has_release == 'true'
+        run: mv dist dist-prod
+
+      - name: Return to triggering ref
+        if: steps.tag.outputs.has_release == 'true'
+        run: git checkout ${{ github.sha }}
+
+      - name: Reinstall main's deps
+        if: steps.tag.outputs.has_release == 'true'
+        run: npm ci
+
+      # ---- Preview build (current main, /preview/ path) ----
+      - name: Build preview
+        run: npm run build
+        env:
+          # When no release exists yet this build serves at `/`; the
+          # merge step below short-circuits and ships this dist as-is.
+          # Once the first release lands, this becomes the /preview/
+          # build instead.
+          VITE_BASE: ${{ steps.tag.outputs.has_release == 'true' && '/preview/' || '/' }}
+
+      # ---- Optional /branch/ build + persist to orphan branch ----
+      - name: Stash preview dist
+        if: steps.dispatch.outputs.has_dispatch == 'true'
+        run: mv dist dist-preview
+
+      - name: Checkout dispatched ref
+        if: steps.dispatch.outputs.has_dispatch == 'true'
+        run: |
+          git fetch origin "${{ steps.dispatch.outputs.ref }}"
+          git checkout "${{ steps.dispatch.outputs.ref }}"
+
+      - name: Reinstall deps for dispatched ref
+        if: steps.dispatch.outputs.has_dispatch == 'true'
+        run: npm ci
+
+      - name: Build /branch/
+        if: steps.dispatch.outputs.has_dispatch == 'true'
+        run: npm run build
+        env:
+          VITE_BASE: /branch/
+
+      - name: Persist /branch/ build to orphan branch
+        if: steps.dispatch.outputs.has_dispatch == 'true'
+        run: |
+          mv dist dist-branch
+          STAGE=$(mktemp -d)
+          cp -R dist-branch/. "$STAGE/"
+          # Drop CNAME from the per-slot copy; only the root artifact
+          # may carry it. (Vite copies public/CNAME into every build.)
+          rm -f "$STAGE/CNAME"
+          # Build an orphan tree containing just the build output and
+          # force-push it to BRANCH_DEPLOY_REF. Force-push is safe: the
+          # branch is auto-managed and only ever written by this step.
+          # The identity must be configured INSIDE the staging repo —
+          # `git init` below creates a fresh repo with no inherited
+          # config, so a workspace-level `git config` would not reach
+          # the commit here ("empty ident name" otherwise).
+          cd "$STAGE"
+          git init -q -b "$BRANCH_DEPLOY_REF"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "branch deploy: ${{ steps.dispatch.outputs.ref }} (${{ github.run_id }})"
+          REMOTE_URL=$(git -C "$GITHUB_WORKSPACE" remote get-url origin)
+          AUTH_URL=$(printf '%s' "$REMOTE_URL" \
+            | sed "s|https://|https://x-access-token:${{ github.token }}@|")
+          git remote add origin "$AUTH_URL"
+          git push -f origin "HEAD:$BRANCH_DEPLOY_REF"
+          cd "$GITHUB_WORKSPACE"
+
+      - name: Return to triggering ref after dispatch build
+        if: steps.dispatch.outputs.has_dispatch == 'true'
+        run: |
+          git checkout ${{ github.sha }}
+          mv dist-preview dist
+
+      # ---- Rehydrate /branch/ from orphan branch (every run) ----
+      # The orphan branch outlives any single dispatch, so regular
+      # deploys pick up the previously-parked build and carry it
+      # forward into the new Pages artifact untouched.
+      - name: Rehydrate /branch/ from orphan branch
+        id: rehydrate
+        run: |
+          if git ls-remote --exit-code --heads origin "$BRANCH_DEPLOY_REF" >/dev/null 2>&1; then
+            git fetch origin "$BRANCH_DEPLOY_REF"
+            mkdir -p dist-branch
+            git --work-tree=dist-branch checkout "origin/$BRANCH_DEPLOY_REF" -- .
+            # The branch's tree is rooted at the build output, no
+            # nested directory. CNAME was stripped on push, so nothing
+            # to clean up here.
+            echo "has_branch_dist=true" >> "$GITHUB_OUTPUT"
+            echo "Rehydrated /branch/ from $BRANCH_DEPLOY_REF."
+          else
+            echo "has_branch_dist=false" >> "$GITHUB_OUTPUT"
+            echo "$BRANCH_DEPLOY_REF branch does not exist yet — skipping /branch/ slot."
+          fi
+
+      # ---- Merge ----
+      - name: Merge builds
+        run: |
+          if [ -d dist-prod ]; then
+            mv dist dist-preview
+            mv dist-prod dist
+            mkdir -p dist/preview
+            # Only one CNAME may exist in the artifact (Pages picks the
+            # root). Drop the per-slot copies before merging in.
+            rm -f dist-preview/CNAME
+            cp -R dist-preview/. dist/preview/
+            echo "Merged: / = ${{ steps.tag.outputs.ref }}, /preview/ = ${{ github.sha }}"
+          else
+            echo "No release yet — serving main at / (no /preview/ slot)."
+          fi
+          if [ "${{ steps.rehydrate.outputs.has_branch_dist }}" = "true" ]; then
+            mkdir -p dist/branch
+            cp -R dist-branch/. dist/branch/
+            echo "Merged: /branch/ from $BRANCH_DEPLOY_REF"
+          fi
+
+      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
@@ -41,6 +244,9 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
