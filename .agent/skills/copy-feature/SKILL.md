@@ -258,6 +258,20 @@ reuse them rather than re-porting:
   English strings, uses a plain `<input>`, and arms delete with a two-tap
   "Confirm" button rather than a `ConfirmDialog`. Appearance applies live (no
   draft/Save), matching the theme engine.
+- **Cloud sync status** — `src/ui/SyncStatus.tsx` (the morphing cloud glyph
+  button) and `src/ui/SyncDetailsModal.tsx` (the info dialog), the two
+  presentational pieces of checklist's header sync affordance, plus the cloud
+  glyph family in `src/ui/icons.tsx` (`Cloud*`/`Spinner`/`Refresh`/
+  `ExternalLink`). They read `SaveStatus` from `app/use-notes-sync.ts`. Unlike
+  checklist these are **not** wired through the modal-bus / a `*-context`:
+  `src/ui/SyncIndicator.tsx` is a thin notes-only orchestrator that owns the
+  modal's open state and derives `providerName` (`adapter.label`) and the
+  reconnect gesture from `useStorageBackend`, mirroring how `ConflictModal`
+  takes `sync` as a prop in `App` rather than going through the bus. Tones
+  collapse to notes' 4-hue palette (no `success`/`pipe`/`flag`): accent =
+  synced, link = unsaved/offline, danger = error/auth/conflict, muted = busy.
+  English strings inlined (no i18n); a "Reload from backend" action is kept
+  from notes' prior indicator. The browser backend renders nothing.
 
 ### Privacy / clean-URL routing
 
