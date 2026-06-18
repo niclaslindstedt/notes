@@ -1,15 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { BUILD_LABEL } from "../build-env.ts";
 import { isBlank, noteTitle, notePreview, type Note } from "../domain/note.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
-import {
-  FAMILY_DEFAULT_THEME,
-  FAMILY_LABELS,
-  themeFamily,
-  type ThemePreset,
-} from "../theme/themes.ts";
-import { setTheme, useApplyAppearance } from "../theme/useTheme.ts";
+import { useApplyAppearance } from "../theme/useTheme.ts";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import { NavContext } from "../ui/nav-context.ts";
@@ -30,21 +23,8 @@ import { useSettingsSync } from "./use-settings-sync.ts";
 // `ModalBusProvider` lets any button open the settings dialog without
 // threading openers through the tree.
 
-// The header button is a quick three-way toggle over the broad families;
-// the full preset / variant / custom picker lives in Settings → Appearance.
-// Cycling jumps to each family's default preset, so it stays well-defined
-// even when the active theme is a variant (e.g. Dracula) or Custom.
-const QUICK_CYCLE = ["dark", "light", "system"] as const;
-
-function nextQuickTheme(theme: ThemePreset): ThemePreset {
-  const family = themeFamily(theme);
-  const idx = QUICK_CYCLE.indexOf(family as (typeof QUICK_CYCLE)[number]);
-  const next = QUICK_CYCLE[(idx + 1) % QUICK_CYCLE.length] ?? "dark";
-  return FAMILY_DEFAULT_THEME[next];
-}
-
 export function App() {
-  const { theme } = useApplyAppearance();
+  useApplyAppearance();
   // The active storage backend (this device / a local folder / a cloud) and
   // its sync engine. Appearance settings reconcile against the same backend
   // so they travel with a synced folder too.
@@ -110,7 +90,6 @@ export function App() {
             ) : (
               <NoteList
                 notes={notes}
-                theme={theme}
                 onOpen={(id) => switchTo(id)}
                 onNew={openNew}
                 syncSlot={syncSlot}
@@ -129,13 +108,11 @@ export function App() {
 
 function NoteList({
   notes,
-  theme,
   onOpen,
   onNew,
   syncSlot,
 }: {
   notes: Note[];
-  theme: ThemePreset;
   onOpen: (id: string) => void;
   onNew: () => void;
   syncSlot: ReactNode;
@@ -144,17 +121,7 @@ function NoteList({
     <div className="flex h-full flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
         <h1 className="text-lg font-bold text-fg-bright">Notes</h1>
-        <div className="flex items-center gap-2">
-          {syncSlot}
-          <button
-            type="button"
-            onClick={() => setTheme(nextQuickTheme(theme))}
-            className="rounded-[var(--radius)] border border-line px-2 py-1 text-xs text-muted hover:text-fg"
-            title="Switch theme"
-          >
-            {FAMILY_LABELS[themeFamily(theme)]}
-          </button>
-        </div>
+        <div className="flex items-center gap-2">{syncSlot}</div>
       </header>
 
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
@@ -173,10 +140,6 @@ function NoteList({
           </ul>
         )}
       </div>
-
-      <footer className="px-4 pb-2 text-center text-[10px] text-muted/70">
-        {BUILD_LABEL}
-      </footer>
 
       <button
         type="button"
