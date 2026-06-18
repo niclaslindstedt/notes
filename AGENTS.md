@@ -205,6 +205,16 @@ The source tree under `src/` is organized by concern, not by file type:
 - `src/styles/` — the CSS-variable token system (`theme.css`).
 - `src/pwa/` — service-worker registration and update lifecycle
   (`usePwaUpdate.ts`), standalone/install detection (`standalone.ts`).
+- `src/achievements/` — the achievements feature: a `catalog.ts` of
+  unlockable trophies (each one a feature of the app), a pure `derive.ts`
+  over an `AchState` (`{ snapshot, appearance }`) transition, an in-memory
+  `bus.ts` for the manual unlocks fired from outside that state
+  (folder/cloud connect, encryption, namespace create, install, undo,
+  reload, conflict resolve), and the `useAchievementWatcher` mounted once in
+  `App`. The unlock map lives in the synced appearance store
+  (`theme/useTheme.ts`), so earned trophies travel with cloud sync; the UI
+  is in `src/ui/achievements/` (the header `TrophyButton`, the four-tier
+  tour modal, and the unlock-notification modal).
 - `src/ui/` — presentational components (e.g. `UpdateToast.tsx`). Two of
   these are **standalone public pages** mounted by a path switch in
   `main.tsx` rather than rendered inside the app shell: `PrivacyPage.tsx`
@@ -226,6 +236,7 @@ the DOM. This keeps `domain/` portable to the planned React Native app.
 | Top-level state / a new view             | `src/app/`                         |
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |
 | PWA / service-worker behaviour           | `src/pwa/`                         |
+| A new achievement / its unlock trigger   | `src/achievements/catalog.ts`      |
 
 ### The public pages
 

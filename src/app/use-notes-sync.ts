@@ -14,6 +14,7 @@ import {
   type MutableRefObject,
 } from "react";
 
+import { unlock } from "../achievements/index.ts";
 import { type Snapshot } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 import {
@@ -390,6 +391,8 @@ export function useNotesSync(deps: {
     (keep: "local" | "remote") => {
       setConflict((current) => {
         if (!current) return null;
+        // Settling a real divergence either way is the "Peacemaker" trophy.
+        unlock("peacemaker");
         if (keep === "local") {
           // Overwrite the remote: re-save this device's bytes basing the
           // write on the remote revision so the backend accepts it.

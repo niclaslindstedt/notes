@@ -9,6 +9,7 @@
 
 import { useCallback, useMemo, useRef } from "react";
 
+import { unlock } from "../achievements/index.ts";
 import {
   createNote,
   editNote,
@@ -134,6 +135,7 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
 
   const undo = useCallback(() => {
     undoTimeline();
+    unlock("secondThoughts");
   }, [undoTimeline]);
 
   const redo = useCallback(() => {

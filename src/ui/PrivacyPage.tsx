@@ -71,8 +71,9 @@ export function PrivacyPage() {
               with each one&apos;s label, icon, and colour.
             </li>
             <li>
-              Per-device preferences — your chosen theme and appearance, and
-              where the floating menu button rests.
+              Per-device preferences — your chosen theme and appearance, where
+              the floating menu button rests, and which in-app achievements you
+              have unlocked.
             </li>
             <li>
               If you turn on an optional sync backend, the small amount of

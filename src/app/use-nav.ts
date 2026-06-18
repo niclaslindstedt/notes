@@ -9,6 +9,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import { unlock } from "../achievements/index.ts";
 import { useStandaloneMobile } from "../pwa/standalone.ts";
 import { useMediaQuery } from "../ui/hooks/useMediaQuery.ts";
 import type { NavContextValue } from "../ui/nav-context.ts";
@@ -75,6 +76,8 @@ export function useNavState(): NavContextValue {
   }, []);
   const setShowMenuButton = useCallback((next: boolean) => {
     setShowMenuButtonState(next);
+    // Hiding the floating button (the edge-swipe-only layout) is "Minimalist".
+    if (!next) unlock("minimalist");
     if (typeof localStorage !== "undefined") {
       try {
         localStorage.setItem(SHOW_BUTTON_KEY, String(next));
