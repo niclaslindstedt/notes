@@ -5,8 +5,7 @@ import type { Workbox } from "workbox-window";
 // `UpdateToast` ("a new build is ready — reload to apply"). Registration
 // and progress tracking live in a module singleton here so multiple
 // surfaces can subscribe; the first subscriber starts it and
-// `useSyncExternalStore` fans the state out. Ported from checklist and
-// pared to a single deploy slot (cacheId `notes`).
+// `useSyncExternalStore` fans the state out. Ported from checklist.
 //
 // We register the service worker ourselves via `workbox-window` rather
 // than vite-plugin-pwa's `useRegisterSW` virtual module, because the hook's
@@ -34,7 +33,14 @@ export type PwaUpdateState = {
 
 const HOUR_MS = 60 * 60 * 1000;
 const POLL_MS = 200;
-const CACHE_ID = "notes";
+
+// Slot-specific Workbox precache cache id. Must stay in sync with the
+// `CACHE_ID` derived from `VITE_BASE` in `vite.config.ts`.
+function cacheIdForBase(base: string): string {
+  if (base === "/preview/") return "notes-preview";
+  if (base === "/branch/") return "notes-branch";
+  return "notes";
+}
 
 let state: PwaUpdateState = {
   progress: null,
@@ -151,6 +157,7 @@ function trackInstall(installing: ServiceWorker | null, base: string) {
   if (!installing) return;
   let stopped = false;
   let timer: number | undefined;
+  const cacheId = cacheIdForBase(base);
 
   const stop = () => {
     stopped = true;
@@ -161,7 +168,7 @@ function trackInstall(installing: ServiceWorker | null, base: string) {
     if (stopped) return;
     const manifest = await fetchPrecacheManifest(base);
     if (manifest && manifest.totalBytes > 0) {
-      const bytes = await cachedBytes(CACHE_ID, manifest);
+      const bytes = await cachedBytes(cacheId, manifest);
       const pct = Math.min(99, Math.round((bytes / manifest.totalBytes) * 100));
       const prev = state.progress ?? 0;
       setState({ progress: Math.max(prev, pct) });

@@ -6,8 +6,9 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig, type Plugin } from "vitest/config";
 
-// The GitHub Pages base path is injected by the deploy workflow via
-// VITE_BASE so the same bundle works at `/`, `/notes/`, or any subpath.
+// The GitHub Pages base path is injected by the `pages.yml` workflow via
+// VITE_BASE so the same bundle works at `/`, `/preview/`, or `/branch/`.
+// Production serves at `/` under the custom domain (see `public/CNAME`).
 const base = process.env.VITE_BASE ?? "/";
 
 const pkg = JSON.parse(
@@ -16,21 +17,67 @@ const pkg = JSON.parse(
 
 // Short build identifier surfaced next to the header wordmark and in the
 // update prompt so you can tell at a glance which build is running. Shape:
-// `<pkg.version>[.<run>][+<commit>]` — `<run>` is the GitHub Actions run
-// number (omitted locally), `<commit>` the short SHA as build metadata.
+// `<pkg.version>[.<run>][-<slot>][+<commit>]`:
+//
+//   - `<run>`    — the GitHub Actions run number (omitted locally).
+//   - `<slot>`   — `pre` for the `/preview/` slot, `br` for `/branch/`,
+//                  omitted for the production `/` slot.
+//   - `<commit>` — the short `GITHUB_SHA` as build metadata after the `+`.
 const GITHUB_RUN_NUMBER = process.env.GITHUB_RUN_NUMBER;
 const COMMIT_HASH = (process.env.GITHUB_SHA ?? "").slice(0, 7);
+const BUILD_SLOT =
+  base === "/preview/" ? "pre" : base === "/branch/" ? "br" : "";
 const BUILD_LABEL =
   pkg.version +
   (GITHUB_RUN_NUMBER ? `.${GITHUB_RUN_NUMBER}` : "") +
+  (BUILD_SLOT ? `-${BUILD_SLOT}` : "") +
   (COMMIT_HASH ? `+${COMMIT_HASH}` : "");
 
-// Workbox precache cache id. A stable, app-specific id keeps this app's
-// precache cache (`<cacheId>-precache-v2-<scope>`) distinct on a shared
-// Pages origin; the download-progress tracker in `usePwaUpdate` opens this
-// cache by name to measure install progress. Must stay in sync with
-// `CACHE_ID` in `src/pwa/usePwaUpdate.ts`.
-const CACHE_ID = "notes";
+// Per-slot Workbox precache cache id. The three Pages slots share one
+// origin, so a slot-specific id keeps each deploy's precache cache
+// (`<cacheId>-precache-v2-<scope>`) distinct — the download-progress
+// tracker in `usePwaUpdate` opens this slot's cache by name to measure
+// install progress without counting another slot's bytes. Must stay in
+// sync with `cacheIdForBase` in `src/pwa/usePwaUpdate.ts`.
+const CACHE_ID =
+  base === "/preview/"
+    ? "notes-preview"
+    : base === "/branch/"
+      ? "notes-branch"
+      : "notes";
+
+// Per-slot PWA display name so the preview and branch slots install as
+// visibly separate apps on the home screen rather than three identically
+// named "Notes" tiles. The W3C identity (`id`/`scope`/`start_url`) is
+// already per-slot below; this just labels the tile to match.
+const PWA_NAME =
+  base === "/preview/"
+    ? "Notes (preview)"
+    : base === "/branch/"
+      ? "Notes (branch)"
+      : "Notes";
+const PWA_SHORT_NAME =
+  base === "/preview/"
+    ? "Notes pre"
+    : base === "/branch/"
+      ? "Notes br"
+      : "Notes";
+
+// Keep each slot's service worker inside its own base path. The default
+// `navigateFallback` (index.html for any in-scope navigation) means the
+// production SW, scoped to `/`, would otherwise claim `/preview/` and
+// `/branch/` navigations and serve the production app shell at those
+// URLs — so a PWA installed from `/preview/` silently runs production.
+// The slot patterns also match the slash-less `/preview` / `/branch`
+// spellings: GitHub Pages 301-redirects those to the trailing-slash URL,
+// but the SW intercepts the navigation before the network. Workbox tests
+// these against `url.pathname + url.search`, hence the `\?` alternative.
+// A non-root build denies everything outside its own base.
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const NAVIGATE_FALLBACK_DENYLIST =
+  base === "/"
+    ? [/^\/preview(?:\/|\?|$)/, /^\/branch(?:\/|\?|$)/]
+    : [new RegExp(`^/(?!${escapeRegex(base.slice(1))})`)];
 
 // Emit `dist/version.json` so the still-active old service worker can tell
 // the client which version is incoming when a new build deploys (read
@@ -119,8 +166,8 @@ export default defineConfig({
         id: base,
         scope: base,
         start_url: base,
-        name: "Notes",
-        short_name: "Notes",
+        name: PWA_NAME,
+        short_name: PWA_SHORT_NAME,
         description:
           "A local-first PWA for taking notes that works great on mobile and desktop.",
         theme_color: "#1f2933",
@@ -152,11 +199,14 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         // Serve the precached app shell for any in-scope navigation so the
         // app opens offline / on a deep link. The data JSON files are read
-        // cache-bypassed by `usePwaUpdate`, so keep them off the fallback.
+        // cache-bypassed by `usePwaUpdate`, so keep them off the fallback;
+        // the slot patterns keep this slot's SW from claiming another
+        // slot's navigations (see NAVIGATE_FALLBACK_DENYLIST above).
         navigateFallback: `${base}index.html`,
         navigateFallbackDenylist: [
           /version\.json$/,
           /precache-manifest\.json$/,
+          ...NAVIGATE_FALLBACK_DENYLIST,
         ],
       },
     }),

@@ -40,9 +40,6 @@ this list and keep it in sync.
 
 **Deferred — intended, but not built yet (do these as the project matures):**
 
-- **§10.3 Release pipeline** — no `.github/workflows/version-bump.yml` or
-  `release.yml`, and no `scripts/` release tooling. The app isn't published to
-  a registry yet; CHANGELOG is currently hand-maintained (see §8.4 below).
 - **§11.2 / §11.3 Website + SEO** — there is no marketing `website/`, and the
   SEO scaffolding (Open Graph / Twitter Card / JSON-LD, `sitemap.xml`,
   `robots.txt`, `llms.txt`, the `check-seo` and `lighthouse` workflows /
@@ -94,6 +91,92 @@ make icons       # regenerate PWA icons from public/favicon.svg
 - PRs are squash-merged; the **PR title** becomes the single commit on `main`,
   so it must follow conventional-commit format.
 - Breaking changes use `<type>!:` or a `BREAKING CHANGE:` footer.
+- A PR with a **user-visible** change ships a changeset fragment under
+  `.changes/unreleased/` (see "Releases and changelog"). The `changeset` CI
+  job enforces this; opt out with the `no-changelog` label.
+
+## Releases and changelog
+
+### Deployment slots
+
+The app is hosted on GitHub Pages under the custom domain
+**notes.niclaslindstedt.se** (set by `public/CNAME`, which Vite copies into
+every build; the Pages workflow keeps a single CNAME in the root of the
+artifact). `.github/workflows/pages.yml` assembles up to three slots into one
+Pages artifact:
+
+- `/` — the latest released `v*` tag. Before the first release exists, `main`
+  is served here instead (no `/preview/` slot yet).
+- `/preview/` — the current `main`. Every push to `main` rebuilds it.
+- `/branch/` — an opt-in, stable slot for a feature branch. A maintainer
+  dispatches `pages.yml` (`workflow_dispatch`) with a `branch_ref`; the build
+  is force-pushed to the auto-managed `branch-deploy` orphan branch and
+  rehydrated into every subsequent deploy until the next dispatch overwrites
+  it. Delete `branch-deploy` to clear the slot.
+
+The base path each slot is built with comes from `VITE_BASE` (`/`,
+`/preview/`, or `/branch/`), read by `vite.config.ts`, which keys the
+per-slot Workbox `cacheId`, PWA name, and navigation-fallback denylist off it
+so the slots don't clobber one another's service worker on the shared origin.
+
+> **Storage caveat.** All three slots share one origin, and `localStorage` is
+> per-origin (not per-path), so `/preview/` and `/branch/` read and write the
+> **same** notes as production. Namespace the storage keys by base path before
+> using the preview/branch slots for destructive testing.
+
+### Cutting a release
+
+Releases are manual: dispatch `.github/workflows/release.yml`
+(`workflow_dispatch` only) with a `bump`:
+
+- `patch` — bug fixes, no visible behaviour change beyond the fix.
+- `minor` — new user-facing feature or visible behaviour change. Default.
+- `major` — breaking change to the persisted-note shape an older build can't
+  read, or a deliberate UX overhaul.
+
+The workflow collates `.changes/unreleased/` into a dated `CHANGELOG.md`
+section, bumps `package.json`, tags `vX.Y.Z`, creates a GitHub Release from
+that section, and chains into `pages.yml` so the tag is served at `/`
+immediately. Preview locally with `make changelog VERSION=X.Y.Z` (consumes
+the fragments — run on a scratch branch).
+
+### Changeset fragments
+
+When a PR introduces a **user-visible** change, drop a small markdown file in
+`.changes/unreleased/<unix-ts>-<slug>.md`:
+
+```
+---
+type: Added
+title: Short title
+doc: some-feature   # optional
+---
+
+One sentence users will read in the changelog.
+```
+
+`type:` is one of `Added | Changed | Fixed | Removed | Security |
+Deprecated` (Keep a Changelog). `title:` (optional) is a short noun phrase
+bolded at the head of the bullet; the body is a **one-sentence** summary. The
+collator (`scripts/release/collate-changelog.mjs`) renders the bullet as
+`- **<title>** — <summary>` and validates the front-matter at release time —
+an unknown `type:`, a malformed line, or an empty body fails the run loudly.
+The timestamp filename prefix keeps the lexical sort deterministic so
+collation roughly mirrors commit order.
+
+`doc:` (optional, big features only) is the slug of a **feature doc** at
+`docs/features/<slug>.md` — a long-form `# Title` + explanation of one
+feature. The collator appends `[Learn more](feature:<slug>)` to the bullet;
+the `feature:` scheme is the link an in-app "What's new" changelog modal
+(ported from checklist later) will resolve inline. Until that modal exists
+the link is inert, so reach for `doc:` sparingly, and when you do add one,
+create `docs/features/<slug>.md` in the same PR.
+
+The `changeset` job in `ci.yml` enforces a fragment per PR. Pure refactors,
+CI/build/test tweaks, dependency bumps, and docs-only edits pass via the
+skip-list in `scripts/release/check-changeset.mjs` — extend it when adding
+new "obviously not user-visible" path patterns. Opt a genuinely invisible
+change out by labelling the PR `no-changelog`.
 
 ## Architecture summary
 
@@ -153,7 +236,8 @@ pasting it verbatim.
 | Build/test commands               | `README.md`, `CONTRIBUTING.md`, here  |
 | The `src/` layout or boundaries   | This file's Architecture summary      |
 | The `copy-feature` skill behaviour| `.agent/skills/copy-feature/SKILL.md` |
-| A user-visible feature            | `CHANGELOG.md` (Unreleased)           |
+| A user-visible feature            | a fragment in `.changes/unreleased/`  |
+| Release / deploy / changelog flow | this file's "Releases and changelog"  |
 
 ## Maintenance skills
 

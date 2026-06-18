@@ -1,0 +1,158 @@
+name: Release
+
+# Manual-only. The maintainer dispatches this with a chosen semver
+# bump; the workflow consumes .changes/unreleased/ into a new
+# CHANGELOG section, bumps package.json, tags vX.Y.Z, pushes, creates
+# a GitHub Release, then chains into pages.yml so the new tag is
+# served at `/` (and the same code at `/preview/` because main now
+# matches the tag) without waiting for the next push.
+#
+# `commit` is normally empty — the release is cut from main HEAD and
+# the release commit is fast-forwarded onto main. Set it to a sha or
+# ref to cut a release from an earlier commit when main has since
+# advanced with changes not meant for this release: the workflow then
+# builds the version-bump + changelog commit on top of that commit,
+# tags it, and pushes ONLY the tag (main is left untouched, because
+# the release commit is not a fast-forward of HEAD). Reconciling main
+# afterwards — bumping its version and consuming the same fragments —
+# is the maintainer's job.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semver bump"
+        required: true
+        type: choice
+        default: minor
+        options:
+          - patch
+          - minor
+          - major
+      commit:
+        description: "Optional commit sha or ref to release from. Defaults to main HEAD. Use to cut a release from an earlier commit when main has advanced past it."
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - name: Verify clean working tree
+        run: |
+          if ! git diff --quiet || ! git diff --quiet --cached; then
+            echo "::error::working tree is not clean — refusing to release"
+            git status
+            exit 1
+          fi
+
+      # When `commit` is set, detach onto that commit so the bump,
+      # changelog collation, and build below all run against its tree
+      # rather than main HEAD. Reinstall deps so the build matches the
+      # commit's lockfile.
+      - name: Check out target commit
+        if: inputs.commit != ''
+        run: |
+          git checkout --detach "${{ inputs.commit }}"
+          git --no-pager log -1 --oneline
+
+      - name: Reinstall deps for target commit
+        if: inputs.commit != ''
+        run: npm ci
+
+      - name: Bump version
+        id: bump
+        run: |
+          # Compute the next version from the highest released tag, not
+          # from package.json. A release cut from an explicit `commit`
+          # pushes ONLY the tag and leaves main's package.json untouched
+          # (see the "Commit + tag" step below), so trusting package.json
+          # here would bump from a stale base — e.g. a later `minor` after
+          # a tag-only v1.0.0 would regress to 0.x instead of 1.1.0.
+          # Reconciling package.json to the latest tag first makes the
+          # version monotonic with what was actually released.
+          LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+          if [ -n "$LATEST_TAG" ]; then
+            npm version "${LATEST_TAG#v}" --no-git-tag-version --allow-same-version >/dev/null
+          fi
+          NEW=$(npm version ${{ inputs.bump }} --no-git-tag-version)
+          echo "version=${NEW#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=$NEW" >> "$GITHUB_OUTPUT"
+          echo "Bumped from ${LATEST_TAG:-package.json} to $NEW"
+
+      - name: Collate changelog
+        run: node scripts/release/collate-changelog.mjs "${{ steps.bump.outputs.version }}"
+
+      - name: Extract release-notes body
+        run: node scripts/release/extract-section.mjs "${{ steps.bump.outputs.version }}" > .release-notes.md
+
+      - name: Sanity build
+        run: npm run build
+        env:
+          VITE_BASE: /
+
+      - name: Commit + tag
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          FROM_COMMIT: ${{ inputs.commit }}
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json CHANGELOG.md .changes/unreleased
+          git commit -m "chore(release): v${VERSION}"
+          git tag -a "$TAG" -m "Release ${TAG}"
+          if [ -z "$FROM_COMMIT" ]; then
+            git push origin HEAD:main
+          else
+            echo "Releasing from ${FROM_COMMIT} — pushing the tag only, leaving main untouched."
+          fi
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.bump.outputs.tag }}" \
+            --title "${{ steps.bump.outputs.tag }}" \
+            --notes-file .release-notes.md
+
+  deploy:
+    # Chain straight into pages.yml so the new tag is served at `/`
+    # immediately — without this, deployment would wait for the next
+    # push to main.
+    needs: release
+    uses: ./.github/workflows/pages.yml
+    with:
+      release_ref: ${{ needs.release.outputs.tag }}
+    permissions:
+      # pages.yml declares `contents: write` at the top level because its
+      # build job force-pushes the /branch/ slot to the `branch-deploy`
+      # orphan branch. A reusable workflow can't be granted fewer
+      # permissions than it requests, so granting only `contents: read`
+      # here fails the whole Release run at startup before any job runs.
+      contents: write
+      pages: write
+      id-token: write
+    secrets: inherit

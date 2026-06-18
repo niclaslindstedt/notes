@@ -8,11 +8,20 @@ generated assets.
 
 | Variable           | Default | Purpose                                                                                 |
 | ------------------ | ------- | --------------------------------------------------------------------------------------- |
-| `VITE_BASE`        | `/`     | The base path the app is served from. The deploy workflow sets this so the same bundle works at `/` or `/notes/`. |
+| `VITE_BASE`        | `/`     | The base path the app is served from. `pages.yml` sets this per deploy slot — `/` (production), `/preview/`, or `/branch/` — so one bundle serves any of them. |
 | `GITHUB_RUN_NUMBER`| —       | Set by GitHub Actions; appended to the build label so you can tell which build is live. |
 | `GITHUB_SHA`       | —       | Set by GitHub Actions; its short form is appended to the build label as `+<commit>`.    |
 
 None are required for local development.
+
+## Deployment
+
+The production app is served from the custom domain
+**notes.niclaslindstedt.se** (set by `public/CNAME`, which Vite copies into
+every build). `.github/workflows/pages.yml` builds up to three slots into one
+GitHub Pages artifact — `/` (latest release), `/preview/` (current `main`),
+and an optional `/branch/` — and `.github/workflows/release.yml` cuts a
+versioned release. See `AGENTS.md` → "Releases and changelog".
 
 ## PWA manifest
 
