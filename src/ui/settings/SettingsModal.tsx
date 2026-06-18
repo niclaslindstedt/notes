@@ -8,10 +8,12 @@ import {
   DatabaseIcon,
   MenuIcon,
   PaletteIcon,
+  PencilIcon,
   SlidersIcon,
 } from "../icons.tsx";
 import { Modal } from "../Modal.tsx";
 import { AppearanceSection } from "./AppearanceSection.tsx";
+import { EditorSection } from "./EditorSection.tsx";
 import { GeneralSection } from "./GeneralSection.tsx";
 import { StorageSection } from "./StorageSection.tsx";
 
@@ -22,7 +24,7 @@ import { StorageSection } from "./StorageSection.tsx";
 // Save step: every control here applies live through its own store, so the
 // dialog is just a chooser with a Close button and no footer.
 
-type TabId = "general" | "appearance" | "storage";
+type TabId = "general" | "appearance" | "editor" | "storage";
 
 type IconComponent = ComponentType<{ className?: string }>;
 
@@ -31,6 +33,7 @@ type TabDef = { id: TabId; label: string; Icon: IconComponent };
 const TABS: readonly TabDef[] = [
   { id: "general", label: "General", Icon: SlidersIcon },
   { id: "appearance", label: "Appearance", Icon: PaletteIcon },
+  { id: "editor", label: "Editor", Icon: PencilIcon },
   { id: "storage", label: "Storage", Icon: DatabaseIcon },
 ];
 
@@ -74,6 +77,12 @@ export function SettingsModal({ open, onClose, storage }: Props) {
             {activeTab === "general" && <GeneralSection />}
             {activeTab === "appearance" && (
               <AppearanceSection
+                appearance={appearance}
+                onUpdate={updateAppearance}
+              />
+            )}
+            {activeTab === "editor" && (
+              <EditorSection
                 appearance={appearance}
                 onUpdate={updateAppearance}
               />

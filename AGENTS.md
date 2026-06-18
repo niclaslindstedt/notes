@@ -184,8 +184,10 @@ The source tree under `src/` is organized by concern, not by file type:
 
 - `src/app/` — the root component (`App.tsx`), the entry point
   (`main.tsx`), and top-level state hooks (`use-notes.ts`).
-- `src/domain/` — pure functions over the note model (`note.ts`). No DOM,
-  no I/O, trivially testable. The boundary is enforced by eslint.
+- `src/domain/` — pure functions over the note model (`note.ts`) and a
+  dependency-free Markdown parser (`markdown.ts`) the live-preview editor
+  renders from. No DOM, no I/O, trivially testable. The boundary is enforced
+  by eslint.
 - `src/storage/` — persistence, built on a `StorageAdapter` byte contract
   (`adapter.ts`). The serialize/migrate pipeline (`serialize.ts`,
   `migrations.ts`) runs on every load/save so backends only move bytes.
