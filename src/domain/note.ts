@@ -66,3 +66,18 @@ export function isBlank(note: Note): boolean {
 export function sortByUpdated(notes: readonly Note[]): Note[] {
   return [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
 }
+
+// The whole persisted document the storage layer moves in and out of a
+// backend: just the list of notes. Kept version-free here on purpose —
+// versioning is a property of the bytes at rest, so it lives in
+// `storage/migrations.ts` / `storage/serialize.ts`, and `domain/` only ever
+// sees this shape. A `Snapshot` is the unit a backend stores; the markdown
+// codec splits it into one file per note, and the JSON codec writes it whole.
+export type Snapshot = {
+  notes: Note[];
+};
+
+/** An empty document — the fallback for a first run or an unreadable blob. */
+export function emptySnapshot(): Snapshot {
+  return { notes: [] };
+}

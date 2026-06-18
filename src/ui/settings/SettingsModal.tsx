@@ -1,20 +1,23 @@
+import type { UseStorageBackend } from "../../storage/useStorageBackend.ts";
 import { updateAppearance, useAppearance } from "../../theme/useTheme.ts";
 import { CloseIcon, CogIcon } from "../icons.tsx";
 import { Modal } from "../Modal.tsx";
 import { AppearanceSection } from "./AppearanceSection.tsx";
+import { StorageSection } from "./StorageSection.tsx";
 
 // Settings dialog. The header chrome and modal shell match checklist so its
 // full tabbed dialog (a left rail of icon-marked tabs) can grow in here as
-// more subsystems land; for now the body is the single Appearance surface
-// ported from checklist's Appearance tab. Edits apply live through the
-// appearance store, so there's no draft / Save step yet.
+// more subsystems land; for now the body stacks the Appearance and Storage
+// surfaces. Edits apply live through their stores, so there's no draft / Save
+// step yet.
 
 type Props = {
   open: boolean;
   onClose: () => void;
+  storage: UseStorageBackend;
 };
 
-export function SettingsModal({ open, onClose }: Props) {
+export function SettingsModal({ open, onClose, storage }: Props) {
   const appearance = useAppearance();
   return (
     <Modal open={open} onClose={onClose} labelledBy="settings-title">
@@ -41,11 +44,12 @@ export function SettingsModal({ open, onClose }: Props) {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        <div className="mx-auto w-full max-w-2xl">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
           <AppearanceSection
             appearance={appearance}
             onUpdate={updateAppearance}
           />
+          <StorageSection storage={storage} />
         </div>
       </div>
     </Modal>

@@ -186,8 +186,17 @@ The source tree under `src/` is organized by concern, not by file type:
   (`main.tsx`), and top-level state hooks (`use-notes.ts`).
 - `src/domain/` — pure functions over the note model (`note.ts`). No DOM,
   no I/O, trivially testable. The boundary is enforced by eslint.
-- `src/storage/` — persistence. `local.ts` (localStorage) is the only
-  backend today; it is the seam a synced backend grows behind.
+- `src/storage/` — persistence, built on a `StorageAdapter` byte contract
+  (`adapter.ts`). The serialize/migrate pipeline (`serialize.ts`,
+  `migrations.ts`) runs on every load/save so backends only move bytes.
+  Backends: `local/` (localStorage, default), `folder/` (a picked directory
+  of markdown files via the File System Access API), `dropbox/` and `gdrive/`
+  (each note a markdown file in the user's own cloud). `encrypting/` and
+  `cache/` are higher-order wrappers (AES-GCM at rest; offline mirror for the
+  cloud backends); `markdown/codec.ts` is the one-`.md`-file-per-note codec
+  the file backends share via `directory-adapter.ts`. `useStorageBackend.ts`
+  selects and wires the active backend; `settings-store.ts` carries the
+  appearance settings alongside the notes on the file/cloud backends.
 - `src/theme/` — the theme engine (`useTheme.ts`): projects the chosen
   preset onto `<html data-theme>`, which the CSS tokens key off.
 - `src/styles/` — the CSS-variable token system (`theme.css`).
@@ -204,7 +213,7 @@ the DOM. This keeps `domain/` portable to the planned React Native app.
 | Adding…                                  | Put it in…                         |
 | ---------------------------------------- | ---------------------------------- |
 | A pure transform over the note model     | `src/domain/note.ts`               |
-| A new persistence backend                | `src/storage/<backend>.ts`         |
+| A new persistence backend                | `src/storage/<backend>/index.ts`   |
 | A presentational component               | `src/ui/`                          |
 | Top-level state / a new view             | `src/app/`                         |
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |
