@@ -1,0 +1,174 @@
+---
+name: commit
+description: "Commit staged changes, push the branch, and create or update a PR with a conventional-commit-formatted title. Use after completing a feature or fix."
+---
+
+# Commit, Push & PR
+
+This skill handles the full workflow: verify quality gates → commit → push → create or update a PR.
+
+## Step 1: Quality Gates
+
+Run all checks before committing. All must pass:
+
+```sh
+make build     # must compile cleanly (also emits the service worker)
+make test      # vitest run — all tests must pass
+make lint      # eslint . && tsc --noEmit, zero warnings (this is the typecheck)
+make fmt-check # prettier --check
+```
+
+Stop if any check fails. Fix the issue, then re-run. `make lint` folds the
+typecheck in (`tsc --noEmit`), so there is no separate `make typecheck`.
+
+## Step 2: Create a Feature Branch
+
+**Always work on a feature branch — never commit directly to `main`.**
+
+Check the current branch:
+
+```sh
+git branch --show-current
+```
+
+If already on `main` (or any protected branch), create and switch to a feature branch before staging anything. Derive the branch name from the commit type and a short summary of the change (kebab-case, no special characters):
+
+```sh
+git checkout -b type/short-description
+# e.g.: feat/markdown-tables, fix/folder-backend-sync, refactor/storage-adapter
+```
+
+If already on a feature branch, continue with that branch — do not create another one.
+
+## Step 3: Review Changes
+
+```sh
+git status && git diff --staged && git diff
+```
+
+Understand what changed so you can write an accurate commit message and PR title.
+
+## Step 4: Stage & Commit
+
+Stage relevant files (prefer specific paths over `git add -A` to avoid accidentally including secrets or build artifacts):
+
+```sh
+git add <files...>
+```
+
+Write a conventional commit message:
+
+```
+type(scope): summary in imperative mood
+```
+
+**Changelog-eligible types** (pick the right one — it determines what appears in the changelog):
+
+| Type | Changelog section | Version bump |
+|------|-------------------|--------------|
+| `feat` | Added | minor |
+| `fix` | Fixed | patch |
+| `perf` | Performance | patch |
+| `docs` | Documentation | none |
+| `test` | Tests | none |
+| `refactor`, `chore`, `ci`, `build`, `style` | *(not included)* | none |
+
+For breaking changes use `feat!:` or `fix!:`, or add a `BREAKING CHANGE:` footer → triggers a major version bump. In this app a major is a breaking change to the persisted-note shape an older build can't read, or a deliberate UX overhaul.
+
+Scopes are lowercase, comma-separated if multiple: `feat(domain,storage): ...`
+
+```sh
+git commit -m "type(scope): summary"
+```
+
+## Step 5: Push
+
+```sh
+git push -u origin HEAD
+```
+
+## Step 6: Create or Update the PR
+
+**Check if a PR already exists for this branch:**
+
+```sh
+gh pr view --json number,title,url 2>/dev/null
+```
+
+(If `gh` is unavailable, the GitHub MCP tools are the fallback for reading and editing PRs.)
+
+### If no PR exists — create one:
+
+The PR title **must** follow conventional commit format — it becomes the squashed commit message on `main` and is what drives the changelog. Match it to the overall intent of the branch, not just the latest commit.
+
+```sh
+gh pr create \
+  --title "type(scope): summary" \
+  --body "$(cat <<'EOF'
+## Summary
+
+<brief description of the changes and motivation>
+
+## Test plan
+
+- [ ] `make build` passes
+- [ ] `make test` passes
+- [ ] `make lint` has zero warnings
+- [ ] `make fmt-check` applied
+
+## Checklist
+
+- [ ] Tests added/updated
+- [ ] Documentation updated (if user-facing behavior changed)
+- [ ] Changeset fragment added under `.changes/unreleased/` (or PR labelled `no-changelog`)
+- [ ] `/home` showcase + privacy page updated if data/scope/feature surface changed
+- [ ] Commit messages follow conventional commit style
+EOF
+)"
+```
+
+### If a PR already exists — update it:
+
+Re-evaluate the PR title and description to reflect the **combined** scope of all commits on the branch, then update:
+
+```sh
+gh pr edit \
+  --title "type(scope): updated summary" \
+  --body "$(cat <<'EOF'
+## Summary
+
+<updated description covering all changes>
+
+## Test plan
+
+- [ ] `make build` passes
+- [ ] `make test` passes
+- [ ] `make lint` has zero warnings
+- [ ] `make fmt-check` applied
+
+## Checklist
+
+- [ ] Tests added/updated
+- [ ] Documentation updated (if user-facing behavior changed)
+- [ ] Changeset fragment added under `.changes/unreleased/` (or PR labelled `no-changelog`)
+- [ ] `/home` showcase + privacy page updated if data/scope/feature surface changed
+- [ ] Commit messages follow conventional commit style
+EOF
+)"
+```
+
+## Key Reminders
+
+- **PR title = squashed commit on main = changelog entry.** Choose the type and summary carefully.
+- The individual commits within the branch don't appear in the changelog — only the PR title does.
+- A **user-visible** PR needs a changeset fragment under `.changes/unreleased/` (run the `write-changeset` skill), and may need `src/ui/HomePage.tsx` / `src/ui/PrivacyPage.tsx` updated if it changes what data the app reads/writes/sends or which OAuth scope it uses.
+- If the branch touches multiple scopes, use comma-separated scopes: `feat(domain,storage): ...`
+- Never skip hooks (`--no-verify`) — fix the underlying issue instead.
+
+## Skill self-improvement
+
+After a run, if you hit friction the steps above didn't cover — a quality
+gate that should be listed, a PR-body field the reviewers always want, a
+branch-naming convention that keeps coming up — fold the fix back into this
+`SKILL.md` in the same PR. Drift on the skill is the same kind of error the
+skill exists to prevent.
