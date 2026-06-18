@@ -3,15 +3,21 @@ import { useEffect, useRef, useState } from "react";
 import { BUILD_LABEL } from "../build-env.ts";
 import { isBlank, noteTitle, notePreview, type Note } from "../domain/note.ts";
 import { setTheme, useTheme, type ThemePreset } from "../theme/useTheme.ts";
+import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
+import { NavContext } from "../ui/nav-context.ts";
+import { SideMenu } from "../ui/SideMenu.tsx";
 import { UpdateToast } from "../ui/UpdateToast.tsx";
+import { SettingsModalHost } from "./modals/SettingsModalHost.tsx";
+import { useNavState } from "./use-nav.ts";
 import { useNotes } from "./use-notes.ts";
 
-// Root component. Two views — a list of notes and a full-screen editor —
-// switched on `editingId` rather than a router, keeping the shell a single
-// mounted tree (the simplest thing that reads well on a phone). The chrome
-// here is deliberately minimal; richer surfaces (side menu, settings
-// modal, sync status) are what the `copy-feature` skill brings over from
-// checklist.
+// Root component. The shell is a flex row — the side menu (a docked sidebar
+// on wide viewports, a drag-out drawer on phones) beside a main area that
+// shows either the list of notes or a full-screen editor, switched on
+// `editingId` rather than a router so the tree stays a single mounted
+// shell. `NavContext` carries the drawer state down to `SideMenu`;
+// `ModalBusProvider` lets any button open the settings dialog without
+// threading openers through the tree.
 
 const THEME_ORDER: Record<ThemePreset, ThemePreset> = {
   dark: "light",
@@ -29,38 +35,80 @@ export function App() {
   const theme = useTheme();
   const { notes, allNotes, create, update, remove } = useNotes();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const nav = useNavState();
 
   const editing = editingId
     ? (allNotes.find((n) => n.id === editingId) ?? null)
     : null;
 
+  // Switch what's open in the editor, dropping the note we're leaving if it
+  // was never typed into so abandoned "new note" taps don't pile up.
+  function switchTo(id: string | null) {
+    if (editing && isBlank(editing) && editing.id !== id) remove(editing.id);
+    setEditingId(id);
+  }
+
   function openNew() {
+    if (editing && isBlank(editing)) remove(editing.id);
     setEditingId(create());
   }
 
-  function closeEditor() {
-    // Drop a note left blank so abandoned "new note" taps don't pile up.
-    if (editing && isBlank(editing)) remove(editing.id);
-    setEditingId(null);
-  }
-
-  if (editing) {
-    return (
-      <Editor
-        key={editing.id}
-        note={editing}
-        onChange={(body) => update(editing.id, body)}
-        onClose={closeEditor}
-        onDelete={() => {
-          remove(editing.id);
-          setEditingId(null);
-        }}
-      />
-    );
+  function removeNote(id: string) {
+    remove(id);
+    if (id === editingId) setEditingId(null);
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-2xl flex-col">
+    <NavContext.Provider value={nav}>
+      <ModalBusProvider>
+        <div className="flex h-dvh overflow-hidden">
+          <SideMenu
+            notes={notes}
+            activeNoteId={editingId}
+            onSelectNote={(id) => switchTo(id)}
+            onAddNote={openNew}
+            onRemoveNote={removeNote}
+          />
+          <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+            {editing ? (
+              <Editor
+                key={editing.id}
+                note={editing}
+                onChange={(body) => update(editing.id, body)}
+                onClose={() => switchTo(null)}
+                onDelete={() => removeNote(editing.id)}
+              />
+            ) : (
+              <NoteList
+                notes={notes}
+                theme={theme}
+                onOpen={(id) => switchTo(id)}
+                onNew={openNew}
+              />
+            )}
+          </main>
+        </div>
+
+        <SettingsModalHost />
+        <UpdateToast />
+      </ModalBusProvider>
+    </NavContext.Provider>
+  );
+}
+
+function NoteList({
+  notes,
+  theme,
+  onOpen,
+  onNew,
+}: {
+  notes: Note[];
+  theme: ThemePreset;
+  onOpen: (id: string) => void;
+  onNew: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
         <h1 className="text-lg font-bold text-fg-bright">Notes</h1>
         <button
@@ -73,7 +121,7 @@ export function App() {
         </button>
       </header>
 
-      <main className="flex-1 px-4 py-3">
+      <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
         {notes.length === 0 ? (
           <p className="mt-16 text-center text-muted">
             No notes yet. Tap <span className="text-accent">+</span> to write
@@ -83,12 +131,12 @@ export function App() {
           <ul className="flex flex-col gap-2">
             {notes.map((note) => (
               <li key={note.id}>
-                <NoteCard note={note} onOpen={() => setEditingId(note.id)} />
+                <NoteCard note={note} onOpen={() => onOpen(note.id)} />
               </li>
             ))}
           </ul>
         )}
-      </main>
+      </div>
 
       <footer className="px-4 pb-2 text-center text-[10px] text-muted/70">
         {BUILD_LABEL}
@@ -96,14 +144,12 @@ export function App() {
 
       <button
         type="button"
-        onClick={openNew}
+        onClick={onNew}
         aria-label="New note"
         className="fixed bottom-0 right-0 z-20 m-[max(1rem,env(safe-area-inset-bottom))] flex h-14 w-14 items-center justify-center rounded-full bg-accent text-3xl font-light text-page-bg shadow-lg active:scale-95"
       >
         +
       </button>
-
-      <UpdateToast />
     </div>
   );
 }
@@ -149,7 +195,7 @@ function Editor({
   }, []);
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-2xl flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button
           type="button"
@@ -175,7 +221,7 @@ function Editor({
           onChange(e.target.value);
         }}
         placeholder="Start writing…"
-        className="flex-1 resize-none bg-page-bg px-4 py-4 text-fg outline-none placeholder:text-muted/60"
+        className="mx-auto w-full max-w-2xl flex-1 resize-none bg-page-bg px-4 py-4 text-fg outline-none placeholder:text-muted/60"
       />
     </div>
   );

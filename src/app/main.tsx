@@ -15,13 +15,20 @@ import "@fontsource/jetbrains-mono/latin-400.css";
 import "@fontsource/jetbrains-mono/latin-ext-400.css";
 import "@fontsource/jetbrains-mono/latin-700.css";
 import "@fontsource/jetbrains-mono/latin-ext-700.css";
+import { PrivacyPage } from "../ui/PrivacyPage.tsx";
 import { App } from "./App.tsx";
 
 const root = document.getElementById("app");
 if (!root) throw new Error("missing #app mount point");
 
+// Trivial path-based switch. The build emits `dist/privacy/index.html`
+// (see the `emit-privacy-alias` plugin in `vite.config.ts`) so GitHub
+// Pages serves the same SPA at `/privacy/`, and this check decides which
+// view to mount. Deploy slots nest the page one segment deeper
+// (`/preview/privacy/`); the suffix check matches both.
+const path = window.location.pathname.replace(/\/$/, "");
+const isPrivacy = path.endsWith("/privacy");
+
 createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+  <StrictMode>{isPrivacy ? <PrivacyPage /> : <App />}</StrictMode>,
 );
