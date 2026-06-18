@@ -225,7 +225,7 @@ function NoteList({
         type="button"
         onClick={onNew}
         aria-label="New note"
-        className="fixed bottom-0 right-0 z-20 m-[max(1rem,env(safe-area-inset-bottom))] flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-accent text-3xl font-light text-page-bg shadow-lg active:scale-95"
+        className="fixed inset-x-0 bottom-0 z-20 mx-auto mb-[max(1rem,env(safe-area-inset-bottom))] flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-accent text-3xl font-light text-page-bg shadow-lg active:scale-95"
       >
         +
       </button>
