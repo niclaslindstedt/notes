@@ -1,11 +1,11 @@
 import { usePwaUpdate } from "../pwa/usePwaUpdate.ts";
 
-// The in-page "a new build is ready" prompt. The new service worker has
-// already downloaded and is parked in the `waiting` state; clicking Reload
-// applies it (the `controlling` listener in `usePwaUpdate` reloads the
-// page). Surfacing this rather than auto-refreshing is deliberate — a
-// silent swap would discard an in-progress edit.
-
+// Soft "a new build is ready — reload to apply" prompt. The new service
+// worker has already downloaded and is parked in the `waiting` state;
+// clicking Reload applies it (the `controlling` listener in `usePwaUpdate`
+// reloads the page). Surfacing this rather than auto-refreshing is
+// deliberate — a silent swap would discard an in-progress edit. It pins
+// above the safe-area inset, just under any future toast stack.
 export function UpdateToast() {
   const { needRefresh, incomingVersion, reload, dismiss } = usePwaUpdate();
   if (!needRefresh) return null;
@@ -13,32 +13,29 @@ export function UpdateToast() {
   return (
     <div
       role="status"
-      className="fixed inset-x-0 bottom-0 z-50 flex justify-center p-[max(0.75rem,env(safe-area-inset-bottom))]"
+      aria-live="polite"
+      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[60] mx-auto flex max-w-md items-center gap-3 rounded-[var(--radius)] border border-line bg-surface px-3 py-2 text-fg shadow-md"
     >
-      <div className="flex w-full max-w-md items-center gap-3 rounded-[var(--radius)] border border-line bg-surface-2 px-4 py-3 shadow-lg">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-fg-bright">
-            A new version is ready
-          </p>
-          {incomingVersion && (
-            <p className="truncate text-xs text-muted">v{incomingVersion}</p>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={dismiss}
-          className="rounded-[var(--radius)] px-2 py-1 text-sm text-muted hover:text-fg"
-        >
-          Later
-        </button>
-        <button
-          type="button"
-          onClick={reload}
-          className="rounded-[var(--radius)] bg-accent px-3 py-1 text-sm font-medium text-page-bg"
-        >
-          Reload
-        </button>
-      </div>
+      <span className="flex-1 text-sm">
+        {incomingVersion
+          ? `Updated to v${incomingVersion} — reload to apply`
+          : "A new version is ready — reload to apply"}
+      </span>
+      <button
+        type="button"
+        className="cursor-pointer text-sm text-link hover:underline"
+        onClick={reload}
+      >
+        Reload
+      </button>
+      <button
+        type="button"
+        aria-label="Dismiss update notice"
+        className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-[var(--radius)] text-muted hover:text-fg"
+        onClick={dismiss}
+      >
+        ×
+      </button>
     </div>
   );
 }
