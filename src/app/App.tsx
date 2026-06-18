@@ -4,6 +4,7 @@ import { isBlank, noteTitle, notePreview, type Note } from "../domain/note.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { useApplyAppearance } from "../theme/useTheme.ts";
+import { AppTitle } from "../ui/AppTitle.tsx";
 import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
@@ -201,7 +202,7 @@ function NoteList({
   return (
     <div className="flex h-full flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <h1 className="text-lg font-bold text-fg-bright">Notes</h1>
+        <AppTitle />
         <div className="flex items-center gap-2">{syncSlot}</div>
       </header>
 
