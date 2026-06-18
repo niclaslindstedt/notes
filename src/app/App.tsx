@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { BUILD_LABEL } from "../build-env.ts";
 import { isBlank, noteTitle, notePreview, type Note } from "../domain/note.ts";
+import { useStorageBackend } from "../storage/useStorageBackend.ts";
 import {
   FAMILY_DEFAULT_THEME,
   FAMILY_LABELS,
@@ -9,13 +10,17 @@ import {
   type ThemePreset,
 } from "../theme/themes.ts";
 import { setTheme, useApplyAppearance } from "../theme/useTheme.ts";
+import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import { NavContext } from "../ui/nav-context.ts";
 import { SideMenu } from "../ui/SideMenu.tsx";
+import { SyncIndicator } from "../ui/SyncIndicator.tsx";
+import { UnlockGate } from "../ui/UnlockGate.tsx";
 import { UpdateToast } from "../ui/UpdateToast.tsx";
 import { SettingsModalHost } from "./modals/SettingsModalHost.tsx";
 import { useNavState } from "./use-nav.ts";
 import { useNotes } from "./use-notes.ts";
+import { useSettingsSync } from "./use-settings-sync.ts";
 
 // Root component. The shell is a flex row — the side menu (a docked sidebar
 // on wide viewports, a drag-out drawer on phones) beside a main area that
@@ -40,7 +45,14 @@ function nextQuickTheme(theme: ThemePreset): ThemePreset {
 
 export function App() {
   const { theme } = useApplyAppearance();
-  const { notes, allNotes, create, update, remove } = useNotes();
+  // The active storage backend (this device / a local folder / a cloud) and
+  // its sync engine. Appearance settings reconcile against the same backend
+  // so they travel with a synced folder too.
+  const storage = useStorageBackend();
+  useSettingsSync(storage.settingsStore);
+  const { notes, allNotes, create, update, remove, sync } = useNotes(
+    storage.adapter,
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const nav = useNavState();
 
@@ -65,6 +77,15 @@ export function App() {
     if (id === editingId) setEditingId(null);
   }
 
+  // Encryption on, no passphrase held this session — block the app behind the
+  // unlock gate so the encrypted notes never render. The gate still wears the
+  // user's theme (appearance settings are plaintext).
+  if (storage.locked) {
+    return <UnlockGate storage={storage} />;
+  }
+
+  const syncSlot = <SyncIndicator sync={sync} storage={storage} />;
+
   return (
     <NavContext.Provider value={nav}>
       <ModalBusProvider>
@@ -84,6 +105,7 @@ export function App() {
                 onChange={(body) => update(editing.id, body)}
                 onClose={() => switchTo(null)}
                 onDelete={() => removeNote(editing.id)}
+                syncSlot={syncSlot}
               />
             ) : (
               <NoteList
@@ -91,12 +113,14 @@ export function App() {
                 theme={theme}
                 onOpen={(id) => switchTo(id)}
                 onNew={openNew}
+                syncSlot={syncSlot}
               />
             )}
           </main>
         </div>
 
-        <SettingsModalHost />
+        <SettingsModalHost storage={storage} />
+        <ConflictModal sync={sync} />
         <UpdateToast />
       </ModalBusProvider>
     </NavContext.Provider>
@@ -108,24 +132,29 @@ function NoteList({
   theme,
   onOpen,
   onNew,
+  syncSlot,
 }: {
   notes: Note[];
   theme: ThemePreset;
   onOpen: (id: string) => void;
   onNew: () => void;
+  syncSlot: ReactNode;
 }) {
   return (
     <div className="flex h-full flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
         <h1 className="text-lg font-bold text-fg-bright">Notes</h1>
-        <button
-          type="button"
-          onClick={() => setTheme(nextQuickTheme(theme))}
-          className="rounded-[var(--radius)] border border-line px-2 py-1 text-xs text-muted hover:text-fg"
-          title="Switch theme"
-        >
-          {FAMILY_LABELS[themeFamily(theme)]}
-        </button>
+        <div className="flex items-center gap-2">
+          {syncSlot}
+          <button
+            type="button"
+            onClick={() => setTheme(nextQuickTheme(theme))}
+            className="rounded-[var(--radius)] border border-line px-2 py-1 text-xs text-muted hover:text-fg"
+            title="Switch theme"
+          >
+            {FAMILY_LABELS[themeFamily(theme)]}
+          </button>
+        </div>
       </header>
 
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
@@ -182,11 +211,13 @@ function Editor({
   onChange,
   onClose,
   onDelete,
+  syncSlot,
 }: {
   note: Note;
   onChange: (body: string) => void;
   onClose: () => void;
   onDelete: () => void;
+  syncSlot: ReactNode;
 }) {
   const [body, setBody] = useState(note.body);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -211,13 +242,16 @@ function Editor({
         >
           ← Back
         </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="rounded-[var(--radius)] px-2 py-1 text-sm text-danger hover:opacity-80"
-        >
-          Delete
-        </button>
+        <div className="flex items-center gap-2">
+          {syncSlot}
+          <button
+            type="button"
+            onClick={onDelete}
+            className="rounded-[var(--radius)] px-2 py-1 text-sm text-danger hover:opacity-80"
+          >
+            Delete
+          </button>
+        </div>
       </header>
 
       <textarea

@@ -196,6 +196,26 @@ export function updateAppearance<K extends keyof Appearance>(
   persist({ ...current, [key]: value });
 }
 
+/** The live appearance, read imperatively (e.g. to seed a backend file). */
+export function getAppearance(): Appearance {
+  return current;
+}
+
+/**
+ * Replace the whole appearance document — the seam the backend settings-store
+ * reconciliation writes through when another device's `settings.json` is
+ * adopted. Coerces defensively so a stale / partial remote file can't crash
+ * the boot.
+ */
+export function replaceAppearance(raw: unknown): void {
+  persist(coerce(raw));
+}
+
+/** Subscribe to appearance changes (used to mirror edits to the backend). */
+export function subscribeAppearance(listener: () => void): () => void {
+  return subscribe(listener);
+}
+
 /** Set just the theme preset — the quick-toggle path. */
 export function setTheme(theme: ThemePreset): void {
   updateAppearance("theme", theme);
