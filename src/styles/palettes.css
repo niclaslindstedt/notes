@@ -1,0 +1,205 @@
+/* Colour palettes — one block per `data-theme` the engine can set. Each
+   block remaps the colour subset of the :root tokens defined in
+   ./theme.css. Imported by ../styles.css after theme.css. Ported from
+   checklist's palettes, reduced to notes' 11 colour slots.
+
+   Add a block here and a preset to `src/theme/themes.ts` to introduce a new
+   theme — the engine needs no change. `custom` has no block: the theme
+   engine writes the user's slots inline on <html> instead. */
+
+/* One Dark — applied when `data-theme="dark"` and as the pre-boot default
+   (no attribute yet) so the first paint is coherent. */
+:root,
+:root[data-theme="dark"] {
+  --page-bg: #1d2027;
+  --surface: #282c34;
+  --surface-2: #2c313a;
+  --surface-3: #313742;
+  --fg: #abb2bf;
+  --fg-bright: #e6e6e6;
+  --muted: #9097a8;
+  --line: #3e4451;
+  --accent: #98c379;
+  --danger: #e06c75;
+  --link: #61afef;
+
+  color-scheme: dark;
+}
+
+/* One Light — applied when `data-theme="light"`. */
+:root[data-theme="light"] {
+  --page-bg: #eef0f2;
+  --surface: #f8f9fa;
+  --surface-2: #f1f3f5;
+  --surface-3: #e7eaed;
+  --fg: #2f323a;
+  --fg-bright: #15171c;
+  --muted: #6a6f7c;
+  --line: #ccd0d6;
+  --accent: #3f8c3e;
+  --danger: #c9434c;
+  --link: #1d6fd0;
+
+  color-scheme: light;
+}
+
+/* Dracula — popular VS Code dark theme. */
+:root[data-theme="dracula"] {
+  --page-bg: #21222c;
+  --surface: #282a36;
+  --surface-2: #343746;
+  --surface-3: #191a21;
+  --fg: #f8f8f2;
+  --fg-bright: #ffffff;
+  --muted: #8b93c2;
+  --line: #44475a;
+  --accent: #50fa7b;
+  --danger: #ff5555;
+  --link: #8be9fd;
+
+  color-scheme: dark;
+}
+
+/* Monokai — the classic TextMate / Sublime / VS Code dark theme. */
+:root[data-theme="monokai"] {
+  --page-bg: #1e1f1c;
+  --surface: #272822;
+  --surface-2: #3e3d32;
+  --surface-3: #1b1c18;
+  --fg: #f8f8f2;
+  --fg-bright: #ffffff;
+  --muted: #9c9882;
+  --line: #49483e;
+  --accent: #a6e22e;
+  --danger: #f92672;
+  --link: #66d9ef;
+
+  color-scheme: dark;
+}
+
+/* GitHub Dark Default. */
+:root[data-theme="githubDark"] {
+  --page-bg: #010409;
+  --surface: #0d1117;
+  --surface-2: #161b22;
+  --surface-3: #010409;
+  --fg: #c9d1d9;
+  --fg-bright: #f0f6fc;
+  --muted: #8b949e;
+  --line: #30363d;
+  --accent: #7ee787;
+  --danger: #ff7b72;
+  --link: #79c0ff;
+
+  color-scheme: dark;
+}
+
+/* GitHub Light Default. */
+:root[data-theme="githubLight"] {
+  --page-bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #eaeef2;
+  --surface-3: #d0d7de;
+  --fg: #1f2328;
+  --fg-bright: #0d1117;
+  --muted: #6e7781;
+  --line: #d0d7de;
+  --accent: #1a7f37;
+  --danger: #cf222e;
+  --link: #0969da;
+
+  color-scheme: light;
+}
+
+/* Solarized Light — Ethan Schoonover's iconic warm light theme. */
+:root[data-theme="solarizedLight"] {
+  --page-bg: #eee8d5;
+  --surface: #fdf6e3;
+  --surface-2: #f5efdc;
+  --surface-3: #e3ddc9;
+  --fg: #586e75;
+  --fg-bright: #073642;
+  --muted: #657b83;
+  --line: #d6cfb8;
+  --accent: #859900;
+  --danger: #dc322f;
+  --link: #268bd2;
+
+  color-scheme: light;
+}
+
+/* Quiet Light — a calm low-contrast VS Code light theme. */
+:root[data-theme="quietLight"] {
+  --page-bg: #f5f5f5;
+  --surface: #ffffff;
+  --surface-2: #ebebeb;
+  --surface-3: #e0e0e0;
+  --fg: #333333;
+  --fg-bright: #1a1a1a;
+  --muted: #767676;
+  --line: #d4d4d4;
+  --accent: #4f894c;
+  --danger: #b73525;
+  --link: #4b83cd;
+
+  color-scheme: light;
+}
+
+/* Excel Light — Microsoft Excel's light-mode look. */
+:root[data-theme="excel"] {
+  --page-bg: #e6e6e6;
+  --surface: #ffffff;
+  --surface-2: #f3f2f1;
+  --surface-3: #e1dfdd;
+  --fg: #252423;
+  --fg-bright: #171717;
+  --muted: #605e5c;
+  --line: #d4d4d4;
+  --accent: #217346;
+  --danger: #c00000;
+  --link: #0563c1;
+
+  color-scheme: light;
+}
+
+/* System theme — follow the OS colour-scheme. Dark is the default (set in
+   the unscoped `:root` in theme.css); only the light branch needs a rule. */
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    --page-bg: #eef0f2;
+    --surface: #f8f9fa;
+    --surface-2: #f1f3f5;
+    --surface-3: #e7eaed;
+    --fg: #2f323a;
+    --fg-bright: #15171c;
+    --muted: #6a6f7c;
+    --line: #ccd0d6;
+    --accent: #3f8c3e;
+    --danger: #c9434c;
+    --link: #1d6fd0;
+
+    color-scheme: light;
+  }
+}
+
+/* Pre-React fallback: a browser whose OS is in light mode and that hasn't
+   received a `data-theme` attribute yet should still flip to the Light
+   palette so the brief pre-mount flash is coherent. Once React runs,
+   `data-theme=...` on `<html>` takes precedence. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --page-bg: #eef0f2;
+    --surface: #f8f9fa;
+    --surface-2: #f1f3f5;
+    --surface-3: #e7eaed;
+    --fg: #2f323a;
+    --fg-bright: #15171c;
+    --muted: #6a6f7c;
+    --line: #ccd0d6;
+    --accent: #3f8c3e;
+    --danger: #c9434c;
+    --link: #1d6fd0;
+
+    color-scheme: light;
+  }
+}

@@ -1,14 +1,13 @@
+import { updateAppearance, useAppearance } from "../../theme/useTheme.ts";
 import { CloseIcon, CogIcon } from "../icons.tsx";
 import { Modal } from "../Modal.tsx";
+import { AppearanceSection } from "./AppearanceSection.tsx";
 
-// Settings dialog. A skeleton for now: the header chrome and the modal
-// shell are in place, but the body is intentionally empty until there's a
-// preference worth surfacing. checklist's full tabbed dialog (a left rail
-// of icon-marked tabs — General, Theme, Storage, …, each editing a draft
-// committed on Save) is what this grows into; bring those tabs over with
-// the `copy-feature` skill as the matching subsystems land in notes. The
-// header / close-button geometry already matches checklist so the port
-// slots straight in.
+// Settings dialog. The header chrome and modal shell match checklist so its
+// full tabbed dialog (a left rail of icon-marked tabs) can grow in here as
+// more subsystems land; for now the body is the single Appearance surface
+// ported from checklist's Appearance tab. Edits apply live through the
+// appearance store, so there's no draft / Save step yet.
 
 type Props = {
   open: boolean;
@@ -16,6 +15,7 @@ type Props = {
 };
 
 export function SettingsModal({ open, onClose }: Props) {
+  const appearance = useAppearance();
   return (
     <Modal open={open} onClose={onClose} labelledBy="settings-title">
       <header className="relative flex shrink-0 items-center justify-between gap-2 border-b border-line bg-surface-3 px-4 py-3">
@@ -40,10 +40,13 @@ export function SettingsModal({ open, onClose }: Props) {
         </button>
       </header>
 
-      <div className="flex flex-1 items-center justify-center overflow-y-auto px-4 py-10">
-        <p className="max-w-sm text-center text-sm text-muted">
-          Nothing to configure yet — settings will land here as the app grows.
-        </p>
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="mx-auto w-full max-w-2xl">
+          <AppearanceSection
+            appearance={appearance}
+            onUpdate={updateAppearance}
+          />
+        </div>
       </div>
     </Modal>
   );

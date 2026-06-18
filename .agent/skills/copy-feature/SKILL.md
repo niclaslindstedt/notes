@@ -209,7 +209,26 @@ reuse them rather than re-porting:
 - **Icons** — `src/ui/icons.tsx` is a single flat file (notes' layout), not
   checklist's `icons/` family split. Add new glyphs here.
 - **Tokens** — `--surface-3`, `--link`, and `--density-row-py` now exist in
-  every palette in `styles/theme.css`, plus the `drawer-*` keyframes.
+  every palette in `styles/palettes.css`, plus the `drawer-*` keyframes and a
+  `[data-reduce-motion="true"]` override in `styles/theme.css`.
+- **Theme engine** — `src/theme/themes.ts` (preset/font/custom data),
+  `fonts.ts` (lazy `@fontsource` loaders for sans/serif/dyslexic), and
+  `useTheme.ts` (the `useSyncExternalStore` appearance store + projection
+  hook `useApplyAppearance`, called once in `App`). The colour palettes live
+  in `styles/palettes.css`, one block per `data-theme`. notes carries 11
+  colour slots (no checklist `meta`/`path`/`flag`/`pipe`/`success`/`positive`/
+  `negative`) and a single `--radius` (not the sm/md/lg triple); it drops
+  checklist's `borderWidth` control. Appearance applies **live** — notes has
+  no draft/Save step. Add a preset by adding one `PRESET_PALETTES` entry +
+  one `palettes.css` block + registering its id.
+- **Settings primitives** — `src/ui/form/Checkbox.tsx` and
+  `src/ui/settings/shared.tsx` (`Section` / `Field` / `ToggleRow` /
+  `SegmentedRow`). The Appearance surface lives in
+  `src/ui/settings/AppearanceSection.tsx`, rendered inside the
+  `SettingsModal`. checklist's `SelectPicker` / `FloatingPanel` were **not**
+  ported — wrap-radio rows and `SegmentedRow` cover the pickers; bring
+  `FloatingPanel` over only when a feature genuinely needs a positioned
+  popover.
 
 ### Privacy / clean-URL routing
 

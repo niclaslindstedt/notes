@@ -3,13 +3,15 @@
    order — Tailwind first so its `@theme` / `@layer` infrastructure is in
    scope when downstream files extend it.
 
-     1. tailwindcss       — Tailwind v4 base + utilities
-     2. styles/theme.css  — CSS-variable tokens, :root defaults, html/body
-                            reset, and the light-theme override
+     1. tailwindcss          — Tailwind v4 base + utilities
+     2. styles/theme.css     — Tailwind token mapping, structural tokens,
+                               html/body reset, motion rules
+     3. styles/palettes.css  — one colour block per `data-theme` preset
 
-   This is the same layering checklist uses; its richer multi-palette
-   engine (per-preset palettes, custom-theme editor) is intentionally left
-   out here and can be brought over later via the `copy-feature` skill. */
+   This is the same layering checklist uses: theme.css owns the structural
+   token vocabulary, palettes.css supplies the per-preset colours, and the
+   theme engine (`src/theme/`) sets `data-theme` plus the Custom overrides. */
 @import "tailwindcss";
 
 @import "./styles/theme.css";
+@import "./styles/palettes.css";

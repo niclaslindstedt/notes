@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { BUILD_LABEL } from "../build-env.ts";
 import { isBlank, noteTitle, notePreview, type Note } from "../domain/note.ts";
-import { setTheme, useTheme, type ThemePreset } from "../theme/useTheme.ts";
+import {
+  FAMILY_DEFAULT_THEME,
+  FAMILY_LABELS,
+  themeFamily,
+  type ThemePreset,
+} from "../theme/themes.ts";
+import { setTheme, useApplyAppearance } from "../theme/useTheme.ts";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import { NavContext } from "../ui/nav-context.ts";
 import { SideMenu } from "../ui/SideMenu.tsx";
@@ -19,20 +25,21 @@ import { useNotes } from "./use-notes.ts";
 // `ModalBusProvider` lets any button open the settings dialog without
 // threading openers through the tree.
 
-const THEME_ORDER: Record<ThemePreset, ThemePreset> = {
-  dark: "light",
-  light: "system",
-  system: "dark",
-};
+// The header button is a quick three-way toggle over the broad families;
+// the full preset / variant / custom picker lives in Settings → Appearance.
+// Cycling jumps to each family's default preset, so it stays well-defined
+// even when the active theme is a variant (e.g. Dracula) or Custom.
+const QUICK_CYCLE = ["dark", "light", "system"] as const;
 
-const THEME_LABEL: Record<ThemePreset, string> = {
-  dark: "Dark",
-  light: "Light",
-  system: "System",
-};
+function nextQuickTheme(theme: ThemePreset): ThemePreset {
+  const family = themeFamily(theme);
+  const idx = QUICK_CYCLE.indexOf(family as (typeof QUICK_CYCLE)[number]);
+  const next = QUICK_CYCLE[(idx + 1) % QUICK_CYCLE.length] ?? "dark";
+  return FAMILY_DEFAULT_THEME[next];
+}
 
 export function App() {
-  const theme = useTheme();
+  const { theme } = useApplyAppearance();
   const { notes, allNotes, create, update, remove } = useNotes();
   const [editingId, setEditingId] = useState<string | null>(null);
   const nav = useNavState();
@@ -113,11 +120,11 @@ function NoteList({
         <h1 className="text-lg font-bold text-fg-bright">Notes</h1>
         <button
           type="button"
-          onClick={() => setTheme(THEME_ORDER[theme])}
+          onClick={() => setTheme(nextQuickTheme(theme))}
           className="rounded-[var(--radius)] border border-line px-2 py-1 text-xs text-muted hover:text-fg"
           title="Switch theme"
         >
-          {THEME_LABEL[theme]}
+          {FAMILY_LABELS[themeFamily(theme)]}
         </button>
       </header>
 
