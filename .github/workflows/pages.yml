@@ -112,6 +112,13 @@ jobs:
         run: npm run build
         env:
           VITE_BASE: /
+          # Cloud-sync credentials. These are public client identifiers (the
+          # OAuth flows are PKCE, no secret), but they're injected at build
+          # time so a fork plugs in its own apps. Unset -> the backend is
+          # hidden from the storage picker, so they MUST be mapped here from
+          # repo secrets or the deployed build silently disables Drive/Dropbox.
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
 
       - name: Stash production dist
         if: steps.tag.outputs.has_release == 'true'
@@ -134,6 +141,8 @@ jobs:
           # Once the first release lands, this becomes the /preview/
           # build instead.
           VITE_BASE: ${{ steps.tag.outputs.has_release == 'true' && '/preview/' || '/' }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
 
       # ---- Optional /branch/ build + persist to orphan branch ----
       - name: Stash preview dist
@@ -155,6 +164,8 @@ jobs:
         run: npm run build
         env:
           VITE_BASE: /branch/
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
 
       - name: Persist /branch/ build to orphan branch
         if: steps.dispatch.outputs.has_dispatch == 'true'
