@@ -1,0 +1,69 @@
+# Architecture
+
+`notes` is a TypeScript Progressive Web App that runs entirely in the browser
+and is served as static files. There is **no backend**. It is built with Vite,
+React, and Tailwind, and uses `vite-plugin-pwa` for the service worker and web
+app manifest.
+
+## Layering
+
+The source tree under `src/` is organized by concern. The dependency direction
+is strict and enforced by eslint:
+
+```
+app  ──▶  ui  ──▶  domain
+ │                   ▲
+ └──▶  storage  ─────┘
+```
+
+- **`src/domain/`** — pure functions over the note model (`note.ts`). No DOM,
+  no I/O, no imports from `ui/`, `storage/`, or `app/`. This is the layer the
+  planned React Native app reuses unchanged, which is exactly why the boundary
+  is enforced rather than merely encouraged.
+- **`src/storage/`** — persistence. `local.ts` reads and writes the whole note
+  list to `localStorage` under the versioned key `notes/v1`, validating the
+  shape defensively on read. It depends only on `domain/`. A synced or
+  IndexedDB backend would implement the same load/save pair behind this seam.
+- **`src/theme/`** — `useTheme.ts` is a small external store that projects the
+  chosen preset onto `<html data-theme>` and persists it to `localStorage`.
+- **`src/styles/`** — `theme.css` defines the CSS-variable token vocabulary
+  (`--page-bg`, `--surface`, `--fg`, `--accent`, …) and the dark/light/system
+  palettes the tokens resolve to.
+- **`src/pwa/`** — `usePwaUpdate.ts` registers the service worker via
+  `workbox-window` and drives the prompt-style update lifecycle;
+  `standalone.ts` detects the installed-PWA-on-mobile context.
+- **`src/ui/`** — presentational components (e.g. `UpdateToast.tsx`).
+- **`src/app/`** — `App.tsx` (the list ↔ editor shell), `main.tsx` (the entry
+  point), and `use-notes.ts` (the store hook the component tree binds to).
+
+## State and persistence
+
+`use-notes.ts` holds the note list in React state and persists every change to
+`localStorage` via the storage layer. The list view shows non-blank notes
+newest-first; the full list (including a freshly created blank note) is exposed
+so the editor can resolve a note that isn't in the visible list yet. A note
+left blank discards itself when its editor closes.
+
+## PWA update model
+
+The build emits `dist/sw.js` (workbox precache), `dist/version.json` (the
+build label), and `dist/precache-manifest.json` (asset → byte-size map). The
+service worker is registered with `updateViaCache: "none"` and uses the
+**prompt** strategy: a new build installs and parks in the `waiting` state,
+`UpdateToast` surfaces a Reload button, and the page only swaps to the new
+JS when the user clicks it — never silently mid-edit.
+
+## Build-time injection
+
+`vite.config.ts` injects `__APP_VERSION__` and `__BUILD_LABEL__` (re-exported
+typed from `src/build-env.ts`) and runs two small plugins to emit
+`version.json` and `precache-manifest.json`. The base path comes from
+`VITE_BASE` so one bundle deploys to any subpath.
+
+## What's intentionally not here yet
+
+This repo is a focused scaffold. The fuller machinery from `checklist` — the
+multi-palette theme engine and custom-theme editor, modals and the side menu,
+cloud-sync storage backends, the marketing `website/`, full SEO prerendering,
+and the release pipeline — is brought over incrementally via the
+`copy-feature` agent skill, adapted to the notes domain rather than pasted.

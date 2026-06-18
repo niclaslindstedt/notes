@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- `maximum-scale=1` + `user-scalable=no` disable pinch / double-tap
+         zoom. iOS Safari ignores this in a browser tab (by design, for
+         accessibility) but honours it in the installed standalone PWA,
+         where a stray pinch otherwise zooms the fixed shell larger than the
+         screen. The app exposes its own text-size control so zoom isn't the
+         only way to enlarge the UI. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="color-scheme" content="dark light" />
+    <!-- theme-color matched to each rendered background. Dark is the
+         default shell; light is the light-theme bg. -->
+    <meta
+      name="theme-color"
+      content="#1f2933"
+      media="(prefers-color-scheme: dark)"
+    />
+    <meta
+      name="theme-color"
+      content="#fafafa"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="author" content="Niclas Lindstedt" />
+    <meta name="application-name" content="Notes" />
+    <meta
+      name="description"
+      content="A local-first PWA for taking notes that works great on mobile and desktop."
+    />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+
+    <!-- PWA: vite-plugin-pwa injects <link rel="manifest"> here at build
+         time. The Apple-specific tags below are static. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Notes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+
+    <title>Notes</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/app/main.tsx"></script>
+  </body>
+</html>

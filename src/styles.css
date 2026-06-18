@@ -1,0 +1,15 @@
+/* App-wide stylesheet entry, imported once from `src/app/main.tsx`. The
+   substantive rules live in `./styles/` siblings, imported in cascade
+   order — Tailwind first so its `@theme` / `@layer` infrastructure is in
+   scope when downstream files extend it.
+
+     1. tailwindcss       — Tailwind v4 base + utilities
+     2. styles/theme.css  — CSS-variable tokens, :root defaults, html/body
+                            reset, and the light-theme override
+
+   This is the same layering checklist uses; its richer multi-palette
+   engine (per-preset palettes, custom-theme editor) is intentionally left
+   out here and can be brought over later via the `copy-feature` skill. */
+@import "tailwindcss";
+
+@import "./styles/theme.css";
