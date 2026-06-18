@@ -16,6 +16,11 @@ import { createLogger } from "../../dev/logger.ts";
 import { AuthError, RateLimitError, type StorageAdapter } from "../adapter.ts";
 import { createDirectoryAdapter } from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
+import { DEFAULT_NAMESPACE_SLUG, namespaceCloudFolder } from "../namespaces.ts";
+import {
+  fileNamespaceStore,
+  type NamespaceRegistryStore,
+} from "../namespace-store.ts";
 import { fileSettingsStore, type SettingsStore } from "../settings-store.ts";
 import { parseRetryAfterMs, readErrorBody } from "../http-utils.ts";
 import {
@@ -50,9 +55,23 @@ export function isDropboxConfigured(): boolean {
 // matches the Dropbox app registration's "App folder" name.
 export const DROPBOX_APP_FOLDER = "notes.niclaslindstedt.se";
 
-// Web URL that opens the app folder in Dropbox's web UI.
-export function dropboxWebUrl(): string {
-  return `https://www.dropbox.com/home/Apps/${DROPBOX_APP_FOLDER}`;
+// Web URL that opens the app folder (or a namespace's folder within it) in
+// Dropbox's web UI.
+export function dropboxWebUrl(
+  namespace: string = DEFAULT_NAMESPACE_SLUG,
+): string {
+  const folder = namespaceCloudFolder(namespace);
+  const suffix = folder ? `/${folder}` : "";
+  return `https://www.dropbox.com/home/Apps/${DROPBOX_APP_FOLDER}${suffix}`;
+}
+
+// The root path a namespace's markdown files live under, relative to the
+// Dropbox app folder. The default namespace keeps the app-folder root (empty
+// path) it has always used; every other namespace gets its own `/<slug>`
+// folder so it can be shared on its own.
+export function dropboxNamespacePath(namespace: string): string {
+  const folder = namespaceCloudFolder(namespace);
+  return folder ? `/${folder}` : "";
 }
 
 const TOKEN_ENDPOINT = "https://api.dropboxapi.com/oauth2/token";
@@ -115,9 +134,13 @@ type ListFolderResult = {
 export function createDropboxAdapter(
   auth: string | DropboxAuth,
   fetchImpl: FetchImpl = fetch,
+  namespace: string = DEFAULT_NAMESPACE_SLUG,
 ): StorageAdapter {
-  log.info("adapter created");
-  const store = createDropboxFileStore(createAuthedFetch(auth, fetchImpl), "");
+  log.info(`adapter created ns=${namespace}`);
+  const store = createDropboxFileStore(
+    createAuthedFetch(auth, fetchImpl),
+    dropboxNamespacePath(namespace),
+  );
   return createDirectoryAdapter(store, {
     id: "dropbox",
     label: "Dropbox",
@@ -126,12 +149,24 @@ export function createDropboxAdapter(
 }
 
 // Settings store for the Dropbox backend: `/settings.json` at the app-folder
-// root, beside the note markdown files.
+// root, beside the namespace folders. Built with an empty root path so the
+// file store resolves at the app-folder root.
 export function createDropboxSettingsStore(
   auth: string | DropboxAuth,
   fetchImpl: FetchImpl = fetch,
 ): SettingsStore {
   return fileSettingsStore(
+    createDropboxFileStore(createAuthedFetch(auth, fetchImpl), ""),
+  );
+}
+
+// Root namespace-registry store for the Dropbox backend: `/namespaces.json`
+// at the app-folder root, beside `settings.json` and the namespace folders.
+export function createDropboxNamespaceStore(
+  auth: string | DropboxAuth,
+  fetchImpl: FetchImpl = fetch,
+): NamespaceRegistryStore {
+  return fileNamespaceStore(
     createDropboxFileStore(createAuthedFetch(auth, fetchImpl), ""),
   );
 }
@@ -244,9 +279,13 @@ function createDropboxFileStore(
 
   return {
     async list(): Promise<FileEntry[]> {
+      // Non-recursive: notes are stored flat (one `.md` per note, no
+      // nesting), so listing only direct children keeps a namespace's file
+      // set scoped — in particular the default namespace, which roots at the
+      // app folder, never picks up other namespaces' subfolders.
       let page = await listOnce(LIST_FOLDER_ENDPOINT, {
         path: rootPath,
-        recursive: true,
+        recursive: false,
       });
       if (!page) return [];
       const out: FileEntry[] = [];
@@ -254,7 +293,9 @@ function createDropboxFileStore(
         for (const entry of page.entries) {
           if (entry[".tag"] !== "file") continue;
           const path = relativePath(entry);
-          if (path) out.push({ path, rev: entry.rev });
+          // A relative path with a slash sits inside a subfolder (another
+          // namespace's folder when listing at the root) — skip it.
+          if (path && !path.includes("/")) out.push({ path, rev: entry.rev });
         }
         if (!page.has_more) break;
         const next = await listOnce(LIST_FOLDER_CONTINUE_ENDPOINT, {
@@ -323,6 +364,33 @@ function createDropboxFileStore(
       }
     },
   };
+}
+
+// Delete a namespace's entire folder (`/<slug>`) from Dropbox. Used when a
+// namespace is removed while Dropbox is the active backend. A 409 (already
+// gone) is treated as success. The default namespace has no folder of its
+// own — its files share the app-folder root — so it is never passed here.
+export async function deleteDropboxNamespace(
+  auth: string | DropboxAuth,
+  namespace: string,
+  fetchImpl: FetchImpl = fetch,
+): Promise<void> {
+  const path = dropboxNamespacePath(namespace);
+  if (!path) return;
+  const authedFetch = createAuthedFetch(auth, fetchImpl);
+  const res = await authedFetch(DELETE_ENDPOINT, (token) => ({
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ path }),
+  }));
+  if (res.status === 409) return; // already gone
+  if (!res.ok) {
+    const detail = await readErrorBody(res);
+    throw new Error(`Dropbox namespace delete failed: ${res.status} ${detail}`);
+  }
 }
 
 // ---- OAuth (PKCE) ---------------------------------------------------

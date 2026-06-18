@@ -6,11 +6,16 @@ import { useApplyAppearance } from "../theme/useTheme.ts";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
+import {
+  applyFaviconHref,
+  namespaceFaviconHref,
+} from "../ui/namespace-favicon.ts";
 import { NavContext } from "../ui/nav-context.ts";
 import { SideMenu } from "../ui/SideMenu.tsx";
 import { SyncIndicator } from "../ui/SyncIndicator.tsx";
 import { UnlockGate } from "../ui/UnlockGate.tsx";
 import { UpdateToast } from "../ui/UpdateToast.tsx";
+import { NamespacesModalHost } from "./modals/NamespacesModalHost.tsx";
 import { SettingsModalHost } from "./modals/SettingsModalHost.tsx";
 import { useNavState } from "./use-nav.ts";
 import { useNotes } from "./use-notes.ts";
@@ -47,6 +52,25 @@ export function App() {
     enabled: !nav.showButton && !nav.pinned && !nav.open,
     onOpen: nav.toggle,
   });
+
+  // Re-badge the browser-tab favicon to the active namespace's glyph (in its
+  // accent colour) so a glance tells you which namespace you're in. A
+  // namespace with no glyph keeps the bundled mark.
+  const activeNs = storage.namespaces.find(
+    (n) => n.slug === storage.activeNamespace,
+  );
+  const faviconHref = namespaceFaviconHref(activeNs);
+  useEffect(() => {
+    applyFaviconHref(faviconHref);
+  }, [faviconHref]);
+
+  // Switch namespace and leave the editor — the note that was open belongs to
+  // the namespace we're leaving, so the new namespace's list is what should
+  // show.
+  function switchNamespace(slug: string) {
+    storage.switchNamespace(slug);
+    setEditingId(null);
+  }
 
   const editing = editingId
     ? (allNotes.find((n) => n.id === editingId) ?? null)
@@ -88,6 +112,9 @@ export function App() {
             onSelectNote={(id) => switchTo(id)}
             onAddNote={openNew}
             onRemoveNote={removeNote}
+            namespaces={storage.namespaces}
+            activeNamespace={storage.activeNamespace}
+            onSwitchNamespace={switchNamespace}
           />
           <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
             {editing ? (
@@ -111,6 +138,7 @@ export function App() {
         </div>
 
         <SettingsModalHost storage={storage} />
+        <NamespacesModalHost storage={storage} />
         <ConflictModal sync={sync} />
         <UpdateToast />
       </ModalBusProvider>

@@ -197,6 +197,12 @@ The source tree under `src/` is organized by concern, not by file type:
   the file backends share via `directory-adapter.ts`. `useStorageBackend.ts`
   selects and wires the active backend; `settings-store.ts` carries the
   appearance settings alongside the notes on the file/cloud backends.
+  `namespaces.ts` (+ `namespace-store.ts`) is the **namespace** registry: a
+  named bucket holding its own note document, with the active one selecting
+  which storage location every backend reads/writes (a per-slug
+  `localStorage` key, or a per-slug folder; the default keeps the historical
+  root). The list mirrors to `namespaces.json` beside `settings.json` so it
+  travels with a synced folder.
 - `src/theme/` — the theme engine (`useTheme.ts`): projects the chosen
   preset onto `<html data-theme>`, which the CSS tokens key off.
 - `src/styles/` — the CSS-variable token system (`theme.css`).

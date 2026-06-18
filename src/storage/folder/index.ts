@@ -4,11 +4,19 @@
 // the App layer through `showDirectoryPicker` and persisted in IndexedDB (see
 // `handle-store.ts`); this module only sees a live handle.
 //
-// Layout: the picked directory holds the note `<slug>.md` files directly,
-// plus `settings.json` (appearance) and, when encryption is on, `notes.json`
-// (the AES-GCM envelope). That keeps the markdown files browsable,
-// git-trackable, and editable by any other tool — the whole point of the
-// folder backend.
+// Layout: the default namespace holds its note `<slug>.md` files directly in
+// the picked directory; every other namespace gets its own subfolder
+// (`<picked>/<slug>/<note>.md`) so a whole namespace folder can be shared on
+// its own. Beside them at the picked-directory root sit `settings.json`
+// (appearance), `namespaces.json` (the namespace registry), and, when
+// encryption is on, `notes.json` (the AES-GCM envelope). That keeps the
+// markdown files browsable, git-trackable, and editable by any other tool —
+// the whole point of the folder backend.
+//
+// Notes are stored flat (one `.md` per note, no nesting), so each file store
+// enumerates only the files directly in its base directory: the namespace's
+// subfolder, or the picked-directory root for the default namespace — which
+// also keeps the default namespace from picking up other namespaces' folders.
 //
 // Concurrency rides on each file's `lastModified` ms timestamp, surfaced to
 // the directory adapter as the per-file revision; the adapter folds the
@@ -18,6 +26,11 @@ import { createLogger } from "../../dev/logger.ts";
 import type { StorageAdapter } from "../adapter.ts";
 import { createDirectoryAdapter } from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
+import { DEFAULT_NAMESPACE_SLUG, namespaceCloudFolder } from "../namespaces.ts";
+import {
+  fileNamespaceStore,
+  type NamespaceRegistryStore,
+} from "../namespace-store.ts";
 import { fileSettingsStore, type SettingsStore } from "../settings-store.ts";
 
 const log = createLogger("folder");
@@ -37,6 +50,11 @@ function isPermissionError(err: unknown): boolean {
 
 export type CreateFolderAdapterOptions = {
   directoryHandle: FileSystemDirectoryHandle;
+  /**
+   * Which namespace's notes this adapter reads/writes. Defaults to the
+   * default namespace, whose files live directly in the picked directory.
+   */
+  namespace?: string;
   // Fires once when an operation fails because the OS-level permission was
   // revoked between sessions, so the App can clear the in-state handle and
   // surface a reconnect banner without awaiting the next operation.
@@ -44,10 +62,18 @@ export type CreateFolderAdapterOptions = {
 };
 
 class FolderFileStore implements FileStore {
+  // The namespace's folder segment, prepended to every path. Empty for the
+  // default namespace, whose files sit at the picked-directory root (and
+  // whose registry / settings stores root there too).
+  private readonly base: string;
+
   constructor(
     private readonly root: FileSystemDirectoryHandle,
+    namespace: string = "",
     private readonly onPermissionLost?: () => void,
-  ) {}
+  ) {
+    this.base = namespace ? namespaceCloudFolder(namespace) : "";
+  }
 
   // Resolve the directory handle for a `/`-separated path, optionally creating
   // each segment. Returns null when a segment is missing and `create` is false.
@@ -68,11 +94,16 @@ class FolderFileStore implements FileStore {
     return dir;
   }
 
+  // Prepend the namespace base to a relative path's segments.
+  private segmentsFor(path: string): string[] {
+    return [this.base, ...path.split("/")].filter((s) => s.length > 0);
+  }
+
   private async resolveParent(
     path: string,
     create: boolean,
   ): Promise<{ dir: FileSystemDirectoryHandle; name: string } | null> {
-    const segments = path.split("/").filter((s) => s.length > 0);
+    const segments = this.segmentsFor(path);
     const name = segments.pop();
     if (!name) return null;
     const dir = await this.resolveDir(segments, create);
@@ -86,31 +117,25 @@ class FolderFileStore implements FileStore {
     }
   }
 
+  // List the files directly in the base directory (the namespace's subfolder,
+  // or the picked-directory root for the default namespace). Notes are flat,
+  // so directories — other namespaces' folders when listing at the root — are
+  // skipped rather than descended into.
   async list(): Promise<FileEntry[]> {
-    const entries: FileEntry[] = [];
-    await this.walk(this.root, "", entries);
-    return entries;
-  }
-
-  private async walk(
-    dir: FileSystemDirectoryHandle,
-    prefix: string,
-    out: FileEntry[],
-  ): Promise<void> {
+    const dir = await this.resolveDir(this.base ? [this.base] : [], false);
+    if (!dir) return [];
+    const out: FileEntry[] = [];
     try {
       for await (const handle of dir.values()) {
-        const path = prefix ? `${prefix}/${handle.name}` : handle.name;
-        if (handle.kind === "directory") {
-          await this.walk(handle, path, out);
-        } else {
-          const file = await handle.getFile();
-          out.push({ path, rev: String(file.lastModified) });
-        }
+        if (handle.kind !== "file") continue;
+        const file = await handle.getFile();
+        out.push({ path: handle.name, rev: String(file.lastModified) });
       }
     } catch (err) {
       this.reportPermission(err);
       throw err;
     }
+    return out;
   }
 
   async read(path: string): Promise<string | null> {
@@ -160,9 +185,11 @@ class FolderFileStore implements FileStore {
 export function createFolderAdapter(
   options: CreateFolderAdapterOptions,
 ): StorageAdapter {
-  log.info("adapter created");
+  const namespace = options.namespace ?? DEFAULT_NAMESPACE_SLUG;
+  log.info(`adapter created ns=${namespace}`);
   const store = new FolderFileStore(
     options.directoryHandle,
+    namespace,
     options.onPermissionLost,
   );
   return createDirectoryAdapter(store, {
@@ -173,12 +200,25 @@ export function createFolderAdapter(
 }
 
 // Settings store for the folder backend: `settings.json` at the picked
-// directory root, beside the note markdown files.
+// directory root, beside the namespace folders. Built with no namespace so
+// the file store resolves at the root.
 export function createFolderSettingsStore(
   directoryHandle: FileSystemDirectoryHandle,
   onPermissionLost?: () => void,
 ): SettingsStore {
   return fileSettingsStore(
-    new FolderFileStore(directoryHandle, onPermissionLost),
+    new FolderFileStore(directoryHandle, "", onPermissionLost),
+  );
+}
+
+// Root namespace-registry store for the folder backend: `namespaces.json` at
+// the picked directory root, beside `settings.json` and the namespace
+// folders. Built with no namespace so the file store resolves at the root.
+export function createFolderNamespaceStore(
+  directoryHandle: FileSystemDirectoryHandle,
+  onPermissionLost?: () => void,
+): NamespaceRegistryStore {
+  return fileNamespaceStore(
+    new FolderFileStore(directoryHandle, "", onPermissionLost),
   );
 }

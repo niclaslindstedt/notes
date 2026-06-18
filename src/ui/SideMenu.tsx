@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type ReactNode } from "react";
 
 import { BUILD_LABEL } from "../build-env.ts";
 import { noteTitle, type Note } from "../domain/note.ts";
+import type { Namespace } from "../storage/namespaces.ts";
 import { APP_VIEWPORT_RECT } from "./appViewportRect.ts";
 import { useNav } from "./nav-context.ts";
 import { useDraggableMenuButton } from "./hooks/useDraggableMenuButton.ts";
@@ -18,6 +19,7 @@ import {
   TrashIcon,
 } from "./icons.tsx";
 import { useModalDispatch } from "./modal-bus.ts";
+import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
 
 // The navigation drawer. On viewports narrower than the smallest iPad it
 // collapses to a single floating button the user can drag to either side
@@ -55,6 +57,12 @@ type Props = {
   onAddNote: () => void;
   /** Delete a note permanently. */
   onRemoveNote: (id: string) => void;
+  /** Namespaces known on this device, default first. */
+  namespaces: Namespace[];
+  /** The active namespace's slug. */
+  activeNamespace: string;
+  /** Make a namespace active (and leave the editor). */
+  onSwitchNamespace: (slug: string) => void;
 };
 
 export function SideMenu({
@@ -63,6 +71,9 @@ export function SideMenu({
   onSelectNote,
   onAddNote,
   onRemoveNote,
+  namespaces,
+  activeNamespace,
+  onSwitchNamespace,
 }: Props) {
   const dispatch = useModalDispatch();
   const drawerId = useId();
@@ -114,8 +125,35 @@ export function SideMenu({
   // the framing `<nav>` differs between the two, so the rows live here once.
   const sections = (
     <>
+      {/* Namespaces switcher: tap a row to switch which set of notes is
+          shown; the heading's "+" opens the full manage dialog (add / rename
+          / icon / delete). */}
+      <SectionHeader
+        label="Namespaces"
+        onAdd={() => pick(() => dispatch({ kind: "namespaces" }))}
+        addLabel="Manage namespaces"
+      />
+      {namespaces.map((ns) => (
+        <NavItem
+          key={ns.slug}
+          icon={
+            <NamespaceGlyph
+              name={ns.glyph}
+              className="h-5 w-5"
+              style={ns.color ? { color: ns.color } : undefined}
+            />
+          }
+          label={ns.name}
+          active={ns.slug === activeNamespace}
+          onClick={() => {
+            onSwitchNamespace(ns.slug);
+            close();
+          }}
+        />
+      ))}
       <SectionHeader
         label="Notes"
+        border
         onAdd={() => {
           onAddNote();
           close();

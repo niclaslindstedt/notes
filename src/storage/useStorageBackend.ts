@@ -40,7 +40,9 @@ import {
   type DropboxAuth,
   completeDropboxAuth,
   createDropboxAdapter,
+  createDropboxNamespaceStore,
   createDropboxSettingsStore,
+  deleteDropboxNamespace,
   hasPendingDropboxAuth,
   isDropboxConfigured,
   startDropboxAuth,
@@ -48,15 +50,39 @@ import {
 import { withEncryption } from "./encrypting/index.ts";
 import {
   createGdriveAdapter,
+  createGdriveNamespaceStore,
   createGdriveSettingsStore,
+  deleteGdriveNamespace,
   isGdriveConfigured,
   startGdriveAuth,
 } from "./gdrive/index.ts";
-import { BrowserLocalStorageAdapter } from "./local/index.ts";
+import {
+  BrowserLocalStorageAdapter,
+  deleteLocalNamespace,
+} from "./local/index.ts";
 import {
   createFolderAdapter,
+  createFolderNamespaceStore,
   createFolderSettingsStore,
 } from "./folder/index.ts";
+import type { NamespaceRegistryStore } from "./namespace-store.ts";
+import {
+  type Namespace,
+  type NamespaceAppearance,
+  DEFAULT_NAMESPACE_SLUG,
+  addNamespace as registryAddNamespace,
+  getActiveNamespaceSlug,
+  getNamespaces,
+  hasLocalOnlyNamespaces,
+  mergeNamespaceLists,
+  parseNamespaces,
+  removeNamespace as registryRemoveNamespace,
+  renameNamespace as registryRenameNamespace,
+  serializeNamespaces,
+  setActiveNamespaceSlug,
+  setNamespaceAppearance as registrySetNamespaceAppearance,
+  setNamespaces as registrySetNamespaces,
+} from "./namespaces.ts";
 import type { SettingsStore } from "./settings-store.ts";
 import {
   clearDirectoryHandle,
@@ -118,6 +144,27 @@ export interface UseStorageBackend {
   disableEncryption: () => Promise<void>;
   /** Supply the passphrase for an already-encrypted store; throws if wrong. */
   unlock: (password: string) => Promise<void>;
+  /** Namespaces known on this device (default always first). */
+  namespaces: Namespace[];
+  /** The active namespace's slug. */
+  activeNamespace: string;
+  /** Make a namespace active, swapping which document the app reads/writes. */
+  switchNamespace: (slug: string) => void;
+  /** Create a namespace from a display name and switch to it. */
+  createNamespace: (name: string, appearance?: NamespaceAppearance) => void;
+  /** Change a namespace's display name (its data stays put). */
+  renameNamespace: (slug: string, name: string) => void;
+  /**
+   * Set or clear a namespace's appearance (its icon and/or accent colour).
+   * Applies live — there is no draft/Save step.
+   */
+  setNamespaceAppearance: (slug: string, patch: NamespaceAppearance) => void;
+  /**
+   * Remove a namespace and delete its data in the *active* backend. The
+   * default namespace can't be removed. Orphaned copies in other backends
+   * are left for the user to clean up.
+   */
+  removeNamespace: (slug: string) => Promise<void>;
 }
 
 // Strip the OAuth redirect's query params (`code`, `state`, `scope`) from the
@@ -194,6 +241,14 @@ export function useStorageBackend(): UseStorageBackend {
     () => getBackend() !== "folder",
   );
   const [folderReconnectNeeded, setFolderReconnectNeeded] = useState(false);
+  // The namespaces known on this device and which one is active. The list is
+  // seeded from localStorage (and reconciled against the backend's
+  // `namespaces.json` once a file backend resolves); the active pointer is a
+  // per-device cursor selecting which document the adapter reads/writes.
+  const [namespaces, setNamespacesState] = useState<Namespace[]>(getNamespaces);
+  const [activeNamespace, setActiveNamespaceState] = useState<string>(
+    getActiveNamespaceSlug,
+  );
 
   // Drop the live handle and surface the reconnect cue. Called by the folder
   // adapter when an in-flight read / write hits a revoked grant; the IDB
@@ -300,9 +355,12 @@ export function useStorageBackend(): UseStorageBackend {
     folderHandleLoaded,
   ]);
 
-  // The unwrapped backend. Cloud adapters get fresh tokens on every change so
-  // a reconnect rebuilds them; the Dropbox adapter persists any silently
-  // refreshed access token back via the selection's `onAccessTokenRefreshed`.
+  // The unwrapped, namespace-scoped backend. Cloud adapters get fresh tokens
+  // on every change so a reconnect rebuilds them; the Dropbox adapter persists
+  // any silently refreshed access token back via the selection's
+  // `onAccessTokenRefreshed`. Keyed on `activeNamespace` so switching the
+  // namespace rebuilds the document adapter (and its offline cache) onto the
+  // new namespace's storage location.
   const inner = useMemo<StorageAdapter>(() => {
     switch (selection.kind) {
       // Cloud backends mirror their bytes into a local cache so the document
@@ -310,24 +368,34 @@ export function useStorageBackend(): UseStorageBackend {
       // encrypted envelope when encryption is on). Folder / browser are
       // already on-device, so they need no mirror.
       case "dropbox":
-        return withLocalCache(createDropboxAdapter(selection.auth), {
-          storage: globalThis.localStorage,
-          key: localCacheKey("dropbox"),
-        });
+        return withLocalCache(
+          createDropboxAdapter(selection.auth, fetch, activeNamespace),
+          {
+            storage: globalThis.localStorage,
+            key: localCacheKey("dropbox", activeNamespace),
+          },
+        );
       case "gdrive":
-        return withLocalCache(createGdriveAdapter(selection.token), {
-          storage: globalThis.localStorage,
-          key: localCacheKey("gdrive"),
-        });
+        return withLocalCache(
+          createGdriveAdapter(selection.token, fetch, activeNamespace),
+          {
+            storage: globalThis.localStorage,
+            key: localCacheKey("gdrive", activeNamespace),
+          },
+        );
       case "folder":
         return createFolderAdapter({
           directoryHandle: selection.handle,
+          namespace: activeNamespace,
           onPermissionLost: markFolderPermissionLost,
         });
       case "browser":
-        return new BrowserLocalStorageAdapter(globalThis.localStorage);
+        return new BrowserLocalStorageAdapter(
+          globalThis.localStorage,
+          activeNamespace,
+        );
     }
-  }, [selection, markFolderPermissionLost]);
+  }, [selection, activeNamespace, markFolderPermissionLost]);
 
   // The active backend's root settings store — the same selection as `inner`
   // but independent of encryption (settings are app-wide plaintext). Null for
@@ -347,6 +415,77 @@ export function useStorageBackend(): UseStorageBackend {
         return null;
     }
   }, [selection, markFolderPermissionLost]);
+
+  // The active backend's root namespace registry — `namespaces.json` beside
+  // `settings.json` at the app-folder root, so the list of namespaces travels
+  // with the synced/shared folder and lands on every device that connects the
+  // backend. Null for the browser backend (localStorage is its only home) and
+  // while a folder grant is unresolved.
+  const namespaceStore = useMemo<NamespaceRegistryStore | null>(() => {
+    switch (selection.kind) {
+      case "dropbox":
+        return createDropboxNamespaceStore(selection.auth);
+      case "gdrive":
+        return createGdriveNamespaceStore(selection.token);
+      case "folder":
+        return createFolderNamespaceStore(
+          selection.handle,
+          markFolderPermissionLost,
+        );
+      case "browser":
+        return null;
+    }
+  }, [selection, markFolderPermissionLost]);
+
+  // Best-effort push of the current device registry to the active backend.
+  // Shared by the create / rename / appearance / remove verbs so a mutation
+  // is mirrored into `namespaces.json` the same way the appearance settings
+  // mirror `settings.json`. A no-op on the browser backend (no store).
+  const pushNamespaces = useCallback(
+    (list: Namespace[]) => {
+      void Promise.resolve(
+        namespaceStore?.save(serializeNamespaces(list)),
+      ).catch(() => {
+        // A failed write leaves the local copy, which the next reconcile or
+        // mutation re-pushes.
+      });
+    },
+    [namespaceStore],
+  );
+
+  // Reconcile the device's namespace list with the backend's `namespaces.json`
+  // when a file backend is (re)selected. The backend wins on any slug both
+  // sides know, and this device's own namespaces are merged in and pushed
+  // back up — so connecting on a new device adopts the cloud's lists and
+  // uploads any local-only ones rather than dropping them. A missing remote
+  // file is seeded from this device (the first device to connect publishes).
+  useEffect(() => {
+    if (!namespaceStore) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const raw = await namespaceStore.load();
+        if (cancelled) return;
+        const local = getNamespaces();
+        if (raw === null) {
+          await namespaceStore.save(serializeNamespaces(local));
+          return;
+        }
+        const remote = parseNamespaces(raw);
+        const merged = mergeNamespaceLists(local, remote);
+        registrySetNamespaces(merged);
+        setNamespacesState(getNamespaces());
+        if (hasLocalOnlyNamespaces(local, remote)) {
+          await namespaceStore.save(serializeNamespaces(getNamespaces()));
+        }
+      } catch {
+        // Backend unreachable / malformed — keep the local registry.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [namespaceStore]);
 
   const locked = encryption === "encrypted" && password === null;
 
@@ -392,7 +531,10 @@ export function useStorageBackend(): UseStorageBackend {
       return;
     }
     const folder = wrapForActive(
-      createFolderAdapter({ directoryHandle: handle }),
+      createFolderAdapter({
+        directoryHandle: handle,
+        namespace: activeNamespace,
+      }),
     );
     try {
       const [remote, source] = await Promise.all([
@@ -409,7 +551,7 @@ export function useStorageBackend(): UseStorageBackend {
     setFolderReconnectNeeded(false);
     setFolderHandleLoaded(true);
     setBackendState("folder");
-  }, [adapter, wrapForActive]);
+  }, [activeNamespace, adapter, wrapForActive]);
 
   // Re-confirm the OS grant on the already-stored handle. `requestPermission`
   // needs a user gesture, which is why this lives in a click handler.
@@ -433,12 +575,18 @@ export function useStorageBackend(): UseStorageBackend {
     if (folderHandle) {
       try {
         const folder = wrapForActive(
-          createFolderAdapter({ directoryHandle: folderHandle }),
+          createFolderAdapter({
+            directoryHandle: folderHandle,
+            namespace: activeNamespace,
+          }),
         );
         const snap = await folder.load();
         if (snap) {
           const browser = wrapForActive(
-            new BrowserLocalStorageAdapter(globalThis.localStorage),
+            new BrowserLocalStorageAdapter(
+              globalThis.localStorage,
+              activeNamespace,
+            ),
           );
           await browser.save(snap.text);
         }
@@ -451,7 +599,7 @@ export function useStorageBackend(): UseStorageBackend {
     setFolderHandle(null);
     setFolderReconnectNeeded(false);
     setBackendState("browser");
-  }, [folderHandle, wrapForActive]);
+  }, [folderHandle, activeNamespace, wrapForActive]);
 
   const connectDropbox = useCallback(() => {
     // Redirects away; completion runs in the boot effect above — anything
@@ -541,6 +689,89 @@ export function useStorageBackend(): UseStorageBackend {
     [inner],
   );
 
+  const switchNamespace = useCallback((slug: string) => {
+    setActiveNamespaceSlug(slug);
+    setActiveNamespaceState(slug);
+  }, []);
+
+  const createNamespace = useCallback(
+    (name: string, appearance?: NamespaceAppearance) => {
+      const created = registryAddNamespace(name);
+      // Apply the icon / colour the user picked at creation time, if any,
+      // before reading the registry back into state.
+      if (appearance && (appearance.glyph || appearance.color)) {
+        registrySetNamespaceAppearance(created.slug, appearance);
+      }
+      setNamespacesState(getNamespaces());
+      pushNamespaces(getNamespaces());
+      // Land the user in the namespace they just created.
+      setActiveNamespaceSlug(created.slug);
+      setActiveNamespaceState(created.slug);
+    },
+    [pushNamespaces],
+  );
+
+  const renameNamespace = useCallback(
+    (slug: string, name: string) => {
+      registryRenameNamespace(slug, name);
+      setNamespacesState(getNamespaces());
+      pushNamespaces(getNamespaces());
+    },
+    [pushNamespaces],
+  );
+
+  const setNamespaceAppearance = useCallback(
+    (slug: string, patch: NamespaceAppearance) => {
+      registrySetNamespaceAppearance(slug, patch);
+      setNamespacesState(getNamespaces());
+      pushNamespaces(getNamespaces());
+    },
+    [pushNamespaces],
+  );
+
+  const removeNamespace = useCallback(
+    async (slug: string) => {
+      if (slug === DEFAULT_NAMESPACE_SLUG) {
+        throw new Error("The default namespace can't be removed");
+      }
+      // Delete the namespace's bytes in whatever backend is active right now —
+      // that's the only one we hold a connection / key for. A failure
+      // (offline, revoked token) is logged but doesn't block removing the
+      // registry entry; the user can clean up orphaned bytes manually.
+      try {
+        if (backend === "browser") {
+          deleteLocalNamespace(slug);
+        } else if (backend === "folder" && folderHandle) {
+          // Remove the namespace's whole subfolder (and its markdown files).
+          await folderHandle
+            .removeEntry(slug, { recursive: true })
+            .catch(() => {});
+        } else if (backend === "dropbox" && dropboxToken) {
+          await deleteDropboxNamespace(dropboxToken, slug);
+        } else if (backend === "gdrive" && gdriveToken) {
+          await deleteGdriveNamespace(gdriveToken, slug);
+        }
+      } catch (err) {
+        log.warn(`removeNamespace: data delete failed for ${slug}`, err);
+      }
+      registryRemoveNamespace(slug);
+      setNamespacesState(getNamespaces());
+      pushNamespaces(getNamespaces());
+      if (activeNamespace === slug) {
+        setActiveNamespaceSlug(DEFAULT_NAMESPACE_SLUG);
+        setActiveNamespaceState(DEFAULT_NAMESPACE_SLUG);
+      }
+    },
+    [
+      backend,
+      dropboxToken,
+      gdriveToken,
+      activeNamespace,
+      folderHandle,
+      pushNamespaces,
+    ],
+  );
+
   return {
     adapter,
     settingsStore,
@@ -565,5 +796,12 @@ export function useStorageBackend(): UseStorageBackend {
     enableEncryption,
     disableEncryption,
     unlock,
+    namespaces,
+    activeNamespace,
+    switchNamespace,
+    createNamespace,
+    renameNamespace,
+    setNamespaceAppearance,
+    removeNamespace,
   };
 }
