@@ -9,12 +9,21 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import { useStandaloneMobile } from "../pwa/standalone.ts";
 import { useMediaQuery } from "../ui/hooks/useMediaQuery.ts";
 import type { NavContextValue } from "../ui/nav-context.ts";
 import type { MenuButtonPosition } from "../ui/sideMenuPosition.ts";
 
 const STORAGE_KEY = "notes/menu-position";
+const SHOW_BUTTON_KEY = "notes/show-menu-button";
 const DEFAULT_POSITION: MenuButtonPosition = { side: "left", y: 0.5 };
+
+function readShowMenuButton(): boolean {
+  if (typeof localStorage === "undefined") return true;
+  // Absent or anything but an explicit "false" means show the button — the
+  // floating toggle is the default, and only hidden once opted out.
+  return localStorage.getItem(SHOW_BUTTON_KEY) !== "false";
+}
 
 function isPosition(value: unknown): value is MenuButtonPosition {
   if (!value || typeof value !== "object") return false;
@@ -40,9 +49,16 @@ export function useNavState(): NavContextValue {
   const [, setDraggingState] = useState(false);
   const [position, setPositionState] =
     useState<MenuButtonPosition>(readStoredPosition);
+  const [showMenuButton, setShowMenuButtonState] =
+    useState<boolean>(readShowMenuButton);
   // From the smallest iPad up the menu docks open as a permanent sidebar
   // rather than a drawer (matches checklist's breakpoint).
   const pinned = useMediaQuery("(min-width: 768px)");
+  // Hiding the floating button is only safe in the installed PWA on a phone
+  // / tablet, where the inward edge swipe that replaces it has a free edge to
+  // live on. Everywhere else the button always shows whatever the persisted
+  // flag says.
+  const standaloneMobile = useStandaloneMobile();
 
   const toggle = useCallback(() => setOpen((v) => !v), []);
   const close = useCallback(() => setOpen(false), []);
@@ -57,6 +73,16 @@ export function useNavState(): NavContextValue {
       }
     }
   }, []);
+  const setShowMenuButton = useCallback((next: boolean) => {
+    setShowMenuButtonState(next);
+    if (typeof localStorage !== "undefined") {
+      try {
+        localStorage.setItem(SHOW_BUTTON_KEY, String(next));
+      } catch {
+        // Quota exceeded or storage disabled — keep the in-memory value.
+      }
+    }
+  }, []);
 
   return useMemo<NavContextValue>(
     () => ({
@@ -66,11 +92,25 @@ export function useNavState(): NavContextValue {
       setDragging,
       position,
       setPosition,
-      // The floating button only exists in the un-pinned drawer layout; the
-      // pinned sidebar renders no button at all.
-      showButton: !pinned,
+      showMenuButton,
+      setShowMenuButton,
+      // The floating button only exists in the un-pinned drawer layout (the
+      // pinned sidebar renders none); within that layout the standalone-mobile
+      // PWA may hide it in favour of the edge swipe, but nowhere else.
+      showButton: standaloneMobile ? showMenuButton : true,
       pinned,
     }),
-    [open, toggle, close, setDragging, position, setPosition, pinned],
+    [
+      open,
+      toggle,
+      close,
+      setDragging,
+      position,
+      setPosition,
+      showMenuButton,
+      setShowMenuButton,
+      standaloneMobile,
+      pinned,
+    ],
   );
 }

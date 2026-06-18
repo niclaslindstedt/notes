@@ -25,7 +25,20 @@ export type NavContextValue = {
   position: MenuButtonPosition;
   /** Persist a new resting spot after the user drags the button. */
   setPosition: (next: MenuButtonPosition) => void;
-  /** Whether the floating menu button is rendered. */
+  /**
+   * The user's preference for whether the floating button is shown. Only
+   * honoured in the installed PWA on a phone / tablet, where the inward edge
+   * swipe can safely replace it; everywhere else the button always shows
+   * regardless. Bound to the Show-menu-button toggle on the General tab.
+   */
+  showMenuButton: boolean;
+  /** Persist the Show-menu-button preference. */
+  setShowMenuButton: (next: boolean) => void;
+  /**
+   * Whether the floating menu button is actually rendered — the preference
+   * resolved against the platform (always true unless this is a standalone
+   * mobile PWA that opted to hide it).
+   */
   showButton: boolean;
   /**
    * Whether the side menu is pinned open as a persistent docked sidebar
