@@ -93,10 +93,10 @@ export function PrivacyPage() {
           <p>
             With no sync backend enabled, the app makes no third-party network
             calls. The only requests your browser makes are to fetch the
-            app&apos;s own static files (HTML, JavaScript, CSS, fonts, and icons)
-            from its origin, and once loaded it works fully offline as an
-            installed PWA. No fonts, analytics scripts, error-reporting services,
-            or advertising networks are ever loaded.
+            app&apos;s own static files (HTML, JavaScript, CSS, fonts, and
+            icons) from its origin, and once loaded it works fully offline as an
+            installed PWA. No fonts, analytics scripts, error-reporting
+            services, or advertising networks are ever loaded.
           </p>
           <p>
             If you opt in to Dropbox or Google Drive sync, the app additionally
@@ -108,9 +108,9 @@ export function PrivacyPage() {
 
         <Section title="Optional sync" id="cloud-sync">
           <p>
-            Sync is off until you choose a backend yourself. You can pick one
-            of three places to keep a copy of your notes, and you can switch
-            back to local-only at any time:
+            Sync is off until you choose a backend yourself. You can pick one of
+            three places to keep a copy of your notes, and you can switch back
+            to local-only at any time:
           </p>
           <ul className="ml-5 list-disc space-y-2">
             <li>
