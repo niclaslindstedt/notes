@@ -1,9 +1,8 @@
 /* Design tokens. One slot vocabulary (`--page-bg`, `--surface`, `--fg`,
-   `--accent`, …) drives the whole UI, mirroring the structure of
-   checklist's theme so a fuller palette engine can drop in later without
-   reworking call sites. The default is a dark One-Dark-ish palette; the
-   light palette overrides the same slots under `[data-theme="light"]` and
-   under `prefers-color-scheme: light` when the theme is `system`. */
+   `--accent`, …) drives the whole UI. The colour values for each theme
+   preset live in `./palettes.css` (one block per `data-theme`); this file
+   owns the Tailwind `@theme inline` mapping, the non-colour structural
+   tokens (radius, density, fonts), and the html/body reset. */
 
 @theme inline {
   --color-page-bg: var(--page-bg);
@@ -24,63 +23,16 @@
 }
 
 :root {
-  /* One Dark, default shell. */
-  --page-bg: #1d2027;
-  --surface: #282c34;
-  --surface-2: #2c313a;
-  --surface-3: #313742;
-  --fg: #abb2bf;
-  --fg-bright: #e6e6e6;
-  --muted: #9097a8;
-  --line: #3e4451;
-  --accent: #98c379;
-  --danger: #e06c75;
-  --link: #61afef;
-
+  /* Structural (non-colour) tokens. The colour slots live in
+     `./palettes.css`, keyed off `data-theme`; these defaults are the same
+     across every preset and the Custom-theme editor overrides them inline
+     on <html>. "md" radius / "comfortable" density are the baseline. */
   --radius: 8px;
-  /* Vertical padding of a navigation / menu row. checklist drives this off
-     a density preference; notes pins it to a single comfortable value. */
+  /* Vertical padding of a navigation / menu row, driven by the density
+     preference in the Custom theme (otherwise the comfortable default). */
   --density-row-py: 0.5rem;
   --app-font-family: var(--font-mono);
   --app-font-scale: 1;
-
-  color-scheme: dark;
-}
-
-/* One Light palette, applied when the user explicitly picks Light. */
-:root[data-theme="light"] {
-  --page-bg: #eef0f2;
-  --surface: #f8f9fa;
-  --surface-2: #f1f3f5;
-  --surface-3: #e7eaed;
-  --fg: #2f323a;
-  --fg-bright: #15171c;
-  --muted: #6a6f7c;
-  --line: #ccd0d6;
-  --accent: #3f8c3e;
-  --danger: #c9434c;
-  --link: #1d6fd0;
-
-  color-scheme: light;
-}
-
-/* `system` follows the OS preference. */
-@media (prefers-color-scheme: light) {
-  :root[data-theme="system"] {
-    --page-bg: #eef0f2;
-    --surface: #f8f9fa;
-    --surface-2: #f1f3f5;
-    --surface-3: #e7eaed;
-    --fg: #2f323a;
-    --fg-bright: #15171c;
-    --muted: #6a6f7c;
-    --line: #ccd0d6;
-    --accent: #3f8c3e;
-    --danger: #c9434c;
-    --link: #1d6fd0;
-
-    color-scheme: light;
-  }
 }
 
 html,
@@ -147,4 +99,17 @@ body {
   .drawer-backdrop {
     animation-duration: 0ms;
   }
+}
+
+/* Custom-theme "reduce motion" toggle. The engine sets
+   `data-reduce-motion="true"` on <html> when the user enables it; this
+   high-specificity rule short-circuits every transition and animation the
+   same way the OS-level `prefers-reduced-motion` guard above does, but on
+   demand rather than from a system preference. */
+:root[data-reduce-motion="true"] *,
+:root[data-reduce-motion="true"] *::before,
+:root[data-reduce-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
 }
