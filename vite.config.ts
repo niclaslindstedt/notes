@@ -171,6 +171,31 @@ function emitPrivacyAlias(): Plugin {
   };
 }
 
+// Mirror the built `index.html` to `home/index.html` so GitHub Pages serves
+// the SPA from the clean URL `/home/` (and `/preview/home/`, …). This is the
+// public showcase / landing page (`ui/HomePage.tsx`) — the surface Google's
+// OAuth verification reviewer reaches without signing in. Works exactly like
+// `emit-privacy-alias`: `main.tsx` reads `location.pathname` and mounts the
+// home page there, and the copied HTML loads the same origin-absolute hashed
+// asset URLs, so no rewrite is needed.
+function emitHomeAlias(): Plugin {
+  return {
+    name: "emit-home-alias",
+    apply: "build",
+    enforce: "post",
+    generateBundle(_options, bundle) {
+      const index = bundle["index.html"];
+      if (index && index.type === "asset") {
+        this.emitFile({
+          type: "asset",
+          fileName: "home/index.html",
+          source: String(index.source),
+        });
+      }
+    },
+  };
+}
+
 export default defineConfig({
   base,
   plugins: [
@@ -239,6 +264,7 @@ export default defineConfig({
     emitVersionJson(),
     emitPrecacheManifest(),
     emitPrivacyAlias(),
+    emitHomeAlias(),
   ],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),

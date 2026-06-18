@@ -15,20 +15,25 @@ import "@fontsource/jetbrains-mono/latin-400.css";
 import "@fontsource/jetbrains-mono/latin-ext-400.css";
 import "@fontsource/jetbrains-mono/latin-700.css";
 import "@fontsource/jetbrains-mono/latin-ext-700.css";
+import { HomePage } from "../ui/HomePage.tsx";
 import { PrivacyPage } from "../ui/PrivacyPage.tsx";
 import { App } from "./App.tsx";
 
 const root = document.getElementById("app");
 if (!root) throw new Error("missing #app mount point");
 
-// Trivial path-based switch. The build emits `dist/privacy/index.html`
-// (see the `emit-privacy-alias` plugin in `vite.config.ts`) so GitHub
-// Pages serves the same SPA at `/privacy/`, and this check decides which
-// view to mount. Deploy slots nest the page one segment deeper
-// (`/preview/privacy/`); the suffix check matches both.
+// Trivial path-based switch. The build emits `dist/privacy/index.html` and
+// `dist/home/index.html` (see the `emit-privacy-alias` / `emit-home-alias`
+// plugins in `vite.config.ts`) so GitHub Pages serves the same SPA at
+// `/privacy/` and `/home/`, and these checks decide which view to mount.
+// Deploy slots nest the pages one segment deeper (`/preview/privacy/`,
+// `/preview/home/`); the suffix checks match both.
 const path = window.location.pathname.replace(/\/$/, "");
 const isPrivacy = path.endsWith("/privacy");
+const isHome = path.endsWith("/home");
 
 createRoot(root).render(
-  <StrictMode>{isPrivacy ? <PrivacyPage /> : <App />}</StrictMode>,
+  <StrictMode>
+    {isPrivacy ? <PrivacyPage /> : isHome ? <HomePage /> : <App />}
+  </StrictMode>,
 );
