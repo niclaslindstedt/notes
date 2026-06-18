@@ -30,19 +30,27 @@ import {
   COLOR_KEYS,
   COLOR_KEY_TO_CSS_VAR,
   DEFAULT_CUSTOM_THEME,
+  DEFAULT_EDITOR_SETTINGS,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SCALE,
   DEFAULT_THEME,
   FONT_FAMILIES,
   FONT_SCALE_PRESETS,
+  isEditorMargin,
   type CustomTheme,
   type DensityPreset,
+  type EditorSettings,
   type FontFamilyId,
   type RadiusPreset,
   type ThemePreset,
 } from "./themes.ts";
 
-export type { CustomTheme, CustomThemeColors, ThemePreset } from "./themes.ts";
+export type {
+  CustomTheme,
+  CustomThemeColors,
+  EditorSettings,
+  ThemePreset,
+} from "./themes.ts";
 
 // The persisted appearance document. Plain JSON so it round-trips through
 // localStorage unchanged.
@@ -52,6 +60,8 @@ export type Appearance = {
   // UI text-size multiplier; one of `FONT_SCALE_PRESETS`.
   fontScale: number;
   customTheme: CustomTheme;
+  // Note-writing surface preferences (margins, wrap, live Markdown).
+  editor: EditorSettings;
 };
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -59,6 +69,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   fontFamily: DEFAULT_FONT_FAMILY,
   fontScale: DEFAULT_FONT_SCALE,
   customTheme: DEFAULT_CUSTOM_THEME,
+  editor: DEFAULT_EDITOR_SETTINGS,
 };
 
 const STORAGE_KEY = "notes/appearance";
@@ -114,6 +125,7 @@ function coerce(raw: unknown): Appearance {
   const fontScale = raw.fontScale as number;
   const custom = isRecord(raw.customTheme) ? raw.customTheme : {};
   const colors = isRecord(custom.colors) ? custom.colors : {};
+  const editor = isRecord(raw.editor) ? raw.editor : {};
   return {
     theme:
       typeof theme === "string" && (THEME_SET as Set<string>).has(theme)
@@ -145,6 +157,19 @@ function coerce(raw: unknown): Appearance {
           ? (custom.density as DensityPreset)
           : DEFAULT_CUSTOM_THEME.density,
       reduceMotion: custom.reduceMotion === true,
+    },
+    editor: {
+      margin: isEditorMargin(editor.margin)
+        ? editor.margin
+        : DEFAULT_EDITOR_SETTINGS.margin,
+      wordWrap:
+        typeof editor.wordWrap === "boolean"
+          ? editor.wordWrap
+          : DEFAULT_EDITOR_SETTINGS.wordWrap,
+      renderMarkdown:
+        typeof editor.renderMarkdown === "boolean"
+          ? editor.renderMarkdown
+          : DEFAULT_EDITOR_SETTINGS.renderMarkdown,
     },
   };
 }

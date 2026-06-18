@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { isBlank, noteTitle, notePreview, type Note } from "../domain/note.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
+import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { useApplyAppearance } from "../theme/useTheme.ts";
+import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
@@ -30,7 +32,7 @@ import { useSettingsSync } from "./use-settings-sync.ts";
 // threading openers through the tree.
 
 export function App() {
-  useApplyAppearance();
+  const { editor } = useApplyAppearance();
   // The active storage backend (this device / a local folder / a cloud) and
   // its sync engine. Appearance settings reconcile against the same backend
   // so they travel with a synced folder too.
@@ -121,6 +123,7 @@ export function App() {
               <Editor
                 key={editing.id}
                 note={editing}
+                editor={editor}
                 onChange={(body) => update(editing.id, body)}
                 onClose={() => switchTo(null)}
                 onDelete={() => removeNote(editing.id)}
@@ -157,6 +160,23 @@ function NoteList({
   onNew: () => void;
   syncSlot: ReactNode;
 }) {
+  // With no notes yet, pressing Enter (a physical keyboard, so desktop) starts
+  // the first note — the empty state's primary action without a tap.
+  const empty = notes.length === 0;
+  useEffect(() => {
+    if (!empty) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "BUTTON") return;
+      e.preventDefault();
+      onNew();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [empty, onNew]);
+
   return (
     <div className="flex h-full flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
@@ -167,8 +187,9 @@ function NoteList({
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
         {notes.length === 0 ? (
           <p className="mt-16 text-center text-muted">
-            No notes yet. Tap <span className="text-accent">+</span> to write
-            your first one.
+            No notes yet. Tap <span className="text-accent">+</span> (or press{" "}
+            <kbd className="rounded border border-line px-1 text-xs">Enter</kbd>
+            ) to write your first one.
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -185,7 +206,7 @@ function NoteList({
         type="button"
         onClick={onNew}
         aria-label="New note"
-        className="fixed bottom-0 right-0 z-20 m-[max(1rem,env(safe-area-inset-bottom))] flex h-14 w-14 items-center justify-center rounded-full bg-accent text-3xl font-light text-page-bg shadow-lg active:scale-95"
+        className="fixed bottom-0 right-0 z-20 m-[max(1rem,env(safe-area-inset-bottom))] flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-accent text-3xl font-light text-page-bg shadow-lg active:scale-95"
       >
         +
       </button>
@@ -211,29 +232,20 @@ function NoteCard({ note, onOpen }: { note: Note; onOpen: () => void }) {
 
 function Editor({
   note,
+  editor,
   onChange,
   onClose,
   onDelete,
   syncSlot,
 }: {
   note: Note;
+  editor: EditorSettings;
   onChange: (body: string) => void;
   onClose: () => void;
   onDelete: () => void;
   syncSlot: ReactNode;
 }) {
-  const [body, setBody] = useState(note.body);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Focus the editor on open without the autoFocus prop (which a11y
-  // linting flags) — placing the caret at the end so editing an existing
-  // note continues where it left off.
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
-  }, []);
+  const maxWidth = editorMarginMaxWidth(editor.margin);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -257,16 +269,65 @@ function Editor({
         </div>
       </header>
 
-      <textarea
-        ref={textareaRef}
-        value={body}
-        onChange={(e) => {
-          setBody(e.target.value);
-          onChange(e.target.value);
-        }}
-        placeholder="Start writing…"
-        className="mx-auto w-full max-w-2xl flex-1 resize-none bg-page-bg px-4 py-4 text-fg outline-none placeholder:text-muted/60"
-      />
+      {editor.renderMarkdown ? (
+        <MarkdownEditor
+          body={note.body}
+          onChange={onChange}
+          wordWrap={editor.wordWrap}
+          maxWidth={maxWidth}
+        />
+      ) : (
+        <PlainEditor
+          body={note.body}
+          onChange={onChange}
+          wordWrap={editor.wordWrap}
+          maxWidth={maxWidth}
+        />
+      )}
     </div>
+  );
+}
+
+// The Markdown-off fallback: a single full-height textarea. Still honours the
+// margin (writing-column width) and word-wrap preferences.
+function PlainEditor({
+  body,
+  onChange,
+  wordWrap,
+  maxWidth,
+}: {
+  body: string;
+  onChange: (body: string) => void;
+  wordWrap: boolean;
+  maxWidth: string;
+}) {
+  const [value, setValue] = useState(body);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Focus the editor on open without the autoFocus prop (which a11y
+  // linting flags) — placing the caret at the end so editing an existing
+  // note continues where it left off.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      wrap={wordWrap ? "soft" : "off"}
+      onChange={(e) => {
+        setValue(e.target.value);
+        onChange(e.target.value);
+      }}
+      placeholder="Start writing…"
+      style={maxWidth === "none" ? undefined : { maxWidth }}
+      className={`mx-auto w-full flex-1 resize-none bg-page-bg px-4 py-4 text-fg outline-none placeholder:text-muted/60 ${
+        wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"
+      }`}
+    />
   );
 }

@@ -1,0 +1,122 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  classifyLines,
+  parseInline,
+  type InlineNode,
+} from "../../src/domain/markdown.ts";
+
+// Flatten the inline tree to the text it would render, so a test can assert
+// structure without rebuilding the whole node graph by hand.
+function flatten(nodes: InlineNode[]): string {
+  return nodes
+    .map((n) => {
+      switch (n.type) {
+        case "text":
+        case "code":
+        case "link":
+          return n.text;
+        default:
+          return flatten(n.children);
+      }
+    })
+    .join("");
+}
+
+describe("classifyLines", () => {
+  it("classifies a heading with its level and content offset", () => {
+    const [block] = classifyLines("## Hello");
+    expect(block?.kind).toBe("heading");
+    expect(block?.level).toBe(2);
+    expect(block?.content).toBe("Hello");
+    // "## " is three characters, so content starts at column 3.
+    expect(block?.contentStart).toBe(3);
+  });
+
+  it("classifies unordered and ordered list items", () => {
+    const [ul, ol] = classifyLines("- item\n1. first");
+    expect(ul?.kind).toBe("ul");
+    expect(ul?.content).toBe("item");
+    expect(ul?.contentStart).toBe(2);
+    expect(ol?.kind).toBe("ol");
+    expect(ol?.ordinal).toBe("1.");
+    expect(ol?.content).toBe("first");
+  });
+
+  it("classifies blockquotes, rules, and blank lines", () => {
+    const [quote, hr, blank] = classifyLines("> quoted\n---\n");
+    expect(quote?.kind).toBe("quote");
+    expect(quote?.content).toBe("quoted");
+    expect(hr?.kind).toBe("hr");
+    expect(blank?.kind).toBe("blank");
+  });
+
+  it("treats lines inside a fence as code, not Markdown", () => {
+    const blocks = classifyLines("```\n# not a heading\n```");
+    expect(blocks.map((b) => b.kind)).toEqual(["fence", "code", "fence"]);
+    // The would-be heading keeps its raw text and isn't reparsed.
+    expect(blocks[1]?.content).toBe("# not a heading");
+  });
+
+  it("falls back to paragraph for plain text", () => {
+    const [block] = classifyLines("just words");
+    expect(block?.kind).toBe("paragraph");
+    expect(block?.contentStart).toBe(0);
+  });
+});
+
+describe("parseInline", () => {
+  it("parses bold, italic, and bold-italic", () => {
+    expect(parseInline("**b**")[0]).toMatchObject({ type: "strong" });
+    expect(parseInline("*i*")[0]).toMatchObject({ type: "em" });
+    const tri = parseInline("***x***")[0];
+    expect(tri).toMatchObject({ type: "strong" });
+    expect(flatten([tri!])).toBe("x");
+  });
+
+  it("parses inline code and strikethrough", () => {
+    expect(parseInline("`code`")[0]).toMatchObject({
+      type: "code",
+      text: "code",
+    });
+    expect(parseInline("~~gone~~")[0]).toMatchObject({
+      type: "strikethrough",
+    });
+  });
+
+  it("parses links into text and href", () => {
+    expect(parseInline("[label](https://x.y)")[0]).toMatchObject({
+      type: "link",
+      text: "label",
+      href: "https://x.y",
+    });
+  });
+
+  it("records absolute source offsets on leaf nodes", () => {
+    // "ab **c**" — the bold content "c" sits at column 5 in the source.
+    const nodes = parseInline("ab **c**");
+    const strong = nodes.find((n) => n.type === "strong");
+    expect(strong?.type).toBe("strong");
+    if (strong?.type === "strong") {
+      expect(strong.children[0]).toMatchObject({ type: "text", offset: 5 });
+    }
+  });
+
+  it("offsets respect the base column of the line content", () => {
+    // Heading content "Hi" begins at column 2 ("# Hi"), passed as base.
+    const [node] = parseInline("Hi", 2);
+    expect(node).toMatchObject({ type: "text", text: "Hi", offset: 2 });
+  });
+
+  it("does not treat underscores inside a word as emphasis", () => {
+    const nodes = parseInline("a_b_c");
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toMatchObject({ type: "text", text: "a_b_c" });
+  });
+
+  it("leaves an unterminated delimiter as plain text", () => {
+    const nodes = parseInline("**oops");
+    expect(flatten(nodes)).toBe("**oops");
+    expect(nodes.every((n) => n.type === "text")).toBe(true);
+  });
+});

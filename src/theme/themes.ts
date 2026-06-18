@@ -150,6 +150,57 @@ export const MIN_FONT_SCALE = 0.9;
 export const MAX_FONT_SCALE = 1.25;
 export const DEFAULT_FONT_SCALE = 1;
 
+// Editor preferences — how the note-writing surface lays out and whether it
+// renders Markdown. These ride alongside the appearance settings (same store,
+// same `settings.json` sync) because they're device/user writing preferences,
+// not part of the note document.
+
+// The horizontal margins around the writing column. `none` lets the text use
+// the full width of the note area (the default — the editor should feel
+// roomy); the others centre a progressively narrower column, trading width
+// for breathing room at the page edges. `maxWidth` is the CSS cap applied to
+// the column (`"none"` means uncapped / full-bleed).
+export type EditorMargin = "none" | "sm" | "md" | "lg";
+
+export const EDITOR_MARGINS: readonly {
+  id: EditorMargin;
+  label: string;
+  maxWidth: string;
+}[] = [
+  { id: "none", label: "None", maxWidth: "none" },
+  { id: "sm", label: "Small", maxWidth: "60rem" },
+  { id: "md", label: "Medium", maxWidth: "44rem" },
+  { id: "lg", label: "Large", maxWidth: "32rem" },
+];
+
+const EDITOR_MARGIN_IDS = new Set<string>(EDITOR_MARGINS.map((m) => m.id));
+
+export function isEditorMargin(v: unknown): v is EditorMargin {
+  return typeof v === "string" && EDITOR_MARGIN_IDS.has(v);
+}
+
+export function editorMarginMaxWidth(margin: EditorMargin): string {
+  return EDITOR_MARGINS.find((m) => m.id === margin)?.maxWidth ?? "none";
+}
+
+// The persisted editor settings.
+export type EditorSettings = {
+  // Horizontal margins around the writing column.
+  margin: EditorMargin;
+  // Wrap long lines (`true`) versus keep them on one line and scroll the
+  // editor horizontally (`false`).
+  wordWrap: boolean;
+  // Render Markdown inline as you type, Obsidian-style — every line but the
+  // one the caret sits on shows formatted, the active line shows its source.
+  renderMarkdown: boolean;
+};
+
+export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
+  margin: "none",
+  wordWrap: true,
+  renderMarkdown: true,
+};
+
 export type RadiusPreset = "none" | "sm" | "md" | "lg";
 export type DensityPreset = "compact" | "comfortable" | "spacious";
 
