@@ -289,6 +289,18 @@ reuse them rather than re-porting:
   checklist: `useNotesSync` takes a `resetHistory` ref and calls it after the
   load / reload / conflict-adopt paths so the timeline re-seeds against a
   document that arrived from outside the edit path.
+- **Changelog ("What's new") modal** — `src/ui/changelog/`
+  (`parse.ts` Keep-a-Changelog parser, `data.ts` inlining `CHANGELOG.md?raw`,
+  `feature-docs.ts` glob-inlining `docs/features/*.md`, `render.tsx`,
+  `ChangelogModal.tsx`) + `app/modals/ChangelogModalHost.tsx`, opened by the
+  `{ kind: "changelog" }` bus command from a `SparklesIcon` "What's new" row in
+  `SideMenu`. **Unlike checklist, notes does NOT port `ui/markdown/renderMarkdown.tsx`** —
+  it already has one Markdown parser (`domain/markdown.ts`), so `render.tsx`
+  reuses `parseInline` / `classifyLines` and only adds the React-node mapping,
+  the `feature:<slug>` drill-down button, and the `URL_SAFE` href check. Strings
+  are inlined (no i18n). The `TYPE_COLOR` map collapses checklist's
+  positive/negative/success slots — which notes dropped — onto
+  `accent`/`danger`/`muted`; the bold label text carries the distinction.
 
 ### Privacy / clean-URL routing
 
