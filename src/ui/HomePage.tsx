@@ -76,6 +76,11 @@ export function HomePage() {
           <ul className="ml-5 list-disc space-y-1.5">
             <li>Write, edit, and organise plain-text notes.</li>
             <li>
+              Undo and redo your changes — bring back a deleted note or step
+              back through your edits, with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+
+              <kbd>Z</kbd> or the side menu.
+            </li>
+            <li>
               Group notes into separate <em>namespaces</em> — independent
               buckets you can switch between, each with its own icon and colour.
             </li>
