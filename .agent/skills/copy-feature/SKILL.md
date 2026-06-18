@@ -204,8 +204,13 @@ reuse them rather than re-porting:
   Add a modal by extending the `ModalCommand` union and adding a host under
   `src/app/modals/`; mount the host inside `<ModalBusProvider>` in `App`.
 - **Nav drawer** — `src/ui/SideMenu.tsx`, `nav-context.ts`, `app/use-nav.ts`,
-  the `useDraggableMenuButton` / `useSwipeReveal` / `useMediaQuery` hooks,
-  `sideMenuPosition.ts` (pure, unit-tested), and `appViewportRect.ts`.
+  the `useDraggableMenuButton` / `useSwipeReveal` / `useEdgeSwipeOpen` /
+  `useMediaQuery` hooks, `sideMenuPosition.ts` (pure, unit-tested), and
+  `appViewportRect.ts`. The floating button can be hidden (the
+  `showMenuButton` preference on `useNav`, persisted under
+  `notes/show-menu-button`); when hidden, `useEdgeSwipeOpen` (wired in `App`)
+  opens the drawer with an inward edge swipe. The toggle is only offered when
+  `useStandaloneMobile()` is true.
 - **Icons** — `src/ui/icons.tsx` is a single flat file (notes' layout), not
   checklist's `icons/` family split. Add new glyphs here.
 - **Tokens** — `--surface-3`, `--link`, and `--density-row-py` now exist in
@@ -223,11 +228,17 @@ reuse them rather than re-porting:
   one `palettes.css` block + registering its id.
 - **Settings primitives** — `src/ui/form/Checkbox.tsx` and
   `src/ui/settings/shared.tsx` (`Section` / `Field` / `ToggleRow` /
-  `SegmentedRow`). The Appearance surface lives in
-  `src/ui/settings/AppearanceSection.tsx`, rendered inside the
-  `SettingsModal`. checklist's `SelectPicker` / `FloatingPanel` were **not**
-  ported — wrap-radio rows and `SegmentedRow` cover the pickers; bring
-  `FloatingPanel` over only when a feature genuinely needs a positioned
+  `SegmentedRow`). The `SettingsModal` is **tabbed** like checklist's — a
+  left icon-rail on desktop, a burger dropdown in the header on mobile — and
+  lands on a General tab, with `GeneralSection` / `AppearanceSection` /
+  `StorageSection` each rendered per tab (flat `*Section.tsx` files, not
+  checklist's `tabs/` subfolder). There's **no draft / Save footer**: every
+  control applies live through its own store. The mobile section dropdown is
+  an inline `absolute` panel with a `fixed inset-0` catch-all to dismiss —
+  checklist's `FloatingPanel` was **not** needed because the panel sits just
+  below the header, within the card. `SelectPicker` / `FloatingPanel` remain
+  un-ported — wrap-radio rows + `SegmentedRow` cover the pickers; bring
+  `FloatingPanel` over only when a feature needs a genuinely positioned
   popover.
 
 ### Privacy / clean-URL routing

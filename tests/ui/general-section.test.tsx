@@ -1,0 +1,64 @@
+// @vitest-environment jsdom
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { GeneralSection } from "../../src/ui/settings/GeneralSection.tsx";
+import { NavContext, type NavContextValue } from "../../src/ui/nav-context.ts";
+import { useStandaloneMobile } from "../../src/pwa/standalone.ts";
+
+// The Show-menu-button toggle is only offered in the installed PWA on a
+// phone / tablet, so the standalone detector is mocked per test.
+vi.mock("../../src/pwa/standalone.ts", () => ({
+  useStandaloneMobile: vi.fn(() => false),
+}));
+
+const mockStandalone = vi.mocked(useStandaloneMobile);
+
+function renderWithNav(overrides: Partial<NavContextValue> = {}) {
+  const setShowMenuButton = vi.fn();
+  const value: NavContextValue = {
+    open: false,
+    toggle: vi.fn(),
+    close: vi.fn(),
+    setDragging: vi.fn(),
+    position: { side: "left", y: 0.5 },
+    setPosition: vi.fn(),
+    showMenuButton: true,
+    setShowMenuButton,
+    showButton: true,
+    pinned: false,
+    ...overrides,
+  };
+  render(
+    <NavContext.Provider value={value}>
+      <GeneralSection />
+    </NavContext.Provider>,
+  );
+  return { setShowMenuButton };
+}
+
+describe("GeneralSection", () => {
+  afterEach(() => {
+    mockStandalone.mockReturnValue(false);
+  });
+
+  it("always shows the local-first blurb", () => {
+    renderWithNav();
+    expect(screen.getByText(/local-first/i)).toBeTruthy();
+  });
+
+  it("hides the menu-button toggle outside a standalone mobile PWA", () => {
+    mockStandalone.mockReturnValue(false);
+    renderWithNav();
+    expect(screen.queryByLabelText("Show menu button")).toBeNull();
+  });
+
+  it("offers the menu-button toggle in a standalone mobile PWA", () => {
+    mockStandalone.mockReturnValue(true);
+    const { setShowMenuButton } = renderWithNav({ showMenuButton: true });
+    const toggle = screen.getByLabelText("Show menu button");
+    expect(toggle).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(setShowMenuButton).toHaveBeenCalledWith(false);
+  });
+});

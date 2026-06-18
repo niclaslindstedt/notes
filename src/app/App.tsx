@@ -11,6 +11,7 @@ import {
 } from "../theme/themes.ts";
 import { setTheme, useApplyAppearance } from "../theme/useTheme.ts";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
+import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import { NavContext } from "../ui/nav-context.ts";
 import { SideMenu } from "../ui/SideMenu.tsx";
@@ -55,6 +56,17 @@ export function App() {
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const nav = useNavState();
+
+  // When the floating button is hidden (only possible in the standalone
+  // mobile PWA), an inward swipe from the drawer's resting edge opens it.
+  // The hook itself stands down while a modal is open; we gate it off too
+  // when the button is shown, the drawer is already open, or the sidebar is
+  // pinned.
+  useEdgeSwipeOpen({
+    side: nav.position.side,
+    enabled: !nav.showButton && !nav.pinned && !nav.open,
+    onOpen: nav.toggle,
+  });
 
   const editing = editingId
     ? (allNotes.find((n) => n.id === editingId) ?? null)
