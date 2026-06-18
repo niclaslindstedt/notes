@@ -51,7 +51,12 @@ function viewFor(
   // "synced". The other states (conflict, auth-error) need a live backend
   // response to arise, so they can't co-occur with being offline.
   if (offline) {
-    return { Icon: CloudOffIcon, label: "Offline", tone: "warn", action: "open" };
+    return {
+      Icon: CloudOffIcon,
+      label: "Offline",
+      tone: "warn",
+      action: "open",
+    };
   }
   switch (status) {
     case "saving":

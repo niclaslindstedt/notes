@@ -3,7 +3,10 @@ import { useEffect, useId, useState, type ReactElement } from "react";
 import type { SaveStatus } from "../app/use-notes-sync.ts";
 import type { BackendId } from "../storage/backend-preference.ts";
 import { DROPBOX_APP_FOLDER, dropboxWebUrl } from "../storage/dropbox/index.ts";
-import { GDRIVE_APP_FOLDER_NAME, gdriveWebUrl } from "../storage/gdrive/index.ts";
+import {
+  GDRIVE_APP_FOLDER_NAME,
+  gdriveWebUrl,
+} from "../storage/gdrive/index.ts";
 import { namespaceCloudFolder } from "../storage/namespaces.ts";
 import { Button } from "./form/Button.tsx";
 import {
@@ -107,15 +110,19 @@ function statusView(
   }
   switch (status) {
     case "saving":
-      return { Icon: SpinnerIcon, label: "Syncing now…", tone: "busy", spin: true };
+      return {
+        Icon: SpinnerIcon,
+        label: "Syncing now…",
+        tone: "busy",
+        spin: true,
+      };
     case "error":
       return {
         Icon: CloudAlertIcon,
         label: "Sync failed",
         tone: "err",
         detail:
-          statusDetail ??
-          `The last save to ${providerName} didn't go through.`,
+          statusDetail ?? `The last save to ${providerName} didn't go through.`,
       };
     case "throttled":
       return {
@@ -228,7 +235,9 @@ export function SyncDetailsModal({
 
   const reconnectLabel =
     reconnectError !== null ? "Try again" : `Reconnect to ${providerName}`;
-  const ReconnectIcon: IconComponent = reconnectPending ? SpinnerIcon : RefreshIcon;
+  const ReconnectIcon: IconComponent = reconnectPending
+    ? SpinnerIcon
+    : RefreshIcon;
 
   return (
     <Modal open={open} onClose={onClose} labelledBy={titleId}>
