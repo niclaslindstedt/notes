@@ -192,3 +192,30 @@ After a port:
    current.
 4. Commit the SKILL.md edit alongside the ported feature, and refresh
    `.last-updated`.
+
+### Foundations already ported
+
+These shared pieces are in `notes` now (brought over with the side menu) —
+reuse them rather than re-porting:
+
+- **Modal stack** — `src/ui/Modal.tsx` (full-screen-on-mobile / `centered`
+  card, Escape-stack, scroll-lock, focus restore). i18n strings inlined.
+- **Modal command-bus** — `src/ui/modal-bus.ts` + `ModalBusProvider.tsx`.
+  Add a modal by extending the `ModalCommand` union and adding a host under
+  `src/app/modals/`; mount the host inside `<ModalBusProvider>` in `App`.
+- **Nav drawer** — `src/ui/SideMenu.tsx`, `nav-context.ts`, `app/use-nav.ts`,
+  the `useDraggableMenuButton` / `useSwipeReveal` / `useMediaQuery` hooks,
+  `sideMenuPosition.ts` (pure, unit-tested), and `appViewportRect.ts`.
+- **Icons** — `src/ui/icons.tsx` is a single flat file (notes' layout), not
+  checklist's `icons/` family split. Add new glyphs here.
+- **Tokens** — `--surface-3`, `--link`, and `--density-row-py` now exist in
+  every palette in `styles/theme.css`, plus the `drawer-*` keyframes.
+
+### Privacy / clean-URL routing
+
+`main.tsx` does a `location.pathname` suffix switch to mount `PrivacyPage`,
+and `vite.config.ts`'s `emitPrivacyAlias` mirrors `index.html` to
+`privacy/index.html`. notes has **no SEO system yet** (a deferred OSS_SPEC
+item), so unlike checklist this alias does NOT splice per-route
+`<title>`/canonical — it's a verbatim copy. Add the splice here when the SEO
+scaffolding lands.

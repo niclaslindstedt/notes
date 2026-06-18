@@ -9,12 +9,14 @@
   --color-page-bg: var(--page-bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-fg: var(--fg);
   --color-fg-bright: var(--fg-bright);
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-danger: var(--danger);
+  --color-link: var(--link);
 
   --font-mono:
     "JetBrains Mono", "Fira Code", ui-monospace, "SF Mono", Menlo, Consolas,
@@ -26,14 +28,19 @@
   --page-bg: #1d2027;
   --surface: #282c34;
   --surface-2: #2c313a;
+  --surface-3: #313742;
   --fg: #abb2bf;
   --fg-bright: #e6e6e6;
   --muted: #9097a8;
   --line: #3e4451;
   --accent: #98c379;
   --danger: #e06c75;
+  --link: #61afef;
 
   --radius: 8px;
+  /* Vertical padding of a navigation / menu row. checklist drives this off
+     a density preference; notes pins it to a single comfortable value. */
+  --density-row-py: 0.5rem;
   --app-font-family: var(--font-mono);
   --app-font-scale: 1;
 
@@ -45,12 +52,14 @@
   --page-bg: #eef0f2;
   --surface: #f8f9fa;
   --surface-2: #f1f3f5;
+  --surface-3: #e7eaed;
   --fg: #2f323a;
   --fg-bright: #15171c;
   --muted: #6a6f7c;
   --line: #ccd0d6;
   --accent: #3f8c3e;
   --danger: #c9434c;
+  --link: #1d6fd0;
 
   color-scheme: light;
 }
@@ -61,12 +70,14 @@
     --page-bg: #eef0f2;
     --surface: #f8f9fa;
     --surface-2: #f1f3f5;
+    --surface-3: #e7eaed;
     --fg: #2f323a;
     --fg-bright: #15171c;
     --muted: #6a6f7c;
     --line: #ccd0d6;
     --accent: #3f8c3e;
     --danger: #c9434c;
+    --link: #1d6fd0;
 
     color-scheme: light;
   }
@@ -92,4 +103,48 @@ body {
 
 #app {
   min-height: 100dvh;
+}
+
+/* Side-menu drawer entrance. The drawer mounts only while open, so a CSS
+   `animation` (not a `transition`) plays straight off the mount with no
+   first-frame at the resting position — that initial snap-then-settle is
+   what read as a flicker. The panel slides in from whichever edge it rests
+   against (`useDraggableMenuButton`) while the backdrop fades up. The
+   reduce-motion guard below zeroes both. */
+@keyframes drawer-slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes drawer-slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes drawer-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.drawer-panel-left {
+  animation: drawer-slide-in-left 300ms ease-out;
+}
+
+.drawer-panel-right {
+  animation: drawer-slide-in-right 300ms ease-out;
+}
+
+.drawer-backdrop {
+  animation: drawer-backdrop-in 300ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-panel-left,
+  .drawer-panel-right,
+  .drawer-backdrop {
+    animation-duration: 0ms;
+  }
 }
