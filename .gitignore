@@ -1,0 +1,38 @@
+# Common
+.DS_Store
+*.log
+*.tmp
+.env
+.env.local
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Coverage
+.coverage/
+coverage/
+
+# Generated docs
+docs/_build/
+
+# Node / Vite
+node_modules/
+dist/
+dev-dist/
+.vite/
+
+# Service worker output
+public/sw.js
+public/workbox-*.js
+
+# React Native / Expo (native/) build + tooling artifacts
+.expo/
+native/.expo/
+native/android/
+native/ios/
+native/.metro-health-check*
+
+# Transient release artifacts (written by the Release workflow)
+.release-notes.md

@@ -1,0 +1,11 @@
+# Build output
+dist
+dev-dist
+node_modules
+package-lock.json
+
+# Prose and hand-authored docs are managed by humans / the maintenance
+# skills, not reflowed by Prettier.
+**/*.md
+.agent
+.github

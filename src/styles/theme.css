@@ -1,0 +1,95 @@
+/* Design tokens. One slot vocabulary (`--page-bg`, `--surface`, `--fg`,
+   `--accent`, …) drives the whole UI, mirroring the structure of
+   checklist's theme so a fuller palette engine can drop in later without
+   reworking call sites. The default is a dark One-Dark-ish palette; the
+   light palette overrides the same slots under `[data-theme="light"]` and
+   under `prefers-color-scheme: light` when the theme is `system`. */
+
+@theme inline {
+  --color-page-bg: var(--page-bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-fg-bright: var(--fg-bright);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+
+  --font-mono:
+    "JetBrains Mono", "Fira Code", ui-monospace, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+:root {
+  /* One Dark, default shell. */
+  --page-bg: #1d2027;
+  --surface: #282c34;
+  --surface-2: #2c313a;
+  --fg: #abb2bf;
+  --fg-bright: #e6e6e6;
+  --muted: #9097a8;
+  --line: #3e4451;
+  --accent: #98c379;
+  --danger: #e06c75;
+
+  --radius: 8px;
+  --app-font-family: var(--font-mono);
+  --app-font-scale: 1;
+
+  color-scheme: dark;
+}
+
+/* One Light palette, applied when the user explicitly picks Light. */
+:root[data-theme="light"] {
+  --page-bg: #eef0f2;
+  --surface: #f8f9fa;
+  --surface-2: #f1f3f5;
+  --fg: #2f323a;
+  --fg-bright: #15171c;
+  --muted: #6a6f7c;
+  --line: #ccd0d6;
+  --accent: #3f8c3e;
+  --danger: #c9434c;
+
+  color-scheme: light;
+}
+
+/* `system` follows the OS preference. */
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    --page-bg: #eef0f2;
+    --surface: #f8f9fa;
+    --surface-2: #f1f3f5;
+    --fg: #2f323a;
+    --fg-bright: #15171c;
+    --muted: #6a6f7c;
+    --line: #ccd0d6;
+    --accent: #3f8c3e;
+    --danger: #c9434c;
+
+    color-scheme: light;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--page-bg);
+  color: var(--fg);
+  font-family: var(--app-font-family);
+  font-size: calc(1rem * var(--app-font-scale));
+  /* Respect the iOS safe areas so the standalone PWA doesn't tuck content
+     under the notch or the home indicator. */
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#app {
+  min-height: 100dvh;
+}
