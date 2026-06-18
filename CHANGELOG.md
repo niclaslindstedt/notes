@@ -13,6 +13,20 @@ predate the pipeline.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-18
+
+### Added
+
+- **Side menu** — A navigation drawer — docked as a sidebar on wide screens, a drag-out floating button on phones — that lists your notes and links to settings, the source, and the privacy policy.
+- **Settings dialog** — A settings dialog opens from the side menu — a skeleton for now, ready to fill as preferences arrive.
+- **Privacy policy** — A privacy policy is now served at /privacy, spelling out that notes never leave your device.
+- **Theme & appearance** — Settings now has an Appearance panel: pick from eleven built-in themes (One Dark/Light, Dracula, Monokai, GitHub, Solarized, Quiet Light, Excel) or System, choose a font and text size, and build a fully custom theme with your own colours, corner radius, density, and reduced motion.
+- **Storage backends** — Choose where your notes live — this device, a local folder of markdown files, or your own Dropbox or Google Drive — with optional passphrase encryption and offline editing. [Learn more](feature:storage)
+
+### Changed
+
+- **Cleaner note list header** — Removed the redundant theme toggle and version label from the note list — theme now lives only in Settings → Appearance, and the version still shows in the side menu under Source.
+
 ### Added
 
 - Initial scaffold of the notes PWA: a local-first, mobile-first note-taking
