@@ -15,6 +15,14 @@ import { createLogger } from "../../dev/logger.ts";
 import { AuthError, RateLimitError, type StorageAdapter } from "../adapter.ts";
 import { createDirectoryAdapter } from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
+import {
+  DEFAULT_NAMESPACE_SLUG,
+  namespaceCloudFolder,
+} from "../namespaces.ts";
+import {
+  fileNamespaceStore,
+  type NamespaceRegistryStore,
+} from "../namespace-store.ts";
 import { fileSettingsStore, type SettingsStore } from "../settings-store.ts";
 import { parseRetryAfterMs, readErrorBody } from "../http-utils.ts";
 
@@ -95,9 +103,10 @@ type DriveListResponse = { files?: DriveFile[] };
 export function createGdriveAdapter(
   token: string,
   fetchImpl: FetchImpl = fetch,
+  namespace: string = DEFAULT_NAMESPACE_SLUG,
 ): StorageAdapter {
-  log.info(`adapter created hasToken=${Boolean(token)}`);
-  const store = createGdriveFileStore(token, fetchImpl);
+  log.info(`adapter created hasToken=${Boolean(token)} ns=${namespace}`);
+  const store = createGdriveFileStore(token, fetchImpl, namespace);
   return createDirectoryAdapter(store, {
     id: "gdrive",
     label: "Google Drive",
@@ -106,18 +115,38 @@ export function createGdriveAdapter(
 }
 
 // Settings store for the Google Drive backend: `settings.json` in the
-// `notes/` app folder, beside the note markdown files.
+// `notes/` app folder, beside the namespace folders. Built with no namespace
+// so the file store resolves at the app-folder root.
 export function createGdriveSettingsStore(
   token: string,
   fetchImpl: FetchImpl = fetch,
 ): SettingsStore {
-  return fileSettingsStore(createGdriveFileStore(token, fetchImpl));
+  return fileSettingsStore(createGdriveFileStore(token, fetchImpl, ""));
 }
 
-function createGdriveFileStore(token: string, fetchImpl: FetchImpl): FileStore {
-  // Cache folder ids by their relative directory path ("" = the app folder).
-  // Drive ids are stable, so this only ever grows within an adapter's
-  // lifetime.
+// Root namespace-registry store for the Google Drive backend:
+// `namespaces.json` in the `notes/` app folder, beside `settings.json` and
+// the namespace folders. Built with no namespace so the file store resolves
+// at the app-folder root.
+export function createGdriveNamespaceStore(
+  token: string,
+  fetchImpl: FetchImpl = fetch,
+): NamespaceRegistryStore {
+  return fileNamespaceStore(createGdriveFileStore(token, fetchImpl, ""));
+}
+
+function createGdriveFileStore(
+  token: string,
+  fetchImpl: FetchImpl,
+  namespace: string = "",
+): FileStore {
+  // The namespace's folder name under the `notes/` app folder. Empty for the
+  // default namespace (and the root settings / registry stores), so its files
+  // land directly in the app folder.
+  const namespaceFolder = namespace ? namespaceCloudFolder(namespace) : "";
+  // Cache folder ids by their relative directory path ("" = the namespace's
+  // base folder). Drive ids are stable, so this only ever grows within an
+  // adapter's lifetime.
   const dirIdCache = new Map<string, string>();
 
   function authHeader(): Record<string, string> {
@@ -188,7 +217,12 @@ function createGdriveFileStore(token: string, fetchImpl: FetchImpl): FileStore {
     }
 
     let parentId = appId;
-    for (const segment of split(relDir)) {
+    // An empty namespace folder resolves at the app-folder root (the root
+    // settings / registry stores), so the segment drops out and files land
+    // directly in the `notes/` folder.
+    for (const segment of [namespaceFolder, ...split(relDir)].filter(
+      (s) => s.length > 0,
+    )) {
       let id = await findChildFolder(segment, parentId);
       if (!id) {
         if (!create) return null;
@@ -200,11 +234,11 @@ function createGdriveFileStore(token: string, fetchImpl: FetchImpl): FileStore {
     return parentId;
   }
 
-  async function listDir(
-    dirId: string,
-    prefix: string,
-    out: FileEntry[],
-  ): Promise<void> {
+  // List the files directly in a directory. Non-recursive: notes are stored
+  // flat (one `.md` per note, no nesting), so folders are skipped rather than
+  // descended into — which keeps the default namespace, rooted at the `notes/`
+  // app folder, from picking up other namespaces' subfolders.
+  async function listDir(dirId: string, out: FileEntry[]): Promise<void> {
     const query = `'${dirId}' in parents and trashed=false`;
     const url =
       `${DRIVE_FILES_API}?q=${encodeURIComponent(query)}&spaces=drive` +
@@ -216,12 +250,8 @@ function createGdriveFileStore(token: string, fetchImpl: FetchImpl): FileStore {
     }
     const files = ((await res.json()) as DriveListResponse).files ?? [];
     for (const file of files) {
-      const path = prefix ? `${prefix}/${file.name}` : (file.name ?? "");
-      if (file.mimeType === FOLDER_MIME_TYPE) {
-        await listDir(file.id, path, out);
-      } else {
-        out.push({ path, rev: file.version });
-      }
+      if (file.mimeType === FOLDER_MIME_TYPE) continue;
+      out.push({ path: file.name ?? "", rev: file.version });
     }
   }
 
@@ -273,10 +303,10 @@ function createGdriveFileStore(token: string, fetchImpl: FetchImpl): FileStore {
 
   return {
     async list(): Promise<FileEntry[]> {
-      const appId = await resolveDirId("", false);
-      if (!appId) return [];
+      const baseId = await resolveDirId("", false);
+      if (!baseId) return [];
       const out: FileEntry[] = [];
-      await listDir(appId, "", out);
+      await listDir(baseId, out);
       return out;
     },
 
@@ -332,6 +362,51 @@ function createGdriveFileStore(token: string, fetchImpl: FetchImpl): FileStore {
       }
     },
   };
+}
+
+// Delete a namespace's folder (and everything inside it) from Drive. Used
+// when a namespace is removed while Google Drive is the active backend. The
+// default namespace has no folder of its own — its files share the `notes/`
+// app folder — so it is never passed here. A missing folder is a no-op.
+export async function deleteGdriveNamespace(
+  token: string,
+  namespace: string,
+  fetchImpl: FetchImpl = fetch,
+): Promise<void> {
+  const folderName = namespaceCloudFolder(namespace);
+  if (!folderName) return;
+  const auth = { Authorization: `Bearer ${token}` };
+
+  async function searchOne(query: string): Promise<string | null> {
+    const url = `${DRIVE_FILES_API}?q=${encodeURIComponent(
+      query,
+    )}&spaces=drive&fields=files(id)`;
+    const res = await fetchImpl(url, { headers: auth });
+    if (!res.ok) {
+      const body = await readErrorBody(res);
+      throw gdriveError("namespace delete (lookup)", res.status, body);
+    }
+    return ((await res.json()) as DriveListResponse).files?.[0]?.id ?? null;
+  }
+
+  const appId = await searchOne(
+    `name='${GDRIVE_APP_FOLDER_NAME}' and mimeType='${FOLDER_MIME_TYPE}'` +
+      ` and 'root' in parents and trashed=false`,
+  );
+  if (!appId) return;
+  const nsId = await searchOne(
+    `name='${folderName}' and mimeType='${FOLDER_MIME_TYPE}'` +
+      ` and '${appId}' in parents and trashed=false`,
+  );
+  if (!nsId) return;
+  const res = await fetchImpl(`${DRIVE_FILES_API}/${nsId}`, {
+    method: "DELETE",
+    headers: auth,
+  });
+  if (!res.ok && res.status !== 404) {
+    const body = await readErrorBody(res);
+    throw gdriveError("namespace delete", res.status, body, res.headers);
+  }
 }
 
 function split(relDir: string): string[] {

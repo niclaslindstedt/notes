@@ -240,6 +240,24 @@ reuse them rather than re-porting:
   un-ported — wrap-radio rows + `SegmentedRow` cover the pickers; bring
   `FloatingPanel` over only when a feature needs a genuinely positioned
   popover.
+- **Namespaces** — `src/storage/namespaces.ts` (registry + the
+  `namespaceLocalKey` / `namespaceCloudFolder` location helpers) and
+  `namespace-store.ts` (the `namespaces.json` root registry, the
+  `settings-store.ts` counterpart). Every backend takes an active-namespace
+  argument: the local adapter keys per slug, the folder/Dropbox/Drive stores
+  prepend a per-slug folder. **Unlike checklist, notes keeps the _default_
+  namespace at the historical root** (the `notes/v1` key, the app-folder
+  root) so existing data needs no migration — `namespaceCloudFolder` returns
+  `""` for the default, and the file stores list **non-recursively** (notes
+  are flat) so the root-scoped default never picks up sibling namespace
+  folders. UI: `glyphs.ts` (inline glyph set + favicon serialiser),
+  `NamespaceGlyph` / `GlyphGrid` / `ColorPalette` / `namespace-colors.ts`,
+  `namespace-favicon.ts` (re-badges the tab favicon), the `NamespacesModal`
+  (+ its bus host) and the switcher section in `SideMenu`. notes has no
+  toast/i18n/`ConfirmDialog`/`ClearableInput`, so the modal inlines its
+  English strings, uses a plain `<input>`, and arms delete with a two-tap
+  "Confirm" button rather than a `ConfirmDialog`. Appearance applies live (no
+  draft/Save), matching the theme engine.
 
 ### Privacy / clean-URL routing
 

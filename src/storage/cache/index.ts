@@ -31,6 +31,7 @@ import {
   type StorageAdapter,
   type StoredSnapshot,
 } from "../adapter.ts";
+import { DEFAULT_NAMESPACE_SLUG } from "../namespaces.ts";
 
 const log = createLogger("cache");
 
@@ -75,9 +76,19 @@ export function isOfflineError(err: unknown): boolean {
 
 type CachedBytes = { text: string; revision?: string };
 
-/** Build the per-backend localStorage key the cache lives under. */
-export function localCacheKey(backendId: string): string {
-  return `notes:cache:${backendId}`;
+/**
+ * Build the per-backend, per-namespace localStorage key the cache lives
+ * under. The default namespace keeps the bare `notes:cache:<backend>` key it
+ * has always used; every other namespace gets a per-slug suffix so the
+ * offline mirrors of different namespaces don't clobber one another.
+ */
+export function localCacheKey(
+  backendId: string,
+  namespace: string = DEFAULT_NAMESPACE_SLUG,
+): string {
+  return namespace === DEFAULT_NAMESPACE_SLUG
+    ? `notes:cache:${backendId}`
+    : `notes:cache:${backendId}:${namespace}`;
 }
 
 export function withLocalCache(
