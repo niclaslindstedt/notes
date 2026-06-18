@@ -1,7 +1,10 @@
 // Standalone privacy policy, served at `/privacy` (see `app/main.tsx`'s
 // path switch and the `emit-privacy-alias` plugin in `vite.config.ts`).
-// notes is local-first with no backend, no accounts, and no analytics —
-// everything stays in the browser — so this policy is short and absolute.
+// notes is local-first with no backend of our own, no accounts, and no
+// analytics — by default everything stays in the browser. The one way data
+// leaves the device is the opt-in sync backends (a picked local folder, the
+// user's own Dropbox, the user's own Google Drive), which this policy
+// describes in full because the Google Drive scope is verified against it.
 // It is English-only by design (a legal page, not chrome), mirroring
 // checklist's PrivacyPage.
 import { ArrowLeftIcon } from "./icons.tsx";
@@ -35,9 +38,20 @@ export function PrivacyPage() {
             note-taking app served as a static site at{" "}
             <span className="text-fg-bright">notes.niclaslindstedt.se</span>. It
             runs entirely in your browser. There is no backend of our own, no
-            account, no cookies, and no analytics or tracking. Your notes are
-            stored only on your device and never leave it. The project authors
-            never receive your notes in any configuration.
+            account, no cookies, and no analytics or tracking. By default your
+            notes are stored only on your device and never leave it.
+          </p>
+          <p>
+            You may <span className="text-fg-bright">optionally</span> turn on
+            sync to a storage location <em>you</em> control — a local folder on
+            your computer, your own Dropbox, or your own Google Drive — so the
+            same notes appear on more than one device. Even then your notes go
+            only to that location in your own account; the project authors never
+            receive your notes in any configuration. The{" "}
+            <a className="text-link hover:underline" href="#cloud-sync">
+              Optional sync
+            </a>{" "}
+            section below explains exactly what is sent, where, and why.
           </p>
         </Section>
 
@@ -53,25 +67,103 @@ export function PrivacyPage() {
               The text of your notes and when each was created and edited.
             </li>
             <li>
-              Per-device preferences — your chosen theme and where the floating
-              menu button rests.
+              Your <em>namespaces</em> — the named buckets you group notes into,
+              with each one&apos;s label, icon, and colour.
+            </li>
+            <li>
+              Per-device preferences — your chosen theme and appearance, and
+              where the floating menu button rests.
+            </li>
+            <li>
+              If you turn on an optional sync backend, the small amount of
+              configuration it needs to reconnect (for example, which folder you
+              picked or an access token your cloud provider issued to this
+              browser).
             </li>
           </ul>
           <p>
             This data is stored as plain JSON on your own device. Clearing your
-            browser&apos;s site data for this origin erases it permanently —
-            there is no copy elsewhere to restore from.
+            browser&apos;s site data for this origin erases the local copy
+            permanently — if you have not enabled sync, there is no copy
+            elsewhere to restore from.
           </p>
         </Section>
 
         <Section title="Network requests">
           <p>
-            The app makes no third-party network calls. The only requests your
-            browser makes are to fetch the app&apos;s own static files (HTML,
-            JavaScript, CSS, fonts, and icons) from its origin, and once loaded
-            it works fully offline as an installed PWA. No fonts, analytics
-            scripts, error-reporting services, or advertising networks are ever
-            loaded.
+            With no sync backend enabled, the app makes no third-party network
+            calls. The only requests your browser makes are to fetch the
+            app&apos;s own static files (HTML, JavaScript, CSS, fonts, and icons)
+            from its origin, and once loaded it works fully offline as an
+            installed PWA. No fonts, analytics scripts, error-reporting services,
+            or advertising networks are ever loaded.
+          </p>
+          <p>
+            If you opt in to Dropbox or Google Drive sync, the app additionally
+            talks directly from your browser to that provider&apos;s own API to
+            sign you in and to read and write your notes. Those requests go to
+            the provider, not to us. See <em>Optional sync</em> below.
+          </p>
+        </Section>
+
+        <Section title="Optional sync" id="cloud-sync">
+          <p>
+            Sync is off until you choose a backend yourself. You can pick one
+            of three places to keep a copy of your notes, and you can switch
+            back to local-only at any time:
+          </p>
+          <ul className="ml-5 list-disc space-y-2">
+            <li>
+              <span className="text-fg-bright">Local folder.</span> Using your
+              browser&apos;s File System Access API, you grant the app access to
+              a folder you pick on your own computer. Your notes are written
+              there as ordinary <code className="text-fg-bright">.md</code>{" "}
+              markdown files. Nothing is sent over the network; the data never
+              leaves your machine.
+            </li>
+            <li>
+              <span className="text-fg-bright">Google Drive.</span> The app
+              requests only the{" "}
+              <code className="text-fg-bright">drive.file</code> scope, which
+              lets it see and manage <em>only the files it itself creates</em> —
+              a single <code className="text-fg-bright">notes/</code> folder of
+              your notes. It cannot see, read, or touch any other file in your
+              Drive. Sign-in uses Google&apos;s OAuth flow, and the access token
+              Google returns is held only in this browser.
+            </li>
+            <li>
+              <span className="text-fg-bright">Dropbox.</span> The app uses an
+              app-scoped folder, so it can only read and write inside its own
+              dedicated folder — never the rest of your Dropbox. Sign-in uses
+              Dropbox&apos;s OAuth flow (PKCE), and the resulting token is held
+              only in this browser.
+            </li>
+          </ul>
+          <p>
+            In every case the data the app reads or writes is{" "}
+            <span className="text-fg-bright">your notes and nothing else</span>,
+            it stays in your account in your provider, and the project authors
+            never receive it or hold any token for it. The notes are stored as
+            plain markdown files you can open, edit, or delete yourself with any
+            tool. Revoke the app&apos;s access at any time from your
+            provider&apos;s security settings and it simply stops syncing.
+          </p>
+          <p>
+            When a cloud backend is active the app also keeps an offline mirror
+            of the synced bytes in this browser&apos;s storage, so you can read
+            and edit while disconnected; it reconciles with your provider when
+            the connection returns.
+          </p>
+        </Section>
+
+        <Section title="Encryption">
+          <p>
+            You may optionally protect a synced note store with a passphrase.
+            When enabled, your notes are encrypted in your browser with AES-GCM
+            before they are written, so the bytes stored in the folder or cloud
+            — and in the offline mirror — are ciphertext. The passphrase stays
+            on your device and is never sent anywhere; if you lose it, the notes
+            cannot be recovered.
           </p>
         </Section>
 
@@ -116,9 +208,9 @@ export function PrivacyPage() {
           <p>
             Material changes are tracked in the public commit history of the
             source repository. The <em>Last updated</em> date at the top of this
-            page reflects the most recent edit. Should a future version add a
-            feature that sends data anywhere, this policy will be updated to
-            describe it before that feature ships enabled.
+            page reflects the most recent edit. Should a future version change
+            what data is stored or sent, or add another place it can be sent,
+            this policy will be updated to describe it before that change ships.
           </p>
         </Section>
 
@@ -141,13 +233,15 @@ export function PrivacyPage() {
 
 function Section({
   title,
+  id,
   children,
 }: {
   title: string;
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-2">
+    <section id={id} className="flex flex-col gap-2 scroll-mt-10">
       <h2 className="text-sm font-bold tracking-wide text-fg-bright">
         {title}
       </h2>
