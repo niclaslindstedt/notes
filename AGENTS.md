@@ -24,13 +24,56 @@ repo. When in doubt about a layout, naming, or workflow decision, consult the
 relevant section of `OSS_SPEC.md`.
 
 The repo was bootstrapped against the spec and is being brought into full
-conformance incrementally — the release pipeline (`version-bump.yml`,
-`release.yml`), the marketing `website/`, and the full SEO scaffolding are not
-in place yet. Run the validator to see the current gap:
+conformance incrementally. Run the validator to see the current gap:
 
 ```sh
 bash /path/to/oss-spec/scripts/validate.sh .
 ```
+
+### Deviations from OSS_SPEC
+
+These are the spec items this repo does **not** satisfy yet, and why. The
+initial scaffold took the project from 31 structural violations down to 12;
+the remaining 12 are listed here so they're a deliberate, tracked backlog
+rather than an accidental gap. Re-run the validator after changing anything in
+this list and keep it in sync.
+
+**Deferred — intended, but not built yet (do these as the project matures):**
+
+- **§10.3 Release pipeline** — no `.github/workflows/version-bump.yml` or
+  `release.yml`, and no `scripts/` release tooling. The app isn't published to
+  a registry yet; CHANGELOG is currently hand-maintained (see §8.4 below).
+- **§11.2 / §11.3 Website + SEO** — there is no marketing `website/`, and the
+  SEO scaffolding (Open Graph / Twitter Card / JSON-LD, `sitemap.xml`,
+  `robots.txt`, `llms.txt`, the `check-seo` and `lighthouse` workflows /
+  `lighthouserc`) is absent. The deployed artifact is the app itself, served
+  via `pages.yml`; a prerendered marketing surface can be ported from
+  checklist later.
+- **§11.4 PWA completeness** — the offline `navigateFallback` is wired in
+  `vite.config.ts`, but there is no Lighthouse `pwa`-category gate
+  (`lighthouserc`, min score ≥ 0.9) in CI yet.
+- **§13.5 `prompts/`** — no versioned prompt library; nothing in the app uses
+  one yet.
+- **§19.4 Central output module** — no `src/output` semantic logging helpers
+  (`status` / `warn` / `info` / `header` / `error`). This is a CLI-oriented
+  requirement; a browser PWA logs to the devtools console, so this is treated
+  as not-applicable rather than missing — revisit if a CLI/build tool is added.
+- **§21.5 / §21.6 Maintenance skills** — only the `copy-feature` skill exists.
+  The spec also wants a `maintenance/` umbrella skill plus `update-readme` and
+  `update-docs` skills (because `README.md` and `docs/` are present). Port
+  these from checklist's `.agent/skills/` when the docs surface grows enough to
+  need automated upkeep.
+
+**Deliberate, permanent deviations (not bugs — don't "fix" these):**
+
+- **§20.2 Test file suffix** — tests use the Vitest-idiomatic `*.test.ts`
+  suffix under `tests/<concern>/`, matching checklist exactly. The pinned
+  `validate.sh` (spec 2.8.0) flags this because it expects a
+  `_test` / `Test` / `Tests` suffix, but mirroring checklist's convention is
+  the higher priority here. If the test layout is ever reorganized, keep it in
+  lockstep with checklist, not with the validator.
+
+When you close any deferred item above, delete its bullet here in the same PR.
 
 ## Build and test commands
 
