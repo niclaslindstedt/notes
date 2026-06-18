@@ -55,11 +55,6 @@ this list and keep it in sync.
   (`status` / `warn` / `info` / `header` / `error`). This is a CLI-oriented
   requirement; a browser PWA logs to the devtools console, so this is treated
   as not-applicable rather than missing — revisit if a CLI/build tool is added.
-- **§21.5 / §21.6 Maintenance skills** — only the `copy-feature` skill exists.
-  The spec also wants a `maintenance/` umbrella skill plus `update-readme` and
-  `update-docs` skills (because `README.md` and `docs/` are present). Port
-  these from checklist's `.agent/skills/` when the docs surface grows enough to
-  need automated upkeep.
 
 **Deliberate, permanent deviations (not bugs — don't "fix" these):**
 
@@ -293,7 +288,34 @@ pasting it verbatim.
 ## Maintenance skills
 
 Agent skills live under `.agent/skills/` (with `.claude/skills` symlinked to
-it). Each has a `SKILL.md` and a `.last-updated` marker.
+it). Each has a `SKILL.md` and a `.last-updated` marker. Most were ported from
+checklist's `.agent/skills/` and adapted to the notes domain.
+
+**Drift-sync skills** (the `maintenance` umbrella dispatches these in order):
+
+- `maintenance` — the §21.6 umbrella: decides which sync skills are stale,
+  runs each in order, and leaves one combined PR.
+- `sync-oss-spec` — fetch the latest `OSS_SPEC.md` and bring the repo back into
+  conformance, honouring the tracked deviations above.
+- `update-docs` — bring `docs/*.md` (and `docs/features/*.md`) back in sync
+  with the source of truth.
+- `update-readme` — bring `README.md` back in sync with the current surface.
+
+**Manual playbooks** (run on request, not part of `maintenance`):
 
 - `copy-feature` — clone checklist, explore a named feature, and port it into
   this app adapted to the notes domain.
+- `commit` — run the quality gates, commit, push, and open/update a PR.
+- `write-changeset` — decide whether a PR needs a `.changes/unreleased/`
+  fragment, and write or fold one in.
+- `debug-from-logs` — turn pasted diagnostics into a root cause plus a
+  regression test.
+- `fix-comments` — strip changelog-style comments while keeping the
+  invariant-explaining ones.
+- `find-optimizations` — survey the hot paths for order-of-magnitude wins.
+- `refactor` — work the `docs/refactoring-roadmap.md` backlog.
+- `design` — iterate on the UI with an edit / screenshot / inspect loop.
+- `tune-pwa-icons` — tune the PWA icon set generated from `public/favicon.svg`.
+- `dependabot` — consolidate the open Dependabot bumps into one green PR.
+- `release` — cut a release: pre-flight, dispatch `release.yml`, verify the
+  deploy.
