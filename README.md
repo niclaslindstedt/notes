@@ -95,6 +95,24 @@ dependency-free model you can read top to bottom in a minute.
   origin. A different browser, cleared site data, or private mode won't see
   them.
 
+## Public pages
+
+Two routes are served outside the app, without a login, on the same verified
+domain:
+
+- **[/home](https://notes.niclaslindstedt.se/home)** — a showcase landing page
+  that introduces the app, describes what it does, and explains why the
+  optional cloud-sync feature asks for access to your own Google Drive (the
+  narrow `drive.file` scope — only files the app creates) or Dropbox app
+  folder. It's also the homepage used for Google's OAuth verification.
+- **[/privacy](https://notes.niclaslindstedt.se/privacy)** — the privacy
+  policy.
+
+Both live in `src/ui/` (`HomePage.tsx`, `PrivacyPage.tsx`). **When you add or
+change a user-facing feature — especially anything affecting what data the app
+reads, writes, or sends — update `/home` (and `/privacy` where relevant) in the
+same change** so they keep accurately and fully describing the app.
+
 ## Documentation
 
 - [Getting started](docs/getting-started.md)

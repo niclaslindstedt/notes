@@ -210,7 +210,12 @@ The source tree under `src/` is organized by concern, not by file type:
 - `src/styles/` — the CSS-variable token system (`theme.css`).
 - `src/pwa/` — service-worker registration and update lifecycle
   (`usePwaUpdate.ts`), standalone/install detection (`standalone.ts`).
-- `src/ui/` — presentational components (e.g. `UpdateToast.tsx`).
+- `src/ui/` — presentational components (e.g. `UpdateToast.tsx`). Two of
+  these are **standalone public pages** mounted by a path switch in
+  `main.tsx` rather than rendered inside the app shell: `PrivacyPage.tsx`
+  (served at `/privacy`) and `HomePage.tsx` (served at `/home`). Each is
+  copied to its own clean URL at build time by an `emit-*-alias` plugin in
+  `vite.config.ts`. See "The public pages" below.
 
 Dependency direction: `app → ui → domain`, `app → storage → domain`.
 Nothing in `domain/` may import from `ui/`, `storage/`, `app/`, or touch
@@ -226,6 +231,34 @@ the DOM. This keeps `domain/` portable to the planned React Native app.
 | Top-level state / a new view             | `src/app/`                         |
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |
 | PWA / service-worker behaviour           | `src/pwa/`                         |
+
+### The public pages
+
+Two routes are served outside the app shell as crawlable, log-in-free pages,
+each its own component in `src/ui/` mounted by the path switch in
+`src/app/main.tsx` and aliased to a clean URL by an `emit-*-alias` plugin in
+`vite.config.ts`. They nest one segment deeper per deploy slot
+(`/preview/home`, `/branch/privacy`, …), and their links resolve off
+`import.meta.env.BASE_URL` so every slot stays self-contained.
+
+- **`/privacy`** (`PrivacyPage.tsx`) — the privacy policy. This is the URL
+  given on the Google OAuth consent screen.
+- **`/home`** (`HomePage.tsx`) — the public **showcase / landing page**. It is
+  the homepage Google's OAuth verification requires for the Google Drive
+  scope, so it must keep meeting that bar: accurately identify the app and its
+  verified domain (`notes.niclaslindstedt.se`), **fully describe what the app
+  does**, **transparently explain every reason the app requests user data**
+  (today: the opt-in cloud-sync backends and the exact scopes they ask for —
+  Google Drive `drive.file`, the Dropbox app folder), and link to the privacy
+  policy.
+
+> **Keep `/home` in sync with the product.** Whenever you add, remove, or
+> change a user-facing feature — and *especially* anything that touches what
+> data the app reads/writes or which OAuth scope or third party it talks to —
+> update `HomePage.tsx` in the same PR so the description stays accurate and
+> complete. An out-of-date homepage is a failed Google verification, not just
+> stale copy. The same applies to `PrivacyPage.tsx` for anything that changes
+> what is stored or sent.
 
 ## Bringing features over from checklist
 
@@ -253,7 +286,8 @@ pasting it verbatim.
 | Build/test commands               | `README.md`, `CONTRIBUTING.md`, here  |
 | The `src/` layout or boundaries   | This file's Architecture summary      |
 | The `copy-feature` skill behaviour| `.agent/skills/copy-feature/SKILL.md` |
-| A user-visible feature            | a fragment in `.changes/unreleased/`  |
+| A user-visible feature            | a fragment in `.changes/unreleased/`, and the `/home` showcase (`src/ui/HomePage.tsx`) |
+| What data the app reads/writes/sends, or an OAuth scope | `src/ui/HomePage.tsx` **and** `src/ui/PrivacyPage.tsx` |
 | Release / deploy / changelog flow | this file's "Releases and changelog"  |
 
 ## Maintenance skills
