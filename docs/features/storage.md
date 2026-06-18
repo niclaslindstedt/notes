@@ -62,3 +62,10 @@ built in. Set them at build time (see `.env.example`):
 
 Unset, each backend is simply hidden from the picker; This device, Local folder,
 and encryption work without any configuration.
+
+For the **deployed** app these are read from GitHub Actions secrets of the same
+name (`VITE_DROPBOX_APP_KEY`, `VITE_GOOGLE_CLIENT_ID`). Adding the secrets is
+not enough on its own — Actions does not expose secrets to steps automatically,
+so each `npm run build` step in `.github/workflows/pages.yml` maps them into its
+`env:`. If you add a new build step or workflow that ships a deploy, map both
+secrets there too or that build will silently disable the cloud backends.

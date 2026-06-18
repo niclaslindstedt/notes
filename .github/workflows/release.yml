@@ -111,6 +111,9 @@ jobs:
         run: npm run build
         env:
           VITE_BASE: /
+          # Mirror the deploy env (pages.yml) so this build is representative.
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
 
       - name: Commit + tag
         env:
