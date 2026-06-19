@@ -151,7 +151,7 @@ const achievements = {
       name: "Copycat",
       condition: "Copy a note to the clipboard.",
       learnMore:
-        "The copy button beside the sync glyph puts the open note on your clipboard. The caret menu chooses how much to take — just the body, the title and body, or the whole .md file with its YAML frontmatter — and remembers your pick.",
+        "The copy button beside the sync glyph puts the open note on your clipboard. Settings → Editor chooses how much it takes — just the body, the title and body, or the whole .md file with its YAML frontmatter.",
     },
 
     // ── Pro ───────────────────────────────────────────────────────────

@@ -20,14 +20,11 @@ const app = {
   archive: "Archive",
   archiveNote: "Archive note",
   delete: "Delete",
-  // The editor's copy-to-clipboard split-button (left of the sync glyph).
+  // The editor's copy-to-clipboard button (left of the sync glyph). What it
+  // copies is the copy-scope editor setting; see settings.editor.copy*.
   copy: {
     label: "Copy note",
     copied: "Copied",
-    menuLabel: "Copy options",
-    body: "Body",
-    titleBody: "Title and body",
-    frontMatter: "With front matter",
   },
 } as const;
 

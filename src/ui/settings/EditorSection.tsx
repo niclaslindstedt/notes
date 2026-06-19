@@ -100,15 +100,18 @@ export function EditorSection({
         onChange={(v) => update("disableAutocorrect", v)}
       />
       <Field label={t("settings.editor.copyScope")}>
-        <SegmentedRow<CopyScope>
-          ariaLabel={t("settings.editor.copyScope")}
+        <select
           value={editor.copyScope}
-          options={COPY_SCOPES.map((s) => ({
-            value: s,
-            label: copyScopeLabel[s],
-          }))}
-          onChange={(v) => update("copyScope", v)}
-        />
+          onChange={(e) => update("copyScope", e.target.value as CopyScope)}
+          aria-label={t("settings.editor.copyScope")}
+          className="cursor-pointer rounded border border-line bg-surface-2 px-2.5 py-1 text-sm text-fg hover:border-accent focus:border-accent focus:outline-none"
+        >
+          {COPY_SCOPES.map((s) => (
+            <option key={s} value={s}>
+              {copyScopeLabel[s]}
+            </option>
+          ))}
+        </select>
         <p className="text-xs text-muted">
           {t("settings.editor.copyScopeHint")}
         </p>
