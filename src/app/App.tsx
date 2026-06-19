@@ -510,6 +510,25 @@ function TitleField({
   const ref = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(value);
 
+  // Title edits are buffered locally and only pushed upward — which schedules a
+  // save and, on the file/cloud backends, *renames* the note's file (the
+  // filename is a slug of the title) — when the field loses focus or the editor
+  // closes. Pushing on every keystroke renamed the file once per character, and
+  // a mid-rename network blip left the directory half-written, which the sync
+  // layer then read back as a remote edit and surfaced as a phantom conflict.
+  // One rename per editing session keeps the file churn (and the conflicts) away
+  // without changing that the filename still tracks the title.
+  const committed = useRef(value);
+  const latest = useRef(draft);
+  latest.current = draft;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const flush = useCallback(() => {
+    if (latest.current === committed.current) return;
+    committed.current = latest.current;
+    onChangeRef.current(latest.current);
+  }, []);
+
   // Focus the title on mount for a fresh note (without the a11y-flagged
   // focusOnMount attribute), placing the caret at the end.
   useEffect(() => {
@@ -520,9 +539,14 @@ function TitleField({
     el.setSelectionRange(el.value.length, el.value.length);
   }, [focusOnMount]);
 
+  // Flush the buffered title when the editor unmounts — the Back button and
+  // switching notes both tear it down, and on those paths a blur doesn't
+  // reliably fire first.
+  useEffect(() => flush, [flush]);
+
   return (
     <div
-      className="px-4 pt-4"
+      className="w-full px-4 pt-4"
       style={maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" }}
     >
       <input
@@ -533,10 +557,8 @@ function TitleField({
         autoCorrect={disableAutocorrect ? "off" : "on"}
         autoCapitalize={disableAutocorrect ? "off" : "sentences"}
         placeholder={t("app.titlePlaceholder")}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          onChange(e.target.value);
-        }}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={flush}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === "ArrowDown") {
             e.preventDefault();
