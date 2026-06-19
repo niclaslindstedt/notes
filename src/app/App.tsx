@@ -302,10 +302,7 @@ export function App() {
             appears to scroll away with the note. Sizing the shell to
             `--app-height`/`--app-top` (the vars `useViewportHeight` mirrors)
             keeps it filling the visible band, so the header stays frozen. */}
-        <div
-          className="fixed flex overflow-hidden"
-          style={APP_VIEWPORT_RECT}
-        >
+        <div className="fixed flex overflow-hidden" style={APP_VIEWPORT_RECT}>
           <SideMenu
             notes={notes}
             activeNoteId={editingId}
