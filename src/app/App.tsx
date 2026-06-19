@@ -849,6 +849,15 @@ function TitleField({
     el.setSelectionRange(el.value.length, el.value.length);
   }, [focusOnMount]);
 
+  // Clicking (or tabbing) into the title selects the whole thing, so it can be
+  // renamed by just typing — no manual drag-select or erase first. The browser
+  // otherwise collapses the focus-time selection to the caret on the click's
+  // mouseup, so we suppress that one mouseup (only the click that *gained*
+  // focus, leaving later clicks free to reposition the caret as usual). The
+  // mount-focus path above runs after this onFocus and re-pins the caret to the
+  // end, so a fresh note still opens with the caret trailing its default title.
+  const focusingClick = useRef(false);
+
   // Flush the buffered title when the editor unmounts — the Back button and
   // switching notes both tear it down, and on those paths a blur doesn't
   // reliably fire first.
@@ -865,6 +874,17 @@ function TitleField({
       placeholder={t("app.titlePlaceholder")}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={flush}
+      onMouseDown={(e) => {
+        if (document.activeElement !== e.currentTarget)
+          focusingClick.current = true;
+      }}
+      onFocus={(e) => e.currentTarget.select()}
+      onMouseUp={(e) => {
+        if (focusingClick.current) {
+          e.preventDefault();
+          focusingClick.current = false;
+        }
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === "ArrowDown") {
           e.preventDefault();
