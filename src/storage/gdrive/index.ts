@@ -272,7 +272,7 @@ function createGdriveFileStore(
     parentId: string,
     name: string,
     text: string,
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     const meta = JSON.stringify({ name, parents: [parentId] });
     const boundary = `notes-${randomBoundary()}`;
     const body =
@@ -282,7 +282,7 @@ function createGdriveFileStore(
       `Content-Type: text/markdown\r\n\r\n${text}\r\n` +
       `--${boundary}--`;
     const res = await fetchImpl(
-      `${DRIVE_UPLOAD_API}?uploadType=multipart&fields=id`,
+      `${DRIVE_UPLOAD_API}?uploadType=multipart&fields=version`,
       {
         method: "POST",
         headers: {
@@ -296,6 +296,7 @@ function createGdriveFileStore(
       const errBody = await readErrorBody(res);
       throw gdriveError("create", res.status, errBody, res.headers);
     }
+    return ((await res.json()) as DriveFile).version;
   }
 
   return {
@@ -321,7 +322,7 @@ function createGdriveFileStore(
       return res.text();
     },
 
-    async write(path: string, text: string): Promise<void> {
+    async write(path: string, text: string): Promise<string | undefined> {
       const { dir, name } = dirAndName(path);
       const dirId = await resolveDirId(dir, true);
       if (!dirId) throw new Error(`Google Drive: cannot resolve ${dir}`);
@@ -330,7 +331,7 @@ function createGdriveFileStore(
       );
       if (existing) {
         const res = await fetchImpl(
-          `${DRIVE_UPLOAD_API}/${existing}?uploadType=media`,
+          `${DRIVE_UPLOAD_API}/${existing}?uploadType=media&fields=version`,
           {
             method: "PATCH",
             headers: { ...authHeader(), "Content-Type": "text/markdown" },
@@ -341,9 +342,12 @@ function createGdriveFileStore(
           const body = await readErrorBody(res);
           throw gdriveError("update", res.status, body, res.headers);
         }
-        return;
+        // Drive bumps `version` on every change; it's what `list()` reports,
+        // so returning it lets the adapter skip an eventually-consistent
+        // re-list to learn the post-save revision.
+        return ((await res.json()) as DriveFile).version;
       }
-      await createFile(dirId, name, text);
+      return createFile(dirId, name, text);
     },
 
     async remove(path: string): Promise<void> {

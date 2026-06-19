@@ -153,7 +153,7 @@ class FolderFileStore implements FileStore {
     }
   }
 
-  async write(path: string, text: string): Promise<void> {
+  async write(path: string, text: string): Promise<string | undefined> {
     const parent = await this.resolveParent(path, true);
     if (!parent) throw new Error(`folder: cannot resolve ${path}`);
     try {
@@ -163,6 +163,9 @@ class FolderFileStore implements FileStore {
       const writable = await handle.createWritable({ keepExistingData: false });
       await writable.write(text);
       await writable.close();
+      // The fresh `lastModified` is the per-file revision `list()` reports, so
+      // hand it back for the adapter's post-save aggregate.
+      return String((await handle.getFile()).lastModified);
     } catch (err) {
       this.reportPermission(err);
       throw err;

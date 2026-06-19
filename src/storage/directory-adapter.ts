@@ -19,8 +19,24 @@
 //              `notes.json` and the markdown files are cleared.
 //
 // Concurrency uses an aggregate revision built from the per-file revisions
-// the store reports for the whole directory; a save re-lists first and raises
+// the store reports for the whole directory; a save lists first and raises
 // `ConflictError` when the aggregate moved past the caller's `baseRevision`.
+//
+// Two details keep that from firing falsely against a single device's own
+// writes, which is the failure the cloud backends used to hit constantly:
+//
+//   1. The post-save revision is built from the revisions the writes *return*,
+//      never from a follow-up `list()`. Cloud list endpoints (Dropbox's
+//      `list_folder`, Drive's `files.list`) are eventually consistent: for a
+//      moment after a write they still report the previous state. Re-listing
+//      there stamped a stale revision into the caller's baseline, and every
+//      later save then saw the now-settled listing as "moved" and raised a
+//      phantom conflict until the next reload.
+//   2. The pre-save drift check tolerates a listing that lags one of *our
+//      own* recent writes. A back-to-back queued save lists immediately after
+//      the prior write, before propagation; when the listing matches a
+//      revision this adapter produced earlier (rather than one no device of
+//      ours ever made), it's our lag, not another device, so we proceed.
 
 import type { StorageAdapter, StoredSnapshot } from "./adapter.ts";
 import { ConflictError } from "./adapter.ts";
@@ -58,6 +74,20 @@ export function createDirectoryAdapter(
   store: FileStore,
   options: DirectoryAdapterOptions,
 ): StorageAdapter {
+  // Aggregate revisions this adapter has itself produced (from `load` and from
+  // each successful `save`), newest last and bounded. The pre-save drift check
+  // consults it to tell "the backend's listing is still catching up to a write
+  // of ours" (a revision we made earlier) from "another device moved the file"
+  // (a revision we never made) — see the file header. Bounded because only the
+  // most recent few can plausibly be a not-yet-propagated listing.
+  const produced: string[] = [];
+  const MAX_TRACKED = 12;
+  function remember(revision: string): void {
+    if (produced[produced.length - 1] === revision) return;
+    produced.push(revision);
+    if (produced.length > MAX_TRACKED) produced.shift();
+  }
+
   async function readSnapshotText(
     entries: readonly FileEntry[],
   ): Promise<string | null> {
@@ -83,7 +113,9 @@ export function createDirectoryAdapter(
     const entries = await store.list();
     const text = await readSnapshotText(entries);
     if (text === null) return null;
-    return { text, revision: aggregateRevision(entries) };
+    const revision = aggregateRevision(entries);
+    remember(revision);
+    return { text, revision };
   }
 
   async function save(
@@ -93,7 +125,11 @@ export function createDirectoryAdapter(
     const before = await store.list();
     if (baseRevision !== undefined) {
       const current = aggregateRevision(before);
-      if (current !== baseRevision) {
+      // A listing that differs from the caller's baseline is a conflict only
+      // when it's *not* one of our own recently produced states the backend
+      // hasn't finished propagating yet — otherwise a single device collides
+      // with itself on a queued back-to-back save (see the file header).
+      if (current !== baseRevision && !produced.includes(current)) {
         const remoteText = await readSnapshotText(before);
         throw new ConflictError({
           text: remoteText ?? serialize(parse(null)),
@@ -107,22 +143,36 @@ export function createDirectoryAdapter(
     );
     const hasBlob = before.some((e) => e.path === BLOB_FILE_NAME);
 
+    // Collect the per-file revisions the writes report so the post-save
+    // aggregate can be built without re-listing. `null` means a backend
+    // couldn't report one, forcing the (eventually consistent) list fallback.
+    let written: FileEntry[] | null;
     if (isEncryptedEnvelope(text)) {
       // Can't express an envelope as markdown — store it whole and drop any
       // markdown files so the two representations can't disagree.
-      await store.write(BLOB_FILE_NAME, text);
+      const rev = await store.write(BLOB_FILE_NAME, text);
       await Promise.all([...existingMd].map((path) => store.remove(path)));
+      written = rev === undefined ? null : [{ path: BLOB_FILE_NAME, rev }];
     } else {
       const files = snapshotToFiles(parse(text));
       const desired = new Set(files.map((f) => f.path));
-      await Promise.all(files.map((f) => store.write(f.path, f.text)));
+      const entries = await Promise.all(
+        files.map(async (f) => ({
+          path: f.path,
+          rev: await store.write(f.path, f.text),
+        })),
+      );
       const removals = [...existingMd].filter((p) => !desired.has(p));
       if (hasBlob) removals.push(BLOB_FILE_NAME);
       await Promise.all(removals.map((path) => store.remove(path)));
+      written = entries.every((e) => e.rev !== undefined)
+        ? entries.map((e) => ({ path: e.path, rev: e.rev }))
+        : null;
     }
 
-    const after = await store.list();
-    return { text, revision: aggregateRevision(after) };
+    const revision = aggregateRevision(written ?? (await store.list()));
+    remember(revision);
+    return { text, revision };
   }
 
   return {
