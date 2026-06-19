@@ -265,6 +265,28 @@ export function MarkdownEditor({
     moveTo(index, columnFromPoint(e.clientX, e.clientY, blocks[index]!));
   }
 
+  // A click anywhere in the empty note space (the scroll container or the
+  // padding around the lines) drops the caret at the end of the note and
+  // opens the editor. When the last line is already the active line — the
+  // single-line case — `setActive` would be a no-op, so the layout effect
+  // that installs the caret never runs; focus the textarea directly here so
+  // editing always starts, regardless of how tall the document is.
+  function activateEnd(e: ReactMouseEvent) {
+    e.preventDefault();
+    const last = lines.length - 1;
+    const col = lines[last]!.length;
+    if (last === clampedActive) {
+      const ta = taRef.current;
+      if (ta) {
+        ta.focus();
+        const c = Math.min(col, ta.value.length);
+        ta.setSelectionRange(c, c);
+      }
+      return;
+    }
+    moveTo(last, col);
+  }
+
   const widthStyle =
     maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" };
   const wrapClass = wordWrap
@@ -283,16 +305,18 @@ export function MarkdownEditor({
       onMouseDown={(e) => {
         // A click in the empty area below the text drops the caret at the end
         // of the note rather than doing nothing.
-        if (e.target === e.currentTarget) {
-          e.preventDefault();
-          const last = lines.length - 1;
-          moveTo(last, lines[last]!.length);
-        }
+        if (e.target === e.currentTarget) activateEnd(e);
       }}
     >
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div
         className={`px-4 py-4 ${wordWrap ? "" : "w-max min-w-full"}`}
         style={widthStyle}
+        onMouseDown={(e) => {
+          // Clicks landing on the content wrapper itself — its padding or the
+          // gaps around the lines — count as the empty note space too.
+          if (e.target === e.currentTarget) activateEnd(e);
+        }}
       >
         {lines.map((line, index) =>
           index === clampedActive ? (
