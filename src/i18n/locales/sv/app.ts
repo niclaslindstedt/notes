@@ -9,6 +9,9 @@ const app: AppCatalog = {
   deleteNote: "Ta bort anteckning",
   startWriting: "Börja skriva…",
   titlePlaceholder: "Titel",
+  archive: "Arkivera",
+  archiveNote: "Arkivera anteckning",
+  delete: "Ta bort",
 };
 
 export default app;

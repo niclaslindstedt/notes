@@ -71,6 +71,9 @@ export function noteToMarkdown(note: Note): string {
     ...(note.title ? { title: note.title } : {}),
     created: String(note.createdAt),
     updated: String(note.updatedAt),
+    // Only written when the note is archived, so an active note's frontmatter
+    // stays minimal and an older file (no flag) round-trips as active.
+    ...(note.archived ? { archived: "true" } : {}),
   });
   // One blank line between the frontmatter and the body, and exactly one
   // trailing newline so the file ends cleanly. Trailing blank lines in the
@@ -112,7 +115,17 @@ export function parseNote(text: string): Note | null {
   const updatedAt = front.updated ? toEpoch(front.updated) : createdAt;
   // Drop the single trailing newline `noteToMarkdown` adds; keep the body
   // otherwise verbatim.
-  return { id, title, body: body.replace(/\n$/, ""), createdAt, updatedAt };
+  const note: Note = {
+    id,
+    title,
+    body: body.replace(/\n$/, ""),
+    createdAt,
+    updatedAt,
+  };
+  // Carry the archived flag only when set, mirroring how it's written — an
+  // active note never gains an explicit `archived: false`.
+  if (front.archived === "true") note.archived = true;
+  return note;
 }
 
 // Frontmatter timestamps are epoch-ms numbers written as strings. Tolerate a

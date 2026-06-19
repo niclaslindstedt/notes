@@ -41,6 +41,19 @@ describe("markdown codec", () => {
     expect(parsed?.body).toBe("the body");
   });
 
+  it("round-trips the archived flag through the frontmatter", () => {
+    const archived: Note = { ...note("arch1", "Old", "body"), archived: true };
+    const file = snapshotToFiles({ notes: [archived] })[0]!;
+    expect(file.text).toContain("archived: true");
+    expect(parseNote(file.text)?.archived).toBe(true);
+    // An active note never writes the flag, and parses back without it.
+    const active = snapshotToFiles({
+      notes: [note("act1", "New", "body")],
+    })[0]!;
+    expect(active.text).not.toContain("archived");
+    expect(parseNote(active.text)?.archived).toBeUndefined();
+  });
+
   it("derives a slug-of-title filename suffixed with the id tail", () => {
     const stem = noteFileStem(note("abcdef123456", "My First Note"));
     expect(stem).toBe("my-first-note-123456");

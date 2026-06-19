@@ -12,6 +12,10 @@ const app = {
   deleteNote: "Delete note",
   startWriting: "Start writing…",
   titlePlaceholder: "Title",
+  // Swipe actions on a note card in the overview.
+  archive: "Archive",
+  archiveNote: "Archive note",
+  delete: "Delete",
 } as const;
 
 export type AppCatalog = Widen<typeof app>;

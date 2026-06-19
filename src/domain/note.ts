@@ -15,6 +15,12 @@ export type Note = {
   // every edit and is what the list sorts by (most-recent first).
   createdAt: number;
   updatedAt: number;
+  // Archived notes stay in the document but drop out of the overview list.
+  // Swiping a note right in the overview marks it archived so it disappears
+  // without being destroyed; the archive view (reached from the side menu)
+  // lists them and offers a restore. Absent on an active note rather than
+  // written as `false`, so an older document needs no migration.
+  archived?: boolean;
 };
 
 // Cheap, collision-resistant id. `crypto.randomUUID` is available in every
@@ -50,6 +56,24 @@ export function retitleNote(
   now: number = Date.now(),
 ): Note {
   return { ...note, title, updatedAt: now };
+}
+
+// Return a copy of `note` marked archived (hidden from the overview) or
+// active again, without destroying it. `updatedAt` is left untouched so a
+// restored note keeps its place in the most-recently-edited ordering rather
+// than jumping to the top.
+export function setArchived(note: Note, archived: boolean): Note {
+  return { ...note, archived };
+}
+
+/** The notes shown in the overview — everything not archived. */
+export function activeNotes(notes: readonly Note[]): Note[] {
+  return notes.filter((n) => !n.archived);
+}
+
+/** The notes shown in the archive view — everything marked archived. */
+export function archivedNotes(notes: readonly Note[]): Note[] {
+  return notes.filter((n) => n.archived);
 }
 
 // The title shown in the list, trimmed. Falls back to a placeholder so a note
