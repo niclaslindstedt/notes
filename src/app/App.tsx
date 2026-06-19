@@ -13,6 +13,7 @@ import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
 import { useUndoRedoShortcuts } from "../ui/hooks/useUndoRedoShortcuts.ts";
 import { useViewportHeight } from "../ui/hooks/useViewportHeight.ts";
+import { ArrowLeftIcon, TrashIcon } from "../ui/icons.tsx";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
   applyFaviconHref,
@@ -309,9 +310,11 @@ function Editor({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-[var(--radius)] px-2 py-1 text-sm text-accent hover:text-fg-bright"
+          title="Back"
+          aria-label="Back"
+          className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-accent/40 bg-transparent text-accent hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
         >
-          ← Back
+          <ArrowLeftIcon className="h-[18px] w-[18px]" />
         </button>
         <div className="flex items-center gap-2">
           <TrophyButton />
@@ -319,9 +322,11 @@ function Editor({
           <button
             type="button"
             onClick={onDelete}
-            className="rounded-[var(--radius)] px-2 py-1 text-sm text-danger hover:opacity-80"
+            title="Delete note"
+            aria-label="Delete note"
+            className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-danger/50 bg-transparent text-danger hover:bg-danger/10 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
           >
-            Delete
+            <TrashIcon className="h-[18px] w-[18px]" />
           </button>
         </div>
       </header>
