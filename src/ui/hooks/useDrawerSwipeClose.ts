@@ -114,7 +114,8 @@ export function useDrawerSwipeClose(
       if (axis.current === "none") {
         if (Math.abs(mx) < AXIS_LOCK && Math.abs(my) < AXIS_LOCK) return;
         axis.current = Math.abs(mx) > Math.abs(my) ? "h" : "v";
-        if (axis.current === "h") e.currentTarget.setPointerCapture(e.pointerId);
+        if (axis.current === "h")
+          e.currentTarget.setPointerCapture(e.pointerId);
       }
       if (axis.current !== "h") return;
       e.preventDefault();
@@ -166,8 +167,7 @@ export function useDrawerSwipeClose(
     [onClose],
   );
 
-  const progress =
-    width.current > 0 ? 1 - Math.abs(offset) / width.current : 1;
+  const progress = width.current > 0 ? 1 - Math.abs(offset) / width.current : 1;
 
   return {
     offset,
