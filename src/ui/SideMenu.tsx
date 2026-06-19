@@ -7,6 +7,7 @@ import type { Namespace } from "../storage/namespaces.ts";
 import { APP_VIEWPORT_RECT } from "./appViewportRect.ts";
 import { useNav } from "./nav-context.ts";
 import { useDraggableMenuButton } from "./hooks/useDraggableMenuButton.ts";
+import { useDrawerSwipeClose } from "./hooks/useDrawerSwipeClose.ts";
 import { useSwipeReveal } from "./hooks/useSwipeReveal.ts";
 import {
   ArchiveIcon,
@@ -129,6 +130,9 @@ export function SideMenu({
     pinned,
   } = useNav();
   const drag = useDraggableMenuButton(position, setPosition);
+  // Drag the open drawer back toward its resting edge to close it (the mobile
+  // counterpart to the edge swipe that opens it). Pinned never opens this way.
+  const swipeClose = useDrawerSwipeClose(position.side, open, close);
 
   // Mirror the live drag state up so the parent can gate competing global
   // gestures off while the button is being dragged.
@@ -398,12 +402,19 @@ export function SideMenu({
             aria-label={t("nav.close")}
             tabIndex={-1}
             onClick={close}
-            className="drawer-backdrop absolute inset-0 cursor-default bg-black/50"
+            style={{ opacity: swipeClose.progress }}
+            className={`drawer-backdrop absolute inset-0 cursor-default bg-black/50 ${
+              swipeClose.animating ? "transition-opacity duration-200" : ""
+            }`}
           />
           <nav
             id={drawerId}
             aria-label={t("nav.label")}
-            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl [padding-bottom:max(env(safe-area-inset-bottom),calc(1.25rem_-_var(--density-row-py)))] [padding-top:env(safe-area-inset-top)] ${
+            {...swipeClose.handlers}
+            style={{ transform: `translateX(${swipeClose.offset}px)` }}
+            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl [touch-action:pan-y] [padding-bottom:max(env(safe-area-inset-bottom),calc(1.25rem_-_var(--density-row-py)))] [padding-top:env(safe-area-inset-top)] ${
+              swipeClose.animating ? "transition-transform duration-200" : ""
+            } ${
               onRight
                 ? "drawer-panel-right border-l border-line"
                 : "drawer-panel-left border-r border-line"
@@ -559,6 +570,7 @@ function SwipeToRemove({
       </div>
       <div
         {...swipe.handlers}
+        data-drawer-swipe-ignore
         style={{ transform: `translateX(${swipe.offset}px)` }}
         className={`relative bg-surface [touch-action:pan-y] ${
           swipe.animating ? "transition-transform duration-200" : ""

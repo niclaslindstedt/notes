@@ -39,6 +39,20 @@ html,
 body {
   margin: 0;
   padding: 0;
+  /* Lock the document to the viewport. The app pins its shell to the
+     *visual* viewport with `position: fixed` and scrolls its content inside
+     dedicated regions (the note list, the editor body); the document itself
+     must never scroll. Without this lock iOS — most visibly the standalone
+     PWA — rubber-bands the whole document on any vertical drag, carrying the
+     fixed shell (and its sticky header) off the top of the screen, and
+     churns `visualViewport.offsetTop` so the keyboard-open editor jitters and
+     won't settle at the bottom. Pull-to-refresh is JS-driven
+     (`usePullToRefresh`), so nothing here needs native document scroll. The
+     iOS safe areas are honoured by the shell's own padding, not by document
+     flow. */
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -46,15 +60,12 @@ body {
   color: var(--fg);
   font-family: var(--app-font-family);
   font-size: calc(1rem * var(--app-font-scale));
-  /* Respect the iOS safe areas so the standalone PWA doesn't tuck content
-     under the notch or the home indicator. */
-  min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 #app {
-  min-height: 100dvh;
+  height: 100%;
 }
 
 /* Side-menu drawer entrance. The drawer mounts only while open, so a CSS
