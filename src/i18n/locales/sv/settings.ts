@@ -26,6 +26,16 @@ const settings: SettingsCatalog = {
     menuButton: "Visa menyknapp",
     menuButtonHint:
       "När den är av sveper du in från skärmkanten för att öppna menyn.",
+    diagnosticsTitle: "Diagnostik",
+    verboseLogging: "Utförlig synkloggning",
+    verboseLoggingHint:
+      "Spela in ett detaljerat spår av varje sparning så att ett synkproblem kan felsökas. Lämna av vid vanlig användning.",
+    logsHint:
+      "Återskapa problemet och kopiera sedan loggarna till en buggrapport.",
+    logsEmpty: "Inga loggar har fångats än.",
+    copyLogs: "Kopiera loggar",
+    logsCopied: "Kopierat!",
+    clearLogs: "Rensa",
   },
 
   editor: {

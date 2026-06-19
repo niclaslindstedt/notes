@@ -360,6 +360,11 @@ function createDropboxFileStore(
       // what `list()` reports for these bytes, so the directory adapter can
       // stamp the post-save revision without an eventually-consistent re-list.
       const meta = (await res.json()) as { rev?: string };
+      if (typeof meta.rev !== "string") {
+        log.warn(`upload ${path}: response carried no rev`, meta);
+      } else {
+        log.debug(`upload ${path}: rev=${meta.rev}`);
+      }
       return meta.rev;
     },
 

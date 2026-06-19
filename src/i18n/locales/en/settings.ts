@@ -31,6 +31,15 @@ const settings = {
     menuButton: "Show menu button",
     menuButtonHint:
       "When off, swipe in from the edge of the screen to open the menu.",
+    diagnosticsTitle: "Diagnostics",
+    verboseLogging: "Verbose sync logging",
+    verboseLoggingHint:
+      "Record a detailed trace of every save so a sync problem can be diagnosed. Leave off for normal use.",
+    logsHint: "Reproduce the issue, then copy the logs into a bug report.",
+    logsEmpty: "No logs captured yet.",
+    copyLogs: "Copy logs",
+    logsCopied: "Copied!",
+    clearLogs: "Clear",
   },
 
   editor: {

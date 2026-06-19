@@ -3,6 +3,7 @@ import { useLang, useT, writeLanguagePreference } from "../../i18n/index.ts";
 import { useStandaloneMobile } from "../../pwa/standalone.ts";
 import { setDisableAchievements, useAppearance } from "../../theme/useTheme.ts";
 import { useNav } from "../nav-context.ts";
+import { DiagnosticsSection } from "./DiagnosticsSection.tsx";
 import { LanguagePicker } from "./LanguagePicker.tsx";
 import { Field, Section, ToggleRow } from "./shared.tsx";
 
@@ -55,6 +56,8 @@ export function GeneralSection() {
           />
         </Section>
       )}
+
+      <DiagnosticsSection />
     </>
   );
 }

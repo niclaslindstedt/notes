@@ -17,7 +17,7 @@
 
 const MAX_LOG_ENTRIES = 500;
 
-export type LogLevel = "info" | "warn" | "error";
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export type LogEntry = {
   ts: number;
@@ -27,13 +27,47 @@ export type LogEntry = {
 };
 
 export type Logger = {
+  // Verbose, per-operation tracing. Captured only when debug logging is
+  // switched on (Settings → General → Diagnostics) so normal use doesn't fill
+  // the ring buffer with noise. info / warn / error are always captured.
+  debug: (...args: unknown[]) => void;
   info: (...args: unknown[]) => void;
   warn: (...args: unknown[]) => void;
   error: (...args: unknown[]) => void;
 };
 
+const DEBUG_KEY = "notes:debug-logs";
+
 const buffer: LogEntry[] = [];
 const subscribers = new Set<() => void>();
+
+let debugEnabled = (() => {
+  try {
+    return (
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem(DEBUG_KEY) === "1"
+    );
+  } catch {
+    return false;
+  }
+})();
+
+/** Whether verbose `debug`-level capture is currently on. */
+export function isDebugLogging(): boolean {
+  return debugEnabled;
+}
+
+/** Turn verbose `debug`-level capture on or off (persisted per device). */
+export function setDebugLogging(on: boolean): void {
+  debugEnabled = on;
+  try {
+    localStorage.setItem(DEBUG_KEY, on ? "1" : "0");
+  } catch {
+    // localStorage unavailable (private mode quota) — the in-memory flag still
+    // takes effect for this session.
+  }
+  notify();
+}
 
 // Render an Error for the log buffer. Leads with `name: message` and appends
 // the stack when available — some engines (Safari/iOS) format `err.stack` as
@@ -85,16 +119,30 @@ function notify(): void {
   }
 }
 
+// Cached immutable view of the buffer. `getLogs` must return a stable
+// reference between mutations or `useSyncExternalStore` re-renders forever;
+// every buffer change invalidates it so the next read rebuilds it once.
+let snapshot: LogEntry[] = [];
+let snapshotDirty = true;
+
+function invalidate(): void {
+  snapshotDirty = true;
+}
+
 function push(level: LogLevel, scope: string, args: unknown[]): void {
   buffer.push({ ts: Date.now(), level, scope, message: formatMessage(args) });
   if (buffer.length > MAX_LOG_ENTRIES) {
     buffer.splice(0, buffer.length - MAX_LOG_ENTRIES);
   }
+  invalidate();
   notify();
 }
 
 export function createLogger(scope: string): Logger {
   return {
+    debug: (...args) => {
+      if (debugEnabled) push("debug", scope, args);
+    },
     info: (...args) => push("info", scope, args),
     warn: (...args) => push("warn", scope, args),
     error: (...args) => push("error", scope, args),
@@ -102,7 +150,28 @@ export function createLogger(scope: string): Logger {
 }
 
 export function getLogs(): LogEntry[] {
-  return buffer.slice();
+  if (snapshotDirty) {
+    snapshot = buffer.slice();
+    snapshotDirty = false;
+  }
+  return snapshot;
+}
+
+/** Drop every captured entry. Backs the Diagnostics "Clear" action. */
+export function clearLogs(): void {
+  buffer.length = 0;
+  invalidate();
+  notify();
+}
+
+/** Render the captured log as plain text for copying into a bug report. */
+export function formatLogs(): string {
+  return buffer
+    .map(
+      (e) =>
+        `${new Date(e.ts).toISOString()} [${e.level}] ${e.scope}: ${e.message}`,
+    )
+    .join("\n");
 }
 
 export function subscribeToLogs(cb: () => void): () => void {
