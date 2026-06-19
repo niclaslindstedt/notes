@@ -26,7 +26,7 @@ import { createLogger } from "../../dev/logger.ts";
 import type { StorageAdapter } from "../adapter.ts";
 import { createDirectoryAdapter } from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
-import { DEFAULT_NAMESPACE_SLUG, namespaceCloudFolder } from "../namespaces.ts";
+import { DEFAULT_NAMESPACE_SLUG, namespaceNotesFolder } from "../namespaces.ts";
 import {
   fileNamespaceStore,
   type NamespaceRegistryStore,
@@ -62,17 +62,18 @@ export type CreateFolderAdapterOptions = {
 };
 
 class FolderFileStore implements FileStore {
-  // The namespace's folder segment, prepended to every path. Empty for the
-  // default namespace, whose files sit at the picked-directory root (and
-  // whose registry / settings stores root there too).
-  private readonly base: string;
+  // The folder segments this store is rooted at, relative to the picked
+  // directory: `notes` / `<slug>` `notes` for a namespace's documents, or
+  // empty for the registry / settings stores that root at the picked
+  // directory itself.
+  private readonly baseSegments: string[];
 
   constructor(
     private readonly root: FileSystemDirectoryHandle,
-    namespace: string = "",
+    base: string = "",
     private readonly onPermissionLost?: () => void,
   ) {
-    this.base = namespace ? namespaceCloudFolder(namespace) : "";
+    this.baseSegments = base.split("/").filter((s) => s.length > 0);
   }
 
   // Resolve the directory handle for a `/`-separated path, optionally creating
@@ -94,9 +95,11 @@ class FolderFileStore implements FileStore {
     return dir;
   }
 
-  // Prepend the namespace base to a relative path's segments.
+  // Prepend the store's base to a relative path's segments.
   private segmentsFor(path: string): string[] {
-    return [this.base, ...path.split("/")].filter((s) => s.length > 0);
+    return [...this.baseSegments, ...path.split("/")].filter(
+      (s) => s.length > 0,
+    );
   }
 
   private async resolveParent(
@@ -122,7 +125,7 @@ class FolderFileStore implements FileStore {
   // so directories — other namespaces' folders when listing at the root — are
   // skipped rather than descended into.
   async list(): Promise<FileEntry[]> {
-    const dir = await this.resolveDir(this.base ? [this.base] : [], false);
+    const dir = await this.resolveDir(this.baseSegments, false);
     if (!dir) return [];
     const out: FileEntry[] = [];
     try {
@@ -192,7 +195,7 @@ export function createFolderAdapter(
   log.info(`adapter created ns=${namespace}`);
   const store = new FolderFileStore(
     options.directoryHandle,
-    namespace,
+    namespaceNotesFolder(namespace),
     options.onPermissionLost,
   );
   return createDirectoryAdapter(store, {

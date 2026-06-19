@@ -8,6 +8,7 @@ import {
   hasLocalOnlyNamespaces,
   mergeNamespaceLists,
   namespaceCloudFolder,
+  namespaceNotesFolder,
   namespaceLocalKey,
   parseNamespaces,
   removeNamespace,
@@ -118,6 +119,11 @@ describe("storage location helpers", () => {
     expect(namespaceLocalKey("work")).toBe("notes/v1:work");
     expect(namespaceCloudFolder(DEFAULT_NAMESPACE_SLUG)).toBe("");
     expect(namespaceCloudFolder("work")).toBe("work");
+  });
+
+  it("nests note files in a notes/ subfolder of the namespace", () => {
+    expect(namespaceNotesFolder(DEFAULT_NAMESPACE_SLUG)).toBe("notes");
+    expect(namespaceNotesFolder("work")).toBe("work/notes");
   });
 });
 

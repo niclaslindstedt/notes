@@ -19,9 +19,11 @@
 // Storage layout (the part that makes folder-sharing work):
 //   - Cloud / folder backends give every *non-default* namespace its own
 //     folder so a whole folder can be shared wholesale (the `family/`
-//     folder shared with relatives). The default namespace keeps the
-//     app-folder root it has always used, so existing synced notes are read
-//     back with no migration (see `namespaceCloudFolder`).
+//     folder shared with relatives). The note markdown files then live in a
+//     `notes/` subfolder of that namespace folder (`notes/` for the default
+//     namespace, `<slug>/notes/` for the rest — see `namespaceNotesFolder`),
+//     keeping them apart from the `settings.json` / `namespaces.json` the
+//     backend writes at the app-folder root.
 //   - The local backend has no folders, so each namespace simply gets its
 //     own localStorage key; the default keeps the historical `notes/v1` key
 //     (see `namespaceLocalKey`).
@@ -324,14 +326,25 @@ export function namespaceLocalKey(slug: string): string {
 }
 
 /**
- * Folder segment a namespace's note files live under, relative to the
- * backend's app-folder root. The default namespace returns the empty string
- * — it keeps the app-folder root it has always used, so existing synced
- * notes need no migration — while every other namespace gets its own
- * subfolder so the whole folder can be shared wholesale. The empty segment
- * is dropped by each backend's path join, landing default's files directly
- * at the root.
+ * The namespace's own folder, relative to the backend's app-folder root: the
+ * empty string for the default namespace (it owns the app-folder root) and
+ * the slug for every other namespace, so a whole namespace folder can be
+ * shared wholesale. This is the folder the `settings.json` / `namespaces.json`
+ * the backend mirrors sit beside, and the parent of the notes `notes/`
+ * subfolder (see `namespaceNotesFolder`).
  */
 export function namespaceCloudFolder(slug: string): string {
   return slug === DEFAULT_NAMESPACE_SLUG ? "" : slug;
+}
+
+/**
+ * Folder the namespace's note markdown files live under, relative to the
+ * backend's app-folder root: `notes/` for the default namespace and
+ * `<slug>/notes/` for every other one. Nesting the notes in their own
+ * subfolder keeps them apart from the registry / settings files at the
+ * namespace root and the per-namespace subfolders beside them.
+ */
+export function namespaceNotesFolder(slug: string): string {
+  const base = namespaceCloudFolder(slug);
+  return base ? `${base}/notes` : "notes";
 }

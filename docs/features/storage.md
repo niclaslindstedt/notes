@@ -18,7 +18,10 @@ control. Open **Settings → Where your notes are stored** and pick one:
   so you can read and edit them straight from Dropbox or Drive too.
 
 However you store them, your notes are saved as **one markdown file per note**,
-so they stay readable and portable outside the app.
+so they stay readable and portable outside the app. On the folder and cloud
+backends the note files live in a **`notes/` subfolder** (a namespace you
+created keeps its notes under `<namespace>/notes/`), kept apart from the
+`settings.json` the app writes beside it.
 
 ## Encryption
 
@@ -45,9 +48,10 @@ nothing is merged behind your back.
 
 ## Settings travel too
 
-Your appearance settings (theme, font, custom-theme tweaks) are written
-alongside the notes as a `settings.json` file at the backend's root, so they
-follow a synced or shared folder onto your other devices. They're kept as plain
+Your appearance settings (theme, font, custom-theme tweaks) are written as a
+`settings.json` file at the backend's root — beside the `notes/` subfolder the
+note files live in — so they follow a synced or shared folder onto your other
+devices. They're kept as plain
 JSON even when the notes are encrypted — theme choices aren't secret, and
 keeping them readable is what lets the unlock screen render in your theme.
 
