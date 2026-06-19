@@ -28,6 +28,7 @@ describe("editor margin helpers", () => {
       renderMarkdown: true,
       disableSpellcheck: false,
       disableAutocorrect: false,
+      defaultTitle: "dateTime",
     });
   });
 });

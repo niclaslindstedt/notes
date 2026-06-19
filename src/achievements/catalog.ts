@@ -203,6 +203,19 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     },
   },
   {
+    id: "namingConvention",
+    tier: "intermediate",
+    glyph: TypeGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.appearance.editor.defaultTitle],
+      predicate: (prev, next) =>
+        prev.appearance.editor.defaultTitle !==
+        next.appearance.editor.defaultTitle,
+    },
+  },
+  {
     id: "archivist",
     tier: "intermediate",
     glyph: ArchiveGlyph,

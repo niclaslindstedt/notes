@@ -50,6 +50,12 @@ const settings = {
 
   editor: {
     title: "Editor",
+    defaultTitle: "Default note title",
+    defaultTitleHint:
+      "What to name a new note before you give it a title of your own.",
+    defaultTitleOff: "Off",
+    defaultTitleDateTime: "Date & time",
+    defaultTitleNumbered: "Numbered",
     margins: "Margins",
     marginsHint: "How much breathing room to leave around the writing column.",
     wordWrap: "Word wrap",
