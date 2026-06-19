@@ -99,6 +99,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Föredrar du ren text? Inställningar → Redigerare stänger av direktförhandsvisningen så att anteckningar förblir vanlig, oformaterad källtext.",
     },
+    freehand: {
+      name: "Frihand",
+      condition: "Inaktivera stavningskontroll eller autokorrigering.",
+      learnMore:
+        "Skriver du kod, strukturerade anteckningar eller ett annat språk? Inställningar → Redigerare kan stoppa enheten från att kontrollera stavning och autokorrigera medan du skriver.",
+    },
     compartments: {
       name: "Fack",
       condition: "Skapa en andra namnrymd.",

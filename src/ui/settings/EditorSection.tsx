@@ -55,6 +55,18 @@ export function EditorSection({
         checked={editor.renderMarkdown}
         onChange={(v) => update("renderMarkdown", v)}
       />
+      <ToggleRow
+        label={t("settings.editor.disableSpellcheck")}
+        hint={t("settings.editor.disableSpellcheckHint")}
+        checked={editor.disableSpellcheck}
+        onChange={(v) => update("disableSpellcheck", v)}
+      />
+      <ToggleRow
+        label={t("settings.editor.disableAutocorrect")}
+        hint={t("settings.editor.disableAutocorrectHint")}
+        checked={editor.disableAutocorrect}
+        onChange={(v) => update("disableAutocorrect", v)}
+      />
     </Section>
   );
 }

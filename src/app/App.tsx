@@ -335,6 +335,8 @@ function Editor({
           body={note.body}
           onChange={onChange}
           wordWrap={editor.wordWrap}
+          disableSpellcheck={editor.disableSpellcheck}
+          disableAutocorrect={editor.disableAutocorrect}
           maxWidth={maxWidth}
         />
       ) : (
@@ -342,6 +344,8 @@ function Editor({
           body={note.body}
           onChange={onChange}
           wordWrap={editor.wordWrap}
+          disableSpellcheck={editor.disableSpellcheck}
+          disableAutocorrect={editor.disableAutocorrect}
           maxWidth={maxWidth}
         />
       )}
@@ -355,11 +359,15 @@ function PlainEditor({
   body,
   onChange,
   wordWrap,
+  disableSpellcheck,
+  disableAutocorrect,
   maxWidth,
 }: {
   body: string;
   onChange: (body: string) => void;
   wordWrap: boolean;
+  disableSpellcheck: boolean;
+  disableAutocorrect: boolean;
   maxWidth: string;
 }) {
   const t = useT();
@@ -381,6 +389,9 @@ function PlainEditor({
       ref={textareaRef}
       value={value}
       wrap={wordWrap ? "soft" : "off"}
+      spellCheck={!disableSpellcheck}
+      autoCorrect={disableAutocorrect ? "off" : "on"}
+      autoCapitalize={disableAutocorrect ? "off" : "sentences"}
       onChange={(e) => {
         setValue(e.target.value);
         onChange(e.target.value);

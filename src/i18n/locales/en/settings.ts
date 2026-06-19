@@ -40,6 +40,12 @@ const settings = {
     renderMarkdown: "Render Markdown",
     renderMarkdownHint:
       "Format Markdown as you type — every line but the one you're on shows formatted, like Obsidian.",
+    disableSpellcheck: "Disable spell check",
+    disableSpellcheckHint:
+      "Stop your device checking spelling as you type, hiding the red squiggles.",
+    disableAutocorrect: "Disable auto correct",
+    disableAutocorrectHint:
+      "Stop your device auto-correcting and auto-capitalising as you type (mostly affects mobile keyboards).",
   },
 
   appearance: {

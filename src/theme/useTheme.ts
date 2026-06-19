@@ -211,6 +211,8 @@ function coerce(raw: unknown): Appearance {
         typeof editor.renderMarkdown === "boolean"
           ? editor.renderMarkdown
           : DEFAULT_EDITOR_SETTINGS.renderMarkdown,
+      disableSpellcheck: editor.disableSpellcheck === true,
+      disableAutocorrect: editor.disableAutocorrect === true,
     },
     achievements,
     unseenAchievements: validUnseen(raw.unseenAchievements, achievements),

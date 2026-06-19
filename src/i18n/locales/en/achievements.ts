@@ -105,6 +105,12 @@ const achievements = {
       learnMore:
         "Prefer raw text? Settings → Editor switches the live preview off so notes stay plain, unformatted source.",
     },
+    freehand: {
+      name: "Freehand",
+      condition: "Disable spell check or autocorrect.",
+      learnMore:
+        "Writing code, structured notes, or another language? Settings → Editor can stop your device checking spelling and auto-correcting as you type.",
+    },
     compartments: {
       name: "Compartments",
       condition: "Create a second namespace.",
