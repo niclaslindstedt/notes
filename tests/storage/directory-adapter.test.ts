@@ -80,7 +80,10 @@ describe("directory adapter", () => {
     const [first, second] = notes();
     const stored = await a.save(serialize({ notes: [first!, second!] }));
     // Another device edits the SAME note we're about to write.
-    await store.write(notePath(first!), "---\nid: a\ncreated: 1\n---\nremote\n");
+    await store.write(
+      notePath(first!),
+      "---\nid: a\ncreated: 1\n---\nremote\n",
+    );
     await expect(
       a.save(
         serialize({ notes: [editNote(first!, "local", 9), second!] }),
