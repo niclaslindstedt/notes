@@ -47,16 +47,21 @@ const sync = {
   pendingDetail: "You have changes that haven't been saved to {provider} yet.",
   syncedHeading: "Synced to {provider}",
 
-  // Conflict-resolution prompt.
+  // Conflict-resolution prompt. The two copies are summarised side by side
+  // (note + word counts) and the user picks which one wins.
   conflict: {
     title: "These notes changed on another device",
     hint: "Your copy on this device and the copy on the backend have both moved on. Keep one — nothing is merged automatically.",
+    mineLabel: "This device",
+    theirsLabel: "Other device",
     // No plural engine: the component picks One vs Other by the count and
     // passes {n}.
-    keepMineOne: "Keep this device's copy ({n} note)",
-    keepMineOther: "Keep this device's copy ({n} notes)",
-    keepTheirsOne: "Keep the other copy ({n} note)",
-    keepTheirsOther: "Keep the other copy ({n} notes)",
+    notesOne: "{n} note",
+    notesOther: "{n} notes",
+    wordsOne: "{n} word",
+    wordsOther: "{n} words",
+    keepMine: "Keep this device's copy",
+    keepTheirs: "Keep the other copy",
   },
 } as const;
 
