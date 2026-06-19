@@ -41,6 +41,8 @@ export function fileNamespaceStore(
 ): NamespaceRegistryStore {
   return {
     load: () => rootStore.read(NAMESPACES_FILE_NAME),
-    save: (text) => rootStore.write(NAMESPACES_FILE_NAME, text),
+    save: async (text) => {
+      await rootStore.write(NAMESPACES_FILE_NAME, text);
+    },
   };
 }

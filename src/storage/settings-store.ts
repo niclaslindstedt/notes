@@ -36,6 +36,8 @@ export interface SettingsStore {
 export function fileSettingsStore(rootStore: FileStore): SettingsStore {
   return {
     load: () => rootStore.read(SETTINGS_FILE_NAME),
-    save: (text) => rootStore.write(SETTINGS_FILE_NAME, text),
+    save: async (text) => {
+      await rootStore.write(SETTINGS_FILE_NAME, text);
+    },
   };
 }

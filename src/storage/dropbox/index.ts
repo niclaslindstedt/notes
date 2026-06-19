@@ -323,7 +323,7 @@ function createDropboxFileStore(
       return res.text();
     },
 
-    async write(path: string, text: string): Promise<void> {
+    async write(path: string, text: string): Promise<string | undefined> {
       const res = await authedFetch(UPLOAD_ENDPOINT, (token) => ({
         method: "POST",
         headers: {
@@ -346,6 +346,11 @@ function createDropboxFileStore(
         const detail = await readErrorBody(res);
         throw new Error(`Dropbox upload failed: ${res.status} ${detail}`);
       }
+      // The upload response is the file's new metadata; its `rev` is exactly
+      // what `list()` reports for these bytes, so the directory adapter can
+      // stamp the post-save revision without an eventually-consistent re-list.
+      const meta = (await res.json()) as { rev?: string };
+      return meta.rev;
     },
 
     async remove(path: string): Promise<void> {
