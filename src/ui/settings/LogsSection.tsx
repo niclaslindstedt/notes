@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useT } from "../../i18n/index.ts";
 import {
@@ -8,26 +8,31 @@ import {
   type LogEntry,
   type LogLevel,
 } from "../../dev/logger.ts";
-import { Button } from "../form/Button.tsx";
-import { Field, Section, SegmentedRow } from "./shared.tsx";
+import { Field, Section } from "./shared.tsx";
 
-// The Logs settings tab, ported from budget's LogsTab: a live, filterable view
-// of the in-app log ring buffer with Copy / Clear. It's how a sync problem —
-// notably the phantom "changed on another device" conflict — is captured on a
+// The Logs settings tab, modelled on checklist's Logs tab: a live, filterable
+// view of the in-app log ring buffer with Copy / Clear. It's how a sync problem
+// — notably the phantom "changed on another device" conflict — is captured on a
 // phone (where devtools are out of reach) and copied into a bug report. The
 // capture toggle that persists the buffer across reloads lives on the Developer
 // tab; turning it on is also what reveals this tab.
+//
+// Each entry is a card with a level-coloured left rail, its metadata on the
+// first line (time · level · scope) and the message wrapped on its own line.
 
 type LogFilter = "all" | LogLevel;
 
 export function LogsSection() {
   const t = useT();
+  const filterId = useId();
   // `version` is a tick that increments whenever the logger pushes or clears —
   // used to force a re-read of `getLogs()`. A ref-style subscription is simpler
   // than mirroring the whole buffer into state and lets the logger own storage.
   const [version, setVersion] = useState(0);
   const [filter, setFilter] = useState<LogFilter>("all");
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<null | "copied" | "failed">(
+    null,
+  );
   const listRef = useRef<HTMLDivElement | null>(null);
   // Only auto-scroll new entries into view if the user was already pinned to
   // the bottom, so reading earlier entries while logs stream in stays sane.
@@ -66,52 +71,74 @@ export function LogsSection() {
       await navigator.clipboard.writeText(
         entries.map(formatLogLine).join("\n"),
       );
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopyStatus("copied");
     } catch {
-      // Clipboard blocked (insecure context / permission) — leave the label
-      // unchanged; the user can still read the entries.
+      // Clipboard blocked (insecure context / permission) — surface it in the
+      // status line; the user can still read the entries.
+      setCopyStatus("failed");
     }
+    setTimeout(() => setCopyStatus(null), 2000);
   }
 
   return (
     <Section title={t("settings.logs.title")}>
-      <Field label={t("settings.logs.filterLabel")}>
-        <SegmentedRow<LogFilter>
-          value={filter}
-          onChange={setFilter}
-          ariaLabel={t("settings.logs.filterLabel")}
-          options={[
-            { value: "all", label: t("settings.logs.filterAll") },
-            { value: "info", label: t("settings.logs.filterInfo") },
-            { value: "warn", label: t("settings.logs.filterWarn") },
-            { value: "error", label: t("settings.logs.filterError") },
-          ]}
-        />
-      </Field>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="primary"
-          onClick={handleCopy}
-          disabled={entries.length === 0}
-        >
-          {copied ? t("settings.logs.copied") : t("settings.logs.copy")}
-        </Button>
-        <Button onClick={clearLogs} disabled={allEntries.length === 0}>
-          {t("settings.logs.clear")}
-        </Button>
-        <span className="text-xs text-muted">
-          {entries.length === 0
-            ? t("settings.logs.empty")
-            : t("settings.logs.entryCount", { count: entries.length })}
-        </span>
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <Field label={t("settings.logs.filterLabel")}>
+          <select
+            id={filterId}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as LogFilter)}
+            aria-label={t("settings.logs.filterLabel")}
+            className="cursor-pointer rounded border border-line bg-surface-2 px-2.5 py-1 text-sm text-fg hover:border-accent focus:border-accent focus:outline-none"
+          >
+            <option value="all">{t("settings.logs.filterAll")}</option>
+            <option value="info">{t("settings.logs.filterInfo")}</option>
+            <option value="warn">{t("settings.logs.filterWarn")}</option>
+            <option value="error">{t("settings.logs.filterError")}</option>
+          </select>
+        </Field>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={entries.length === 0}
+            className="cursor-pointer rounded border border-line px-2.5 py-1 text-xs text-muted hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t("settings.logs.copy")}
+          </button>
+          <button
+            type="button"
+            onClick={clearLogs}
+            disabled={allEntries.length === 0}
+            className="cursor-pointer rounded border border-line px-2.5 py-1 text-xs text-muted hover:border-danger hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t("settings.logs.clear")}
+          </button>
+        </div>
       </div>
+
+      <p className="text-xs text-muted">
+        {entries.length === 0
+          ? t("settings.logs.empty")
+          : t("settings.logs.entryCount", { count: entries.length })}
+        {copyStatus === "copied" && (
+          <>
+            {" — "}
+            <span className="text-accent">{t("settings.logs.copied")}</span>
+          </>
+        )}
+        {copyStatus === "failed" && (
+          <>
+            {" — "}
+            <span className="text-danger">{t("settings.logs.copyFailed")}</span>
+          </>
+        )}
+      </p>
 
       <div
         ref={listRef}
         onScroll={handleScroll}
-        className="max-h-80 overflow-y-auto rounded border border-line bg-surface-2 font-mono text-[11px]"
+        className="max-h-[334px] overflow-y-auto rounded border border-line bg-surface-2 font-mono text-xs"
       >
         {entries.length === 0 ? (
           <p className="px-2 py-3 text-muted">{t("settings.logs.empty")}</p>
@@ -120,15 +147,19 @@ export function LogsSection() {
             {entries.map((entry, idx) => (
               <li
                 key={`${entry.ts}-${idx}`}
-                className="flex flex-wrap items-baseline gap-2 border-b border-line px-2 py-1 last:border-b-0"
+                className={`flex flex-col gap-0.5 border-b border-l-2 border-line px-2.5 py-1.5 last:border-b-0 ${railClass(
+                  entry.level,
+                )}`}
               >
-                <span className="text-muted tabular-nums">
-                  {formatLogTime(entry.ts)}
+                <span className="flex flex-wrap items-baseline gap-2">
+                  <span className="text-muted tabular-nums">
+                    {formatLogTime(entry.ts)}
+                  </span>
+                  <span className={levelClass(entry.level)}>
+                    {entry.level.toUpperCase()}
+                  </span>
+                  <span className="text-accent">[{entry.scope}]</span>
                 </span>
-                <span className={levelClass(entry.level)}>
-                  {entry.level.toUpperCase()}
-                </span>
-                <span className="text-accent">[{entry.scope}]</span>
                 <span className="break-words whitespace-pre-wrap text-fg">
                   {entry.message}
                 </span>
@@ -161,5 +192,19 @@ function levelClass(level: LogLevel): string {
       return "text-link";
     case "info":
       return "text-muted";
+  }
+}
+
+// The card's left rail colour, keyed by level so a wall of entries scans at a
+// glance. Info — the common case — takes the accent so every row still carries
+// a visible rail; warnings and errors stand out in their semantic colour.
+function railClass(level: LogLevel): string {
+  switch (level) {
+    case "error":
+      return "border-l-danger";
+    case "warn":
+      return "border-l-link";
+    case "info":
+      return "border-l-accent";
   }
 }

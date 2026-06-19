@@ -130,16 +130,17 @@ const settings = {
 
   logs: {
     title: "Logs",
-    filterLabel: "Show",
+    filterLabel: "Filter",
     filterAll: "All",
     filterInfo: "Info",
-    filterWarn: "Warn",
-    filterError: "Error",
+    filterWarn: "Warnings",
+    filterError: "Errors",
     copy: "Copy",
-    copied: "Copied!",
+    copied: "Copied to clipboard.",
+    copyFailed: "Copy failed.",
     clear: "Clear",
-    empty: "No logs yet.",
-    entryCount: "{count} entries",
+    empty: "No entries.",
+    entryCount: "{count} entries.",
   },
 } as const;
 

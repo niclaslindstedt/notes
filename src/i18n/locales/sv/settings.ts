@@ -129,16 +129,17 @@ const settings: SettingsCatalog = {
 
   logs: {
     title: "Loggar",
-    filterLabel: "Visa",
+    filterLabel: "Filter",
     filterAll: "Alla",
     filterInfo: "Info",
-    filterWarn: "Varning",
+    filterWarn: "Varningar",
     filterError: "Fel",
     copy: "Kopiera",
-    copied: "Kopierat!",
+    copied: "Kopierat till urklipp.",
+    copyFailed: "Kopieringen misslyckades.",
     clear: "Rensa",
-    empty: "Inga loggar än.",
-    entryCount: "{count} poster",
+    empty: "Inga poster.",
+    entryCount: "{count} poster.",
   },
 };
 
