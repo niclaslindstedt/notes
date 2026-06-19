@@ -13,6 +13,8 @@
 // Custom-theme editor seeds from. Read by the Appearance section,
 // `useTheme`, and the appearance store's validator.
 
+import { type DefaultTitleScheme } from "../domain/note.ts";
+
 // Theme preset. `dark` / `light` lock to the One Dark / One Light
 // palettes; `dracula`, `monokai`, `githubDark`, `githubLight`,
 // `solarizedLight`, and `quietLight` are the popular editor themes adapted
@@ -199,6 +201,9 @@ export type EditorSettings = {
   // Stop the browser/OS auto-correcting and auto-capitalising what you type
   // (mostly a mobile-keyboard behaviour) so your text goes through verbatim.
   disableAutocorrect: boolean;
+  // How a freshly created note is named before the user types a title of
+  // their own. See `DefaultTitleScheme` in the domain.
+  defaultTitle: DefaultTitleScheme;
 };
 
 export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
@@ -207,6 +212,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   renderMarkdown: true,
   disableSpellcheck: false,
   disableAutocorrect: false,
+  defaultTitle: "dateTime",
 };
 
 export type RadiusPreset = "none" | "sm" | "md" | "lg";

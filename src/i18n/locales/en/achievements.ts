@@ -117,6 +117,12 @@ const achievements = {
       learnMore:
         "Writing code, structured notes, or another language? Settings → Editor can stop your device checking spelling and auto-correcting as you type.",
     },
+    namingConvention: {
+      name: "Naming convention",
+      condition: "Change the default title for new notes.",
+      learnMore:
+        "Settings → Editor decides what a brand-new note is called before you title it yourself — the date and time, an auto-incrementing “Note”, “Note 2”, … , or nothing at all.",
+    },
     archivist: {
       name: "Archivist",
       condition: "Archive a note.",

@@ -35,7 +35,7 @@ export type NotesStore = {
   allNotes: Note[];
   // Archived notes, most-recently-edited first — what the archive view lists.
   archived: Note[];
-  create: () => string;
+  create: (title?: string) => string;
   update: (id: string, body: string) => void;
   retitle: (id: string, title: string) => void;
   remove: (id: string) => void;
@@ -112,11 +112,17 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
     [sync, record],
   );
 
-  const create = useCallback((): string => {
-    const note = createNote();
-    commit((prev) => [note, ...prev], "New note");
-    return note.id;
-  }, [commit]);
+  // A new note opens with the title the caller supplies — the default-title
+  // scheme stamps one in (date & time, or the next "Note N"); an empty title
+  // leaves the note blank until it's typed into.
+  const create = useCallback(
+    (title = ""): string => {
+      const note = { ...createNote(), title };
+      commit((prev) => [note, ...prev], "New note");
+      return note.id;
+    },
+    [commit],
+  );
 
   const update = useCallback(
     (id: string, body: string): void => {

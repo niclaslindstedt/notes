@@ -1,3 +1,7 @@
+import {
+  DEFAULT_TITLE_SCHEMES,
+  type DefaultTitleScheme,
+} from "../../domain/note.ts";
 import { useT } from "../../i18n/index.ts";
 import {
   EDITOR_MARGINS,
@@ -32,8 +36,28 @@ export function EditorSection({
     onUpdate("editor", { ...editor, [key]: value });
   }
 
+  const titleSchemeLabel: Record<DefaultTitleScheme, string> = {
+    none: t("settings.editor.defaultTitleOff"),
+    dateTime: t("settings.editor.defaultTitleDateTime"),
+    numbered: t("settings.editor.defaultTitleNumbered"),
+  };
+
   return (
     <Section title={t("settings.editor.title")}>
+      <Field label={t("settings.editor.defaultTitle")}>
+        <SegmentedRow<DefaultTitleScheme>
+          ariaLabel={t("settings.editor.defaultTitle")}
+          value={editor.defaultTitle}
+          options={DEFAULT_TITLE_SCHEMES.map((s) => ({
+            value: s,
+            label: titleSchemeLabel[s],
+          }))}
+          onChange={(v) => update("defaultTitle", v)}
+        />
+        <p className="text-xs text-muted">
+          {t("settings.editor.defaultTitleHint")}
+        </p>
+      </Field>
       <Field label={t("settings.editor.margins")}>
         <SegmentedRow<EditorMargin>
           ariaLabel={t("settings.editor.margins")}

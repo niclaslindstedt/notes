@@ -45,6 +45,12 @@ const settings: SettingsCatalog = {
 
   editor: {
     title: "Redigerare",
+    defaultTitle: "Standardtitel",
+    defaultTitleHint:
+      "Vad en ny anteckning ska heta innan du ger den en egen titel.",
+    defaultTitleOff: "Av",
+    defaultTitleDateTime: "Datum & tid",
+    defaultTitleNumbered: "Numrerad",
     margins: "Marginaler",
     marginsHint: "Hur mycket andrum som lämnas runt skrivkolumnen.",
     wordWrap: "Radbrytning",

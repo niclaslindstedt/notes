@@ -14,6 +14,7 @@ import {
   CodeIcon,
   CogIcon,
   HeartIcon,
+  ListIcon,
   MenuIcon,
   NoteIcon,
   PlusIcon,
@@ -52,6 +53,12 @@ import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
 // notes is open source; the "source" link points at its repository.
 const SOURCE_URL = "https://github.com/niclaslindstedt/notes";
 
+// The drawer stays focused on what you're working on: it lists only the most
+// recently edited notes and hides the rest behind the "Show all" entry, which
+// opens the full overview. Tuned so the list never crowds out the menu below
+// it on a phone.
+const MAX_RECENT_NOTES = 6;
+
 type Props = {
   /** Notes to list, in display order (most-recently-edited first). */
   notes: Note[];
@@ -59,6 +66,10 @@ type Props = {
   activeNoteId: string | null;
   /** Open a note in the editor. */
   onSelectNote: (id: string) => void;
+  /** Leave the editor and show the full overview of every note. */
+  onShowAll: () => void;
+  /** Whether the overview (rather than a note or the archive) is showing. */
+  showAllActive: boolean;
   /** Start a fresh note and open it. */
   onAddNote: () => void;
   /** Delete a note permanently. */
@@ -89,6 +100,8 @@ export function SideMenu({
   notes,
   activeNoteId,
   onSelectNote,
+  onShowAll,
+  showAllActive,
   onAddNote,
   onRemoveNote,
   archivedCount,
@@ -207,7 +220,7 @@ export function SideMenu({
           {t("nav.notesEmpty")}
         </p>
       ) : (
-        notes.map((note) => {
+        notes.slice(0, MAX_RECENT_NOTES).map((note) => {
           const row = (
             <NavItem
               icon={
@@ -237,7 +250,19 @@ export function SideMenu({
           );
         })
       )}
-      {/* Archive lives at the foot of the notes list — it's a view onto the
+      {/* "Show all" opens the full overview — and, with the Back button gone
+          from the editor, it's how you return there. Active (accent) whenever
+          the overview rather than a note or the archive is showing. */}
+      <NavItem
+        icon={<ListIcon className="h-5 w-5" />}
+        label={t("nav.showAll")}
+        active={showAllActive}
+        onClick={() => {
+          onShowAll();
+          close();
+        }}
+      />
+      {/* Archive lives at the foot of the notes list — a view onto the
           archived notes, not a section of its own. The count badge mirrors the
           number of archived notes (hidden when the archive is empty). */}
       <NavItem

@@ -14,6 +14,7 @@ const nav = {
   manageNamespaces: "Manage namespaces",
   notes: "Notes",
   newNote: "New note",
+  showAll: "Show all",
   notesEmpty: "No notes yet.",
   deleteNote: "Delete note",
   confirmDelete: "Confirm delete",

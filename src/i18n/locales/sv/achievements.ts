@@ -111,6 +111,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Skriver du kod, strukturerade anteckningar eller ett annat språk? Inställningar → Redigerare kan stoppa enheten från att kontrollera stavning och autokorrigera medan du skriver.",
     },
+    namingConvention: {
+      name: "Namnsättning",
+      condition: "Ändra standardtiteln för nya anteckningar.",
+      learnMore:
+        "Inställningar → Redigerare avgör vad en helt ny anteckning heter innan du själv titulerar den — datum och tid, en automatiskt räknande ”Note”, ”Note 2”, … , eller ingenting alls.",
+    },
     archivist: {
       name: "Arkivarie",
       condition: "Arkivera en anteckning.",
