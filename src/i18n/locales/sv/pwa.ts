@@ -5,6 +5,9 @@ const pwa: PwaCatalog = {
   updateReadyGeneric: "En ny version är redo — läs in igen för att tillämpa",
   downloading: "Laddar ner uppdatering… {percent} %",
   dismiss: "Avfärda uppdateringsmeddelande",
+  pullToRefresh: "Dra för att uppdatera",
+  releaseToRefresh: "Släpp för att uppdatera",
+  refreshing: "Uppdaterar…",
 };
 
 export default pwa;

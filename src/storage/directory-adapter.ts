@@ -187,9 +187,12 @@ export function createDirectoryAdapter(
 
   // Read the markdown files (or the encrypted blob) into the serialized
   // snapshot text, and refresh `tracked` from what's on disk so the next save
-  // diffs against the real current state.
+  // diffs against the real current state. `reuse` carries the bytes of files
+  // whose revision the caller already knows are current, so they're taken from
+  // memory instead of re-downloaded — the read half of incremental sync.
   async function readSnapshot(
     entries: readonly FileEntry[],
+    reuse: ReadonlyMap<string, string> = new Map(),
   ): Promise<string | null> {
     const revisions = currentRevisions(entries);
     const mdPaths = entries.map((e) => e.path).filter(isMarkdownPath);
@@ -197,7 +200,7 @@ export function createDirectoryAdapter(
       const files = await Promise.all(
         mdPaths.map(async (path) => ({
           path,
-          text: (await store.read(path)) ?? "",
+          text: reuse.get(path) ?? (await store.read(path)) ?? "",
         })),
       );
       for (const file of files) {
@@ -217,15 +220,54 @@ export function createDirectoryAdapter(
     return null;
   }
 
-  async function load(): Promise<StoredSnapshot | null> {
+  // Bytes of the notes a `previous` snapshot already holds at a revision the
+  // current listing still reports — these don't need re-downloading. Skipped
+  // entirely when the previous bytes are an encrypted envelope (single blob,
+  // nothing per-file to reuse) or can't be parsed.
+  function reusableFiles(
+    previous: StoredSnapshot | undefined,
+    entries: readonly FileEntry[],
+  ): Map<string, string> {
+    const reuse = new Map<string, string>();
+    if (!previous || isEncryptedEnvelope(previous.text)) return reuse;
+    const prevRevs = parseRevisions(previous.revision);
+    if (prevRevs.size === 0) return reuse;
+    let prevFiles: Map<string, string>;
+    try {
+      prevFiles = new Map(
+        snapshotToFiles(parse(previous.text)).map((f) => [f.path, f.text]),
+      );
+    } catch {
+      return reuse;
+    }
+    for (const entry of entries) {
+      if (!isMarkdownPath(entry.path)) continue;
+      const text = prevFiles.get(entry.path);
+      if (
+        text !== undefined &&
+        prevRevs.get(entry.path) === (entry.rev ?? "")
+      ) {
+        reuse.set(entry.path, text);
+      }
+    }
+    return reuse;
+  }
+
+  async function load(
+    previous?: StoredSnapshot,
+  ): Promise<StoredSnapshot | null> {
     const entries = await store.list();
     // A load re-establishes the baseline from scratch.
     tracked.clear();
     uncertain.clear();
-    const text = await readSnapshot(entries);
+    const reuse = reusableFiles(previous, entries);
+    const text = await readSnapshot(entries, reuse);
     if (text === null) return null;
     const revision = aggregateRevision(entries);
-    log.info(`${options.id} load: rev=${shortRev(revision)}`);
+    const mdCount = entries.filter((e) => isMarkdownPath(e.path)).length;
+    log.info(
+      `${options.id} load: rev=${shortRev(revision)} files=${mdCount} reused=${reuse.size} fetched=${mdCount - reuse.size}`,
+    );
     return { text, revision };
   }
 
