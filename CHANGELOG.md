@@ -27,6 +27,8 @@ predate the pipeline.
 
 - **Cleaner note list header** — Removed the redundant theme toggle and version label from the note list — theme now lives only in Settings → Appearance, and the version still shows in the side menu under Source.
 
+## [0.1.0] - 2026-06-18
+
 ### Added
 
 - Initial scaffold of the notes PWA: a local-first, mobile-first note-taking
