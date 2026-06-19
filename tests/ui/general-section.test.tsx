@@ -52,11 +52,11 @@ describe("GeneralSection", () => {
     expect(screen.getByText(/local-first/i)).toBeTruthy();
   });
 
-  it("toggles the achievements system on and off", () => {
+  it("toggles the achievements system off", () => {
     renderWithNav();
-    const toggle = screen.getByLabelText("Achievements");
+    const toggle = screen.getByLabelText("Disable achievements");
     expect(toggle).toBeTruthy();
-    // On by default; unchecking it disables the system.
+    // Off by default (achievements on); ticking it disables the system.
     fireEvent.click(toggle);
     expect(getAppearance().disableAchievements).toBe(true);
   });

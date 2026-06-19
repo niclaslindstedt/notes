@@ -18,10 +18,10 @@ export function GeneralSection() {
         connect a folder or cloud. Appearance settings are saved on this device.
       </p>
       <ToggleRow
-        label="Achievements"
-        hint="Earn trophies as you discover features. Turn off to hide the trophy button; earned trophies are kept."
-        checked={!disableAchievements}
-        onChange={(on) => setDisableAchievements(!on)}
+        label="Disable achievements"
+        hint="Stop tracking achievements and hide the trophy button. Achievements you’ve already earned are kept."
+        checked={disableAchievements}
+        onChange={setDisableAchievements}
       />
       {standaloneMobile && (
         <ToggleRow
