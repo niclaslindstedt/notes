@@ -139,8 +139,9 @@ block kind to its CSS classes.
 `src/domain/markdown.ts` — a dependency-free, pragmatic Markdown subset.
 `classifyLines` splits the body into `LineBlock[]` (one per line, tracking
 fenced-code state); `parseInline` tokenizes a line into `InlineNode`s (strong,
-em, code, link, strikethrough), each leaf carrying a source-column `offset` for
-click-to-caret mapping. It is pure (no DOM/IO) and fast enough to run on every
+em, code, link, image, strikethrough), each leaf carrying a source-column
+`offset` for click-to-caret mapping. The `image` node (`![alt](href)`) is what
+the [attachment renderer](#image-attachments) turns into an inline thumbnail. It is pure (no DOM/IO) and fast enough to run on every
 keystroke, which is why it lives in `domain/`.
 
 ### Title field
@@ -159,6 +160,35 @@ created under the throwaway default title until the real title settles.
 are edited in the Editor tab of the settings modal, `EditorSection`
 (`src/ui/settings/EditorSection.tsx`) — see [Storage settings](#storage-settings)
 and its sibling sections.
+
+### Image attachments
+
+Paste (`Ctrl`/`Cmd`+`V`) or drag-and-drop an image into the editor and it
+becomes a note **attachment** — shown inline as a small thumbnail you click to
+open full-size. The model is `Attachment`
+(`{ filename, mime, data }`, `src/domain/attachment.ts`); it rides on the
+`Note` as `attachments?: Attachment[]`, with the full image held in memory as a
+`data:` URL and the body carrying a flat `![file](attachments/<file>)`
+reference. `MarkdownEditor`'s paste / drop handlers build the attachment
+(`src/ui/attachments/fromFile.ts`), persist it via `useNotes().attach`, and
+insert the reference; `imageFilesFrom` filters the payload to images so a
+dropped `.md` still falls through to the [drag-and-drop import](#drag-and-drop-import).
+Rendering goes through `AttachmentsProvider` (`src/ui/attachments/`): the
+`image` `InlineNode` resolves its reference to one of the note's attachments and
+renders an `InlineImage` thumbnail (`useThumbnail` downscales via canvas, cached
+by filename), with `ImageViewer` showing the original on click.
+
+Attachments are **only offered on a folder / cloud backend** — the editor gates
+paste / drop on the adapter's `"attachments"` capability, which the
+[directory adapter](#directory-adapter) advertises when an `AttachmentStore`
+(`src/storage/attachment-store.ts`) is wired. On save the directory adapter
+externalises each referenced image to a real file at
+`attachments/<note-name>/<filename>` (a sibling of the `notes/` folder, via each
+backend's binary `AttachmentStore`); on load it reads the files back into the
+`data:` URLs, reusing the offline cache's copies so unchanged images aren't
+re-downloaded. Under encryption the images stay inside the single encrypted
+blob rather than as separate files. The local "This device" backend has no
+`AttachmentStore`, so it never accepts an image.
 
 ## The note model and operations
 

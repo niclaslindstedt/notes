@@ -35,7 +35,11 @@ export type AdapterCapability =
   | "watch"
   // `getRevision()` is implemented — the current revision token can be
   // fetched without downloading the full body.
-  | "getRevision";
+  | "getRevision"
+  // The backend stores image attachments as files (a folder / cloud backend).
+  // The editor gates paste / drop of images on this so the local browser
+  // backend, which has nowhere to put a file, doesn't accept them.
+  | "attachments";
 
 export type StorageAdapter = {
   // Stable identifier so device-local settings (auth tokens, last-used

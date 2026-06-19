@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { unlock, useAchievementWatcher } from "../achievements/index.ts";
+import { type Attachment } from "../domain/attachment.ts";
 import { classifyLines } from "../domain/markdown.ts";
 import {
   defaultNoteTitle,
@@ -39,6 +40,7 @@ import {
   TrashIcon,
 } from "../ui/icons.tsx";
 import { RenderedLine } from "../ui/MarkdownLine.tsx";
+import { AttachmentsProvider } from "../ui/attachments/AttachmentsProvider.tsx";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
   applyFaviconHref,
@@ -91,6 +93,7 @@ export function App() {
     create,
     importFiles,
     update,
+    attach,
     retitle,
     remove,
     archive,
@@ -367,6 +370,8 @@ export function App() {
                 onTitleChange={(title) => retitle(editing.id, title)}
                 onTitleSettle={sync.releaseSaves}
                 syncSlot={syncSlot}
+                canAttach={storage.adapter.capabilities.has("attachments")}
+                onAttach={(attachment) => attach(editing.id, attachment)}
               />
             ) : reading ? (
               <ReadOnlyNote
@@ -698,11 +703,16 @@ function ReadOnlyNote({
             <h1 className="mb-3 text-2xl font-bold text-fg-bright">{title}</h1>
           )}
           {blocks ? (
-            blocks.map((block, i) => (
-              <div key={i} className="text-fg break-words whitespace-pre-wrap">
-                <RenderedLine block={block} />
-              </div>
-            ))
+            <AttachmentsProvider attachments={note.attachments}>
+              {blocks.map((block, i) => (
+                <div
+                  key={i}
+                  className="text-fg break-words whitespace-pre-wrap"
+                >
+                  <RenderedLine block={block} />
+                </div>
+              ))}
+            </AttachmentsProvider>
           ) : (
             <pre className="text-fg font-[inherit] break-words whitespace-pre-wrap">
               {note.body}
@@ -743,6 +753,8 @@ function Editor({
   onTitleChange,
   onTitleSettle,
   syncSlot,
+  canAttach,
+  onAttach,
 }: {
   note: Note;
   editor: EditorSettings;
@@ -750,6 +762,8 @@ function Editor({
   onTitleChange: (title: string) => void;
   onTitleSettle: () => void;
   syncSlot: ReactNode;
+  canAttach: boolean;
+  onAttach: (attachment: Attachment) => void;
 }) {
   const maxWidth = editorMarginMaxWidth(editor.margin);
   // A brand-new note opens with the caret in the title; an existing note keeps
@@ -794,6 +808,9 @@ function Editor({
             disableAutocorrect={editor.disableAutocorrect}
             maxWidth={maxWidth}
             focusOnMount={!titleFirst}
+            attachments={note.attachments}
+            canAttach={canAttach}
+            onAttach={onAttach}
           />
         ) : (
           <PlainEditor

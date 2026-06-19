@@ -348,3 +348,16 @@ export function namespaceNotesFolder(slug: string): string {
   const base = namespaceCloudFolder(slug);
   return base ? `${base}/notes` : "notes";
 }
+
+/**
+ * Folder the namespace's note *image attachments* live under, relative to the
+ * backend's app-folder root: `attachments/` for the default namespace and
+ * `<slug>/attachments/` for every other one — a sibling of the `notes/`
+ * subfolder (see `namespaceNotesFolder`), so a shared namespace folder carries
+ * its images alongside its notes. Each image then sits in a per-note subfolder
+ * (`attachments/<note-name>/<file>`).
+ */
+export function namespaceAttachmentsFolder(slug: string): string {
+  const base = namespaceCloudFolder(slug);
+  return base ? `${base}/attachments` : "attachments";
+}

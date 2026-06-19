@@ -139,6 +139,7 @@ export type InlineNode =
   | { type: "text"; text: string; offset: number }
   | { type: "code"; text: string; offset: number }
   | { type: "link"; text: string; href: string; offset: number }
+  | { type: "image"; alt: string; href: string; offset: number }
   | { type: "strong"; children: InlineNode[] }
   | { type: "em"; children: InlineNode[] }
   | { type: "strikethrough"; children: InlineNode[] };
@@ -176,6 +177,24 @@ export function parseInline(text: string, base = 0): InlineNode[] {
           offset: base + i + 1,
         });
         i = close + 1;
+        textStart = i;
+        continue;
+      }
+    }
+
+    if (c === "!" && text.charAt(i + 1) === "[") {
+      // `![alt](href)` — an image. Reuses the link matcher one char along, so
+      // the `!` and the bracket pair are consumed together.
+      const link = matchLink(text, i + 1);
+      if (link) {
+        flush(i);
+        nodes.push({
+          type: "image",
+          alt: link.text,
+          href: link.href,
+          offset: base + i,
+        });
+        i = link.end;
         textStart = i;
         continue;
       }

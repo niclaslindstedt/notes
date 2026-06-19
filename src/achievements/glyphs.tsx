@@ -236,6 +236,17 @@ export function MedalGlyph({ className }: IconProps) {
   );
 }
 
+// A framed picture with a sun and a mountain — the image-attachment glyph.
+export function ImageGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.5-3.5a2 2 0 0 0-2.8 0L4 22" />
+    </Svg>
+  );
+}
+
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;

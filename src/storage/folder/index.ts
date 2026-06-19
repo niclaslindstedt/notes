@@ -24,9 +24,14 @@
 
 import { createLogger } from "../../dev/logger.ts";
 import type { StorageAdapter } from "../adapter.ts";
+import type { AttachmentEntry, AttachmentStore } from "../attachment-store.ts";
 import { createDirectoryAdapter } from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
-import { DEFAULT_NAMESPACE_SLUG, namespaceNotesFolder } from "../namespaces.ts";
+import {
+  DEFAULT_NAMESPACE_SLUG,
+  namespaceAttachmentsFolder,
+  namespaceNotesFolder,
+} from "../namespaces.ts";
 import {
   fileNamespaceStore,
   type NamespaceRegistryStore,
@@ -188,6 +193,122 @@ class FolderFileStore implements FileStore {
   }
 }
 
+// Binary attachment store for the folder backend: each note's images under
+// `<picked>/attachments/<note-name>/` (or `<slug>/attachments/...`). Shares the
+// folder backend's directory-resolution and permission-loss reporting, but
+// moves bytes (an image) rather than UTF-8 markdown.
+class FolderAttachmentStore implements AttachmentStore {
+  private readonly baseSegments: string[];
+
+  constructor(
+    private readonly root: FileSystemDirectoryHandle,
+    base: string,
+    private readonly onPermissionLost?: () => void,
+  ) {
+    this.baseSegments = base.split("/").filter((s) => s.length > 0);
+  }
+
+  private reportPermission(err: unknown): void {
+    if (isPermissionError(err)) {
+      log.error("permission lost", err);
+      this.onPermissionLost?.();
+    }
+  }
+
+  private async resolveDir(
+    segments: string[],
+    create: boolean,
+  ): Promise<FileSystemDirectoryHandle | null> {
+    let dir = this.root;
+    for (const segment of segments.filter((s) => s.length > 0)) {
+      try {
+        dir = await dir.getDirectoryHandle(segment, { create });
+      } catch (err) {
+        if (isNotFoundError(err)) return null;
+        this.reportPermission(err);
+        throw err;
+      }
+    }
+    return dir;
+  }
+
+  private segmentsFor(path: string): string[] {
+    return [...this.baseSegments, ...path.split("/")].filter(
+      (s) => s.length > 0,
+    );
+  }
+
+  // Walk the `attachments/` tree (note-name subfolders, each holding image
+  // files) into flat `<note-name>/<file>` paths.
+  async list(): Promise<AttachmentEntry[]> {
+    const dir = await this.resolveDir(this.baseSegments, false);
+    if (!dir) return [];
+    const out: AttachmentEntry[] = [];
+    try {
+      for await (const sub of dir.values()) {
+        if (sub.kind !== "directory") continue;
+        for await (const file of sub.values()) {
+          if (file.kind !== "file") continue;
+          out.push({ path: `${sub.name}/${file.name}` });
+        }
+      }
+    } catch (err) {
+      this.reportPermission(err);
+      throw err;
+    }
+    return out;
+  }
+
+  async read(path: string): Promise<Uint8Array | null> {
+    const segments = this.segmentsFor(path);
+    const name = segments.pop();
+    if (!name) return null;
+    const dir = await this.resolveDir(segments, false);
+    if (!dir) return null;
+    try {
+      const handle = await dir.getFileHandle(name, { create: false });
+      const buffer = await (await handle.getFile()).arrayBuffer();
+      return new Uint8Array(buffer);
+    } catch (err) {
+      if (isNotFoundError(err)) return null;
+      this.reportPermission(err);
+      throw err;
+    }
+  }
+
+  async write(path: string, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
+    const segments = this.segmentsFor(path);
+    const name = segments.pop();
+    if (!name) throw new Error(`folder: cannot resolve ${path}`);
+    const dir = await this.resolveDir(segments, true);
+    if (!dir) throw new Error(`folder: cannot resolve ${path}`);
+    try {
+      const handle = await dir.getFileHandle(name, { create: true });
+      const writable = await handle.createWritable({ keepExistingData: false });
+      await writable.write(bytes);
+      await writable.close();
+    } catch (err) {
+      this.reportPermission(err);
+      throw err;
+    }
+  }
+
+  async remove(path: string): Promise<void> {
+    const segments = this.segmentsFor(path);
+    const name = segments.pop();
+    if (!name) return;
+    const dir = await this.resolveDir(segments, false);
+    if (!dir) return;
+    try {
+      await dir.removeEntry(name);
+    } catch (err) {
+      if (isNotFoundError(err)) return;
+      this.reportPermission(err);
+      throw err;
+    }
+  }
+}
+
 export function createFolderAdapter(
   options: CreateFolderAdapterOptions,
 ): StorageAdapter {
@@ -198,11 +319,20 @@ export function createFolderAdapter(
     namespaceNotesFolder(namespace),
     options.onPermissionLost,
   );
-  return createDirectoryAdapter(store, {
-    id: "folder",
-    label: "Local folder",
-    saveDebounceMs: SAVE_DEBOUNCE_MS,
-  });
+  const attachments = new FolderAttachmentStore(
+    options.directoryHandle,
+    namespaceAttachmentsFolder(namespace),
+    options.onPermissionLost,
+  );
+  return createDirectoryAdapter(
+    store,
+    {
+      id: "folder",
+      label: "Local folder",
+      saveDebounceMs: SAVE_DEBOUNCE_MS,
+    },
+    attachments,
+  );
 }
 
 // Settings store for the folder backend: `settings.json` at the picked
