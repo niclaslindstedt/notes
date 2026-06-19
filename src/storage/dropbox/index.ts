@@ -363,7 +363,7 @@ function createDropboxFileStore(
       if (typeof meta.rev !== "string") {
         log.warn(`upload ${path}: response carried no rev`, meta);
       } else {
-        log.debug(`upload ${path}: rev=${meta.rev}`);
+        log.info(`upload ${path}: rev=${meta.rev}`);
       }
       return meta.rev;
     },

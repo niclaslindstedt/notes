@@ -5,6 +5,7 @@ import type { UseStorageBackend } from "../../storage/useStorageBackend.ts";
 import { updateAppearance, useAppearance } from "../../theme/useTheme.ts";
 import {
   CloseIcon,
+  CodeIcon,
   CogIcon,
   DatabaseIcon,
   MenuIcon,
@@ -16,6 +17,7 @@ import { Modal } from "../Modal.tsx";
 import { AppearanceSection } from "./AppearanceSection.tsx";
 import { EditorSection } from "./EditorSection.tsx";
 import { GeneralSection } from "./GeneralSection.tsx";
+import { LogsSection } from "./LogsSection.tsx";
 import { StorageSection } from "./StorageSection.tsx";
 
 // Settings dialog. Lands on the General tab, with Appearance and Storage as
@@ -25,7 +27,7 @@ import { StorageSection } from "./StorageSection.tsx";
 // Save step: every control here applies live through its own store, so the
 // dialog is just a chooser with a Close button and no footer.
 
-type TabId = "general" | "appearance" | "editor" | "storage";
+type TabId = "general" | "appearance" | "editor" | "storage" | "logs";
 
 type IconComponent = ComponentType<{ className?: string }>;
 
@@ -36,6 +38,7 @@ const TABS: readonly TabDef[] = [
   { id: "appearance", labelKey: "settings.tab.appearance", Icon: PaletteIcon },
   { id: "editor", labelKey: "settings.tab.editor", Icon: PencilIcon },
   { id: "storage", labelKey: "settings.tab.storage", Icon: DatabaseIcon },
+  { id: "logs", labelKey: "settings.tab.logs", Icon: CodeIcon },
 ];
 
 type Props = {
@@ -89,6 +92,7 @@ export function SettingsModal({ open, onClose, storage }: Props) {
               />
             )}
             {activeTab === "storage" && <StorageSection storage={storage} />}
+            {activeTab === "logs" && <LogsSection />}
           </div>
         </div>
       </div>

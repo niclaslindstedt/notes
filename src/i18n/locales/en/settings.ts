@@ -16,6 +16,7 @@ const settings = {
     appearance: "Appearance",
     editor: "Editor",
     storage: "Storage",
+    logs: "Logs",
   },
 
   general: {
@@ -31,15 +32,6 @@ const settings = {
     menuButton: "Show menu button",
     menuButtonHint:
       "When off, swipe in from the edge of the screen to open the menu.",
-    diagnosticsTitle: "Diagnostics",
-    verboseLogging: "Verbose sync logging",
-    verboseLoggingHint:
-      "Record a detailed trace of every save so a sync problem can be diagnosed. Leave off for normal use.",
-    logsHint: "Reproduce the issue, then copy the logs into a bug report.",
-    logsEmpty: "No logs captured yet.",
-    copyLogs: "Copy logs",
-    logsCopied: "Copied!",
-    clearLogs: "Clear",
   },
 
   editor: {
@@ -120,6 +112,23 @@ const settings = {
     wrong: "That passphrase didn't work.",
     offline:
       "You're offline and nothing is cached on this device yet. Connect to the internet and try again.",
+  },
+
+  logs: {
+    title: "Logs",
+    capture: "Capture logs across reloads",
+    captureHint:
+      "Keep the log when the app reloads, so a problem that only shows up after a restart isn't lost. Off by default.",
+    filterLabel: "Show",
+    filterAll: "All",
+    filterInfo: "Info",
+    filterWarn: "Warn",
+    filterError: "Error",
+    copy: "Copy",
+    copied: "Copied!",
+    clear: "Clear",
+    empty: "No logs yet.",
+    entryCount: "{count} entries",
   },
 } as const;
 

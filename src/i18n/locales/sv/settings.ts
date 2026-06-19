@@ -11,6 +11,7 @@ const settings: SettingsCatalog = {
     appearance: "Utseende",
     editor: "Redigerare",
     storage: "Lagring",
+    logs: "Loggar",
   },
 
   general: {
@@ -26,16 +27,6 @@ const settings: SettingsCatalog = {
     menuButton: "Visa menyknapp",
     menuButtonHint:
       "När den är av sveper du in från skärmkanten för att öppna menyn.",
-    diagnosticsTitle: "Diagnostik",
-    verboseLogging: "Utförlig synkloggning",
-    verboseLoggingHint:
-      "Spela in ett detaljerat spår av varje sparning så att ett synkproblem kan felsökas. Lämna av vid vanlig användning.",
-    logsHint:
-      "Återskapa problemet och kopiera sedan loggarna till en buggrapport.",
-    logsEmpty: "Inga loggar har fångats än.",
-    copyLogs: "Kopiera loggar",
-    logsCopied: "Kopierat!",
-    clearLogs: "Rensa",
   },
 
   editor: {
@@ -120,6 +111,23 @@ const settings: SettingsCatalog = {
     wrong: "Den lösenfrasen fungerade inte.",
     offline:
       "Du är offline och inget är cachat på den här enheten ännu. Anslut till internet och försök igen.",
+  },
+
+  logs: {
+    title: "Loggar",
+    capture: "Fånga loggar mellan omladdningar",
+    captureHint:
+      "Behåll loggen när appen laddas om, så att ett problem som bara dyker upp efter en omstart inte går förlorat. Av som standard.",
+    filterLabel: "Visa",
+    filterAll: "Alla",
+    filterInfo: "Info",
+    filterWarn: "Varning",
+    filterError: "Fel",
+    copy: "Kopiera",
+    copied: "Kopierat!",
+    clear: "Rensa",
+    empty: "Inga loggar än.",
+    entryCount: "{count} poster",
   },
 };
 

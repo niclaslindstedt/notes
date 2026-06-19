@@ -104,7 +104,7 @@ export function createDirectoryAdapter(
   // after one can't recognise its own lagging write. If this line appears
   // mid-typing-session (not just on connect / namespace switch), the adapter
   // is being recreated under the sync engine and dropping the lag tolerance.
-  log.debug(`${options.id}: directory adapter created`);
+  log.info(`${options.id}: directory adapter created`);
 
   async function readSnapshotText(
     entries: readonly FileEntry[],
@@ -133,7 +133,7 @@ export function createDirectoryAdapter(
     if (text === null) return null;
     const revision = aggregateRevision(entries);
     remember(revision);
-    log.debug(`${options.id} load: rev=${shortRev(revision)}`);
+    log.info(`${options.id} load: rev=${shortRev(revision)}`);
     return { text, revision };
   }
 
@@ -143,7 +143,7 @@ export function createDirectoryAdapter(
   ): Promise<StoredSnapshot> {
     const before = await store.list();
     const current = aggregateRevision(before);
-    log.debug(
+    log.info(
       `${options.id} save: base=${shortRev(baseRevision)} listed=${shortRev(current)} match=${current === baseRevision} producedN=${produced.length}`,
     );
     if (baseRevision !== undefined && current !== baseRevision) {
@@ -217,7 +217,7 @@ export function createDirectoryAdapter(
     }
     const revision = aggregateRevision(written ?? (await store.list()));
     remember(revision);
-    log.debug(
+    log.info(
       `${options.id} save: committed base=${shortRev(baseRevision)} -> rev=${shortRev(revision)}`,
     );
     return { text, revision };
