@@ -18,6 +18,9 @@ import { fileToAttachment, imageFilesFrom } from "./attachments/fromFile.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
 
+// Zero-width space — invisible, but a real character the keyboard can delete.
+const SENTINEL = "​";
+
 // An Obsidian-style live-preview Markdown editor. The document is rendered as
 // a column of lines; every line shows its formatted Markdown except the one
 // the caret sits on, which becomes a plain textarea showing the raw source.
@@ -86,6 +89,18 @@ export function MarkdownEditor({
   );
 
   const clampedActive = Math.min(active, lines.length - 1);
+
+  // An empty active line below the first one carries an invisible zero-width
+  // sentinel inside its textarea. A soft keyboard only fires the `beforeinput`
+  // delete event when there is something *before* the caret to delete; an
+  // empty textarea therefore swallows Backspace, so holding it would erase a
+  // line down to its start and then stop instead of merging into the line
+  // above. The sentinel gives that Backspace something to bite on, which we
+  // intercept and turn into a merge. It never reaches the source string — the
+  // textarea shows it but `value`/`onChange` only ever see the real line.
+  const activeLine = lines[clampedActive] ?? "";
+  const useSentinel = clampedActive > 0 && activeLine === "";
+  const caretOffset = useSentinel ? SENTINEL.length : 0;
 
   // Apply a line-array mutation: re-derive the source, move the active line,
   // and queue the caret column for the effect below to install.
@@ -189,12 +204,29 @@ export function MarkdownEditor({
       ta.style.width = `${ta.scrollWidth}px`;
     }
     if (pendingCaret.current !== null) {
-      const col = Math.min(pendingCaret.current, ta.value.length);
+      const col =
+        caretOffset + Math.min(pendingCaret.current, activeLine.length);
       ta.focus();
       ta.setSelectionRange(col, col);
       pendingCaret.current = null;
+    } else if (
+      useSentinel &&
+      document.activeElement === ta &&
+      ta.selectionStart < caretOffset
+    ) {
+      // Keep the caret *after* the sentinel so a Backspace deletes the sentinel
+      // (which we turn into a merge) rather than landing before it and no-op-ing
+      // — the case that previously left the caret stuck at the line start.
+      ta.setSelectionRange(caretOffset, caretOffset);
     }
-  }, [clampedActive, value, wordWrap]);
+  }, [
+    clampedActive,
+    value,
+    wordWrap,
+    useSentinel,
+    caretOffset,
+    activeLine.length,
+  ]);
 
   // Structural edits also arrive as `beforeinput` events, and on mobile this
   // is the *only* place they show up: soft keyboards (and IME composition)
@@ -213,8 +245,10 @@ export function MarkdownEditor({
   handleBeforeInput.current = (e: InputEvent) => {
     const ta = taRef.current;
     if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
+    // Work in source-line columns: subtract the sentinel so column 0 of an
+    // empty line is detected whether or not the textarea carries the sentinel.
+    const start = ta.selectionStart - caretOffset;
+    const end = ta.selectionEnd - caretOffset;
     const text = lines[clampedActive] ?? "";
     const i = clampedActive;
     switch (e.inputType) {
@@ -250,7 +284,22 @@ export function MarkdownEditor({
     return () => ta.removeEventListener("beforeinput", listener);
   }, []);
 
-  function onTextChange(text: string) {
+  function onTextChange(ta: HTMLTextAreaElement) {
+    const raw = ta.value;
+    // The sentinel was deleted, leaving the field empty: that Backspace is the
+    // one a soft keyboard would otherwise have swallowed. Merge into the line
+    // above (this only fires below the first line, where the sentinel lives).
+    if (useSentinel && raw === "") {
+      mergeWithPrev();
+      return;
+    }
+    // Strip the sentinel back out so the source string never sees it, and
+    // shift the queued caret to match the removed character.
+    const hadSentinel = raw.startsWith(SENTINEL);
+    const text = hadSentinel ? raw.slice(SENTINEL.length) : raw;
+    if (hadSentinel) {
+      pendingCaret.current = Math.max(0, ta.selectionStart - SENTINEL.length);
+    }
     const next = [...lines];
     next[clampedActive] = text;
     const joined = next.join("\n");
@@ -260,8 +309,10 @@ export function MarkdownEditor({
 
   function onKeyDown(e: ReactKeyboardEvent<HTMLTextAreaElement>) {
     const ta = e.currentTarget;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
+    // Source-line columns (see the `beforeinput` handler): the sentinel sits in
+    // front of the caret on an empty line, so discount it before comparing.
+    const start = ta.selectionStart - caretOffset;
+    const end = ta.selectionEnd - caretOffset;
     const text = lines[clampedActive] ?? "";
     const i = clampedActive;
 
@@ -399,14 +450,14 @@ export function MarkdownEditor({
                 ref={taRef}
                 rows={1}
                 wrap={wordWrap ? "soft" : "off"}
-                value={line}
+                value={useSentinel ? SENTINEL : line}
                 spellCheck={!disableSpellcheck}
                 autoCorrect={disableAutocorrect ? "off" : "on"}
                 autoCapitalize={disableAutocorrect ? "off" : "sentences"}
                 placeholder={
                   lines.length === 1 ? t("app.startWriting") : undefined
                 }
-                onChange={(e) => onTextChange(e.target.value)}
+                onChange={(e) => onTextChange(e.currentTarget)}
                 onKeyDown={onKeyDown}
                 onPaste={onPaste}
                 className={`block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-fg outline-none placeholder:text-muted/60 ${wrapClass} ${lineTextClass(
