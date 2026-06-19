@@ -441,7 +441,7 @@ function TitleField({
             onEnter();
           }
         }}
-        className="w-full border-0 bg-transparent p-0 text-2xl font-bold text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60"
+        className="w-full appearance-none border-0 bg-transparent p-0 font-[inherit] text-2xl font-bold text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60"
       />
     </div>
   );
