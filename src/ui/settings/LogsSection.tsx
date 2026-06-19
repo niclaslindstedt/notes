@@ -4,20 +4,19 @@ import { useT } from "../../i18n/index.ts";
 import {
   clearLogs,
   getLogs,
-  isCaptureEnabled,
-  setCaptureEnabled,
   subscribeToLogs,
   type LogEntry,
   type LogLevel,
 } from "../../dev/logger.ts";
 import { Button } from "../form/Button.tsx";
-import { Field, Section, SegmentedRow, ToggleRow } from "./shared.tsx";
+import { Field, Section, SegmentedRow } from "./shared.tsx";
 
 // The Logs settings tab, ported from budget's LogsTab: a live, filterable view
-// of the in-app log ring buffer with Copy / Clear, plus the capture toggle
-// that persists the buffer across reloads. It's how a sync problem — notably
-// the phantom "changed on another device" conflict — is captured on a phone
-// (where devtools are out of reach) and copied into a bug report.
+// of the in-app log ring buffer with Copy / Clear. It's how a sync problem —
+// notably the phantom "changed on another device" conflict — is captured on a
+// phone (where devtools are out of reach) and copied into a bug report. The
+// capture toggle that persists the buffer across reloads lives on the Developer
+// tab; turning it on is also what reveals this tab.
 
 type LogFilter = "all" | LogLevel;
 
@@ -37,11 +36,9 @@ export function LogsSection() {
   useEffect(() => subscribeToLogs(() => setVersion((v) => v + 1)), []);
 
   // `version` is the force-re-read signal — it bumps on every logger push /
-  // clear / capture toggle so these recompute against the latest buffer.
+  // clear so these recompute against the latest buffer.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const allEntries = useMemo(() => getLogs(), [version]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const capture = useMemo(() => isCaptureEnabled(), [version]);
   const entries = useMemo(
     () =>
       filter === "all"
@@ -79,13 +76,6 @@ export function LogsSection() {
 
   return (
     <Section title={t("settings.logs.title")}>
-      <ToggleRow
-        label={t("settings.logs.capture")}
-        hint={t("settings.logs.captureHint")}
-        checked={capture}
-        onChange={setCaptureEnabled}
-      />
-
       <Field label={t("settings.logs.filterLabel")}>
         <SegmentedRow<LogFilter>
           value={filter}

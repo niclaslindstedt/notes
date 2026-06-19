@@ -304,6 +304,13 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     trigger: { kind: "manual" },
   },
   {
+    id: "underTheHood",
+    tier: "expert",
+    glyph: CodeGlyph,
+    learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
     id: "completionist",
     tier: "expert",
     glyph: MedalGlyph,
