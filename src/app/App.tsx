@@ -24,7 +24,10 @@ import { TrophyButton } from "../ui/achievements/TrophyButton.tsx";
 import { AppTitle } from "../ui/AppTitle.tsx";
 import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
+import { DropOverlay } from "../ui/DropOverlay.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
+import { useFileDrop } from "../ui/hooks/useFileDrop.ts";
+import { useMediaQuery } from "../ui/hooks/useMediaQuery.ts";
 import { usePullToRefresh } from "../ui/hooks/usePullToRefresh.ts";
 import { useRowSwipe } from "../ui/hooks/useRowSwipe.ts";
 import { useUndoRedoShortcuts } from "../ui/hooks/useUndoRedoShortcuts.ts";
@@ -87,6 +90,7 @@ export function App() {
     allNotes,
     archived,
     create,
+    importFiles,
     update,
     retitle,
     remove,
@@ -203,6 +207,16 @@ export function App() {
     },
   );
 
+  // Desktop drag-and-drop import: dropping markdown files anywhere on the
+  // window imports each as a note (its filename becomes the title). Dragging a
+  // file from the OS is a pointer gesture, so it's gated to hover-capable
+  // (non-touch) devices; `drop.dragging` drives the full-window drop overlay.
+  const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
+  const drop = useFileDrop({
+    enabled: isDesktop,
+    onFiles: (files) => importDropped(files),
+  });
+
   // Switch what's open in the editor, dropping the note we're leaving if it
   // was never typed into so abandoned "new note" taps don't pile up. Opening a
   // note always lands on the overview behind it (editable notes are never
@@ -233,6 +247,20 @@ export function App() {
     const id = create(title);
     pristineNew.current = { id, title };
     setEditingId(id);
+  }
+
+  // Land a batch of dropped markdown files in the library, then surface them:
+  // drop the throwaway note if the editor was on a never-touched one, leave
+  // the editor / reader, and show the overview where the imports now sit at
+  // the top. No-op when the drop carried nothing importable.
+  function importDropped(files: { name: string; text: string }[]) {
+    const added = importFiles(files);
+    if (added === 0) return;
+    if (editing && discardable(editing)) remove(editing.id);
+    setEditingId(null);
+    setReadingId(null);
+    setView("notes");
+    unlock("importer");
   }
 
   // Leave the editor / reader and show the full overview of active notes —
@@ -383,6 +411,7 @@ export function App() {
           state={ptr.state}
           pullDistance={ptr.pullDistance}
         />
+        <DropOverlay visible={drop.dragging} />
         <UpdateToast />
       </ModalBusProvider>
     </NavContext.Provider>

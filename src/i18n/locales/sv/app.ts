@@ -9,6 +9,9 @@ const app: AppCatalog = {
   deleteNote: "Ta bort anteckning",
   startWriting: "Börja skriva…",
   titlePlaceholder: "Titel",
+  dropTitle: "Släpp för att importera",
+  dropHint:
+    "Släpp för att lägga till dina Markdown-filer som anteckningar — varje filnamn blir anteckningens titel.",
   archive: "Arkivera",
   archiveNote: "Arkivera anteckning",
   delete: "Ta bort",

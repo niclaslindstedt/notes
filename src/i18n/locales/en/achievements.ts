@@ -141,6 +141,12 @@ const achievements = {
       learnMore:
         "notes speaks English and Swedish — switch in Settings → General and the whole interface follows. Your choice is remembered on this device.",
     },
+    importer: {
+      name: "Importer",
+      condition: "Drag and drop a Markdown file into the app.",
+      learnMore:
+        "On desktop, drop one or more Markdown files anywhere on the window and each becomes a note — the file's name turns into the title and its contents fill the body.",
+    },
 
     // ── Pro ───────────────────────────────────────────────────────────
     localVault: {

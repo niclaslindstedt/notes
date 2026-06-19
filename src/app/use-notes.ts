@@ -22,6 +22,7 @@ import {
   type Note,
   type Snapshot,
 } from "../domain/note.ts";
+import { importedNote } from "../domain/import.ts";
 import type { StorageAdapter } from "../storage/adapter.ts";
 import { useNotesSync, type NotesSync } from "./use-notes-sync.ts";
 import { useUndoRedo } from "./use-undo-redo.ts";
@@ -36,6 +37,10 @@ export type NotesStore = {
   // Archived notes, most-recently-edited first — what the archive view lists.
   archived: Note[];
   create: (title?: string) => string;
+  // Import dropped markdown files as notes — each file's name (sans extension)
+  // becomes the title and its contents the body. Lands them in one undo step
+  // and returns how many were added.
+  importFiles: (files: readonly { name: string; text: string }[]) => number;
   update: (id: string, body: string) => void;
   retitle: (id: string, title: string) => void;
   remove: (id: string) => void;
@@ -120,6 +125,22 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
       const note = { ...createNote(), title };
       commit((prev) => [note, ...prev], "New note");
       return note.id;
+    },
+    [commit],
+  );
+
+  // Import a batch of dropped files as new notes in one undo step, newest
+  // first so they sit at the top of the list (like a freshly created note).
+  const importFiles = useCallback(
+    (files: readonly { name: string; text: string }[]): number => {
+      const fresh = files.map((f) => importedNote(f.name, f.text));
+      if (fresh.length === 0) return 0;
+      const label =
+        fresh.length === 1
+          ? `Imported note “${noteTitle(fresh[0]!)}”`
+          : `Imported ${fresh.length} notes`;
+      commit((prev) => [...fresh, ...prev], label);
+      return fresh.length;
     },
     [commit],
   );
@@ -213,6 +234,7 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
     allNotes: notes,
     archived: archivedList,
     create,
+    importFiles,
     update,
     retitle,
     remove,

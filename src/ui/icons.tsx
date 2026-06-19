@@ -172,6 +172,29 @@ export function ArrowDownIcon({ className }: IconProps) {
   );
 }
 
+// A document with a down-arrow into it — the import/drop affordance. Used by
+// the drag-and-drop overlay and re-exported as the "Importer" achievement glyph.
+export function ImportIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+      <path d="M5 12V5a2 2 0 0 1 2-2h7l5 5v4" />
+      <path d="M12 13v8" />
+      <path d="m8 17 4 4 4-4" />
+    </svg>
+  );
+}
+
 export function PlusIcon({ className }: IconProps) {
   return (
     <svg

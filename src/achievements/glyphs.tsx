@@ -12,6 +12,7 @@ import {
   ArchiveIcon,
   CloudIcon,
   CodeIcon,
+  ImportIcon,
   PaletteIcon,
   PlusIcon,
   RefreshIcon,
@@ -238,6 +239,7 @@ export function MedalGlyph({ className }: IconProps) {
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;
+export const ImportGlyph: Glyph = ImportIcon;
 export const PlusGlyph: Glyph = PlusIcon;
 export const UndoGlyph: Glyph = UndoIcon;
 export const CodeGlyph: Glyph = CodeIcon;

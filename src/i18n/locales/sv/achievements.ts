@@ -135,6 +135,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "notes talar engelska och svenska — byt i Inställningar → Allmänt så följer hela gränssnittet med. Ditt val kommer ihåg på den här enheten.",
     },
+    importer: {
+      name: "Importör",
+      condition: "Dra och släpp en Markdown-fil i appen.",
+      learnMore:
+        "På datorn kan du släppa en eller flera Markdown-filer var som helst på fönstret så blir varje fil en anteckning — filnamnet blir titeln och innehållet fyller anteckningen.",
+    },
 
     // ── Proffs ────────────────────────────────────────────────────────
     localVault: {

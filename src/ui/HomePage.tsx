@@ -91,6 +91,12 @@ export function HomePage() {
               +<kbd>Z</kbd> or the side menu.
             </li>
             <li>
+              On a computer, drag and drop Markdown files anywhere onto the app
+              to <em>import</em> them — each file becomes a note, with its
+              filename as the title. The files are read in your browser and
+              never uploaded anywhere.
+            </li>
+            <li>
               Group notes into separate <em>namespaces</em> — independent
               buckets you can switch between, each with its own icon and colour.
             </li>
