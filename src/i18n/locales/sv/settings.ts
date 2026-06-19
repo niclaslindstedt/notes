@@ -11,6 +11,7 @@ const settings: SettingsCatalog = {
     appearance: "Utseende",
     editor: "Redigerare",
     storage: "Lagring",
+    developer: "Utvecklare",
     logs: "Loggar",
   },
 
@@ -20,6 +21,7 @@ const settings: SettingsCatalog = {
     languageHint: "Översätt gränssnittet mellan engelska och svenska.",
     achievementsTitle: "Bedrifter",
     menuTitle: "Meny",
+    developerTitle: "Utvecklare",
     language: "Språk",
     disableAchievements: "Inaktivera bedrifter",
     disableAchievementsHint:
@@ -27,6 +29,18 @@ const settings: SettingsCatalog = {
     menuButton: "Visa menyknapp",
     menuButtonHint:
       "När den är av sveper du in från skärmkanten för att öppna menyn.",
+    devMode: "Utvecklarläge",
+    devModeHint:
+      "Visa fliken Utvecklare med diagnostikverktyg. Stannar på den här enheten.",
+  },
+
+  developer: {
+    title: "Utvecklare",
+    blurb:
+      "Diagnostik för utveckling. De här inställningarna stannar på den här enheten och följer aldrig med en synkad mapp eller moln.",
+    captureLogs: "Spara loggar",
+    captureLogsHint:
+      "Spela in den inbyggda loggen i den här webbläsaren så att den överlever en omladdning, och visa fliken Loggar. Av som standard.",
   },
 
   editor: {
@@ -115,9 +129,6 @@ const settings: SettingsCatalog = {
 
   logs: {
     title: "Loggar",
-    capture: "Fånga loggar mellan omladdningar",
-    captureHint:
-      "Behåll loggen när appen laddas om, så att ett problem som bara dyker upp efter en omstart inte går förlorat. Av som standard.",
     filterLabel: "Visa",
     filterAll: "Alla",
     filterInfo: "Info",

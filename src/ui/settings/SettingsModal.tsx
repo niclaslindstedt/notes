@@ -1,5 +1,12 @@
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+} from "react";
 
+import { useDevMode } from "../../dev/useDevMode.ts";
 import { useT, type MessageKey } from "../../i18n/index.ts";
 import type { UseStorageBackend } from "../../storage/useStorageBackend.ts";
 import { updateAppearance, useAppearance } from "../../theme/useTheme.ts";
@@ -11,10 +18,12 @@ import {
   MenuIcon,
   PaletteIcon,
   PencilIcon,
+  ScrollTextIcon,
   SlidersIcon,
 } from "../icons.tsx";
 import { Modal } from "../Modal.tsx";
 import { AppearanceSection } from "./AppearanceSection.tsx";
+import { DeveloperSection } from "./DeveloperSection.tsx";
 import { EditorSection } from "./EditorSection.tsx";
 import { GeneralSection } from "./GeneralSection.tsx";
 import { LogsSection } from "./LogsSection.tsx";
@@ -26,20 +35,42 @@ import { StorageSection } from "./StorageSection.tsx";
 // burger menu in the header on mobile. Unlike checklist there's no draft /
 // Save step: every control here applies live through its own store, so the
 // dialog is just a chooser with a Close button and no footer.
+//
+// Developer and Logs are diagnostic tabs gated behind the device-local
+// developer-mode flag: Developer appears once dev mode is on, and Logs appears
+// only once log capture is turned on from there (turning dev mode off forces
+// capture off, so the Logs tab can never outlive its data).
 
-type TabId = "general" | "appearance" | "editor" | "storage" | "logs";
+type TabId =
+  | "general"
+  | "appearance"
+  | "editor"
+  | "storage"
+  | "developer"
+  | "logs";
 
 type IconComponent = ComponentType<{ className?: string }>;
 
 type TabDef = { id: TabId; labelKey: MessageKey; Icon: IconComponent };
 
-const TABS: readonly TabDef[] = [
+const BASE_TABS: readonly TabDef[] = [
   { id: "general", labelKey: "settings.tab.general", Icon: SlidersIcon },
   { id: "appearance", labelKey: "settings.tab.appearance", Icon: PaletteIcon },
   { id: "editor", labelKey: "settings.tab.editor", Icon: PencilIcon },
   { id: "storage", labelKey: "settings.tab.storage", Icon: DatabaseIcon },
-  { id: "logs", labelKey: "settings.tab.logs", Icon: CodeIcon },
 ];
+
+const DEVELOPER_TAB: TabDef = {
+  id: "developer",
+  labelKey: "settings.tab.developer",
+  Icon: CodeIcon,
+};
+
+const LOGS_TAB: TabDef = {
+  id: "logs",
+  labelKey: "settings.tab.logs",
+  Icon: ScrollTextIcon,
+};
 
 type Props = {
   open: boolean;
@@ -49,7 +80,17 @@ type Props = {
 
 export function SettingsModal({ open, onClose, storage }: Props) {
   const appearance = useAppearance();
+  const { devMode, captureLogs } = useDevMode();
   const [activeTab, setActiveTab] = useState<TabId>("general");
+
+  // Developer is gated on dev mode; Logs is gated on log capture (which can
+  // only be on while dev mode is, so the Logs tab never outlives its data).
+  const tabs = useMemo<readonly TabDef[]>(() => {
+    const list = [...BASE_TABS];
+    if (devMode) list.push(DEVELOPER_TAB);
+    if (captureLogs) list.push(LOGS_TAB);
+    return list;
+  }, [devMode, captureLogs]);
 
   // Always reopen on the General tab — it's the landing tab. Resetting while
   // closed keeps the next open clean without a visible flash of the old tab.
@@ -57,16 +98,23 @@ export function SettingsModal({ open, onClose, storage }: Props) {
     if (!open) setActiveTab("general");
   }, [open]);
 
+  // If the active tab disappears (dev mode or capture turned off while it's
+  // showing), fall back to General so the panel is never empty.
+  useEffect(() => {
+    if (!tabs.some((tab) => tab.id === activeTab)) setActiveTab("general");
+  }, [tabs, activeTab]);
+
   return (
     <Modal open={open} onClose={onClose} labelledBy="settings-title">
       <SettingsHeader
+        tabs={tabs}
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         onClose={onClose}
       />
 
       <div className="flex flex-1 overflow-hidden">
-        <TabSidebar activeTab={activeTab} onSelect={setActiveTab} />
+        <TabSidebar tabs={tabs} activeTab={activeTab} onSelect={setActiveTab} />
 
         <div
           role="tabpanel"
@@ -92,6 +140,7 @@ export function SettingsModal({ open, onClose, storage }: Props) {
               />
             )}
             {activeTab === "storage" && <StorageSection storage={storage} />}
+            {activeTab === "developer" && <DeveloperSection />}
             {activeTab === "logs" && <LogsSection />}
           </div>
         </div>
@@ -105,17 +154,19 @@ export function SettingsModal({ open, onClose, storage }: Props) {
 // shows the static "Settings" title (the burger is hidden at `sm:` and up).
 // The h2 stays mounted (sr-only on mobile) so `aria-labelledby` resolves.
 function SettingsHeader({
+  tabs,
   activeTab,
   onSelectTab,
   onClose,
 }: {
+  tabs: readonly TabDef[];
   activeTab: TabId;
   onSelectTab: (id: TabId) => void;
   onClose: () => void;
 }) {
   const t = useT();
   const [menuOpen, setMenuOpen] = useState(false);
-  const activeDef = TABS.find((tab) => tab.id === activeTab);
+  const activeDef = tabs.find((tab) => tab.id === activeTab);
   const ActiveIcon = activeDef?.Icon ?? CogIcon;
   const activeLabel = activeDef ? t(activeDef.labelKey) : t("settings.title");
 
@@ -156,7 +207,7 @@ function SettingsHeader({
                 role="menu"
                 className="absolute top-full left-0 z-50 mt-1 flex w-48 flex-col gap-0.5 rounded border border-line bg-surface-3 p-2 shadow-xl"
               >
-                {TABS.map((tab) => {
+                {tabs.map((tab) => {
                   const Icon = tab.Icon;
                   const isActive = tab.id === activeTab;
                   return (
@@ -210,9 +261,11 @@ function SettingsHeader({
 // over). A WAI-ARIA tablist with roving tabindex and arrow-key navigation;
 // activation follows focus to match the mouse / touch behaviour.
 function TabSidebar({
+  tabs,
   activeTab,
   onSelect,
 }: {
+  tabs: readonly TabDef[];
   activeTab: TabId;
   onSelect: (id: TabId) => void;
 }) {
@@ -235,9 +288,9 @@ function TabSidebar({
     if (e.key === "ArrowUp") next = idx - 1;
     else if (e.key === "ArrowDown") next = idx + 1;
     else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = TABS.length - 1;
-    const wrapped = (next + TABS.length) % TABS.length;
-    const nextDef = TABS[wrapped];
+    else if (e.key === "End") next = tabs.length - 1;
+    const wrapped = (next + tabs.length) % tabs.length;
+    const nextDef = tabs[wrapped];
     if (!nextDef) return;
     onSelect(nextDef.id);
     buttonRefs.current[nextDef.id]?.focus();
@@ -250,7 +303,7 @@ function TabSidebar({
       aria-label={t("settings.sections")}
       className="hidden w-40 shrink-0 flex-col gap-0.5 overflow-y-auto overscroll-contain border-r border-line bg-surface-3 p-2 sm:flex"
     >
-      {TABS.map((tab, idx) => {
+      {tabs.map((tab, idx) => {
         const Icon = tab.Icon;
         const active = tab.id === activeTab;
         return (

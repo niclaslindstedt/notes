@@ -173,6 +173,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "I den installerade mobilappen kan du dölja den flytande menyknappen helt och öppna sidomenyn med ett inåtsvep från skärmkanten.",
     },
+    underTheHood: {
+      name: "Under huven",
+      condition: "Slå på utvecklarläget.",
+      learnMore:
+        "Inställningar → Allmänt → Utvecklarläge visar en Utvecklare-flik vars diagnostik — som att spara den inbyggda loggen mellan omladdningar — hjälper dig spåra ett synkproblem från enheten där det inträffar.",
+    },
     completionist: {
       name: "Fullbordaren",
       condition: "Lås upp alla andra bedrifter.",

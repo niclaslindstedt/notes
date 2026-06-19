@@ -16,6 +16,7 @@ const settings = {
     appearance: "Appearance",
     editor: "Editor",
     storage: "Storage",
+    developer: "Developer",
     logs: "Logs",
   },
 
@@ -25,6 +26,7 @@ const settings = {
     languageHint: "Translate the UI between English and Swedish.",
     achievementsTitle: "Achievements",
     menuTitle: "Menu",
+    developerTitle: "Developer",
     language: "Language",
     disableAchievements: "Disable achievements",
     disableAchievementsHint:
@@ -32,6 +34,18 @@ const settings = {
     menuButton: "Show menu button",
     menuButtonHint:
       "When off, swipe in from the edge of the screen to open the menu.",
+    devMode: "Developer mode",
+    devModeHint:
+      "Reveal the Developer tab with diagnostic tools. Stays on this device.",
+  },
+
+  developer: {
+    title: "Developer",
+    blurb:
+      "Diagnostics for development. These settings stay on this device and never travel with a synced folder or cloud.",
+    captureLogs: "Capture logs",
+    captureLogsHint:
+      "Record the in-app log to this browser so it survives a reload, and show the Logs tab. Off by default.",
   },
 
   editor: {
@@ -116,9 +130,6 @@ const settings = {
 
   logs: {
     title: "Logs",
-    capture: "Capture logs across reloads",
-    captureHint:
-      "Keep the log when the app reloads, so a problem that only shows up after a restart isn't lost. Off by default.",
     filterLabel: "Show",
     filterAll: "All",
     filterInfo: "Info",

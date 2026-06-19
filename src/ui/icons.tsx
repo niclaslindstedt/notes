@@ -63,6 +63,26 @@ export function CodeIcon({ className }: IconProps) {
   );
 }
 
+export function ScrollTextIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="M5 3h11a2 2 0 0 1 2 2v13a3 3 0 0 0 3 3H8a3 3 0 0 1-3-3V3z" />
+      <path d="M21 18a3 3 0 0 1-3 3" />
+      <path d="M8 7h7M8 11h7" />
+    </svg>
+  );
+}
+
 export function HeartIcon({ className }: IconProps) {
   return (
     <svg

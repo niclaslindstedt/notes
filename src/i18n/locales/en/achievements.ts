@@ -179,6 +179,12 @@ const achievements = {
       learnMore:
         "On the installed mobile app you can hide the floating menu button entirely and open the side menu with an inward swipe from the screen edge.",
     },
+    underTheHood: {
+      name: "Under the Hood",
+      condition: "Turn on developer mode.",
+      learnMore:
+        "Settings → General → Developer mode reveals a Developer tab whose diagnostics — like capturing the in-app log across reloads — help track down a sync problem from the device it happens on.",
+    },
     completionist: {
       name: "Completionist",
       condition: "Unlock every other achievement.",
