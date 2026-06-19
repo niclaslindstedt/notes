@@ -140,7 +140,10 @@ export function withLocalCache(
 
     async load(): Promise<StoredSnapshot | null> {
       try {
-        const snap = await inner.load();
+        // Hand the inner backend our cached copy so a file-per-note backend can
+        // fetch only the notes whose revision moved instead of re-reading the
+        // whole folder — the read half of keeping a large note set in sync.
+        const snap = await inner.load(readCache() ?? undefined);
         if (snap) {
           writeCache({ text: snap.text, revision: snap.revision });
         } else {

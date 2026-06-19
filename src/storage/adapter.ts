@@ -58,7 +58,14 @@ export type StorageAdapter = {
 
   // Load the current snapshot. Returns null when nothing has been stored yet
   // (first run, or an empty cloud app folder).
-  load(): Promise<StoredSnapshot | null>;
+  //
+  // `previous` is an optional hint: the snapshot the caller last held for this
+  // backend (e.g. the offline cache). A file-per-note backend uses it to skip
+  // re-downloading notes whose revision hasn't moved — it lists cheaply, then
+  // fetches only the files that changed. Adapters that can't exploit it ignore
+  // the argument and load in full; passing it can never change the result, only
+  // how much is fetched.
+  load(previous?: StoredSnapshot): Promise<StoredSnapshot | null>;
 
   // Save the snapshot. If `baseRevision` is provided and the remote has
   // moved beyond it, the adapter must throw `ConflictError` carrying the
