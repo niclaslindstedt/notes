@@ -151,6 +151,36 @@ describe("directory adapter", () => {
     expect(await adapter(memoryStore()).load()).toBeNull();
   });
 
+  it("reuses unchanged notes on load and fetches only what moved", async () => {
+    const real = memoryStore();
+    let reads = 0;
+    const counting: FileStore = {
+      list: () => real.list(),
+      read: (p) => {
+        reads += 1;
+        return real.read(p);
+      },
+      write: (p, t) => real.write(p, t),
+      remove: (p) => real.remove(p),
+    };
+    const a = adapter(counting);
+    const [first, second] = notes();
+    await a.save(serialize({ notes: [first!, second!] }));
+    const full = await a.load();
+    expect(reads).toBe(2);
+
+    // A second device edits only the first note, behind our back.
+    await real.write(notePath(first!), "---\nid: a\ncreated: 1\n---\nmoved\n");
+    reads = 0;
+    // Hand the adapter the snapshot we already hold: it should fetch only the
+    // note whose revision moved, and reuse the untouched one from memory.
+    const next = await a.load(full ?? undefined);
+    expect(reads).toBe(1);
+    // The result is still complete and correct (both notes present).
+    expect(parse(next?.text).notes).toHaveLength(2);
+    expect(next?.text).toContain("moved");
+  });
+
   it("reads the directory only once per save (no post-write re-list)", async () => {
     // The post-save revision must come from the write responses, not a second
     // list() — re-listing is what made the cloud backends stamp a stale,

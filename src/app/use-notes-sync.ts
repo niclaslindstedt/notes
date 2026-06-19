@@ -86,6 +86,12 @@ export interface NotesSync {
   offline: boolean;
   /** Re-read the document from the active backend, replacing what's on screen. */
   reload: () => Promise<void>;
+  /**
+   * Pull the latest from a remote backend (pull-to-refresh / foreground /
+   * opening a note). Like `reload`, but a no-op on the local browser backend,
+   * and it leaves the document and undo timeline untouched when nothing moved.
+   */
+  refresh: () => Promise<void>;
   /** Flush any debounced save immediately (the "save now" affordance). */
   saveNow: () => void;
   /** Resolve an open conflict by keeping this device's copy or the remote's. */
@@ -352,6 +358,7 @@ export function useNotesSync(deps: {
     saveGeneration.current += 1;
     inFlight.current = false;
     pendingDoc.current = null;
+    const prevRevision = revisionRef.current;
     let stored;
     try {
       stored = await adapterRef.current.load();
@@ -365,11 +372,26 @@ export function useNotesSync(deps: {
     setConflict(null);
     setStatus("idle");
     setStatusDetail(null);
+    // A refresh that finds the remote unchanged must not replace the document
+    // or reset the undo timeline — that would wipe the user's place every time
+    // a poll, foreground, or note-open turned up nothing new.
+    if (stored?.revision !== undefined && stored.revision === prevRevision) {
+      return;
+    }
     setDirty(false);
     const reloaded = parse(stored?.text);
     setDoc(reloaded);
     resetHistory?.current(reloaded);
   }, [flushSave, setDoc, resetHistory]);
+
+  // The pull-to-refresh / foreground / open-note gesture: re-read the backend,
+  // but only for backends that actually have a remote to diverge from — the
+  // local browser store has no other writer, so refreshing it would just churn
+  // the undo timeline for nothing.
+  const refresh = useCallback(async () => {
+    if (adapterRef.current.id === "browser") return;
+    await reload();
+  }, [reload]);
 
   // When connectivity returns, flush whatever edit piled up offline so it
   // syncs to the backend without the user lifting a finger.
@@ -381,6 +403,23 @@ export function useNotesSync(deps: {
     };
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
+  }, []);
+
+  // Coming back to the app (a tab refocus, returning from the home screen on
+  // mobile) pulls the latest from the backend — the "exit and open again"
+  // refresh, without a manual gesture. `refresh` is a no-op on the local
+  // backend and cheap (incremental) on the cloud ones.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      log.info("app foregrounded — refreshing from backend");
+      void refreshRef.current();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   const saveNow = useCallback(() => {
@@ -429,6 +468,7 @@ export function useNotesSync(deps: {
     offline,
     loaded,
     reload,
+    refresh,
     saveNow,
     resolveConflict,
   };

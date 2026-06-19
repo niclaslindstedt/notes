@@ -152,6 +152,26 @@ export function ArrowLeftIcon({ className }: IconProps) {
   );
 }
 
+/** A downward arrow — the pull-to-refresh indicator rotates it 180° to
+ *  signal "release to refresh". */
+export function ArrowDownIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="M12 5v14M19 12l-7 7-7-7" />
+    </svg>
+  );
+}
+
 export function PlusIcon({ className }: IconProps) {
   return (
     <svg
