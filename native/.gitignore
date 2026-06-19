@@ -1,0 +1,12 @@
+# Expo / native build artifacts
+.expo/
+dist/
+web-build/
+ios/
+android/
+
+# Secrets — never commit store credentials
+play-service-account.json
+*.p8
+*.p12
+*.keystore

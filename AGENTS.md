@@ -9,8 +9,11 @@ this repo. `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, `GEMINI.md`, and
 `notes` is a local-first PWA for taking notes that works great on mobile and
 desktop. It runs entirely in the browser and is served as static files —
 there is **no backend**. Notes are persisted to `localStorage`. A React
-Native app is planned; the platform-agnostic core under `src/domain/` is kept
-framework-free so it can be reused there unchanged.
+Native (Expo) app lives under [`native/`](native/README.md) — a thin
+presentation layer that imports the platform-agnostic core (`src/domain/`,
+the `use-notes*` app hooks, the storage contract) verbatim and supplies its
+own native views; that core is kept framework-free precisely so it can be
+reused there unchanged.
 
 Mobile is the primary testing device. Every visible change should be checked
 at a phone viewport first.
