@@ -106,6 +106,12 @@ export function HomePage() {
               Drive (see below).
             </li>
             <li>
+              <em>Copy</em> a note to your clipboard with the button beside the
+              sync glyph — just the body, the title and body, or the whole
+              Markdown file with its frontmatter. It stays on your device; the
+              clipboard is written locally.
+            </li>
+            <li>
               Group notes into separate <em>namespaces</em> — independent
               buckets you can switch between, each with its own icon and colour.
             </li>

@@ -71,6 +71,7 @@ Honour these when naming a new file, key, or string.
 | **Image attachment** / **paste an image** / **drop an image** / **thumbnail** / **attachments folder** | `Attachment` (`src/domain/attachment.ts`); `AttachmentsProvider`, `InlineImage`, `ImageViewer`, `useThumbnail` (`src/ui/attachments/`); `AttachmentStore` (`src/storage/attachment-store.ts`); `attach` (`src/app/use-notes.ts`). [→](overview.md#image-attachments) |
 | **Title field** / **rename a note** / **the note title**   | `TitleField` in `src/app/App.tsx`; `retitleNote` (`src/domain/note.ts`). [→](overview.md#title-field)        |
 | **Editor margin** / **writing column width** / **word wrap** / **spell-check toggle** | `EditorSettings`, `EditorMargin`, `editorMarginMaxWidth` (`src/theme/themes.ts`); `EditorSection` (`src/ui/settings/EditorSection.tsx`). [→](overview.md#editor-settings) |
+| **Copy button** / **copy glyph** / **copy note** / **copy scope** / **copy with front matter** | `CopyNoteButton` (`src/ui/CopyNoteButton.tsx`); `buildCopyText` (`src/ui/copy-note.ts`); `CopyScope` (`src/domain/note.ts`). [→](overview.md#copy-button) |
 
 ## The note model and operations
 

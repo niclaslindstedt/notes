@@ -64,6 +64,12 @@ const settings: SettingsCatalog = {
     disableAutocorrect: "Inaktivera autokorrigering",
     disableAutocorrectHint:
       "Sluta låta enheten autokorrigera och automatiskt göra versaler medan du skriver (påverkar mest mobiltangentbord).",
+    copyScope: "Kopiera",
+    copyScopeHint:
+      "Vad redigerarens kopieringsknapp lägger på urklipp. Brödtext är bara det du skrev; de andra lägger till titeln, eller hela .md-filen med dess YAML-frontmatter.",
+    copyBody: "Brödtext",
+    copyTitleBody: "Titel & brödtext",
+    copyFrontMatter: "Frontmatter",
   },
 
   appearance: {

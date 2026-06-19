@@ -172,6 +172,25 @@ export function ArrowDownIcon({ className }: IconProps) {
   );
 }
 
+/** A downward chevron — the disclosure caret on the copy split-button. */
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
 // A document with a down-arrow into it — the import/drop affordance. Used by
 // the drag-and-drop overlay and re-exported as the "Importer" achievement glyph.
 export function ImportIcon({ className }: IconProps) {
@@ -264,6 +283,27 @@ export function TrashIcon({ className }: IconProps) {
     >
       <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
       <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
+/** Two overlapping pages — copy the note to the clipboard. The header copy
+ *  button and the "Copycat" achievement share it. */
+export function CopyIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <rect x="8" y="8" width="14" height="14" rx="2" />
+      <path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2" />
     </svg>
   );
 }

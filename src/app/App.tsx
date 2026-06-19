@@ -39,6 +39,7 @@ import {
   RestoreIcon,
   TrashIcon,
 } from "../ui/icons.tsx";
+import { CopyNoteButton } from "../ui/CopyNoteButton.tsx";
 import { RenderedLine } from "../ui/MarkdownLine.tsx";
 import { AttachmentsProvider } from "../ui/attachments/AttachmentsProvider.tsx";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
@@ -694,7 +695,10 @@ function ReadOnlyNote({
         >
           <ArrowLeftIcon className="h-[18px] w-[18px]" />
         </button>
-        <div className="flex items-center gap-2">{syncSlot}</div>
+        <div className="flex items-center gap-2">
+          <CopyNoteButton note={note} copyScope={editor.copyScope} />
+          {syncSlot}
+        </div>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -795,7 +799,10 @@ function Editor({
           disableSpellcheck={editor.disableSpellcheck}
           disableAutocorrect={editor.disableAutocorrect}
         />
-        <div className="flex shrink-0 items-center gap-2">{syncSlot}</div>
+        <div className="flex shrink-0 items-center gap-2">
+          <CopyNoteButton note={note} copyScope={editor.copyScope} />
+          {syncSlot}
+        </div>
       </header>
 
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">

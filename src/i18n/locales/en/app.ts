@@ -20,6 +20,15 @@ const app = {
   archive: "Archive",
   archiveNote: "Archive note",
   delete: "Delete",
+  // The editor's copy-to-clipboard split-button (left of the sync glyph).
+  copy: {
+    label: "Copy note",
+    copied: "Copied",
+    menuLabel: "Copy options",
+    body: "Body",
+    titleBody: "Title and body",
+    frontMatter: "With front matter",
+  },
 } as const;
 
 export type AppCatalog = Widen<typeof app>;

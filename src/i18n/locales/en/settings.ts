@@ -69,6 +69,12 @@ const settings = {
     disableAutocorrect: "Disable auto correct",
     disableAutocorrectHint:
       "Stop your device auto-correcting and auto-capitalising as you type (mostly affects mobile keyboards).",
+    copyScope: "Copy",
+    copyScopeHint:
+      "What the editor's copy button puts on the clipboard. Body is just what you wrote; the others add the title, or the whole .md file with its YAML frontmatter.",
+    copyBody: "Body",
+    copyTitleBody: "Title & body",
+    copyFrontMatter: "Front matter",
   },
 
   appearance: {

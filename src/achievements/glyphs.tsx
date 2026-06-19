@@ -12,6 +12,7 @@ import {
   ArchiveIcon,
   CloudIcon,
   CodeIcon,
+  CopyIcon,
   ImportIcon,
   PaletteIcon,
   PlusIcon,
@@ -257,3 +258,4 @@ export const CodeGlyph: Glyph = CodeIcon;
 export const CloudGlyph: Glyph = CloudIcon;
 export const RefreshGlyph: Glyph = RefreshIcon;
 export const PaletteGlyph: Glyph = PaletteIcon;
+export const CopyGlyph: Glyph = CopyIcon;
