@@ -12,6 +12,11 @@ const app = {
   deleteNote: "Delete note",
   startWriting: "Start writing…",
   titlePlaceholder: "Title",
+  // Drag-and-drop import overlay (desktop): shown while Markdown files are
+  // dragged over the window.
+  dropTitle: "Drop to import",
+  dropHint:
+    "Release to add your Markdown files as notes — each file's name becomes the note title.",
   // Swipe actions on a note card in the overview.
   archive: "Archive",
   archiveNote: "Archive note",
