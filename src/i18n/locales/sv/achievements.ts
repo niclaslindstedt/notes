@@ -101,9 +101,9 @@ const achievements: AchievementsCatalog = {
     },
     freehand: {
       name: "Frihand",
-      condition: "Stäng av stavningskontroll och autokorrigering.",
+      condition: "Inaktivera stavningskontroll eller autokorrigering.",
       learnMore:
-        "Skriver du kod, strukturerade anteckningar eller ett annat språk? Inställningar → Redigerare stoppar enheten från att kontrollera stavning och autokorrigera medan du skriver.",
+        "Skriver du kod, strukturerade anteckningar eller ett annat språk? Inställningar → Redigerare kan stoppa enheten från att kontrollera stavning och autokorrigera medan du skriver.",
     },
     compartments: {
       name: "Fack",

@@ -31,8 +31,10 @@ type Props = {
   onChange: (body: string) => void;
   /** Wrap long lines, or keep them on one line and scroll horizontally. */
   wordWrap: boolean;
-  /** Spell check + autocorrect/-capitalise as you type (`false` to disable). */
-  spellcheck: boolean;
+  /** Turn off browser/OS spell check (the red squiggles). */
+  disableSpellcheck: boolean;
+  /** Turn off mobile autocorrect and auto-capitalisation. */
+  disableAutocorrect: boolean;
   /** Max width of the writing column (`"none"` for full-bleed) + classes. */
   maxWidth: string;
 };
@@ -41,7 +43,8 @@ export function MarkdownEditor({
   body,
   onChange,
   wordWrap,
-  spellcheck,
+  disableSpellcheck,
+  disableAutocorrect,
   maxWidth,
 }: Props) {
   const t = useT();
@@ -299,9 +302,9 @@ export function MarkdownEditor({
               rows={1}
               wrap={wordWrap ? "soft" : "off"}
               value={line}
-              spellCheck={spellcheck}
-              autoCorrect={spellcheck ? "on" : "off"}
-              autoCapitalize={spellcheck ? "sentences" : "off"}
+              spellCheck={!disableSpellcheck}
+              autoCorrect={disableAutocorrect ? "off" : "on"}
+              autoCapitalize={disableAutocorrect ? "off" : "sentences"}
               placeholder={
                 lines.length === 1 ? t("app.startWriting") : undefined
               }

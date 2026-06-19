@@ -169,9 +169,15 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     learnMore: true,
     trigger: {
       kind: "derived",
-      slices: (s) => [s.appearance.editor.spellcheck],
+      slices: (s) => [
+        s.appearance.editor.disableSpellcheck,
+        s.appearance.editor.disableAutocorrect,
+      ],
       predicate: (prev, next) =>
-        prev.appearance.editor.spellcheck && !next.appearance.editor.spellcheck,
+        (!prev.appearance.editor.disableSpellcheck &&
+          next.appearance.editor.disableSpellcheck) ||
+        (!prev.appearance.editor.disableAutocorrect &&
+          next.appearance.editor.disableAutocorrect),
     },
   },
   {

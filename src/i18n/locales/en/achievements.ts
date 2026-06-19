@@ -107,9 +107,9 @@ const achievements = {
     },
     freehand: {
       name: "Freehand",
-      condition: "Turn off spell check and autocorrect.",
+      condition: "Disable spell check or autocorrect.",
       learnMore:
-        "Writing code, structured notes, or another language? Settings → Editor stops your device checking spelling and auto-correcting as you type.",
+        "Writing code, structured notes, or another language? Settings → Editor can stop your device checking spelling and auto-correcting as you type.",
     },
     compartments: {
       name: "Compartments",

@@ -35,9 +35,12 @@ const settings: SettingsCatalog = {
     renderMarkdown: "Rendera Markdown",
     renderMarkdownHint:
       "Formatera Markdown medan du skriver — varje rad utom den du står på visas formaterad, som i Obsidian.",
-    spellcheck: "Stavningskontroll och autokorrigering",
-    spellcheckHint:
-      "Låt din enhet kontrollera stavning och autokorrigera medan du skriver. Stäng av för att dölja de röda vågorna och stoppa autokorrigering och automatisk versalisering på mobilen.",
+    disableSpellcheck: "Inaktivera stavningskontroll",
+    disableSpellcheckHint:
+      "Sluta låta enheten kontrollera stavning medan du skriver, döljer de röda vågorna.",
+    disableAutocorrect: "Inaktivera autokorrigering",
+    disableAutocorrectHint:
+      "Sluta låta enheten autokorrigera och automatiskt göra versaler medan du skriver (påverkar mest mobiltangentbord).",
   },
 
   appearance: {

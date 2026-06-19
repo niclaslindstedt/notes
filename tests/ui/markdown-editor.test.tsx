@@ -11,7 +11,8 @@ function renderEditor(body: string) {
       body={body}
       onChange={onChange}
       wordWrap
-      spellcheck
+      disableSpellcheck={false}
+      disableAutocorrect={false}
       maxWidth="none"
     />,
   );
