@@ -11,6 +11,7 @@ const settings: SettingsCatalog = {
     appearance: "Utseende",
     editor: "Redigerare",
     storage: "Lagring",
+    logs: "Loggar",
   },
 
   general: {
@@ -110,6 +111,23 @@ const settings: SettingsCatalog = {
     wrong: "Den lösenfrasen fungerade inte.",
     offline:
       "Du är offline och inget är cachat på den här enheten ännu. Anslut till internet och försök igen.",
+  },
+
+  logs: {
+    title: "Loggar",
+    capture: "Fånga loggar mellan omladdningar",
+    captureHint:
+      "Behåll loggen när appen laddas om, så att ett problem som bara dyker upp efter en omstart inte går förlorat. Av som standard.",
+    filterLabel: "Visa",
+    filterAll: "Alla",
+    filterInfo: "Info",
+    filterWarn: "Varning",
+    filterError: "Fel",
+    copy: "Kopiera",
+    copied: "Kopierat!",
+    clear: "Rensa",
+    empty: "Inga loggar än.",
+    entryCount: "{count} poster",
   },
 };
 

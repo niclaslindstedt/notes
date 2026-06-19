@@ -44,6 +44,18 @@ import { isEncryptedEnvelope } from "./crypto.ts";
 import type { FileEntry, FileStore } from "./file-store.ts";
 import { filesToSnapshot, snapshotToFiles } from "./markdown/codec.ts";
 import { parse, serialize } from "./serialize.ts";
+import { createLogger } from "../dev/logger.ts";
+
+const log = createLogger("sync");
+
+// Shorten an aggregate revision for a log line — it can be long for a
+// multi-file document, and only its head and tail matter when eyeballing
+// whether two revisions differ.
+function shortRev(rev: string | undefined): string {
+  if (rev === undefined) return "∅";
+  if (rev.length <= 48) return rev;
+  return `${rev.slice(0, 28)}…${rev.slice(-16)}`;
+}
 
 // Single-file location for bytes that can't be expressed as markdown: an
 // AES-GCM envelope (encryption on).
@@ -88,6 +100,12 @@ export function createDirectoryAdapter(
     if (produced.length > MAX_TRACKED) produced.shift();
   }
 
+  // A rebuild starts `produced` empty, so the first queued back-to-back save
+  // after one can't recognise its own lagging write. If this line appears
+  // mid-typing-session (not just on connect / namespace switch), the adapter
+  // is being recreated under the sync engine and dropping the lag tolerance.
+  log.info(`${options.id}: directory adapter created`);
+
   async function readSnapshotText(
     entries: readonly FileEntry[],
   ): Promise<string | null> {
@@ -115,6 +133,7 @@ export function createDirectoryAdapter(
     if (text === null) return null;
     const revision = aggregateRevision(entries);
     remember(revision);
+    log.info(`${options.id} load: rev=${shortRev(revision)}`);
     return { text, revision };
   }
 
@@ -123,13 +142,29 @@ export function createDirectoryAdapter(
     baseRevision?: string,
   ): Promise<StoredSnapshot> {
     const before = await store.list();
-    if (baseRevision !== undefined) {
-      const current = aggregateRevision(before);
+    const current = aggregateRevision(before);
+    log.info(
+      `${options.id} save: base=${shortRev(baseRevision)} listed=${shortRev(current)} match=${current === baseRevision} producedN=${produced.length}`,
+    );
+    if (baseRevision !== undefined && current !== baseRevision) {
       // A listing that differs from the caller's baseline is a conflict only
       // when it's *not* one of our own recently produced states the backend
       // hasn't finished propagating yet — otherwise a single device collides
       // with itself on a queued back-to-back save (see the file header).
-      if (current !== baseRevision && !produced.includes(current)) {
+      const tolerated = produced.includes(current);
+      // Always captured (no debug toggle needed): this single line is what a
+      // phantom-conflict bug report turns on. `tolerated` true means we
+      // absorbed our own lagging write; false means the modal is about to show.
+      log.warn(
+        `${options.id} save: listing diverged from base — ${tolerated ? "tolerated own lag" : "raising CONFLICT"}`,
+        {
+          base: shortRev(baseRevision),
+          listed: shortRev(current),
+          tolerated,
+          recentlyProduced: produced.slice(-8).map(shortRev),
+        },
+      );
+      if (!tolerated) {
         const remoteText = await readSnapshotText(before);
         throw new ConflictError({
           text: remoteText ?? serialize(parse(null)),
@@ -170,8 +205,21 @@ export function createDirectoryAdapter(
         : null;
     }
 
+    if (written === null) {
+      // A backend write reported no revision, so we can't build the post-save
+      // revision authoritatively and must re-list — which is eventually
+      // consistent and the very thing that reintroduces phantom self-conflicts.
+      // Always captured: if this shows up, the backend's write isn't returning
+      // its rev (e.g. an unexpected upload-response shape).
+      log.warn(
+        `${options.id} save: a write returned no revision — falling back to a re-list (lag-prone, may cause phantom conflicts)`,
+      );
+    }
     const revision = aggregateRevision(written ?? (await store.list()));
     remember(revision);
+    log.info(
+      `${options.id} save: committed base=${shortRev(baseRevision)} -> rev=${shortRev(revision)}`,
+    );
     return { text, revision };
   }
 

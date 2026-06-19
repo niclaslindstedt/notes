@@ -16,6 +16,7 @@ const settings = {
     appearance: "Appearance",
     editor: "Editor",
     storage: "Storage",
+    logs: "Logs",
   },
 
   general: {
@@ -111,6 +112,23 @@ const settings = {
     wrong: "That passphrase didn't work.",
     offline:
       "You're offline and nothing is cached on this device yet. Connect to the internet and try again.",
+  },
+
+  logs: {
+    title: "Logs",
+    capture: "Capture logs across reloads",
+    captureHint:
+      "Keep the log when the app reloads, so a problem that only shows up after a restart isn't lost. Off by default.",
+    filterLabel: "Show",
+    filterAll: "All",
+    filterInfo: "Info",
+    filterWarn: "Warn",
+    filterError: "Error",
+    copy: "Copy",
+    copied: "Copied!",
+    clear: "Clear",
+    empty: "No logs yet.",
+    entryCount: "{count} entries",
   },
 } as const;
 
