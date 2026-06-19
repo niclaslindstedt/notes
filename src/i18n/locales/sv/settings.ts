@@ -14,9 +14,11 @@ const settings: SettingsCatalog = {
   },
 
   general: {
-    title: "Allmänt",
-    blurb:
-      "notes är en lokal-först-app — dina anteckningar finns i den här webbläsaren om du inte ansluter en mapp eller ett moln. Utseendeinställningar sparas på den här enheten.",
+    languageTitle: "Språk",
+    languageChoose: "Välj språk",
+    languageHint: "Översätt gränssnittet mellan engelska och svenska.",
+    achievementsTitle: "Bedrifter",
+    menuTitle: "Meny",
     language: "Språk",
     disableAchievements: "Inaktivera bedrifter",
     disableAchievementsHint:

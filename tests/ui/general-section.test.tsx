@@ -47,9 +47,10 @@ describe("GeneralSection", () => {
     setDisableAchievements(false);
   });
 
-  it("always shows the local-first blurb", () => {
+  it("offers a flag button per supported language", () => {
     renderWithNav();
-    expect(screen.getByText(/local-first/i)).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "English" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Svenska" })).toBeTruthy();
   });
 
   it("toggles the achievements system off", () => {

@@ -19,9 +19,11 @@ const settings = {
   },
 
   general: {
-    title: "General",
-    blurb:
-      "notes is a local-first app — your notes live in this browser unless you connect a folder or cloud. Appearance settings are saved on this device.",
+    languageTitle: "Language",
+    languageChoose: "Choose language",
+    languageHint: "Translate the UI between English and Swedish.",
+    achievementsTitle: "Achievements",
+    menuTitle: "Menu",
     language: "Language",
     disableAchievements: "Disable achievements",
     disableAchievementsHint:
