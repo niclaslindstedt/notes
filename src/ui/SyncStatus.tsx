@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+import { useT, type TFunction } from "../i18n/index.ts";
 import type { SaveStatus } from "../app/use-notes-sync.ts";
 import {
   CloudAlertIcon,
@@ -42,6 +43,7 @@ type View = {
 };
 
 function viewFor(
+  t: TFunction,
   status: SaveStatus,
   dirty: boolean,
   offline: boolean,
@@ -53,7 +55,7 @@ function viewFor(
   if (offline) {
     return {
       Icon: CloudOffIcon,
-      label: "Offline",
+      label: t("sync.offline"),
       tone: "warn",
       action: "open",
     };
@@ -62,7 +64,7 @@ function viewFor(
     case "saving":
       return {
         Icon: SpinnerIcon,
-        label: "Saving…",
+        label: t("sync.saving"),
         tone: "busy",
         spin: true,
         action: "open",
@@ -70,28 +72,28 @@ function viewFor(
     case "error":
       return {
         Icon: CloudAlertIcon,
-        label: "Sync failed",
+        label: t("sync.failed"),
         tone: "err",
         action: "open",
       };
     case "throttled":
       return {
         Icon: CloudAlertIcon,
-        label: "Rate limited — retrying",
+        label: t("sync.throttled"),
         tone: "warn",
         action: "open",
       };
     case "auth-error":
       return {
         Icon: CloudAlertIcon,
-        label: "Reconnect needed",
+        label: t("sync.reauthRequired"),
         tone: "err",
         action: "open",
       };
     case "conflict":
       return {
         Icon: CloudAlertIcon,
-        label: "Sync conflict",
+        label: t("sync.syncConflict"),
         tone: "err",
         action: "open",
       };
@@ -100,13 +102,13 @@ function viewFor(
       return dirty
         ? {
             Icon: CloudUploadIcon,
-            label: "Save unsaved changes",
+            label: t("sync.saveUnsaved"),
             tone: "push",
             action: "save",
           }
         : {
             Icon: CloudCheckIcon,
-            label: `Synced to ${providerName}`,
+            label: t("sync.syncedTo", { provider: providerName }),
             tone: "ok",
             action: "open",
           };
@@ -129,7 +131,8 @@ export function SyncStatus({
   onSave,
   onOpenDetails,
 }: Props) {
-  const view = viewFor(status, dirty, offline, providerName);
+  const t = useT();
+  const view = viewFor(t, status, dirty, offline, providerName);
   const busy = status === "saving";
   const onClick = view.action === "save" ? onSave : onOpenDetails;
   return (

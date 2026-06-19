@@ -1,5 +1,6 @@
 import { type CSSProperties } from "react";
 
+import { useT } from "../i18n/index.ts";
 import { usePwaUpdate } from "../pwa/usePwaUpdate.ts";
 
 // The header "Notes" wordmark. While a new build's service worker
@@ -9,12 +10,13 @@ import { usePwaUpdate } from "../pwa/usePwaUpdate.ts";
 // fill is full and the build is ready to apply. Idle, it is just the
 // static app name.
 export function AppTitle() {
+  const t = useT();
   const { progress } = usePwaUpdate();
   const filling = progress !== null;
 
   return (
     <h1
-      title={filling ? `Downloading update… ${progress}%` : undefined}
+      title={filling ? t("pwa.downloading", { percent: progress }) : undefined}
       className={`text-lg font-bold text-fg-bright ${
         filling ? "pwa-title-fill" : ""
       }`}
@@ -24,7 +26,7 @@ export function AppTitle() {
           : undefined
       }
     >
-      Notes
+      {t("app.title")}
     </h1>
   );
 }

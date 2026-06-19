@@ -5,7 +5,8 @@
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { glyphs, strings } from "../strings.ts";
+import { useT } from "../../../src/i18n/index.ts";
+import { glyphs } from "../strings.ts";
 import { radius, spacing, useTokens } from "../theme.ts";
 
 export function Header({
@@ -16,12 +17,13 @@ export function Header({
   onOpenMenu: () => void;
 }) {
   const tokens = useTokens();
+  const t = useT();
 
   return (
     <View style={[styles.header, { borderColor: tokens.border }]}>
       <View style={styles.titleWrap}>
         <Text style={[styles.title, { color: tokens.textBright }]}>
-          {strings.app.title}
+          {t("native.title")}
         </Text>
         {count > 0 ? (
           <Text style={[styles.count, { color: tokens.textMuted }]}>
@@ -31,7 +33,7 @@ export function Header({
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={strings.app.openMenu}
+        accessibilityLabel={t("native.openMenu")}
         hitSlop={8}
         onPress={onOpenMenu}
         style={[styles.menuButton, { backgroundColor: tokens.surfaceAlt }]}

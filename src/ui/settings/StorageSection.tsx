@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 
+import { useT } from "../../i18n/index.ts";
 import type { BackendId } from "../../storage/backend-preference.ts";
 import type { UseStorageBackend } from "../../storage/useStorageBackend.ts";
 import { ShieldIcon } from "../icons.tsx";
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export function StorageSection({ storage }: Props) {
+  const t = useT();
   const {
     backend,
     dropboxConfigured,
@@ -45,10 +47,22 @@ export function StorageSection({ storage }: Props) {
     label: string;
     disabled?: boolean;
   }[] = [
-    { value: "browser", label: "This device" },
-    { value: "folder", label: "Local folder", disabled: !folderAvailable },
-    { value: "dropbox", label: "Dropbox", disabled: !dropboxConfigured },
-    { value: "gdrive", label: "Google Drive", disabled: !gdriveConfigured },
+    { value: "browser", label: t("settings.storage.backendBrowser") },
+    {
+      value: "folder",
+      label: t("settings.storage.backendFolder"),
+      disabled: !folderAvailable,
+    },
+    {
+      value: "dropbox",
+      label: t("settings.storage.backendDropbox"),
+      disabled: !dropboxConfigured,
+    },
+    {
+      value: "gdrive",
+      label: t("settings.storage.backendGoogleDrive"),
+      disabled: !gdriveConfigured,
+    },
   ];
 
   const connectGdriveWithCapture = async () => {
@@ -71,15 +85,13 @@ export function StorageSection({ storage }: Props) {
 
   return (
     <>
-      <Section title="Where your notes are stored">
+      <Section title={t("settings.storage.backendTitle")}>
         <p className="text-xs text-muted">
-          Notes are saved as one markdown file per note. Keep them on this
-          device, in a local folder you pick, or in your own cloud — they never
-          touch a server of ours.
+          {t("settings.storage.backendBlurb")}
         </p>
         <div
           role="radiogroup"
-          aria-label="Storage backend"
+          aria-label={t("settings.storage.backendAria")}
           className="flex flex-wrap gap-2"
         >
           {backendOptions.map((opt) => {
@@ -106,8 +118,7 @@ export function StorageSection({ storage }: Props) {
 
         {backend === "browser" && (
           <p className="text-xs text-muted">
-            Notes live in this browser only. They stay on this device and
-            aren&apos;t shared with your other devices.
+            {t("settings.storage.browserHint")}
           </p>
         )}
 
@@ -115,10 +126,10 @@ export function StorageSection({ storage }: Props) {
           <div className="flex flex-col gap-2">
             <p className="text-xs text-muted">
               {folderReconnectNeeded
-                ? "This browser lost access to the folder. Reconnect to keep saving there."
+                ? t("settings.storage.folderReconnectHint")
                 : folderConnected
-                  ? "Your notes are saved as markdown files in the folder you picked."
-                  : "Pick a folder to keep your notes in as markdown files."}
+                  ? t("settings.storage.folderConnected")
+                  : t("settings.storage.folderUnconnected")}
             </p>
             <div className="flex items-center gap-2">
               {folderReconnectNeeded ? (
@@ -126,7 +137,7 @@ export function StorageSection({ storage }: Props) {
                   variant="primary"
                   onClick={() => void reconnectFolder()}
                 >
-                  Reconnect folder
+                  {t("settings.storage.folderReconnect")}
                 </Button>
               ) : folderConnected ? (
                 <>
@@ -134,13 +145,15 @@ export function StorageSection({ storage }: Props) {
                     variant="secondary"
                     onClick={() => void disconnectFolder()}
                   >
-                    Disconnect
+                    {t("common.disconnect")}
                   </Button>
-                  <span className="text-xs text-accent">Connected</span>
+                  <span className="text-xs text-accent">
+                    {t("common.connected")}
+                  </span>
                 </>
               ) : (
                 <Button variant="primary" onClick={() => void connectFolder()}>
-                  Choose folder…
+                  {t("settings.storage.folderChoose")}
                 </Button>
               )}
             </div>
@@ -151,19 +164,21 @@ export function StorageSection({ storage }: Props) {
           <div className="flex flex-col gap-2">
             <p className="text-xs text-muted">
               {dropboxConnected
-                ? "Your notes sync to your Dropbox app folder."
-                : "Sign in to keep your notes in your own Dropbox."}
+                ? t("settings.storage.dropboxConnected")
+                : t("settings.storage.dropboxUnconnected")}
             </p>
             {dropboxConnected ? (
               <div className="flex items-center gap-2">
                 <Button variant="secondary" onClick={disconnectDropbox}>
-                  Disconnect
+                  {t("common.disconnect")}
                 </Button>
-                <span className="text-xs text-accent">Connected</span>
+                <span className="text-xs text-accent">
+                  {t("common.connected")}
+                </span>
               </div>
             ) : (
               <Button variant="primary" onClick={connectDropbox}>
-                Connect
+                {t("common.connect")}
               </Button>
             )}
           </div>
@@ -173,22 +188,24 @@ export function StorageSection({ storage }: Props) {
           <div className="flex flex-col gap-2">
             <p className="text-xs text-muted">
               {gdriveConnected
-                ? "Your notes sync to a folder in your Google Drive."
-                : "Sign in to keep your notes in your own Google Drive."}
+                ? t("settings.storage.gdriveConnected")
+                : t("settings.storage.gdriveUnconnected")}
             </p>
             {gdriveConnected ? (
               <div className="flex items-center gap-2">
                 <Button variant="secondary" onClick={disconnectGdrive}>
-                  Disconnect
+                  {t("common.disconnect")}
                 </Button>
-                <span className="text-xs text-accent">Connected</span>
+                <span className="text-xs text-accent">
+                  {t("common.connected")}
+                </span>
               </div>
             ) : (
               <Button
                 variant="primary"
                 onClick={() => void connectGdriveWithCapture()}
               >
-                Connect
+                {t("common.connect")}
               </Button>
             )}
             {gdriveError && (
@@ -221,6 +238,7 @@ function EncryptionSection({
   onEnable: (password: string) => Promise<void>;
   onDisable: () => Promise<void>;
 }) {
+  const t = useT();
   const on = encryption === "encrypted";
   const [setting, setSetting] = useState(false);
   const [pass, setPass] = useState("");
@@ -232,11 +250,11 @@ function EncryptionSection({
     e.preventDefault();
     if (busy) return;
     if (pass.length < 4) {
-      setError("Use a passphrase of at least 4 characters.");
+      setError(t("settings.storage.passphraseTooShort"));
       return;
     }
     if (pass !== confirm) {
-      setError("The passphrases don't match.");
+      setError(t("settings.storage.passphraseMismatch"));
       return;
     }
     setBusy(true);
@@ -270,26 +288,26 @@ function EncryptionSection({
     "rounded-[var(--radius)] border border-line bg-surface-2 px-2 py-1.5 text-sm text-fg outline-none focus:border-accent";
 
   return (
-    <Section title="Encryption">
+    <Section title={t("settings.storage.encryptionTitle")}>
       <div className="flex items-start gap-3">
         <ShieldIcon
           className={`mt-0.5 h-5 w-5 ${on ? "text-accent" : "text-muted"}`}
         />
         <div className="flex-1">
           <h3 className="text-sm font-bold text-fg-bright">
-            {on ? "Encryption is on" : "Encryption is off"}
+            {on
+              ? t("settings.storage.encryptionOn")
+              : t("settings.storage.encryptionOff")}
           </h3>
           <p className="mt-1 text-xs text-muted">
-            Scramble your notes (AES-GCM) with a passphrase before they&apos;re
-            saved. The passphrase never leaves this device and can&apos;t be
-            recovered — forget it and the notes can&apos;t be read.
+            {t("settings.storage.encryptionHint")}
           </p>
         </div>
       </div>
 
       {!on && !setting && (
         <Button variant="primary" onClick={() => setSetting(true)}>
-          Turn on encryption
+          {t("settings.storage.enableEncryption")}
         </Button>
       )}
 
@@ -299,25 +317,24 @@ function EncryptionSection({
             type="password"
             value={pass}
             onChange={(e) => setPass(e.target.value)}
-            placeholder="Passphrase"
-            aria-label="Passphrase"
+            placeholder={t("settings.storage.passphrase")}
+            aria-label={t("settings.storage.passphrase")}
             className={inputClass}
           />
           <input
             type="password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            placeholder="Confirm passphrase"
-            aria-label="Confirm passphrase"
+            placeholder={t("settings.storage.passphraseConfirm")}
+            aria-label={t("settings.storage.passphraseConfirm")}
             className={inputClass}
           />
           <p className="text-xs text-danger">
-            There is no recovery. If you forget this passphrase your notes
-            can&apos;t be read.
+            {t("settings.storage.passphraseWarning")}
           </p>
           <div className="flex items-center gap-2">
             <Button type="submit" variant="primary" disabled={busy}>
-              Turn on encryption
+              {t("settings.storage.enableEncryption")}
             </Button>
             <Button
               type="button"
@@ -329,7 +346,7 @@ function EncryptionSection({
                 setConfirm("");
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>
@@ -337,7 +354,7 @@ function EncryptionSection({
 
       {on && (
         <Button variant="danger" onClick={() => void disable()} disabled={busy}>
-          Turn off encryption
+          {t("settings.storage.disableEncryption")}
         </Button>
       )}
 

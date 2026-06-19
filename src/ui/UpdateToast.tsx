@@ -1,3 +1,4 @@
+import { useT } from "../i18n/index.ts";
 import { usePwaUpdate } from "../pwa/usePwaUpdate.ts";
 
 // Soft "a new build is ready — reload to apply" prompt. The new service
@@ -7,6 +8,7 @@ import { usePwaUpdate } from "../pwa/usePwaUpdate.ts";
 // deliberate — a silent swap would discard an in-progress edit. It pins
 // above the safe-area inset, just under any future toast stack.
 export function UpdateToast() {
+  const t = useT();
   const { needRefresh, incomingVersion, reload, dismiss } = usePwaUpdate();
   if (!needRefresh) return null;
 
@@ -18,19 +20,19 @@ export function UpdateToast() {
     >
       <span className="flex-1 text-sm">
         {incomingVersion
-          ? `Updated to v${incomingVersion} — reload to apply`
-          : "A new version is ready — reload to apply"}
+          ? t("pwa.updateReady", { version: incomingVersion })
+          : t("pwa.updateReadyGeneric")}
       </span>
       <button
         type="button"
         className="cursor-pointer text-sm text-link hover:underline"
         onClick={reload}
       >
-        Reload
+        {t("common.reload")}
       </button>
       <button
         type="button"
-        aria-label="Dismiss update notice"
+        aria-label={t("pwa.dismiss")}
         className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-[var(--radius)] text-muted hover:text-fg"
         onClick={dismiss}
       >

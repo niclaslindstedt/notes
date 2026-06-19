@@ -208,8 +208,20 @@ The source tree under `src/` is organized by concern, not by file type:
 - `src/styles/` — the CSS-variable token system (`theme.css`).
 - `src/pwa/` — service-worker registration and update lifecycle
   (`usePwaUpdate.ts`), standalone/install detection (`standalone.ts`).
+- `src/i18n/` — the i18n layer (ported from checklist): a dependency-free,
+  typed `t()` runtime (`index.ts`) over per-language catalog modules under
+  `locales/<lang>/` (English `en/` is bundled + is the `Catalog`/`MessageKey`
+  type source; every other language is code-split and loaded on demand). The
+  active language rides a React context provided by `LanguageRoot` (mounted
+  around the app shell in `main.tsx`), backed by a plaintext localStorage
+  mirror (`language-preference.ts`) so first paint renders in the right
+  language; `locale.ts` is the framework-free code/`bcp47`/detection helper
+  the React Native app shares. English and Swedish ship today. The
+  English-only public pages (`HomePage`/`PrivacyPage`) render outside
+  `LanguageRoot` and are intentionally not translated.
 - `src/achievements/` — the achievements feature: a `catalog.ts` of
-  unlockable trophies (each one a feature of the app), a pure `derive.ts`
+  unlockable trophies (each one a feature of the app, its display copy in the
+  `achievements` i18n namespace keyed by id), a pure `derive.ts`
   over an `AchState` (`{ snapshot, appearance }`) transition, an in-memory
   `bus.ts` for the manual unlocks fired from outside that state
   (folder/cloud connect, encryption, namespace create, install, undo,
@@ -240,6 +252,7 @@ the DOM. This keeps `domain/` portable to the planned React Native app.
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |
 | PWA / service-worker behaviour           | `src/pwa/`                         |
 | A new achievement / its unlock trigger   | `src/achievements/catalog.ts`      |
+| A user-facing string / its translation   | `src/i18n/locales/{en,sv}/<ns>.ts` |
 
 ### The public pages
 
@@ -314,11 +327,14 @@ queue). The whole system can be switched off in Settings → General.
 It lives in two places that must stay in lockstep:
 
 - **The catalog** — `src/achievements/catalog.ts`: each entry's `id`
-  (stable, write-once), `tier`, `glyph`, unlock `trigger`, and — unlike
-  checklist, which has an i18n layer — its display copy (`name`, `condition`,
-  optional `learnMore`) **inlined right on the entry**. Glyphs are inline SVGs
-  in `src/achievements/glyphs.tsx` (the app stays dependency-free — no
-  `lucide-react`); reuse one of `src/ui/icons.tsx`'s glyphs where it fits.
+  (stable, write-once), `tier`, `glyph`, unlock `trigger`, and a
+  `learnMore?: boolean` flag. The display copy (`name`, `condition`, optional
+  `learnMore`) lives in the `achievements` i18n namespace, keyed by id
+  (`achievements.catalog.<id>.{name,condition,learnMore}`) — so a new entry
+  needs both a catalog row and its strings in `locales/{en,sv}/achievements.ts`.
+  Glyphs are inline SVGs in `src/achievements/glyphs.tsx` (the app stays
+  dependency-free — no `lucide-react`); reuse one of `src/ui/icons.tsx`'s
+  glyphs where it fits.
 - **The renderer** — `src/ui/achievements/AchievementsModal.tsx` reads the
   catalog by `id`. New entries appear automatically without touching it.
 

@@ -15,6 +15,7 @@ import "@fontsource/jetbrains-mono/latin-400.css";
 import "@fontsource/jetbrains-mono/latin-ext-400.css";
 import "@fontsource/jetbrains-mono/latin-700.css";
 import "@fontsource/jetbrains-mono/latin-ext-700.css";
+import { LanguageRoot } from "../i18n/LanguageRoot.tsx";
 import { HomePage } from "../ui/HomePage.tsx";
 import { PrivacyPage } from "../ui/PrivacyPage.tsx";
 import { App } from "./App.tsx";
@@ -32,8 +33,20 @@ const path = window.location.pathname.replace(/\/$/, "");
 const isPrivacy = path.endsWith("/privacy");
 const isHome = path.endsWith("/home");
 
+// The standalone `/privacy` and `/home` pages are crawlable, English-only
+// surfaces (the privacy policy and the Google-verification showcase), so they
+// render outside `LanguageRoot` and aren't translated. Only the app shell is
+// wrapped, so it picks up the active language and the first-paint gate.
 createRoot(root).render(
   <StrictMode>
-    {isPrivacy ? <PrivacyPage /> : isHome ? <HomePage /> : <App />}
+    {isPrivacy ? (
+      <PrivacyPage />
+    ) : isHome ? (
+      <HomePage />
+    ) : (
+      <LanguageRoot>
+        <App />
+      </LanguageRoot>
+    )}
   </StrictMode>,
 );

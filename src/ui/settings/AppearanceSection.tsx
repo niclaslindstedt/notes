@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { useT } from "../../i18n/index.ts";
 import { loadAllFontFamilies } from "../../theme/fonts.ts";
 import {
   COLOR_GROUPS,
@@ -48,6 +49,7 @@ export function AppearanceSection({
   appearance: Appearance;
   onUpdate: UpdateAppearance;
 }) {
+  const t = useT();
   const isCustom = appearance.theme === "custom";
 
   // The non-default font families load on demand; pull them all in when the
@@ -89,8 +91,8 @@ export function AppearanceSection({
 
   return (
     <>
-      <Section title="Theme">
-        <Field label="Mode">
+      <Section title={t("settings.appearance.theme")}>
+        <Field label={t("settings.appearance.mode")}>
           <ThemeModeRow
             value={appearance.theme}
             onChange={handleThemeChange}
@@ -98,12 +100,12 @@ export function AppearanceSection({
           />
           {appearance.theme === "system" && (
             <p className="text-xs text-muted">
-              Follows your device's light / dark setting.
+              {t("settings.appearance.systemNote")}
             </p>
           )}
         </Field>
         {(family === "dark" || family === "light") && (
-          <Field label="Variant">
+          <Field label={t("settings.appearance.variant")}>
             <ThemeVariantRow
               value={appearance.theme}
               onChange={handleThemeChange}
@@ -112,16 +114,16 @@ export function AppearanceSection({
         )}
       </Section>
 
-      <Section title="Font">
-        <Field label="Font family">
+      <Section title={t("settings.appearance.font")}>
+        <Field label={t("settings.appearance.fontFamily")}>
           <FontFamilyRow
             value={appearance.fontFamily}
             onChange={(v) => onUpdate("fontFamily", v)}
           />
         </Field>
-        <Field label="Text size">
+        <Field label={t("settings.appearance.textSize")}>
           <SegmentedRow<number>
-            ariaLabel="Text size"
+            ariaLabel={t("settings.appearance.textSize")}
             value={appearance.fontScale}
             options={FONT_SCALE_PRESETS.map((p) => ({
               value: p.scale,
@@ -134,7 +136,7 @@ export function AppearanceSection({
 
       {isCustom && (
         <>
-          <Section title="Colours">
+          <Section title={t("settings.appearance.colours")}>
             {COLOR_GROUPS.map((group) => (
               <Field key={group.id} label={group.label}>
                 <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-x-2 gap-y-2.5">
@@ -151,10 +153,10 @@ export function AppearanceSection({
             ))}
           </Section>
 
-          <Section title="Shape & motion">
-            <Field label="Corner radius">
+          <Section title={t("settings.appearance.shapeMotion")}>
+            <Field label={t("settings.appearance.cornerRadius")}>
               <SegmentedRow
-                ariaLabel="Corner radius"
+                ariaLabel={t("settings.appearance.cornerRadius")}
                 value={appearance.customTheme.radius}
                 options={RADIUS_PRESETS.map((p) => ({
                   value: p,
@@ -163,9 +165,9 @@ export function AppearanceSection({
                 onChange={(v) => updateCustom("radius", v)}
               />
             </Field>
-            <Field label="Density">
+            <Field label={t("settings.appearance.density")}>
               <SegmentedRow
-                ariaLabel="Density"
+                ariaLabel={t("settings.appearance.density")}
                 value={appearance.customTheme.density}
                 options={DENSITY_PRESETS.map((p) => ({
                   value: p,
@@ -175,8 +177,8 @@ export function AppearanceSection({
               />
             </Field>
             <ToggleRow
-              label="Reduce motion"
-              hint="Disable animations and transitions."
+              label={t("settings.appearance.reduceMotion")}
+              hint={t("settings.appearance.reduceMotionHint")}
               checked={appearance.customTheme.reduceMotion}
               onChange={(v) => updateCustom("reduceMotion", v)}
             />

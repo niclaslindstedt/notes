@@ -1,3 +1,4 @@
+import { useT } from "../../i18n/index.ts";
 import {
   EDITOR_MARGINS,
   type EditorMargin,
@@ -21,6 +22,7 @@ export function EditorSection({
   appearance: Appearance;
   onUpdate: UpdateAppearance;
 }) {
+  const t = useT();
   const editor = appearance.editor;
 
   function update<K extends keyof EditorSettings>(
@@ -31,27 +33,25 @@ export function EditorSection({
   }
 
   return (
-    <Section title="Editor">
-      <Field label="Margins">
+    <Section title={t("settings.editor.title")}>
+      <Field label={t("settings.editor.margins")}>
         <SegmentedRow<EditorMargin>
-          ariaLabel="Margins"
+          ariaLabel={t("settings.editor.margins")}
           value={editor.margin}
           options={EDITOR_MARGINS.map((m) => ({ value: m.id, label: m.label }))}
           onChange={(v) => update("margin", v)}
         />
-        <p className="text-xs text-muted">
-          How much breathing room to leave around the writing column.
-        </p>
+        <p className="text-xs text-muted">{t("settings.editor.marginsHint")}</p>
       </Field>
       <ToggleRow
-        label="Word wrap"
-        hint="Wrap long lines instead of scrolling sideways."
+        label={t("settings.editor.wordWrap")}
+        hint={t("settings.editor.wordWrapHint")}
         checked={editor.wordWrap}
         onChange={(v) => update("wordWrap", v)}
       />
       <ToggleRow
-        label="Render Markdown"
-        hint="Format Markdown as you type — every line but the one you're on shows formatted, like Obsidian."
+        label={t("settings.editor.renderMarkdown")}
+        hint={t("settings.editor.renderMarkdownHint")}
         checked={editor.renderMarkdown}
         onChange={(v) => update("renderMarkdown", v)}
       />

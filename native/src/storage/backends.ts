@@ -10,9 +10,9 @@
 
 import { Platform } from "react-native";
 
+import type { MessageKey } from "../../../src/i18n/index.ts";
 import type { StorageAdapter } from "../../../src/storage/adapter.ts";
 
-import { strings } from "../strings.ts";
 import { AsyncStorageAdapter } from "./asyncStorageAdapter.ts";
 
 /** Stable id for a native backend choice, persisted per device. */
@@ -23,21 +23,21 @@ export const DEFAULT_BACKEND_ID: NativeBackendId = "browser";
 export interface BackendOption {
   /** Persisted identifier (see `backendPreference.ts`). */
   readonly id: NativeBackendId;
-  /** Human-readable label for the picker. */
-  readonly label: string;
+  /** i18n key for the picker label, resolved through `t()` at render time. */
+  readonly labelKey: MessageKey;
   /** Build a fresh adapter instance for the given namespace. */
   create(namespace?: string): StorageAdapter;
 }
 
 const browserBackend: BackendOption = {
   id: "browser",
-  label: strings.storage.thisDevice,
+  labelKey: "native.storage.thisDevice",
   create: (namespace) => new AsyncStorageAdapter(namespace),
 };
 
 const icloudBackend: BackendOption = {
   id: "icloud",
-  label: strings.storage.icloud,
+  labelKey: "native.storage.icloud",
   // Required lazily so the iOS-only native module behind the adapter is never
   // loaded on Android/web, where this branch is unreachable.
   create: (namespace) => {

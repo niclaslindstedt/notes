@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 
+import { useT } from "../i18n/index.ts";
 import { OfflineUnavailableError } from "../storage/cache/index.ts";
 import type { UseStorageBackend } from "../storage/useStorageBackend.ts";
 import { ShieldIcon } from "./icons.tsx";
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export function UnlockGate({ storage }: Props) {
+  const t = useT();
   const [pass, setPass] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -29,11 +31,9 @@ export function UnlockGate({ storage }: Props) {
       setPass("");
     } catch (err) {
       if (err instanceof OfflineUnavailableError) {
-        setError(
-          "You're offline and nothing is cached on this device yet. Connect to the internet and try again.",
-        );
+        setError(t("settings.unlock.offline"));
       } else {
-        setError("That passphrase didn't work.");
+        setError(t("settings.unlock.wrong"));
       }
     } finally {
       setBusy(false);
@@ -49,18 +49,16 @@ export function UnlockGate({ storage }: Props) {
         <div className="flex items-center gap-2 text-accent">
           <ShieldIcon className="h-6 w-6" />
           <h1 className="text-base font-bold text-fg-bright">
-            Notes are locked
+            {t("settings.unlock.title")}
           </h1>
         </div>
-        <p className="text-xs text-muted">
-          Enter your passphrase to unlock and read your notes on this device.
-        </p>
+        <p className="text-xs text-muted">{t("settings.unlock.hint")}</p>
         <input
           type="password"
           value={pass}
           onChange={(e) => setPass(e.target.value)}
-          placeholder="Passphrase"
-          aria-label="Passphrase"
+          placeholder={t("settings.unlock.passphrase")}
+          aria-label={t("settings.unlock.passphrase")}
           // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
           className="rounded-[var(--radius)] border border-line bg-surface-2 px-3 py-2 text-sm text-fg outline-none focus:border-accent"
@@ -75,7 +73,7 @@ export function UnlockGate({ storage }: Props) {
           disabled={busy || !pass}
           className="cursor-pointer rounded-[var(--radius)] border border-accent bg-accent/15 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Unlock
+          {t("settings.unlock.unlock")}
         </button>
       </form>
     </div>

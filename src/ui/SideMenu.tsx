@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type ReactNode } from "react";
 
 import { BUILD_LABEL } from "../build-env.ts";
 import { noteTitle, type Note } from "../domain/note.ts";
+import { useT } from "../i18n/index.ts";
 import type { Namespace } from "../storage/namespaces.ts";
 import { APP_VIEWPORT_RECT } from "./appViewportRect.ts";
 import { useNav } from "./nav-context.ts";
@@ -91,6 +92,7 @@ export function SideMenu({
   activeNamespace,
   onSwitchNamespace,
 }: Props) {
+  const t = useT();
   const dispatch = useModalDispatch();
   const drawerId = useId();
   const {
@@ -146,9 +148,9 @@ export function SideMenu({
           rename / icon / delete) — a cog, not a "+", because it manages
           rather than adds inline. */}
       <SectionHeader
-        label="Namespaces"
+        label={t("nav.namespaces")}
         onAdd={() => pick(() => dispatch({ kind: "namespaces" }))}
-        addLabel="Manage namespaces"
+        addLabel={t("nav.manageNamespaces")}
         addIcon={<CogIcon className="h-4 w-4" />}
       />
       {namespaces.map((ns) => {
@@ -182,17 +184,17 @@ export function SideMenu({
         );
       })}
       <SectionHeader
-        label="Notes"
+        label={t("nav.notes")}
         border
         onAdd={() => {
           onAddNote();
           close();
         }}
-        addLabel="New note"
+        addLabel={t("nav.newNote")}
       />
       {notes.length === 0 ? (
         <p className="px-5 py-[var(--density-row-py)] text-sm text-muted">
-          No notes yet.
+          {t("nav.notesEmpty")}
         </p>
       ) : (
         notes.map((note) => {
@@ -216,8 +218,8 @@ export function SideMenu({
           return (
             <SwipeToRemove
               key={note.id}
-              actionLabel="Delete note"
-              confirmLabel="Confirm delete"
+              actionLabel={t("nav.deleteNote")}
+              confirmLabel={t("nav.confirmDelete")}
               onRemove={() => onRemoveNote(note.id)}
             >
               {row}
@@ -225,19 +227,19 @@ export function SideMenu({
           );
         })
       )}
-      <SectionHeader label="Edit" border />
+      <SectionHeader label={t("nav.edit")} border />
       {/* Undo / redo keep the drawer open so a burst of reverts can be
           applied without reopening it each time. */}
       <NavItem
         icon={<UndoIcon className="h-5 w-5" />}
-        label="Undo"
+        label={t("nav.undo")}
         active={false}
         disabled={!canUndo}
         onClick={onUndo}
       />
       <NavItem
         icon={<RedoIcon className="h-5 w-5" />}
-        label="Redo"
+        label={t("nav.redo")}
         active={false}
         disabled={!canRedo}
         onClick={onRedo}
@@ -248,7 +250,7 @@ export function SideMenu({
         {donateUrl && (
           <MenuLink
             icon={<HeartIcon className="h-5 w-5 text-danger" />}
-            label="Donate"
+            label={t("menu.donate")}
             href={donateUrl}
             external
             onClick={close}
@@ -256,7 +258,7 @@ export function SideMenu({
         )}
         <MenuLink
           icon={<CodeIcon className="h-5 w-5" />}
-          label="Source"
+          label={t("menu.source")}
           href={SOURCE_URL}
           external
           sublabel={BUILD_LABEL}
@@ -264,18 +266,18 @@ export function SideMenu({
         />
         <MenuLink
           icon={<ShieldIcon className="h-5 w-5" />}
-          label="Privacy"
+          label={t("menu.privacy")}
           href={privacyUrl}
           onClick={close}
         />
         <MenuButton
           icon={<SparklesIcon className="h-5 w-5" />}
-          label="What's new"
+          label={t("menu.changelog")}
           onClick={() => pick(() => dispatch({ kind: "changelog" }))}
         />
         <MenuButton
           icon={<CogIcon className="h-5 w-5" />}
-          label="Settings"
+          label={t("menu.settings")}
           onClick={() => pick(() => dispatch({ kind: "settings" }))}
         />
       </div>
@@ -290,7 +292,7 @@ export function SideMenu({
   if (pinned) {
     return (
       <nav
-        aria-label="Navigation"
+        aria-label={t("nav.label")}
         className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface [padding-bottom:max(env(safe-area-inset-bottom),calc(1.25rem_-_var(--density-row-py)))] [padding-top:env(safe-area-inset-top)] ${
           onRight ? "order-last border-l border-line" : "border-r border-line"
         }`}
@@ -317,7 +319,7 @@ export function SideMenu({
           aria-haspopup="menu"
           aria-expanded={open}
           aria-controls={open ? drawerId : undefined}
-          aria-label={open ? "Close menu" : "Open menu"}
+          aria-label={open ? t("nav.close") : t("nav.open")}
           className={`fixed z-40 flex h-11 w-11 touch-none items-center justify-center rounded-full border border-line bg-surface text-muted shadow-lg select-none hover:text-fg-bright ${
             drag.dragging
               ? "cursor-grabbing transition-none"
@@ -335,14 +337,14 @@ export function SideMenu({
         >
           <button
             type="button"
-            aria-label="Close menu"
+            aria-label={t("nav.close")}
             tabIndex={-1}
             onClick={close}
             className="drawer-backdrop absolute inset-0 cursor-default bg-black/50"
           />
           <nav
             id={drawerId}
-            aria-label="Navigation"
+            aria-label={t("nav.label")}
             className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl [padding-bottom:max(env(safe-area-inset-bottom),calc(1.25rem_-_var(--density-row-py)))] [padding-top:env(safe-area-inset-top)] ${
               onRight
                 ? "drawer-panel-right border-l border-line"

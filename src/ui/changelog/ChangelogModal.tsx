@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { useT } from "../../i18n/index.ts";
 import { ArrowLeftIcon, CloseIcon } from "../icons.tsx";
 import { Modal } from "../Modal.tsx";
 import { CHANGELOG } from "./data.ts";
@@ -31,6 +32,7 @@ type Props = {
 };
 
 export function ChangelogModal({ open, onClose }: Props) {
+  const t = useT();
   // When set to a known slug the modal shows that feature doc in place of the
   // release list; the header grows a back button that clears it. A slug with no
   // bundled doc is ignored, so the link is inert rather than a dead end.
@@ -84,7 +86,7 @@ export function ChangelogModal({ open, onClose }: Props) {
           <button
             type="button"
             onClick={() => setDocSlug(null)}
-            aria-label="Back"
+            aria-label={t("common.back")}
             className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg"
           >
             <ArrowLeftIcon className="h-5 w-5" />
@@ -98,7 +100,7 @@ export function ChangelogModal({ open, onClose }: Props) {
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("common.close")}
             className="-mr-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg"
           >
             <CloseIcon className="h-5 w-5" />
@@ -126,12 +128,12 @@ export function ChangelogModal({ open, onClose }: Props) {
           id="changelog-title"
           className="text-sm font-bold tracking-wide text-fg-bright"
         >
-          Changelog
+          {t("changelog.heading")}
         </h2>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t("common.close")}
           className="-mr-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg"
         >
           <CloseIcon className="h-5 w-5" />
@@ -144,7 +146,7 @@ export function ChangelogModal({ open, onClose }: Props) {
         className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 text-sm"
       >
         {CHANGELOG.length === 0 ? (
-          <p className="py-8 text-center text-muted">No releases yet.</p>
+          <p className="py-8 text-center text-muted">{t("changelog.empty")}</p>
         ) : (
           <div className="flex flex-col gap-6">
             {CHANGELOG.map((release) => (

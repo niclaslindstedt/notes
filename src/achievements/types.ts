@@ -69,16 +69,17 @@ export type Trigger =
 export type Achievement = {
   // Stable string id — once shipped, never renamed. Used as the key inside
   // `Appearance.achievements` and the bus's pending queue, as the React key
-  // in catalog renders, and to look up the display copy in the catalog.
+  // in catalog renders, and as the path segment in the i18n catalog
+  // (`achievements.catalog.<id>.{name,condition,learnMore}`) the renderer
+  // looks the display copy up by.
   id: string;
   tier: AchievementTier;
   glyph: Glyph;
-  // Short noun-phrase name shown in both modals.
-  name: string;
-  // One sentence describing how the trophy is earned (the row subtitle).
-  condition: string;
-  // Optional longer body shown inside a per-achievement `<details>` in the
-  // tour. Not every trophy needs depth beyond its condition.
-  learnMore?: string;
+  // Whether the i18n catalog carries a `learnMore` key for this id. The
+  // expanded body is shown inside a per-achievement `<details>` in the tour;
+  // not every trophy needs depth beyond its condition, so each entry declares
+  // the presence here and the renderer reads through it instead of probing
+  // the catalog at runtime.
+  learnMore?: boolean;
   trigger: Trigger;
 };

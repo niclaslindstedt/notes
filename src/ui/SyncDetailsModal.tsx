@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, type ReactElement } from "react";
 
+import { useT, type TFunction } from "../i18n/index.ts";
 import type { SaveStatus } from "../app/use-notes-sync.ts";
 import type { BackendId } from "../storage/backend-preference.ts";
 import { DROPBOX_APP_FOLDER, dropboxWebUrl } from "../storage/dropbox/index.ts";
@@ -92,6 +93,7 @@ type StatusView = {
 };
 
 function statusView(
+  t: TFunction,
   status: SaveStatus,
   statusDetail: string | null,
   dirty: boolean,
@@ -103,60 +105,61 @@ function statusView(
   if (offline) {
     return {
       Icon: CloudOffIcon,
-      label: "You're offline",
+      label: t("sync.offlineHeading"),
       tone: "warn",
-      detail: `You're editing the copy saved on this device. It'll sync back to ${providerName} when the connection returns.`,
+      detail: t("sync.offlineDetail", { provider: providerName }),
     };
   }
   switch (status) {
     case "saving":
       return {
         Icon: SpinnerIcon,
-        label: "Syncing now…",
+        label: t("sync.syncingNow"),
         tone: "busy",
         spin: true,
       };
     case "error":
       return {
         Icon: CloudAlertIcon,
-        label: "Sync failed",
+        label: t("sync.failedHeading"),
         tone: "err",
         detail:
-          statusDetail ?? `The last save to ${providerName} didn't go through.`,
+          statusDetail ??
+          t("sync.failedDetailFallback", { provider: providerName }),
       };
     case "throttled":
       return {
         Icon: CloudAlertIcon,
-        label: "Rate limited",
+        label: t("sync.throttledHeading"),
         tone: "warn",
-        detail: `${providerName} is throttling saves. Your latest changes will sync automatically in a moment.`,
+        detail: t("sync.throttledDetail", { provider: providerName }),
       };
     case "auth-error":
       return {
         Icon: CloudAlertIcon,
-        label: "Reconnect needed",
+        label: t("sync.reauthHeading"),
         tone: "err",
-        detail: `Your connection to ${providerName} expired. Reconnect to keep syncing.`,
+        detail: t("sync.reauthDetail", { provider: providerName }),
       };
     case "conflict":
       return {
         Icon: CloudAlertIcon,
-        label: "Sync conflict",
+        label: t("sync.conflictHeading"),
         tone: "err",
-        detail: `Another device changed these notes. Choose which copy to keep in the conflict prompt.`,
+        detail: t("sync.conflictDetail"),
       };
     case "saved":
     case "idle":
       return dirty
         ? {
             Icon: CloudUploadIcon,
-            label: "Unsaved changes",
+            label: t("sync.pendingHeading"),
             tone: "push",
-            detail: `You have changes that haven't been saved to ${providerName} yet.`,
+            detail: t("sync.pendingDetail", { provider: providerName }),
           }
         : {
             Icon: CloudCheckIcon,
-            label: `Synced to ${providerName}`,
+            label: t("sync.syncedHeading", { provider: providerName }),
             tone: "ok",
           };
   }
@@ -192,6 +195,7 @@ export function SyncDetailsModal({
   onReconnect,
   onClose,
 }: Props) {
+  const t = useT();
   const titleId = useId();
   const [reconnectPending, setReconnectPending] = useState(false);
   const [reconnectError, setReconnectError] = useState<string | null>(null);
@@ -210,7 +214,14 @@ export function SyncDetailsModal({
   }, [status]);
 
   const view = providerView(backend, namespace);
-  const state = statusView(status, statusDetail, dirty, offline, providerName);
+  const state = statusView(
+    t,
+    status,
+    statusDetail,
+    dirty,
+    offline,
+    providerName,
+  );
   const busy = status === "saving";
   const showReconnect = status === "auth-error";
 
@@ -231,10 +242,13 @@ export function SyncDetailsModal({
     !busy &&
     !showReconnect &&
     (status === "error" || (dirty && status !== "conflict"));
-  const saveLabel = status === "error" ? "Try again" : "Save now";
+  const saveLabel =
+    status === "error" ? t("common.tryAgain") : t("sync.saveNow");
 
   const reconnectLabel =
-    reconnectError !== null ? "Try again" : `Reconnect to ${providerName}`;
+    reconnectError !== null
+      ? t("common.tryAgain")
+      : t("sync.reconnectTo", { provider: providerName });
   const ReconnectIcon: IconComponent = reconnectPending
     ? SpinnerIcon
     : RefreshIcon;
@@ -247,12 +261,12 @@ export function SyncDetailsModal({
           className="flex items-center gap-2 text-sm font-bold tracking-wide text-fg-bright"
         >
           <CloudIcon className="h-4 w-4" />
-          Cloud sync
+          {t("sync.cloudSync")}
         </h2>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t("common.close")}
           className="-mr-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--radius)] text-muted hover:bg-surface-2 hover:text-fg"
         >
           <CloseIcon className="h-5 w-5" />
@@ -261,7 +275,7 @@ export function SyncDetailsModal({
 
       <div className="flex flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4">
         <div className="flex flex-col gap-2">
-          <span className="text-xs text-muted">Status</span>
+          <span className="text-xs text-muted">{t("sync.status")}</span>
           <div
             className={`flex items-start gap-2 rounded-[var(--radius)] border px-2 py-2 ${TONE_BORDER[state.tone]}`}
           >
@@ -312,7 +326,7 @@ export function SyncDetailsModal({
             )}
 
             <Button variant="secondary" onClick={onReload}>
-              Reload from backend
+              {t("sync.reloadFromBackend")}
             </Button>
           </div>
 
@@ -322,12 +336,12 @@ export function SyncDetailsModal({
         </div>
 
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted">Backend</span>
+          <span className="text-xs text-muted">{t("sync.backend")}</span>
           <span className="text-sm text-fg-bright">{providerName}</span>
         </div>
 
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted">File location</span>
+          <span className="text-xs text-muted">{t("sync.fileLocation")}</span>
           <span className="rounded-[var(--radius)] border border-line bg-surface-2 px-2 py-1.5 font-mono text-xs break-all text-fg">
             {view.path}
           </span>
@@ -336,7 +350,7 @@ export function SyncDetailsModal({
 
       <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-line bg-surface-3 px-4 py-3">
         <Button variant="secondary" onClick={onClose}>
-          Close
+          {t("common.close")}
         </Button>
         {view.url && (
           <a
@@ -346,7 +360,7 @@ export function SyncDetailsModal({
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius)] border border-accent bg-accent/10 px-3 py-1.5 text-sm font-bold text-accent hover:bg-accent/20"
           >
             <ExternalLinkIcon className="h-3.5 w-3.5" />
-            Open in {providerName}
+            {t("sync.openIn", { provider: providerName })}
           </a>
         )}
       </footer>
