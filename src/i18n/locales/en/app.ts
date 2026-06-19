@@ -9,7 +9,7 @@ const app = {
   empty: "No notes yet. Tap + (or press Enter) to write your first one.",
   newNote: "New note",
   back: "Back",
-  delete: "Delete",
+  deleteNote: "Delete note",
   startWriting: "Start writing…",
 } as const;
 

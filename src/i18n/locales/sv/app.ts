@@ -6,7 +6,7 @@ const app: AppCatalog = {
     "Inga anteckningar än. Tryck på + (eller tryck Enter) för att skriva din första.",
   newNote: "Ny anteckning",
   back: "Tillbaka",
-  delete: "Ta bort",
+  deleteNote: "Ta bort anteckning",
   startWriting: "Börja skriva…",
 };
 
