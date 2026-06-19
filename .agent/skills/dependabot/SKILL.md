@@ -52,19 +52,31 @@ versions with the commands above — the shape holds, the numbers drift):
   here. Check `npm view vite-plugin-pwa@<ver> peerDependencies` for the
   Vite range it accepts and bump it alongside Vite. `vitest`'s Vite peer
   is usually wide — check but it normally already allows the new Vite.
-- **ESLint major** → a new ESLint or `@typescript-eslint`/`typescript-eslint`
-  major can grow its `recommended` preset with new rules (see step 4),
-  and its `eslint` peer must list the new major. Bump
-  `typescript-eslint`, `@eslint/js`, and `eslint-plugin-import` to
-  versions whose `eslint` peer spans the new major. If a lint/format
-  plugin's declared peer lags the host's major but works fine in
-  practice, prefer an `overrides` shim over downgrading the host:
+- **ESLint major** → a new ESLint, `eslint-plugin-react-hooks`, or
+  `@typescript-eslint` major can grow its `recommended` preset with new
+  rules (see step 4), and its `eslint` peer must list the new major. This
+  repo uses the **separate** `@typescript-eslint/eslint-plugin` +
+  `@typescript-eslint/parser` packages (not the `typescript-eslint` meta
+  package), and Dependabot's grouped dev-deps bump leaves them **pinned at
+  their old minor** — bump both to the latest `8.x` so their `eslint` peer
+  spans the new major. Bump `@eslint/js` and `eslint-plugin-react-hooks`
+  to versions whose `eslint` peer lists the new major too. Lint/format
+  plugins lag their host's major: both `eslint-plugin-import` and
+  `eslint-plugin-jsx-a11y` cap their `eslint` peer at `^9` while working
+  fine on `^10` — prefer an `overrides` shim per lagging plugin over
+  downgrading the host:
   ```json
-  "overrides": { "<lagging-plugin>": { "eslint": "$eslint" } }
+  "overrides": {
+    "eslint-plugin-import": { "eslint": "$eslint" },
+    "eslint-plugin-jsx-a11y": { "eslint": "$eslint" }
+  }
   ```
-- **TypeScript major** → confirm `typescript-eslint`'s `typescript`
-  peer still spans it. Bump typescript-eslint to its latest 8.x line if
-  the installed one predates the new TS allowance.
+- **TypeScript major** → confirm `typescript-eslint`'s `typescript` peer
+  still spans it. Bumping the `@typescript-eslint/*` pair to latest `8.x`
+  (above) covers this — `8.61`'s peer is `>=4.8.4 <6.1.0`, which spans
+  TS `6.0.x` but **not** `6.1+`, so keep the `typescript` caret on the
+  `6.0` line rather than letting it float to a TS minor the plugin
+  doesn't yet allow.
 
 Then resolve cleanly. A stale lock produces misleading ERESOLVE traces,
 so wipe both:
@@ -94,14 +106,18 @@ there, keep `domain/` free of `ui/` / `storage/` / `app/` / DOM imports.
 
 ## 4. Lint — preserve the surface, don't adopt new rules
 
-A new ESLint or `@typescript-eslint` major can grow its `recommended`
-preset with a wave of new rules that fire on deliberate, working
-patterns. **Adopting them is a standalone refactor, not part of a
-version bump.** Turn the newly-firing rules off in `eslint.config.js`
-(after the `...recommended.rules` spread) with a comment explaining they
-arrived via the bump, so the prior lint surface is preserved and the
-diff stays about versions. Disabling the newly-firing rules to preserve
-the prior lint surface is a bump; adopting them is a separate refactor.
+A new ESLint, `@typescript-eslint`, **or `eslint-plugin-react-hooks`**
+major can grow its `recommended` preset with a wave of new rules that
+fire on deliberate, working patterns. **Adopting them is a standalone
+refactor, not part of a version bump.** Turn the newly-firing rules off
+in `eslint.config.js` (after the `...recommended.rules` spread) with a
+comment explaining they arrived via the bump, so the prior lint surface
+is preserved and the diff stays about versions. Disabling the
+newly-firing rules to preserve the prior lint surface is a bump; adopting
+them is a separate refactor. Rules seen arriving this way (re-discover
+with the counter below — the list grows): `react-hooks/refs` and
+`react-hooks/set-state-in-effect` (eslint-plugin-react-hooks 7),
+`no-useless-assignment` (`@eslint/js` 10 recommended).
 
 Discover _which_ rules are new by counting failures by ruleId rather
 than scrolling the full message list:
@@ -163,10 +179,17 @@ reopen for the same version.
 package-lock.json` before trusting the trace.
 - `vite-plugin-pwa` must move with a Vite major — it's not in the
   Dependabot batch. Check its `peerDependencies` for the Vite range.
+- The `@typescript-eslint/*` pair is **left at its old minor** by the
+  grouped dev-deps PR — bump both to latest `8.x` so their `eslint` peer
+  spans a new ESLint major and their `typescript` peer spans a new TS
+  major.
 - A lint/format plugin whose peer lags the host's major → `overrides`
-  shim, not a downgrade of the host.
+  shim, not a downgrade of the host. Both `eslint-plugin-import` and
+  `eslint-plugin-jsx-a11y` cap `eslint` at `^9` and need the shim on an
+  ESLint 10 bump.
 - New `recommended` lint rules from a major → disable (with a comment),
-  don't refactor.
+  don't refactor. `eslint-plugin-react-hooks` majors grow their preset
+  too, not just ESLint/`@typescript-eslint`.
 - GitHub Actions pins live in all three of `ci.yml`, `pages.yml`, and
   `release.yml` — sweep the whole `.github/workflows/` directory, not
   just `ci.yml`.
