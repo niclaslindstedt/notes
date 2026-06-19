@@ -9,6 +9,7 @@ import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
 import { useUndoRedoShortcuts } from "../ui/hooks/useUndoRedoShortcuts.ts";
+import { useViewportHeight } from "../ui/hooks/useViewportHeight.ts";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
   applyFaviconHref,
@@ -35,6 +36,11 @@ import { useSettingsSync } from "./use-settings-sync.ts";
 // threading openers through the tree.
 
 export function App() {
+  // Pin every fixed overlay (the drawer, the modals) to the live visual
+  // viewport so they fill the screen on the iOS standalone PWA, where bare
+  // `100svh` comes up short. Sets the `--app-height` / `--app-top` vars that
+  // `appViewportRect.ts` reads.
+  useViewportHeight();
   const { editor } = useApplyAppearance();
   // The active storage backend (this device / a local folder / a cloud) and
   // its sync engine. Appearance settings reconcile against the same backend
