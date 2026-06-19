@@ -162,11 +162,14 @@ export function App() {
   }
 
   // Switch what's open in the editor, dropping the note we're leaving if it
-  // was never typed into so abandoned "new note" taps don't pile up.
+  // was never typed into so abandoned "new note" taps don't pile up. Opening
+  // an existing note pulls the latest from a remote backend so you read its
+  // current contents — cheap (incremental) and a no-op locally.
   function switchTo(id: string | null) {
     if (editing && discardable(editing) && editing.id !== id)
       remove(editing.id);
     setEditingId(id);
+    if (id !== null) void sync.refresh();
   }
 
   function openNew() {
