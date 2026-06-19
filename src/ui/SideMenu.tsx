@@ -65,6 +65,10 @@ type Props = {
   onRemoveNote: (id: string) => void;
   /** How many notes are archived — shown as a count on the Archive entry. */
   archivedCount: number;
+  /** Open the archive page (the list of archived notes). */
+  onOpenArchive: () => void;
+  /** Whether the archive page is the view currently shown. */
+  archiveActive: boolean;
   /** Revert the most recent recorded edit. */
   onUndo: () => void;
   /** Re-apply the most recently undone edit. */
@@ -88,6 +92,8 @@ export function SideMenu({
   onAddNote,
   onRemoveNote,
   archivedCount,
+  onOpenArchive,
+  archiveActive,
   onUndo,
   onRedo,
   canUndo,
@@ -231,6 +237,19 @@ export function SideMenu({
           );
         })
       )}
+      {/* Archive lives at the foot of the notes list — it's a view onto the
+          archived notes, not a section of its own. The count badge mirrors the
+          number of archived notes (hidden when the archive is empty). */}
+      <NavItem
+        icon={<ArchiveIcon className="h-5 w-5" />}
+        label={t("nav.archive")}
+        active={archiveActive}
+        badge={archivedCount > 0 ? archivedCount : undefined}
+        onClick={() => {
+          onOpenArchive();
+          close();
+        }}
+      />
       <SectionHeader label={t("nav.edit")} border />
       {/* Undo / redo keep the drawer open so a burst of reverts can be
           applied without reopening it each time. */}
@@ -273,12 +292,6 @@ export function SideMenu({
           label={t("menu.privacy")}
           href={privacyUrl}
           onClick={close}
-        />
-        <MenuButton
-          icon={<ArchiveIcon className="h-5 w-5" />}
-          label={t("nav.archive")}
-          count={archivedCount}
-          onClick={() => pick(() => dispatch({ kind: "archive" }))}
         />
         <MenuButton
           icon={<SparklesIcon className="h-5 w-5" />}
@@ -416,6 +429,7 @@ function NavItem({
   label,
   active,
   disabled = false,
+  badge,
   onClick,
 }: {
   icon: ReactNode;
@@ -424,6 +438,9 @@ function NavItem({
   // Renders the row inert and dimmed — used by undo / redo at the timeline
   // ends, where there is nothing to revert or re-apply.
   disabled?: boolean;
+  // Optional trailing count pill (e.g. the number of archived notes). The
+  // caller hides it at zero by passing `undefined`.
+  badge?: number;
   onClick: () => void;
 }) {
   return (
@@ -443,6 +460,11 @@ function NavItem({
     >
       <span className={active ? "text-accent" : "text-muted"}>{icon}</span>
       <span className="flex-1 truncate">{label}</span>
+      {badge !== undefined && (
+        <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-xs text-muted tabular-nums">
+          {badge}
+        </span>
+      )}
     </button>
   );
 }
@@ -520,14 +542,10 @@ function SwipeToRemove({
 function MenuButton({
   icon,
   label,
-  count,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
-  // Optional trailing tally (e.g. the number of archived notes). Hidden when
-  // zero so an empty archive carries no badge.
-  count?: number;
   onClick: () => void;
 }) {
   return (
@@ -539,11 +557,6 @@ function MenuButton({
     >
       <span className="text-muted">{icon}</span>
       <span className="flex-1">{label}</span>
-      {count !== undefined && count > 0 && (
-        <span className="shrink-0 text-xs text-muted tabular-nums">
-          {count}
-        </span>
-      )}
     </button>
   );
 }

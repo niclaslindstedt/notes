@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { unlock, useAchievementWatcher } from "../achievements/index.ts";
+import { classifyLines } from "../domain/markdown.ts";
 import { isBlank, noteTitle, notePreview, type Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { isStandaloneMobile } from "../pwa/standalone.ts";
@@ -21,7 +22,13 @@ import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
 import { useRowSwipe } from "../ui/hooks/useRowSwipe.ts";
 import { useUndoRedoShortcuts } from "../ui/hooks/useUndoRedoShortcuts.ts";
 import { useViewportHeight } from "../ui/hooks/useViewportHeight.ts";
-import { ArchiveIcon, ArrowLeftIcon, TrashIcon } from "../ui/icons.tsx";
+import {
+  ArchiveIcon,
+  ArrowLeftIcon,
+  RestoreIcon,
+  TrashIcon,
+} from "../ui/icons.tsx";
+import { RenderedLine } from "../ui/MarkdownLine.tsx";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
   applyFaviconHref,
@@ -34,7 +41,6 @@ import { UnlockGate } from "../ui/UnlockGate.tsx";
 import { UpdateToast } from "../ui/UpdateToast.tsx";
 import { AchievementsModalHost } from "./modals/AchievementsModalHost.tsx";
 import { AchievementsUnlockModalHost } from "./modals/AchievementsUnlockModalHost.tsx";
-import { ArchiveModalHost } from "./modals/ArchiveModalHost.tsx";
 import { ChangelogModalHost } from "./modals/ChangelogModalHost.tsx";
 import { NamespacesModalHost } from "./modals/NamespacesModalHost.tsx";
 import { SettingsModalHost } from "./modals/SettingsModalHost.tsx";
@@ -44,11 +50,14 @@ import { useSettingsSync } from "./use-settings-sync.ts";
 
 // Root component. The shell is a flex row — the side menu (a docked sidebar
 // on wide viewports, a drag-out drawer on phones) beside a main area that
-// shows either the list of notes or a full-screen editor, switched on
-// `editingId` rather than a router so the tree stays a single mounted
-// shell. `NavContext` carries the drawer state down to `SideMenu`;
-// `ModalBusProvider` lets any button open the settings dialog without
-// threading openers through the tree.
+// shows one of four surfaces, switched on plain state rather than a router so
+// the tree stays a single mounted shell: the notes overview, the archive page
+// (the same overview filtered to archived notes — a real page, not a modal, so
+// the side menu's edge-swipe still works over it), a full-screen editor
+// (`editingId`), or a read-only view of an archived note (`readingId`).
+// `NavContext` carries the drawer state down to `SideMenu`; `ModalBusProvider`
+// lets any button open the settings dialog without threading openers through
+// the tree.
 
 export function App() {
   // Pin every fixed overlay (the drawer, the modals) to the live visual
@@ -80,6 +89,12 @@ export function App() {
     sync,
   } = useNotes(storage.adapter);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Which list the main area shows when nothing is open in the editor / reader.
+  const [view, setView] = useState<"notes" | "archive">("notes");
+  // An archived note opened read-only (tapped from the archive page). Distinct
+  // from `editingId` so the editor stays the editable surface and the reader
+  // the read-only one.
+  const [readingId, setReadingId] = useState<string | null>(null);
   const nav = useNavState();
 
   // When the floating button is hidden (only possible in the standalone
@@ -132,27 +147,53 @@ export function App() {
   function switchNamespace(slug: string) {
     storage.switchNamespace(slug);
     setEditingId(null);
+    setReadingId(null);
+    setView("notes");
   }
 
   const editing = editingId
     ? (allNotes.find((n) => n.id === editingId) ?? null)
     : null;
+  const reading = readingId
+    ? (allNotes.find((n) => n.id === readingId) ?? null)
+    : null;
 
   // Switch what's open in the editor, dropping the note we're leaving if it
-  // was never typed into so abandoned "new note" taps don't pile up.
+  // was never typed into so abandoned "new note" taps don't pile up. Opening a
+  // note always lands on the overview behind it (editable notes are never
+  // archived), so closing the editor returns there.
   function switchTo(id: string | null) {
     if (editing && isBlank(editing) && editing.id !== id) remove(editing.id);
+    setReadingId(null);
+    if (id) setView("notes");
     setEditingId(id);
   }
 
   function openNew() {
     if (editing && isBlank(editing)) remove(editing.id);
+    setReadingId(null);
+    setView("notes");
     setEditingId(create());
+  }
+
+  // Open the archive page — the same overview filtered to archived notes.
+  // Leaves the editor / reader so the list is what shows.
+  function openArchive() {
+    if (editing && isBlank(editing)) remove(editing.id);
+    setEditingId(null);
+    setReadingId(null);
+    setView("archive");
+  }
+
+  // Open an archived note read-only (tapped from the archive page).
+  function openRead(id: string) {
+    setReadingId(id);
   }
 
   function removeNote(id: string) {
     remove(id);
     if (id === editingId) setEditingId(null);
+    if (id === readingId) setReadingId(null);
   }
 
   // Archiving a note from the overview leaves the editor too if that note
@@ -161,6 +202,23 @@ export function App() {
   function archiveNote(id: string) {
     archive(id);
     if (id === editingId) setEditingId(null);
+  }
+
+  // Restore from the archive page's swipe gesture: the note leaves the archive
+  // list and reappears in the overview, but we stay on the archive page.
+  function restoreNote(id: string) {
+    restore(id);
+    if (id === readingId) setReadingId(null);
+  }
+
+  // Restore from the read-only view's Restore button: the note is unarchived
+  // (it slides back into the overview) and immediately reopened in the
+  // editable editor, so the user can keep writing without another tap.
+  function restoreAndEdit(id: string) {
+    restore(id);
+    setReadingId(null);
+    setView("notes");
+    setEditingId(id);
   }
 
   // Encryption on, no passphrase held this session — block the app behind the
@@ -183,6 +241,8 @@ export function App() {
             onAddNote={openNew}
             onRemoveNote={removeNote}
             archivedCount={archived.length}
+            onOpenArchive={openArchive}
+            archiveActive={view === "archive" && !editing}
             onUndo={undo}
             onRedo={redo}
             canUndo={canUndo}
@@ -203,6 +263,25 @@ export function App() {
                 onDelete={() => removeNote(editing.id)}
                 syncSlot={syncSlot}
               />
+            ) : reading ? (
+              <ReadOnlyNote
+                key={reading.id}
+                note={reading}
+                editor={editor}
+                onBack={() => setReadingId(null)}
+                onRestore={() => restoreAndEdit(reading.id)}
+                onDelete={() => removeNote(reading.id)}
+                syncSlot={syncSlot}
+              />
+            ) : view === "archive" ? (
+              <ArchiveList
+                notes={archived}
+                onOpen={openRead}
+                onRestore={restoreNote}
+                onDelete={removeNote}
+                onBack={() => setView("notes")}
+                syncSlot={syncSlot}
+              />
             ) : (
               <NoteList
                 notes={notes}
@@ -218,11 +297,6 @@ export function App() {
 
         <SettingsModalHost storage={storage} />
         <NamespacesModalHost storage={storage} />
-        <ArchiveModalHost
-          notes={archived}
-          onRestore={restore}
-          onRemove={removeNote}
-        />
         <ChangelogModalHost />
         <AchievementsModalHost />
         <AchievementsUnlockModalHost />
@@ -286,8 +360,10 @@ function NoteList({
                 <SwipeableNoteCard
                   note={note}
                   onOpen={() => onOpen(note.id)}
-                  onArchive={() => onArchive(note.id)}
+                  onPrimary={() => onArchive(note.id)}
                   onDelete={() => onDelete(note.id)}
+                  primaryLabel={t("app.archive")}
+                  primaryIcon={<ArchiveIcon className="h-4 w-4" />}
                 />
               </li>
             ))}
@@ -324,42 +400,50 @@ function NoteCard({ note, onOpen }: { note: Note; onOpen: () => void }) {
 }
 
 // A note card with two swipe outcomes behind a sliding foreground (see
-// `useRowSwipe`): swiping right uncovers an Archive backdrop and files the
-// note away once past the threshold; swiping left latches a Delete button
-// open. Both are recorded on the undo timeline, so a stray swipe is one Undo
-// away — which is why delete here needs no confirmation. A plain tap still
-// opens the note; the hook swallows the click that trails a real drag.
+// `useRowSwipe`): swiping right uncovers the primary backdrop and fires it
+// once past the threshold — archive in the overview, restore on the archive
+// page; swiping left latches a Delete button open. Both are recorded on the
+// undo timeline, so a stray swipe is one Undo away — which is why delete here
+// needs no confirmation. A plain tap still opens the note; the hook swallows
+// the click that trails a real drag.
 function SwipeableNoteCard({
   note,
   onOpen,
-  onArchive,
+  onPrimary,
   onDelete,
+  primaryLabel,
+  primaryIcon,
 }: {
   note: Note;
   onOpen: () => void;
-  onArchive: () => void;
+  /** The swipe-right outcome — archive in the overview, restore in the archive. */
+  onPrimary: () => void;
   onDelete: () => void;
+  /** Backdrop label revealed by the swipe-right gesture. */
+  primaryLabel: string;
+  /** Backdrop icon revealed by the swipe-right gesture. */
+  primaryIcon: ReactNode;
 }) {
   const t = useT();
-  const archive = useCallback(() => onArchive(), [onArchive]);
-  const swipe = useRowSwipe(archive);
+  const primary = useCallback(() => onPrimary(), [onPrimary]);
+  const swipe = useRowSwipe(primary);
 
   return (
     <div className="relative overflow-hidden rounded-[var(--radius)]">
-      {/* Archive — uncovered by swiping the card right. Hidden unless the
-          foreground is sliding right so the archive slide-off never bares it. */}
+      {/* Primary action — uncovered by swiping the card right. Hidden unless
+          the foreground is sliding right so the slide-off never bares it. */}
       <div
         aria-hidden={swipe.offset <= 0}
         className={`absolute inset-0 flex items-center justify-start gap-2 rounded-[var(--radius)] bg-accent/15 pl-4 text-xs font-semibold tracking-wide text-accent uppercase ${
           swipe.offset > 0 ? "" : "invisible"
         }`}
       >
-        <ArchiveIcon className="h-4 w-4" />
-        {t("app.archive")}
+        {primaryIcon}
+        {primaryLabel}
       </div>
 
       {/* Delete — uncovered by swiping the card left. Kept hidden while the
-          card slides right to archive so it's never exposed on slide-off. */}
+          card slides right so it's never exposed on slide-off. */}
       <div
         aria-hidden={swipe.offset >= 0}
         className={`absolute inset-0 flex items-center justify-end ${
@@ -384,6 +468,166 @@ function SwipeableNoteCard({
         }`}
       >
         <NoteCard note={note} onOpen={onOpen} />
+      </div>
+    </div>
+  );
+}
+
+// The archive page — the notes overview filtered to archived notes. A real
+// view (not a modal) so the side menu's edge-swipe-to-open still works over
+// it. Mirrors the overview's swipeable cards, but swipe-right restores instead
+// of archives, and there's no "new note" button. Tapping a card opens the note
+// read-only (see `ReadOnlyNote`). A back button returns to the overview.
+function ArchiveList({
+  notes,
+  onOpen,
+  onRestore,
+  onDelete,
+  onBack,
+  syncSlot,
+}: {
+  notes: Note[];
+  onOpen: (id: string) => void;
+  onRestore: (id: string) => void;
+  onDelete: (id: string) => void;
+  onBack: () => void;
+  syncSlot: ReactNode;
+}) {
+  const t = useT();
+  return (
+    <div className="flex h-full flex-col">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onBack}
+            title={t("app.back")}
+            aria-label={t("app.back")}
+            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-accent/40 bg-transparent text-accent hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
+          >
+            <ArrowLeftIcon className="h-[18px] w-[18px]" />
+          </button>
+          <h1 className="truncate text-lg font-bold tracking-wide text-fg-bright">
+            {t("nav.archiveHeading")}
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <TrophyButton />
+          {syncSlot}
+        </div>
+      </header>
+
+      <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
+        {notes.length === 0 ? (
+          <p className="mt-16 text-center text-muted">{t("nav.archiveEmpty")}</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {notes.map((note) => (
+              <li key={note.id}>
+                <SwipeableNoteCard
+                  note={note}
+                  onOpen={() => onOpen(note.id)}
+                  onPrimary={() => onRestore(note.id)}
+                  onDelete={() => onDelete(note.id)}
+                  primaryLabel={t("nav.restore")}
+                  primaryIcon={<RestoreIcon className="h-4 w-4" />}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// A read-only view of an archived note, opened by tapping it on the archive
+// page. The body is rendered formatted (the same line renderer the live
+// editor uses for inactive lines) but nothing is editable. Two floating
+// actions — styled after checklist's bulk archive/delete buttons — sit at the
+// foot: Restore (unarchives the note and reopens it editable straight away)
+// and Delete (removes it for good — undoable, so no confirm beat).
+function ReadOnlyNote({
+  note,
+  editor,
+  onBack,
+  onRestore,
+  onDelete,
+  syncSlot,
+}: {
+  note: Note;
+  editor: EditorSettings;
+  onBack: () => void;
+  onRestore: () => void;
+  onDelete: () => void;
+  syncSlot: ReactNode;
+}) {
+  const t = useT();
+  const maxWidth = editorMarginMaxWidth(editor.margin);
+  const widthStyle =
+    maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" };
+  const title = note.title.trim();
+  // Respect the Markdown-rendering preference: formatted lines when on, the
+  // raw source otherwise — matching how the same note reads in the editor.
+  const blocks = editor.renderMarkdown ? classifyLines(note.body) : null;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <button
+          type="button"
+          onClick={onBack}
+          title={t("app.back")}
+          aria-label={t("app.back")}
+          className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-accent/40 bg-transparent text-accent hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
+        >
+          <ArrowLeftIcon className="h-[18px] w-[18px]" />
+        </button>
+        <div className="flex items-center gap-2">
+          <TrophyButton />
+          {syncSlot}
+        </div>
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="w-full px-4 pt-4 pb-28" style={widthStyle}>
+          {title && (
+            <h1 className="mb-3 text-2xl font-bold text-fg-bright">{title}</h1>
+          )}
+          {blocks ? (
+            blocks.map((block, i) => (
+              <div key={i} className="whitespace-pre-wrap break-words text-fg">
+                <RenderedLine block={block} />
+              </div>
+            ))
+          ) : (
+            <pre className="font-[inherit] whitespace-pre-wrap break-words text-fg">
+              {note.body}
+            </pre>
+          )}
+        </div>
+      </div>
+
+      {/* Floating actions, after checklist's bulk archive/delete buttons:
+          tinted, rounded, free-standing — Restore (accent/link) and Delete
+          (danger). Restore reopens the note editable; delete is undoable. */}
+      <div className="fixed inset-x-0 bottom-0 z-20 flex justify-center gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <button
+          type="button"
+          onClick={onRestore}
+          className="flex cursor-pointer items-center gap-2 rounded-md bg-link/10 px-4 py-2 text-sm font-semibold text-link shadow-sm transition-[filter,background-color] hover:bg-link/20 active:brightness-90"
+        >
+          <RestoreIcon className="h-5 w-5" />
+          {t("nav.restore")}
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="flex cursor-pointer items-center gap-2 rounded-md bg-danger/10 px-4 py-2 text-sm font-semibold text-danger shadow-sm transition-[filter,background-color] hover:bg-danger/20 active:brightness-90"
+        >
+          <TrashIcon className="h-5 w-5" />
+          {t("app.delete")}
+        </button>
       </div>
     </div>
   );
