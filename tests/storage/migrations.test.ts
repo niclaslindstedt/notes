@@ -35,7 +35,12 @@ describe("storage migrations", () => {
     const result = migrate({
       version: 1,
       notes: [
-        { id: "a", body: "Groceries\n\nmilk\neggs", createdAt: 1, updatedAt: 2 },
+        {
+          id: "a",
+          body: "Groceries\n\nmilk\neggs",
+          createdAt: 1,
+          updatedAt: 2,
+        },
       ],
     });
     const note = (result.data.notes as Array<Record<string, unknown>>)[0]!;

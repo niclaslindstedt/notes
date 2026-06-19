@@ -67,7 +67,9 @@ export function MarkdownEditor({
   // whenever we move the active line programmatically. Null on mount when the
   // body shouldn't grab focus (a new note focuses its title field instead);
   // clicks / arrow keys still set it, so the body stays fully editable.
-  const pendingCaret = useRef<number | null>(focusOnMount ? value.length : null);
+  const pendingCaret = useRef<number | null>(
+    focusOnMount ? value.length : null,
+  );
 
   const clampedActive = Math.min(active, lines.length - 1);
 
