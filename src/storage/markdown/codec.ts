@@ -15,6 +15,10 @@
 // edited separately from the body — so it rides the frontmatter rather than
 // being recovered from the first body line.
 
+import {
+  ATTACHMENT_REF_PREFIX,
+  attachmentFilenameFromHref,
+} from "../../domain/attachment.ts";
 import { type Note, type Snapshot } from "../../domain/note.ts";
 
 /** A single markdown document keyed by its path relative to the app root. */
@@ -75,10 +79,46 @@ export function noteToMarkdown(note: Note): string {
     // stays minimal and an older file (no flag) round-trips as active.
     ...(note.archived ? { archived: "true" } : {}),
   });
+  // Point image references at the on-disk sibling layout
+  // (`../attachments/<stem>/<file>`) so the file opens with working images in
+  // any markdown viewer; the in-memory body keeps the rename-proof flat form.
+  const body = refsToDisk(note.body.replace(/\n+$/, ""), noteFileStem(note));
   // One blank line between the frontmatter and the body, and exactly one
   // trailing newline so the file ends cleanly. Trailing blank lines in the
   // body are trimmed (normalised) before the single newline is re-added.
-  return `${front}\n${note.body.replace(/\n+$/, "")}\n`;
+  return `${front}\n${body}\n`;
+}
+
+// -- Attachment references --------------------------------------------
+//
+// In memory a note body references an image by the flat `attachments/<file>`
+// (no note-name segment, so it survives a rename); on disk the note lives in
+// `notes/<stem>.md` and the image in the sibling `attachments/<stem>/<file>`,
+// so the reference is rewritten to the relative `../attachments/<stem>/<file>`
+// on the way out and collapsed back to the basename on the way in.
+
+const IMAGE_REF_RE = /(!\[[^\]]*\]\()([^)]+)(\))/g;
+
+function refsToDisk(body: string, stem: string): string {
+  return body.replace(
+    IMAGE_REF_RE,
+    (whole, open: string, href: string, close: string) => {
+      const filename = attachmentFilenameFromHref(href);
+      if (!filename) return whole;
+      return `${open}../${ATTACHMENT_REF_PREFIX}${stem}/${filename}${close}`;
+    },
+  );
+}
+
+function refsFromDisk(body: string): string {
+  return body.replace(
+    IMAGE_REF_RE,
+    (whole, open: string, href: string, close: string) => {
+      const filename = attachmentFilenameFromHref(href);
+      if (!filename) return whole;
+      return `${open}${ATTACHMENT_REF_PREFIX}${filename}${close}`;
+    },
+  );
 }
 
 function renderFrontmatter(fields: Record<string, string>): string {
@@ -118,7 +158,9 @@ export function parseNote(text: string): Note | null {
   const note: Note = {
     id,
     title,
-    body: body.replace(/\n$/, ""),
+    // Drop the single trailing newline, then collapse any on-disk attachment
+    // reference back to the flat in-memory form.
+    body: refsFromDisk(body.replace(/\n$/, "")),
     createdAt,
     updatedAt,
   };

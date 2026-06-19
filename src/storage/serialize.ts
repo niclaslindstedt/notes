@@ -9,6 +9,7 @@
 // `serialize` stamps, while `domain/` keeps working with the version-free
 // `Snapshot` shape.
 
+import type { Attachment } from "../domain/attachment.ts";
 import { emptySnapshot, type Note, type Snapshot } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 import { LATEST_VERSION, migrate } from "./migrations.ts";
@@ -62,8 +63,38 @@ export function parse(text: string | null | undefined): Snapshot {
   const notes: Note[] = Array.isArray(doc.notes)
     ? doc.notes.filter(isNote).map((n) => {
         const title = (n as { title?: unknown }).title;
-        return { ...n, title: typeof title === "string" ? title : "" };
+        const attachments = parseAttachments(
+          (n as { attachments?: unknown }).attachments,
+        );
+        const note: Note = {
+          ...n,
+          title: typeof title === "string" ? title : "",
+        };
+        if (attachments.length > 0) note.attachments = attachments;
+        else delete note.attachments;
+        return note;
       })
     : [];
   return { notes };
+}
+
+// Drop any malformed attachment entry rather than failing the whole note, the
+// same defensive stance `isNote` takes for notes. A note's attachments are
+// optional, so an absent or non-array value yields none.
+function parseAttachments(value: unknown): Attachment[] {
+  if (!Array.isArray(value)) return [];
+  const out: Attachment[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const a = entry as Record<string, unknown>;
+    if (
+      typeof a.filename === "string" &&
+      typeof a.mime === "string" &&
+      typeof a.data === "string" &&
+      a.filename.length > 0
+    ) {
+      out.push({ filename: a.filename, mime: a.mime, data: a.data });
+    }
+  }
+  return out;
 }

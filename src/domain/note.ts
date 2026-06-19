@@ -3,6 +3,8 @@
 // reuse the exact same logic (the eslint config enforces the no-ui /
 // no-storage / no-DOM boundary). Storage and UI build on top of it.
 
+import type { Attachment } from "./attachment.ts";
+
 // A single note. `title` is a short heading the user edits in its own field
 // (it is *not* the first body line); `body` is the plain text / Markdown
 // below it. Both are stored — the title rides the markdown frontmatter so it
@@ -21,6 +23,13 @@ export type Note = {
   // lists them and offers a restore. Absent on an active note rather than
   // written as `false`, so an older document needs no migration.
   archived?: boolean;
+  // Images the user pasted or dropped into the note. Each rides in memory as a
+  // `data:` URL the editor renders; on the file backends the storage layer
+  // externalises it to a real image file under `attachments/<note-name>/` (see
+  // `domain/attachment.ts`). Absent on a note with no images rather than an
+  // empty array, so an older document needs no migration and a JSON note with
+  // none stays minimal.
+  attachments?: Attachment[];
 };
 
 // Cheap, collision-resistant id. `crypto.randomUUID` is available in every
@@ -94,7 +103,11 @@ export function notePreview(note: Note): string {
 
 /** True when a note carries no user content and is safe to discard. */
 export function isBlank(note: Note): boolean {
-  return note.title.trim().length === 0 && note.body.trim().length === 0;
+  return (
+    note.title.trim().length === 0 &&
+    note.body.trim().length === 0 &&
+    (note.attachments?.length ?? 0) === 0
+  );
 }
 
 // Sort newest-edited first. Returns a new array; never mutates the input.

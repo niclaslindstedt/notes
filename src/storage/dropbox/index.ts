@@ -14,10 +14,12 @@
 
 import { createLogger } from "../../dev/logger.ts";
 import { AuthError, RateLimitError, type StorageAdapter } from "../adapter.ts";
+import type { AttachmentEntry, AttachmentStore } from "../attachment-store.ts";
 import { createDirectoryAdapter } from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
 import {
   DEFAULT_NAMESPACE_SLUG,
+  namespaceAttachmentsFolder,
   namespaceCloudFolder,
   namespaceNotesFolder,
 } from "../namespaces.ts";
@@ -84,6 +86,14 @@ export function dropboxNotesPath(namespace: string): string {
   return `/${namespaceNotesFolder(namespace)}`;
 }
 
+// The Dropbox path a namespace's image attachments live under, relative to the
+// app folder: `/attachments` for the default namespace, `/<slug>/attachments`
+// otherwise — a sibling of the notes folder. The root the attachment store is
+// scoped to.
+export function dropboxAttachmentsPath(namespace: string): string {
+  return `/${namespaceAttachmentsFolder(namespace)}`;
+}
+
 const TOKEN_ENDPOINT = "https://api.dropboxapi.com/oauth2/token";
 const AUTH_BASE = "https://www.dropbox.com/oauth2/authorize";
 const UPLOAD_ENDPOINT = "https://content.dropboxapi.com/2/files/upload";
@@ -147,15 +157,24 @@ export function createDropboxAdapter(
   namespace: string = DEFAULT_NAMESPACE_SLUG,
 ): StorageAdapter {
   log.info(`adapter created ns=${namespace}`);
+  const authedFetch = createAuthedFetch(auth, fetchImpl);
   const store = createDropboxFileStore(
-    createAuthedFetch(auth, fetchImpl),
+    authedFetch,
     dropboxNotesPath(namespace),
   );
-  return createDirectoryAdapter(store, {
-    id: "dropbox",
-    label: "Dropbox",
-    saveDebounceMs: SAVE_DEBOUNCE_MS,
-  });
+  const attachments = createDropboxAttachmentStore(
+    authedFetch,
+    dropboxAttachmentsPath(namespace),
+  );
+  return createDirectoryAdapter(
+    store,
+    {
+      id: "dropbox",
+      label: "Dropbox",
+      saveDebounceMs: SAVE_DEBOUNCE_MS,
+    },
+    attachments,
+  );
 }
 
 // Settings store for the Dropbox backend: `/settings.json` at the app-folder
@@ -366,6 +385,130 @@ function createDropboxFileStore(
         log.info(`upload ${path}: rev=${meta.rev}`);
       }
       return meta.rev;
+    },
+
+    async remove(path: string): Promise<void> {
+      const res = await authedFetch(DELETE_ENDPOINT, (token) => ({
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ path: `${rootPath}/${path}` }),
+      }));
+      if (res.status === 409) return; // already gone
+      if (!res.ok) {
+        const detail = await readErrorBody(res);
+        throw new Error(`Dropbox delete failed: ${res.status} ${detail}`);
+      }
+    },
+  };
+}
+
+// Binary attachment store for Dropbox: a note's images under
+// `/attachments/<note-name>/` (or `/<slug>/attachments/...`). Lists
+// recursively (the tree is nested, unlike the flat notes folder), moves raw
+// image bytes, and rides the same authed-fetch / silent-refresh path.
+function createDropboxAttachmentStore(
+  authedFetch: AuthedFetch,
+  rootPath: string,
+): AttachmentStore {
+  const rootPrefix = `${rootPath}/`.toLowerCase();
+
+  function relativePath(entry: DropboxEntry): string | null {
+    const full = entry.path_display ?? entry.path_lower;
+    if (!full) return null;
+    if (full.toLowerCase().startsWith(rootPrefix)) {
+      return full.slice(rootPrefix.length);
+    }
+    return null;
+  }
+
+  async function listOnce(
+    endpoint: string,
+    body: unknown,
+  ): Promise<ListFolderResult | null> {
+    const res = await authedFetch(endpoint, (token) => ({
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    }));
+    if (res.status === 409) return null; // path/not_found — empty folder
+    if (!res.ok) {
+      const detail = await readErrorBody(res);
+      throw new Error(`Dropbox list_folder failed: ${res.status} ${detail}`);
+    }
+    return (await res.json()) as ListFolderResult;
+  }
+
+  return {
+    async list(): Promise<AttachmentEntry[]> {
+      // Recursive: the attachments tree nests one note-name folder deep, so
+      // unlike the flat notes folder it must be walked in full.
+      let page = await listOnce(LIST_FOLDER_ENDPOINT, {
+        path: rootPath,
+        recursive: true,
+      });
+      if (!page) return [];
+      const out: AttachmentEntry[] = [];
+      for (;;) {
+        for (const entry of page.entries) {
+          if (entry[".tag"] !== "file") continue;
+          const path = relativePath(entry);
+          if (path && path.includes("/")) out.push({ path });
+        }
+        if (!page.has_more) break;
+        const next = await listOnce(LIST_FOLDER_CONTINUE_ENDPOINT, {
+          cursor: page.cursor,
+        });
+        if (!next) break;
+        page = next;
+      }
+      return out;
+    },
+
+    async read(path: string): Promise<Uint8Array | null> {
+      const res = await authedFetch(DOWNLOAD_ENDPOINT, (token) => ({
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Dropbox-API-Arg": dropboxApiArg({ path: `${rootPath}/${path}` }),
+        },
+      }));
+      if (res.status === 409) return null;
+      if (!res.ok) {
+        const detail = await readErrorBody(res);
+        throw new Error(`Dropbox download failed: ${res.status} ${detail}`);
+      }
+      return new Uint8Array(await res.arrayBuffer());
+    },
+
+    async write(path: string, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
+      const res = await authedFetch(UPLOAD_ENDPOINT, (token) => ({
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Dropbox-API-Arg": dropboxApiArg({
+            path: `${rootPath}/${path}`,
+            mode: "overwrite",
+            mute: true,
+          }),
+          "Content-Type": "application/octet-stream",
+        },
+        body: bytes,
+      }));
+      if (res.status === 429) {
+        throw new RateLimitError(
+          parseRetryAfterMs(res.headers, RATE_LIMIT_FALLBACK_MS),
+        );
+      }
+      if (!res.ok) {
+        const detail = await readErrorBody(res);
+        throw new Error(`Dropbox upload failed: ${res.status} ${detail}`);
+      }
     },
 
     async remove(path: string): Promise<void> {

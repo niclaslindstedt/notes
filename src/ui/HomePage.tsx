@@ -98,6 +98,14 @@ export function HomePage() {
               never uploaded anywhere.
             </li>
             <li>
+              Attach images to a note — paste (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+
+              <kbd>V</kbd>) or drag an image into the editor and it appears as a
+              clickable thumbnail. Images are saved as ordinary image files in
+              an <em>attachments</em> folder beside your notes, so this is
+              available when you sync to a local folder, Dropbox, or Google
+              Drive (see below).
+            </li>
+            <li>
               Group notes into separate <em>namespaces</em> — independent
               buckets you can switch between, each with its own icon and colour.
             </li>

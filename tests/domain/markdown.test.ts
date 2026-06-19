@@ -16,6 +16,8 @@ function flatten(nodes: InlineNode[]): string {
         case "code":
         case "link":
           return n.text;
+        case "image":
+          return n.alt;
         default:
           return flatten(n.children);
       }
@@ -90,6 +92,21 @@ describe("parseInline", () => {
       text: "label",
       href: "https://x.y",
     });
+  });
+
+  it("parses an image into alt and href, distinct from a link", () => {
+    const [node] = parseInline("![my pic](attachments/abcd-pic.png)");
+    expect(node).toMatchObject({
+      type: "image",
+      alt: "my pic",
+      href: "attachments/abcd-pic.png",
+      offset: 0,
+    });
+  });
+
+  it("keeps surrounding text around an inline image", () => {
+    const nodes = parseInline("see ![pic](attachments/a.png) here");
+    expect(nodes.map((n) => n.type)).toEqual(["text", "image", "text"]);
   });
 
   it("records absolute source offsets on leaf nodes", () => {

@@ -4,12 +4,17 @@ import {
   useMemo,
   useRef,
   useState,
+  type ClipboardEvent as ReactClipboardEvent,
+  type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 
+import { type Attachment, attachmentMarkdown } from "../domain/attachment.ts";
 import { classifyLines } from "../domain/markdown.ts";
 import { useT } from "../i18n/index.ts";
+import { AttachmentsProvider } from "./attachments/AttachmentsProvider.tsx";
+import { fileToAttachment, imageFilesFrom } from "./attachments/fromFile.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
 
@@ -39,6 +44,12 @@ type Props = {
   maxWidth: string;
   /** Place the caret in the body on mount (false when the title takes focus). */
   focusOnMount?: boolean;
+  /** The note's image attachments, for resolving `![](attachments/…)` refs. */
+  attachments?: Attachment[];
+  /** Whether the active backend can store image attachments (file backends). */
+  canAttach?: boolean;
+  /** Persist a pasted / dropped image onto the note. */
+  onAttach?: (attachment: Attachment) => void;
 };
 
 export function MarkdownEditor({
@@ -49,6 +60,9 @@ export function MarkdownEditor({
   disableAutocorrect,
   maxWidth,
   focusOnMount = true,
+  attachments,
+  canAttach = false,
+  onAttach,
 }: Props) {
   const t = useT();
   // Local source of truth, seeded from the note. App keys the editor by note
@@ -114,6 +128,51 @@ export function MarkdownEditor({
     const next = [...lines];
     next.splice(i, 2, text + lines[i + 1]!);
     commit(next, i, text.length);
+  }
+
+  // Insert one image per line at the active line, followed by an empty line to
+  // keep typing on. Replaces the active line when it's blank so a paste into an
+  // empty note doesn't leave a stray gap above the image.
+  function insertAttachments(atts: readonly Attachment[]) {
+    if (atts.length === 0) return;
+    const i = clampedActive;
+    const cur = lines[i] ?? "";
+    const inserted = [...atts.map(attachmentMarkdown), ""];
+    const next = [...lines];
+    const base = cur.trim() === "" ? i : i + 1;
+    next.splice(base, cur.trim() === "" ? 1 : 0, ...inserted);
+    commit(next, base + inserted.length - 1, 0);
+  }
+
+  // Read each image file into an attachment, persist it onto the note, and drop
+  // its reference into the body. A no-op when the backend can't store files or
+  // nothing in the payload was an image.
+  async function attachImages(files: File[]) {
+    if (!canAttach || files.length === 0) return;
+    const built = await Promise.all(files.map(fileToAttachment));
+    const atts = built.filter((a): a is Attachment => a !== null);
+    if (atts.length === 0) return;
+    for (const a of atts) onAttach?.(a);
+    insertAttachments(atts);
+  }
+
+  function onPaste(e: ReactClipboardEvent<HTMLTextAreaElement>) {
+    if (!canAttach) return;
+    const images = imageFilesFrom(e.clipboardData);
+    if (images.length === 0) return; // let normal text paste through
+    e.preventDefault();
+    void attachImages(images);
+  }
+
+  function onDrop(e: ReactDragEvent<HTMLDivElement>) {
+    if (!canAttach) return;
+    const images = imageFilesFrom(e.dataTransfer);
+    if (images.length === 0) return; // not an image — leave it to file-import
+    // Claim the drop so the global markdown-import handler ignores it and the
+    // browser doesn't navigate to the dropped image.
+    e.preventDefault();
+    e.stopPropagation();
+    void attachImages(images);
   }
 
   // Size the textarea to its content (so it never scrolls internally) and
@@ -301,66 +360,84 @@ export function MarkdownEditor({
     : "whitespace-pre";
 
   return (
-    // This is one editing widget, not a set of independent controls: the
-    // textarea is the focusable, keyboard-driven surface, and the line
-    // <div>s are non-interactive visual proxies for source the textarea
-    // edits. Clicking one only repositions the caret (keyboard users move it
-    // with the arrow keys), so the static-interaction a11y rule doesn't apply.
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    <div
-      className={`min-h-0 flex-1 ${wordWrap ? "overflow-y-auto" : "overflow-auto"}`}
-      onMouseDown={(e) => {
-        // A click in the empty area below the text drops the caret at the end
-        // of the note rather than doing nothing.
-        if (e.target === e.currentTarget) activateEnd(e);
-      }}
-    >
+    <AttachmentsProvider attachments={attachments}>
+      {/* This is one editing widget, not a set of independent controls: the
+        textarea is the focusable, keyboard-driven surface, and the line
+        <div>s are non-interactive visual proxies for source the textarea
+        edits. Clicking one only repositions the caret (keyboard users move it
+        with the arrow keys), so the static-interaction a11y rule doesn't apply. */}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div
-        className={`px-4 py-4 ${wordWrap ? "" : "w-max min-w-full"}`}
-        style={widthStyle}
+        className={`min-h-0 flex-1 ${wordWrap ? "overflow-y-auto" : "overflow-auto"}`}
         onMouseDown={(e) => {
-          // Clicks landing on the content wrapper itself — its padding or the
-          // gaps around the lines — count as the empty note space too.
+          // A click in the empty area below the text drops the caret at the end
+          // of the note rather than doing nothing.
           if (e.target === e.currentTarget) activateEnd(e);
         }}
+        onDrop={onDrop}
+        onDragOver={(e) => {
+          // A drag carrying files must have its default prevented for a drop to
+          // fire at all; the drop handler then decides whether it's an image to
+          // attach or something to leave to the global markdown import.
+          if (canAttach && carriesFiles(e)) e.preventDefault();
+        }}
       >
-        {lines.map((line, index) =>
-          index === clampedActive ? (
-            <textarea
-              key="active"
-              ref={taRef}
-              rows={1}
-              wrap={wordWrap ? "soft" : "off"}
-              value={line}
-              spellCheck={!disableSpellcheck}
-              autoCorrect={disableAutocorrect ? "off" : "on"}
-              autoCapitalize={disableAutocorrect ? "off" : "sentences"}
-              placeholder={
-                lines.length === 1 ? t("app.startWriting") : undefined
-              }
-              onChange={(e) => onTextChange(e.target.value)}
-              onKeyDown={onKeyDown}
-              className={`block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-fg outline-none placeholder:text-muted/60 ${wrapClass} ${lineTextClass(
-                blocks[clampedActive]!,
-              )}`}
-            />
-          ) : (
-            // A visual proxy for one source line; clicking rolls the editing
-            // textarea here. See the widget note above.
-            // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-            <div
-              key={index}
-              onMouseDown={(e) => activateAt(e, index)}
-              className={`cursor-text text-fg ${wrapClass}`}
-            >
-              <RenderedLine block={blocks[index]!} />
-            </div>
-          ),
-        )}
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+        <div
+          className={`px-4 py-4 ${wordWrap ? "" : "w-max min-w-full"}`}
+          style={widthStyle}
+          onMouseDown={(e) => {
+            // Clicks landing on the content wrapper itself — its padding or the
+            // gaps around the lines — count as the empty note space too.
+            if (e.target === e.currentTarget) activateEnd(e);
+          }}
+        >
+          {lines.map((line, index) =>
+            index === clampedActive ? (
+              <textarea
+                key="active"
+                ref={taRef}
+                rows={1}
+                wrap={wordWrap ? "soft" : "off"}
+                value={line}
+                spellCheck={!disableSpellcheck}
+                autoCorrect={disableAutocorrect ? "off" : "on"}
+                autoCapitalize={disableAutocorrect ? "off" : "sentences"}
+                placeholder={
+                  lines.length === 1 ? t("app.startWriting") : undefined
+                }
+                onChange={(e) => onTextChange(e.target.value)}
+                onKeyDown={onKeyDown}
+                onPaste={onPaste}
+                className={`block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-fg outline-none placeholder:text-muted/60 ${wrapClass} ${lineTextClass(
+                  blocks[clampedActive]!,
+                )}`}
+              />
+            ) : (
+              // A visual proxy for one source line; clicking rolls the editing
+              // textarea here. See the widget note above.
+              // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+              <div
+                key={index}
+                onMouseDown={(e) => activateAt(e, index)}
+                className={`cursor-text text-fg ${wrapClass}`}
+              >
+                <RenderedLine block={blocks[index]!} />
+              </div>
+            ),
+          )}
+        </div>
       </div>
-    </div>
+    </AttachmentsProvider>
   );
+}
+
+// Whether a drag is carrying files (rather than, say, dragged text) — the same
+// `"Files"` type check the global import uses, so the editor only claims file
+// drags and leaves selection drags to the textarea.
+function carriesFiles(e: ReactDragEvent): boolean {
+  const types = e.dataTransfer?.types;
+  return types ? Array.from(types).includes("Files") : false;
 }
 
 // How many visual rows the textarea's content occupies — used to decide

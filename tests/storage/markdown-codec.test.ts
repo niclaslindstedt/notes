@@ -41,6 +41,23 @@ describe("markdown codec", () => {
     expect(parsed?.body).toBe("the body");
   });
 
+  it("rewrites image references to the on-disk sibling layout and back", () => {
+    const n = note(
+      "aabbcc112233",
+      "Holiday",
+      "before\n![pic](attachments/xy-pic.png)\nafter",
+    );
+    const file = snapshotToFiles({ notes: [n] })[0]!;
+    const stem = noteFileStem(n);
+    // On disk the note sits in notes/<stem>.md and the image in the sibling
+    // attachments/<stem>/, so the reference points up-and-over.
+    expect(file.text).toContain(`![pic](../attachments/${stem}/xy-pic.png)`);
+    // Coming back, the reference collapses to the rename-proof flat form.
+    expect(parseNote(file.text)?.body).toBe(
+      "before\n![pic](attachments/xy-pic.png)\nafter",
+    );
+  });
+
   it("round-trips the archived flag through the frontmatter", () => {
     const archived: Note = { ...note("arch1", "Old", "body"), archived: true };
     const file = snapshotToFiles({ notes: [archived] })[0]!;

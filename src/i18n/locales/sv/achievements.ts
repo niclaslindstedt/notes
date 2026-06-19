@@ -167,6 +167,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "När två enheter ändrar samma anteckningar medan de är åtskilda lyfter appen fram krocken och låter dig behålla dina eller ta deras — inga redigeringar tyst förlorade.",
     },
+    pictureThis: {
+      name: "En bild säger mer",
+      condition: "Klistra in eller släpp en bild i en anteckning.",
+      learnMore:
+        "Med en lokal mapp eller molnbackend kan du klistra in (Ctrl/Cmd+V) eller dra en bild rakt in i redigeraren. Den sparas som en riktig bildfil i en attachments-mapp bredvid dina anteckningar och visas inline som en miniatyr du kan klicka på för att öppna i full storlek.",
+    },
 
     // ── Expert ────────────────────────────────────────────────────────
     paranoidMode: {

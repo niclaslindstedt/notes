@@ -15,6 +15,7 @@ import {
   EyeOffGlyph,
   FolderGlyph,
   GlobeGlyph,
+  ImageGlyph,
   ImportGlyph,
   LayersGlyph,
   LockGlyph,
@@ -54,6 +55,11 @@ const hasTitledNote = (snap: Snapshot) =>
 // A note that has been swiped into the archive — the first time someone tidies
 // a note away without deleting it.
 const hasArchivedNote = (snap: Snapshot) => snap.notes.some((n) => n.archived);
+
+// A note that carries an image attachment — the first time someone pastes or
+// drops a picture into a note (only possible on a folder / cloud backend).
+const hasAttachment = (snap: Snapshot) =>
+  snap.notes.some((n) => (n.attachments?.length ?? 0) > 0);
 
 export const ACHIEVEMENTS: readonly Achievement[] = [
   // ──────────────────────────────────────────────────────────────
@@ -280,6 +286,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     glyph: MergeGlyph,
     learnMore: true,
     trigger: { kind: "manual" },
+  },
+  {
+    id: "pictureThis",
+    tier: "pro",
+    glyph: ImageGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasAttachment(prev.snapshot) && hasAttachment(next.snapshot),
+    },
   },
 
   // ──────────────────────────────────────────────────────────────

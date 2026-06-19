@@ -44,12 +44,31 @@
 //      file whose last write threw mid-flight (`uncertain`, a lost ack) —
 //      both are our own write settling, not another device.
 
-import type { StorageAdapter, StoredSnapshot } from "./adapter.ts";
+import type {
+  AdapterCapability,
+  StorageAdapter,
+  StoredSnapshot,
+} from "./adapter.ts";
 import { ConflictError } from "./adapter.ts";
+import {
+  type AttachmentStore,
+  bytesToDataUrl,
+  dataUrlToBytes,
+} from "./attachment-store.ts";
 import { isEncryptedEnvelope } from "./crypto.ts";
 import type { FileEntry, FileStore } from "./file-store.ts";
-import { filesToSnapshot, snapshotToFiles } from "./markdown/codec.ts";
+import {
+  filesToSnapshot,
+  noteFileStem,
+  snapshotToFiles,
+} from "./markdown/codec.ts";
 import { parse, serialize } from "./serialize.ts";
+import {
+  type Attachment,
+  mimeForFilename,
+  referencedAttachments,
+} from "../domain/attachment.ts";
+import type { Snapshot } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 
 const log = createLogger("sync");
@@ -136,6 +155,20 @@ export type DirectoryAdapterOptions = {
   saveDebounceMs?: number;
 };
 
+// The on-disk path of one of a note's attachment files, relative to the
+// attachment store's `attachments/` root: `<note-stem>/<filename>`. The stem
+// matches the note's `<stem>.md` so the load path can pair a note with its
+// images, and so a title change relocates both together.
+function attachmentPath(stem: string, filename: string): string {
+  return `${stem}/${filename}`;
+}
+
+// The note-stem segment of an attachment path, used to group a listing by note.
+function stemOfAttachmentPath(path: string): string {
+  const slash = path.indexOf("/");
+  return slash === -1 ? "" : path.slice(0, slash);
+}
+
 // The last-known-good state of one file this adapter wrote: the content hash
 // (to skip redundant rewrites) and the revision the backend reported (to
 // recognise our own writes when a later listing shows them).
@@ -147,6 +180,7 @@ type Tracked = {
 export function createDirectoryAdapter(
   store: FileStore,
   options: DirectoryAdapterOptions,
+  attachments?: AttachmentStore,
 ): StorageAdapter {
   // Per-file state this adapter has itself established, from `load` and from
   // each successful `save`. `tracked` is the baseline a save diffs against —
@@ -168,6 +202,11 @@ export function createDirectoryAdapter(
     if (list.length > MAX_TRACKED_REVS) list.shift();
     producedRevs.set(path, list);
   }
+
+  // Whether this adapter has ever observed an attachment file (on load, or by
+  // writing one). Lets a save skip the attachment listing entirely for the
+  // common image-free document — see `reconcileAttachments`.
+  let attachmentsTouched = false;
 
   // Paths whose most recent write threw mid-flight (a lost ack: the backend
   // may have committed the bytes but the response never arrived). Until the
@@ -268,7 +307,152 @@ export function createDirectoryAdapter(
     log.info(
       `${options.id} load: rev=${shortRev(revision)} files=${mdCount} reused=${reuse.size} fetched=${mdCount - reuse.size}`,
     );
-    return { text, revision };
+    // The markdown carries only the image *references*; pull the image bytes
+    // back from the `attachments/` tree and re-attach them. Skipped for an
+    // encrypted blob (its images ride inside the envelope, not as files).
+    const hydrated =
+      attachments && !isEncryptedEnvelope(text)
+        ? await hydrateAttachments(text, previous)
+        : text;
+    return { text: hydrated, revision };
+  }
+
+  // Read the note images back from the `attachments/` tree into the snapshot's
+  // `data:` URLs. Images whose filename the `previous` snapshot already holds
+  // are reused from memory rather than re-downloaded — attachments are
+  // content-addressed by a unique filename, so a matching name means matching
+  // bytes. Only genuinely new files are fetched.
+  async function hydrateAttachments(
+    text: string,
+    previous: StoredSnapshot | undefined,
+  ): Promise<string> {
+    let entries: { path: string }[];
+    try {
+      entries = await attachments!.list();
+    } catch (err) {
+      log.warn(`${options.id} load: listing attachments failed`, err);
+      return text;
+    }
+    if (entries.length === 0) return text;
+    attachmentsTouched = true;
+
+    const snapshot = parse(text);
+    // Index this note set's attachment files by note stem.
+    const byStem = new Map<string, string[]>();
+    for (const entry of entries) {
+      const stem = stemOfAttachmentPath(entry.path);
+      if (!stem) continue;
+      const list = byStem.get(stem) ?? [];
+      list.push(entry.path);
+      byStem.set(stem, list);
+    }
+
+    // Prior `data:` URLs keyed by filename, so an unchanged image is reused.
+    const cached = previousAttachmentData(previous);
+
+    let fetched = 0;
+    for (const note of snapshot.notes) {
+      const stem = noteFileStem(note);
+      const paths = byStem.get(stem);
+      if (!paths || paths.length === 0) continue;
+      const out: Attachment[] = [];
+      for (const path of paths) {
+        const filename = path.slice(stem.length + 1);
+        const reused = cached.get(filename);
+        if (reused) {
+          out.push(reused);
+          continue;
+        }
+        const bytes = await attachments!.read(path);
+        if (!bytes) continue;
+        const mime = mimeForFilename(filename);
+        out.push({ filename, mime, data: bytesToDataUrl(mime, bytes) });
+        fetched += 1;
+      }
+      if (out.length > 0) note.attachments = out;
+    }
+    if (fetched > 0) {
+      log.info(`${options.id} load: fetched ${fetched} attachment file(s)`);
+    }
+    return serialize(snapshot);
+  }
+
+  // The `data:` URLs a `previous` snapshot already holds, keyed by attachment
+  // filename, so a load can reuse them instead of re-downloading. Tolerates an
+  // encrypted or unparseable previous by returning an empty map.
+  function previousAttachmentData(
+    previous: StoredSnapshot | undefined,
+  ): Map<string, Attachment> {
+    const map = new Map<string, Attachment>();
+    if (!previous || isEncryptedEnvelope(previous.text)) return map;
+    let snapshot: Snapshot;
+    try {
+      snapshot = parse(previous.text);
+    } catch {
+      return map;
+    }
+    for (const note of snapshot.notes) {
+      for (const a of note.attachments ?? []) {
+        if (!map.has(a.filename)) map.set(a.filename, a);
+      }
+    }
+    return map;
+  }
+
+  // The image files a snapshot wants on disk: one per *referenced* attachment,
+  // keyed by its `<stem>/<filename>` path. Unreferenced attachments (the user
+  // deleted the image's line) are dropped so their file is reconciled away.
+  function desiredAttachments(snapshot: Snapshot): Map<string, Attachment> {
+    const desired = new Map<string, Attachment>();
+    for (const note of snapshot.notes) {
+      const stem = noteFileStem(note);
+      for (const a of referencedAttachments(note.body, note.attachments)) {
+        desired.set(attachmentPath(stem, a.filename), a);
+      }
+    }
+    return desired;
+  }
+
+  // Add any new image file and remove orphans (a deleted image, or an old-stem
+  // file left behind by a rename). Best-effort write/remove with errors
+  // propagated so the sync engine retries — markdown writes are idempotent, so
+  // a retried save re-runs cleanly.
+  async function reconcileAttachments(snapshot: Snapshot): Promise<void> {
+    const desired = desiredAttachments(snapshot);
+    // The overwhelmingly common case is a note set with no images at all: skip
+    // the listing round-trip entirely until this adapter has actually seen an
+    // attachment (on load or an earlier save), so an image-free document never
+    // pays for the feature.
+    if (desired.size === 0 && !attachmentsTouched) return;
+    if (desired.size > 0) attachmentsTouched = true;
+    let current: { path: string }[];
+    try {
+      current = await attachments!.list();
+    } catch (err) {
+      log.warn(`${options.id} save: listing attachments failed`, err);
+      current = [];
+    }
+    const currentPaths = new Set(current.map((e) => e.path));
+    if (currentPaths.size > 0) attachmentsTouched = true;
+
+    const toWrite: [string, Attachment][] = [];
+    for (const [path, attachment] of desired) {
+      if (!currentPaths.has(path)) toWrite.push([path, attachment]);
+    }
+    const toRemove = [...currentPaths].filter((p) => !desired.has(p));
+    if (toWrite.length === 0 && toRemove.length === 0) return;
+    log.info(
+      `${options.id} save: attachments write=${toWrite.length} remove=${toRemove.length}`,
+    );
+
+    await Promise.all(
+      toWrite.map(async ([path, attachment]) => {
+        const decoded = dataUrlToBytes(attachment.data);
+        if (!decoded) return; // remote/non-data href — nothing to externalise
+        await attachments!.write(path, decoded.bytes, decoded.mime);
+      }),
+    );
+    await Promise.all(toRemove.map((path) => attachments!.remove(path)));
   }
 
   // Decide which owned files a save must touch and whether any of them
@@ -392,6 +576,14 @@ export function createDirectoryAdapter(
       }),
     );
 
+    // Externalise the note images alongside the markdown (plaintext only — an
+    // encrypted blob keeps its images inside the envelope). Independent of the
+    // markdown revision: an image's reference is what lives in the `.md`, so an
+    // attachment set change already moves the aggregate revision.
+    if (attachments && !isEncryptedEnvelope(text)) {
+      await reconcileAttachments(parse(text));
+    }
+
     // Build the post-save revision from what we know per file: the rev each
     // write returned, or — for files we didn't rewrite — the rev the listing
     // already showed. Only re-list when a write couldn't report its rev (a
@@ -422,11 +614,17 @@ export function createDirectoryAdapter(
     return { text, revision };
   }
 
+  // Advertise image attachments only when an attachment store is wired, so the
+  // editor enables paste / drop on the file backends and leaves it off for the
+  // local (browser) backend that has nowhere to put a file.
+  const capabilities = new Set<AdapterCapability>();
+  if (attachments) capabilities.add("attachments");
+
   return {
     id: options.id,
     label: options.label,
     saveDebounceMs: options.saveDebounceMs,
-    capabilities: new Set(),
+    capabilities,
     load,
     save,
   };

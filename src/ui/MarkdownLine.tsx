@@ -5,6 +5,8 @@ import {
   type InlineNode,
   type LineBlock,
 } from "../domain/markdown.ts";
+import { InlineImage } from "./attachments/InlineImage.tsx";
+import { useAttachmentsContext } from "./attachments/context.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 
 // Presentational rendering for the live-preview editor: turns a parsed
@@ -45,6 +47,15 @@ function renderInline(nodes: InlineNode[]): ReactNode[] {
             {node.text}
           </a>
         );
+      case "image":
+        return (
+          <ImageNode
+            key={i}
+            alt={node.alt}
+            href={node.href}
+            offset={node.offset}
+          />
+        );
       case "strong":
         return (
           <strong key={i} className="font-bold text-fg-bright">
@@ -61,6 +72,29 @@ function renderInline(nodes: InlineNode[]): ReactNode[] {
         );
     }
   });
+}
+
+// An image reference. When it resolves to one of the note's attachments (via
+// the surrounding `AttachmentsProvider`), render the clickable thumbnail;
+// otherwise fall back to the raw markdown text so a stray `![…](…)` stays
+// visible and editable rather than vanishing.
+function ImageNode({
+  alt,
+  href,
+  offset,
+}: {
+  alt: string;
+  href: string;
+  offset: number;
+}) {
+  const ctx = useAttachmentsContext();
+  const attachment = ctx?.resolve(href) ?? null;
+  if (!ctx || !attachment) {
+    return <span data-src={offset}>{`![${alt}](${href})`}</span>;
+  }
+  return (
+    <InlineImage attachment={attachment} srcOffset={offset} onOpen={ctx.open} />
+  );
 }
 
 // Inline content, falling back to a non-breaking space so an empty line keeps

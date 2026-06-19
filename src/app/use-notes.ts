@@ -10,6 +10,7 @@
 import { useCallback, useMemo, useRef } from "react";
 
 import { unlock } from "../achievements/index.ts";
+import { type Attachment, withAttachment } from "../domain/attachment.ts";
 import {
   archivedNotes,
   createNote,
@@ -42,6 +43,8 @@ export type NotesStore = {
   // and returns how many were added.
   importFiles: (files: readonly { name: string; text: string }[]) => number;
   update: (id: string, body: string) => void;
+  /** Attach a pasted / dropped image (its bytes) to a note. */
+  attach: (id: string, attachment: Attachment) => void;
   retitle: (id: string, title: string) => void;
   remove: (id: string) => void;
   /** Move a note to the archive (hidden from the overview, not destroyed). */
@@ -158,6 +161,30 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
     [commit],
   );
 
+  // Attach a pasted / dropped image to a note. The editor inserts the body
+  // reference separately; this only adds the attachment record (its bytes),
+  // which the storage layer externalises to a file on the file backends.
+  // Coalesced with the body edit's undo step so one paste is one undo.
+  const attach = useCallback(
+    (id: string, attachment: Attachment): void => {
+      commit(
+        (prev) =>
+          prev.map((n) =>
+            n.id === id
+              ? {
+                  ...n,
+                  attachments: withAttachment(n.attachments, attachment),
+                  updatedAt: Date.now(),
+                }
+              : n,
+          ),
+        "Attached an image",
+        `edit:${id}`,
+      );
+    },
+    [commit],
+  );
+
   const retitle = useCallback(
     (id: string, title: string): void => {
       commit(
@@ -236,6 +263,7 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
     create,
     importFiles,
     update,
+    attach,
     retitle,
     remove,
     archive,

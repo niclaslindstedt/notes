@@ -173,6 +173,12 @@ const achievements = {
       learnMore:
         "When two devices edit the same notes while apart, the app surfaces the clash and lets you keep yours or take theirs — no edits silently lost.",
     },
+    pictureThis: {
+      name: "Picture this",
+      condition: "Paste or drop an image into a note.",
+      learnMore:
+        "On a local folder or cloud backend you can paste (Ctrl/Cmd+V) or drag an image straight into the editor. It's saved as a real image file under an attachments folder beside your notes and shows inline as a thumbnail you can click to open full-size.",
+    },
 
     // ── Expert ────────────────────────────────────────────────────────
     paranoidMode: {
