@@ -4,8 +4,10 @@ import {
   activeNotes,
   archivedNotes,
   createNote,
+  defaultNoteTitle,
   editNote,
   isBlank,
+  isDefaultTitleScheme,
   noteTitle,
   notePreview,
   retitleNote,
@@ -66,6 +68,36 @@ describe("note domain", () => {
     const notes = [a, b, c];
     expect(activeNotes(notes).map((n) => n.body)).toEqual(["a", "c"]);
     expect(archivedNotes(notes).map((n) => n.body)).toEqual(["b"]);
+  });
+
+  it("validates the default-title scheme", () => {
+    expect(isDefaultTitleScheme("none")).toBe(true);
+    expect(isDefaultTitleScheme("dateTime")).toBe(true);
+    expect(isDefaultTitleScheme("numbered")).toBe(true);
+    expect(isDefaultTitleScheme("nope")).toBe(false);
+    expect(isDefaultTitleScheme(undefined)).toBe(false);
+  });
+
+  it("leaves the title empty under the 'none' scheme", () => {
+    expect(defaultNoteTitle("none", [])).toBe("");
+  });
+
+  it("stamps a local YYYY-MM-DD HH:mm title under the 'dateTime' scheme", () => {
+    const now = new Date(2026, 5, 19, 16, 44).getTime();
+    expect(defaultNoteTitle("dateTime", [], now)).toBe("2026-06-19 16:44");
+  });
+
+  it("picks the next free 'Note N' under the 'numbered' scheme", () => {
+    const note = (title: string) => retitleNote(createNote(0), title, 1);
+    expect(defaultNoteTitle("numbered", [])).toBe("Note");
+    expect(defaultNoteTitle("numbered", [note("Note")])).toBe("Note 2");
+    expect(defaultNoteTitle("numbered", [note("Note"), note("Note 2")])).toBe(
+      "Note 3",
+    );
+    // Gaps and unrelated titles don't throw the count off — it tracks the max.
+    expect(
+      defaultNoteTitle("numbered", [note("Note 5"), note("Groceries")]),
+    ).toBe("Note 6");
   });
 
   it("sorts most-recently-edited first without mutating the input", () => {

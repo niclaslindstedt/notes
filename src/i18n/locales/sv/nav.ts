@@ -9,6 +9,7 @@ const nav: NavCatalog = {
   manageNamespaces: "Hantera namnrymder",
   notes: "Anteckningar",
   newNote: "Ny anteckning",
+  showAll: "Visa alla",
   notesEmpty: "Inga anteckningar än.",
   deleteNote: "Ta bort anteckning",
   confirmDelete: "Bekräfta borttagning",

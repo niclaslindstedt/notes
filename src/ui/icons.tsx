@@ -246,6 +246,49 @@ export function NoteIcon({ className }: IconProps) {
   );
 }
 
+// The app's own mark — the document-with-lines from `public/favicon.svg`,
+// traced on its 64×64 grid (minus the background tile) so it paints with
+// `currentColor`. Shown to the left of the note title in the editor, the way
+// checklist heads each list with its own glyph.
+export function NotesMarkIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 64 64"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="M20 16 H38 L46 24 V48 H20 Z" />
+      <path d="M38 16 V24 H46" />
+      <path d="M26 31 H40 M26 38 H40" />
+    </svg>
+  );
+}
+
+/** A stack of lines — the glyph for the side-menu "Show all" entry. */
+export function ListIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+    </svg>
+  );
+}
+
 /** A pencil — the glyph for renaming a namespace. */
 export function PencilIcon({ className }: IconProps) {
   return (

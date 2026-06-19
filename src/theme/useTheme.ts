@@ -25,6 +25,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 
+import { isDefaultTitleScheme } from "../domain/note.ts";
 import { loadFontFamily } from "./fonts.ts";
 import {
   COLOR_KEYS,
@@ -213,6 +214,9 @@ function coerce(raw: unknown): Appearance {
           : DEFAULT_EDITOR_SETTINGS.renderMarkdown,
       disableSpellcheck: editor.disableSpellcheck === true,
       disableAutocorrect: editor.disableAutocorrect === true,
+      defaultTitle: isDefaultTitleScheme(editor.defaultTitle)
+        ? editor.defaultTitle
+        : DEFAULT_EDITOR_SETTINGS.defaultTitle,
     },
     achievements,
     unseenAchievements: validUnseen(raw.unseenAchievements, achievements),

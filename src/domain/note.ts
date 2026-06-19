@@ -102,6 +102,67 @@ export function sortByUpdated(notes: readonly Note[]): Note[] {
   return [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+// How a freshly created note is named. `none` leaves the title empty (the user
+// names it, or the "Untitled note" fallback shows); `dateTime` stamps the
+// creation date and time; `numbered` picks the next free "Note" / "Note 2" /
+// "Note 3" … name. The choice is a synced editor setting.
+export type DefaultTitleScheme = "none" | "dateTime" | "numbered";
+
+export const DEFAULT_TITLE_SCHEMES: readonly DefaultTitleScheme[] = [
+  "none",
+  "dateTime",
+  "numbered",
+];
+
+export function isDefaultTitleScheme(v: unknown): v is DefaultTitleScheme {
+  return v === "none" || v === "dateTime" || v === "numbered";
+}
+
+// Existing "Note" (= 1) / "Note 12" titles, used to find the next free index.
+const NUMBERED_TITLE_RE = /^Note(?: (\d+))?$/;
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+// `YYYY-MM-DD HH:mm` in local time — sorts naturally, reads cleanly, and makes
+// a stable filename slug on the file / cloud backends.
+function dateTimeTitle(now: number): string {
+  const d = new Date(now);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+// The next free "Note" / "Note 2" / … name given the notes already present.
+function nextNumberedTitle(notes: readonly Note[]): string {
+  let max = 0;
+  for (const n of notes) {
+    const m = NUMBERED_TITLE_RE.exec(n.title.trim());
+    if (!m) continue;
+    const idx = m[1] === undefined ? 1 : Number(m[1]);
+    if (idx > max) max = idx;
+  }
+  const next = max + 1;
+  return next === 1 ? "Note" : `Note ${next}`;
+}
+
+// The title a new note opens with under the chosen scheme. `none` returns an
+// empty string (the note stays blank until typed into). Pure: numbering reads
+// the notes already present, the timestamp reads `now`.
+export function defaultNoteTitle(
+  scheme: DefaultTitleScheme,
+  notes: readonly Note[],
+  now: number = Date.now(),
+): string {
+  switch (scheme) {
+    case "dateTime":
+      return dateTimeTitle(now);
+    case "numbered":
+      return nextNumberedTitle(notes);
+    default:
+      return "";
+  }
+}
+
 // The whole persisted document the storage layer moves in and out of a
 // backend: just the list of notes. Kept version-free here on purpose —
 // versioning is a property of the bytes at rest, so it lives in

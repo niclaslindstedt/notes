@@ -7,7 +7,13 @@ import {
 } from "react";
 
 import { unlock, useAchievementWatcher } from "../achievements/index.ts";
-import { isBlank, noteTitle, notePreview, type Note } from "../domain/note.ts";
+import {
+  defaultNoteTitle,
+  isBlank,
+  noteTitle,
+  notePreview,
+  type Note,
+} from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { isStandaloneMobile } from "../pwa/standalone.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
@@ -21,7 +27,7 @@ import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
 import { useRowSwipe } from "../ui/hooks/useRowSwipe.ts";
 import { useUndoRedoShortcuts } from "../ui/hooks/useUndoRedoShortcuts.ts";
 import { useViewportHeight } from "../ui/hooks/useViewportHeight.ts";
-import { ArchiveIcon, ArrowLeftIcon, TrashIcon } from "../ui/icons.tsx";
+import { ArchiveIcon, NotesMarkIcon, TrashIcon } from "../ui/icons.tsx";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
   applyFaviconHref,
@@ -138,16 +144,37 @@ export function App() {
     ? (allNotes.find((n) => n.id === editingId) ?? null)
     : null;
 
+  // A note the user never committed to — empty body and either no title or the
+  // still-untouched auto-assigned default — is dropped when we leave it, so
+  // abandoned "new note" taps (and their throwaway default titles) don't pile
+  // up. The default-title scheme means a fresh note is no longer simply blank,
+  // so we remember the title it was born with to tell "never touched" apart
+  // from "deliberately named".
+  const pristineNew = useRef<{ id: string; title: string } | null>(null);
+
+  function discardable(note: Note): boolean {
+    if (note.body.trim() !== "") return false;
+    if (note.title.trim() === "") return true;
+    return (
+      pristineNew.current?.id === note.id &&
+      pristineNew.current.title === note.title
+    );
+  }
+
   // Switch what's open in the editor, dropping the note we're leaving if it
   // was never typed into so abandoned "new note" taps don't pile up.
   function switchTo(id: string | null) {
-    if (editing && isBlank(editing) && editing.id !== id) remove(editing.id);
+    if (editing && discardable(editing) && editing.id !== id)
+      remove(editing.id);
     setEditingId(id);
   }
 
   function openNew() {
-    if (editing && isBlank(editing)) remove(editing.id);
-    setEditingId(create());
+    if (editing && discardable(editing)) remove(editing.id);
+    const title = defaultNoteTitle(editor.defaultTitle, allNotes);
+    const id = create(title);
+    pristineNew.current = { id, title };
+    setEditingId(id);
   }
 
   function removeNote(id: string) {
@@ -180,6 +207,7 @@ export function App() {
             notes={notes}
             activeNoteId={editingId}
             onSelectNote={(id) => switchTo(id)}
+            onShowAll={() => switchTo(null)}
             onAddNote={openNew}
             onRemoveNote={removeNote}
             archivedCount={archived.length}
@@ -199,7 +227,6 @@ export function App() {
                 editor={editor}
                 onChange={(body) => update(editing.id, body)}
                 onTitleChange={(title) => retitle(editing.id, title)}
-                onClose={() => switchTo(null)}
                 onDelete={() => removeNote(editing.id)}
                 syncSlot={syncSlot}
               />
@@ -394,7 +421,6 @@ function Editor({
   editor,
   onChange,
   onTitleChange,
-  onClose,
   onDelete,
   syncSlot,
 }: {
@@ -402,7 +428,6 @@ function Editor({
   editor: EditorSettings;
   onChange: (body: string) => void;
   onTitleChange: (title: string) => void;
-  onClose: () => void;
   onDelete: () => void;
   syncSlot: ReactNode;
 }) {
@@ -422,17 +447,21 @@ function Editor({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <button
-          type="button"
-          onClick={onClose}
-          title={t("app.back")}
-          aria-label={t("app.back")}
-          className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-accent/40 bg-transparent text-accent hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
-        >
-          <ArrowLeftIcon className="h-[18px] w-[18px]" />
-        </button>
-        <div className="flex items-center gap-2">
+      {/* The title heads the page, prefixed by the app glyph — the editable
+          document title, the way checklist heads each list with its name and
+          icon. There is no Back button: the side menu's "Show all" returns to
+          the overview. */}
+      <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <NotesMarkIcon className="h-6 w-6 shrink-0 text-accent" />
+        <TitleField
+          value={note.title}
+          onChange={onTitleChange}
+          onEnter={focusBody}
+          focusOnMount={titleFirst}
+          disableSpellcheck={editor.disableSpellcheck}
+          disableAutocorrect={editor.disableAutocorrect}
+        />
+        <div className="flex shrink-0 items-center gap-2">
           <TrophyButton />
           {syncSlot}
           <button
@@ -446,16 +475,6 @@ function Editor({
           </button>
         </div>
       </header>
-
-      <TitleField
-        value={note.title}
-        onChange={onTitleChange}
-        onEnter={focusBody}
-        focusOnMount={titleFirst}
-        disableSpellcheck={editor.disableSpellcheck}
-        disableAutocorrect={editor.disableAutocorrect}
-        maxWidth={maxWidth}
-      />
 
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">
         {editor.renderMarkdown ? (
@@ -484,11 +503,11 @@ function Editor({
   );
 }
 
-// The note's title: its own single-line input above the body, styled to read
-// like the document's top heading (an H1 row) so it looks like part of the
-// note rather than a separate form control. It is *not* part of the body, so
-// backspacing at the start of the body never reaches it. Enter / Arrow-Down
-// hand focus down to the body.
+// The note's title: a single-line input that heads the editor page, sitting
+// inline in the header beside the app glyph so it reads like the document's
+// own title (the way checklist heads a list with its name). It is *not* part
+// of the body, so backspacing at the start of the body never reaches it.
+// Enter / Arrow-Down hand focus down to the body.
 function TitleField({
   value,
   onChange,
@@ -496,7 +515,6 @@ function TitleField({
   focusOnMount,
   disableSpellcheck,
   disableAutocorrect,
-  maxWidth,
 }: {
   value: string;
   onChange: (title: string) => void;
@@ -504,7 +522,6 @@ function TitleField({
   focusOnMount: boolean;
   disableSpellcheck: boolean;
   disableAutocorrect: boolean;
-  maxWidth: string;
 }) {
   const t = useT();
   const ref = useRef<HTMLInputElement>(null);
@@ -545,29 +562,24 @@ function TitleField({
   useEffect(() => flush, [flush]);
 
   return (
-    <div
-      className="w-full px-4 pt-4"
-      style={maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" }}
-    >
-      <input
-        ref={ref}
-        type="text"
-        value={draft}
-        spellCheck={!disableSpellcheck}
-        autoCorrect={disableAutocorrect ? "off" : "on"}
-        autoCapitalize={disableAutocorrect ? "off" : "sentences"}
-        placeholder={t("app.titlePlaceholder")}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={flush}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === "ArrowDown") {
-            e.preventDefault();
-            onEnter();
-          }
-        }}
-        className="w-full appearance-none border-0 bg-transparent p-0 font-[inherit] text-2xl font-bold text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60"
-      />
-    </div>
+    <input
+      ref={ref}
+      type="text"
+      value={draft}
+      spellCheck={!disableSpellcheck}
+      autoCorrect={disableAutocorrect ? "off" : "on"}
+      autoCapitalize={disableAutocorrect ? "off" : "sentences"}
+      placeholder={t("app.titlePlaceholder")}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={flush}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === "ArrowDown") {
+          e.preventDefault();
+          onEnter();
+        }
+      }}
+      className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 font-[inherit] text-lg font-bold text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60"
+    />
   );
 }
 
