@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activeNotes,
+  archivedNotes,
   createNote,
   editNote,
   isBlank,
   noteTitle,
   notePreview,
   retitleNote,
+  setArchived,
   sortByUpdated,
 } from "../../src/domain/note.ts";
 
@@ -43,6 +46,26 @@ describe("note domain", () => {
     expect(renamed.createdAt).toBe(100);
     expect(renamed.updatedAt).toBe(300);
     expect(isBlank(renamed)).toBe(false);
+  });
+
+  it("archives and restores without bumping updatedAt or mutating the input", () => {
+    const note = editNote(createNote(100), "hi", 200);
+    const archived = setArchived(note, true);
+    expect(archived.archived).toBe(true);
+    expect(archived.updatedAt).toBe(200);
+    expect(note.archived).toBeUndefined();
+    const restored = setArchived(archived, false);
+    expect(restored.archived).toBe(false);
+    expect(restored.updatedAt).toBe(200);
+  });
+
+  it("partitions notes into active and archived", () => {
+    const a = editNote(createNote(0), "a", 10);
+    const b = setArchived(editNote(createNote(0), "b", 20), true);
+    const c = editNote(createNote(0), "c", 30);
+    const notes = [a, b, c];
+    expect(activeNotes(notes).map((n) => n.body)).toEqual(["a", "c"]);
+    expect(archivedNotes(notes).map((n) => n.body)).toEqual(["b"]);
   });
 
   it("sorts most-recently-edited first without mutating the input", () => {

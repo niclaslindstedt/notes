@@ -79,9 +79,14 @@ export function HomePage() {
               title and a Markdown body that formats as you type.
             </li>
             <li>
-              Undo and redo your changes — bring back a deleted note or step
-              back through your edits, with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+
-              <kbd>Z</kbd> or the side menu.
+              Swipe a note right in the overview to <em>archive</em> it — it
+              leaves the list without being deleted, and you can restore it from
+              the Archive view. Swipe left to uncover a quick Delete.
+            </li>
+            <li>
+              Undo and redo your changes — bring back a deleted or archived note
+              or step back through your edits, with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>
+              +<kbd>Z</kbd> or the side menu.
             </li>
             <li>
               Group notes into separate <em>namespaces</em> — independent

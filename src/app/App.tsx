@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { unlock, useAchievementWatcher } from "../achievements/index.ts";
 import { isBlank, noteTitle, notePreview, type Note } from "../domain/note.ts";
@@ -12,9 +18,10 @@ import { AppTitle } from "../ui/AppTitle.tsx";
 import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
+import { useRowSwipe } from "../ui/hooks/useRowSwipe.ts";
 import { useUndoRedoShortcuts } from "../ui/hooks/useUndoRedoShortcuts.ts";
 import { useViewportHeight } from "../ui/hooks/useViewportHeight.ts";
-import { ArrowLeftIcon, TrashIcon } from "../ui/icons.tsx";
+import { ArchiveIcon, ArrowLeftIcon, TrashIcon } from "../ui/icons.tsx";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
   applyFaviconHref,
@@ -27,6 +34,7 @@ import { UnlockGate } from "../ui/UnlockGate.tsx";
 import { UpdateToast } from "../ui/UpdateToast.tsx";
 import { AchievementsModalHost } from "./modals/AchievementsModalHost.tsx";
 import { AchievementsUnlockModalHost } from "./modals/AchievementsUnlockModalHost.tsx";
+import { ArchiveModalHost } from "./modals/ArchiveModalHost.tsx";
 import { ChangelogModalHost } from "./modals/ChangelogModalHost.tsx";
 import { NamespacesModalHost } from "./modals/NamespacesModalHost.tsx";
 import { SettingsModalHost } from "./modals/SettingsModalHost.tsx";
@@ -58,10 +66,13 @@ export function App() {
   const {
     notes,
     allNotes,
+    archived,
     create,
     update,
     retitle,
     remove,
+    archive,
+    restore,
     undo,
     redo,
     canUndo,
@@ -144,6 +155,14 @@ export function App() {
     if (id === editingId) setEditingId(null);
   }
 
+  // Archiving a note from the overview leaves the editor too if that note
+  // happened to be the one open, so a stale editor never lingers on a note
+  // that's no longer in the list.
+  function archiveNote(id: string) {
+    archive(id);
+    if (id === editingId) setEditingId(null);
+  }
+
   // Encryption on, no passphrase held this session — block the app behind the
   // unlock gate so the encrypted notes never render. The gate still wears the
   // user's theme (appearance settings are plaintext).
@@ -163,6 +182,7 @@ export function App() {
             onSelectNote={(id) => switchTo(id)}
             onAddNote={openNew}
             onRemoveNote={removeNote}
+            archivedCount={archived.length}
             onUndo={undo}
             onRedo={redo}
             canUndo={canUndo}
@@ -188,6 +208,8 @@ export function App() {
                 notes={notes}
                 onOpen={(id) => switchTo(id)}
                 onNew={openNew}
+                onArchive={archiveNote}
+                onDelete={removeNote}
                 syncSlot={syncSlot}
               />
             )}
@@ -196,6 +218,11 @@ export function App() {
 
         <SettingsModalHost storage={storage} />
         <NamespacesModalHost storage={storage} />
+        <ArchiveModalHost
+          notes={archived}
+          onRestore={restore}
+          onRemove={removeNote}
+        />
         <ChangelogModalHost />
         <AchievementsModalHost />
         <AchievementsUnlockModalHost />
@@ -210,11 +237,15 @@ function NoteList({
   notes,
   onOpen,
   onNew,
+  onArchive,
+  onDelete,
   syncSlot,
 }: {
   notes: Note[];
   onOpen: (id: string) => void;
   onNew: () => void;
+  onArchive: (id: string) => void;
+  onDelete: (id: string) => void;
   syncSlot: ReactNode;
 }) {
   const t = useT();
@@ -252,7 +283,12 @@ function NoteList({
           <ul className="flex flex-col gap-2">
             {notes.map((note) => (
               <li key={note.id}>
-                <NoteCard note={note} onOpen={() => onOpen(note.id)} />
+                <SwipeableNoteCard
+                  note={note}
+                  onOpen={() => onOpen(note.id)}
+                  onArchive={() => onArchive(note.id)}
+                  onDelete={() => onDelete(note.id)}
+                />
               </li>
             ))}
           </ul>
@@ -284,6 +320,72 @@ function NoteCard({ note, onOpen }: { note: Note; onOpen: () => void }) {
         <p className="mt-0.5 truncate text-sm text-muted">{preview}</p>
       )}
     </button>
+  );
+}
+
+// A note card with two swipe outcomes behind a sliding foreground (see
+// `useRowSwipe`): swiping right uncovers an Archive backdrop and files the
+// note away once past the threshold; swiping left latches a Delete button
+// open. Both are recorded on the undo timeline, so a stray swipe is one Undo
+// away — which is why delete here needs no confirmation. A plain tap still
+// opens the note; the hook swallows the click that trails a real drag.
+function SwipeableNoteCard({
+  note,
+  onOpen,
+  onArchive,
+  onDelete,
+}: {
+  note: Note;
+  onOpen: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  const t = useT();
+  const archive = useCallback(() => onArchive(), [onArchive]);
+  const swipe = useRowSwipe(archive);
+
+  return (
+    <div className="relative overflow-hidden rounded-[var(--radius)]">
+      {/* Archive — uncovered by swiping the card right. Hidden unless the
+          foreground is sliding right so the archive slide-off never bares it. */}
+      <div
+        aria-hidden={swipe.offset <= 0}
+        className={`absolute inset-0 flex items-center justify-start gap-2 rounded-[var(--radius)] bg-accent/15 pl-4 text-xs font-semibold tracking-wide text-accent uppercase ${
+          swipe.offset > 0 ? "" : "invisible"
+        }`}
+      >
+        <ArchiveIcon className="h-4 w-4" />
+        {t("app.archive")}
+      </div>
+
+      {/* Delete — uncovered by swiping the card left. Kept hidden while the
+          card slides right to archive so it's never exposed on slide-off. */}
+      <div
+        aria-hidden={swipe.offset >= 0}
+        className={`absolute inset-0 flex items-center justify-end ${
+          swipe.offset < 0 ? "" : "invisible"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={onDelete}
+          className="h-full w-24 rounded-r-[var(--radius)] bg-danger text-xs font-semibold tracking-wide text-white uppercase"
+        >
+          {t("app.delete")}
+        </button>
+      </div>
+
+      {/* Sliding foreground — the card itself. */}
+      <div
+        {...swipe.handlers}
+        style={{ transform: `translateX(${swipe.offset}px)` }}
+        className={`relative [touch-action:pan-y] ${
+          swipe.animating ? "transition-transform duration-200" : ""
+        }`}
+      >
+        <NoteCard note={note} onOpen={onOpen} />
+      </div>
+    </div>
   );
 }
 

@@ -11,11 +11,13 @@ import { useCallback, useMemo, useRef } from "react";
 
 import { unlock } from "../achievements/index.ts";
 import {
+  archivedNotes,
   createNote,
   editNote,
   isBlank,
   noteTitle,
   retitleNote,
+  setArchived,
   sortByUpdated,
   type Note,
   type Snapshot,
@@ -31,10 +33,16 @@ export type NotesStore = {
   // The full set including blank notes, so the editor can resolve a
   // freshly-created note that isn't in `notes` yet.
   allNotes: Note[];
+  // Archived notes, most-recently-edited first — what the archive view lists.
+  archived: Note[];
   create: () => string;
   update: (id: string, body: string) => void;
   retitle: (id: string, title: string) => void;
   remove: (id: string) => void;
+  /** Move a note to the archive (hidden from the overview, not destroyed). */
+  archive: (id: string) => void;
+  /** Bring an archived note back into the overview. */
+  restore: (id: string) => void;
   /** Revert the most recent recorded edit (create / delete / edit session). */
   undo: () => void;
   /** Re-apply the most recently undone edit. */
@@ -146,6 +154,30 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
     [commit],
   );
 
+  const archive = useCallback(
+    (id: string): void => {
+      const target = docRef.current.notes.find((n) => n.id === id);
+      const title = target ? noteTitle(target) : "note";
+      commit(
+        (prev) => prev.map((n) => (n.id === id ? setArchived(n, true) : n)),
+        `Archived note “${title}”`,
+      );
+    },
+    [commit],
+  );
+
+  const restore = useCallback(
+    (id: string): void => {
+      const target = docRef.current.notes.find((n) => n.id === id);
+      const title = target ? noteTitle(target) : "note";
+      commit(
+        (prev) => prev.map((n) => (n.id === id ? setArchived(n, false) : n)),
+        `Restored note “${title}”`,
+      );
+    },
+    [commit],
+  );
+
   const undo = useCallback(() => {
     undoTimeline();
     unlock("secondThoughts");
@@ -156,20 +188,30 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
   }, [redoTimeline]);
 
   // List view always shows most-recently-edited first, with blank notes
-  // (a freshly created, never-typed note) filtered out so they don't
-  // accumulate — they vanish on their own if abandoned.
+  // (a freshly created, never-typed note) and archived notes filtered out —
+  // blanks vanish on their own if abandoned; archived notes live in the
+  // archive view instead.
   const visible = useMemo(
-    () => sortByUpdated(notes.filter((n) => !isBlank(n))),
+    () => sortByUpdated(notes.filter((n) => !isBlank(n) && !n.archived)),
+    [notes],
+  );
+
+  // Archived notes for the archive view, newest-edited first.
+  const archivedList = useMemo(
+    () => sortByUpdated(archivedNotes(notes)),
     [notes],
   );
 
   return {
     notes: visible,
     allNotes: notes,
+    archived: archivedList,
     create,
     update,
     retitle,
     remove,
+    archive,
+    restore,
     undo,
     redo,
     canUndo,

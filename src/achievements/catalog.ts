@@ -8,6 +8,7 @@
 import type { Snapshot } from "../domain/note.ts";
 import {
   AccessibilityGlyph,
+  ArchiveGlyph,
   BoxesGlyph,
   CloudGlyph,
   CodeGlyph,
@@ -48,6 +49,10 @@ const hasMultiLineNote = (snap: Snapshot) =>
 // uses the dedicated title row rather than letting a note stay untitled.
 const hasTitledNote = (snap: Snapshot) =>
   snap.notes.some((n) => n.title.trim() !== "");
+
+// A note that has been swiped into the archive — the first time someone tidies
+// a note away without deleting it.
+const hasArchivedNote = (snap: Snapshot) => snap.notes.some((n) => n.archived);
 
 export const ACHIEVEMENTS: readonly Achievement[] = [
   // ──────────────────────────────────────────────────────────────
@@ -195,6 +200,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
           next.appearance.editor.disableSpellcheck) ||
         (!prev.appearance.editor.disableAutocorrect &&
           next.appearance.editor.disableAutocorrect),
+    },
+  },
+  {
+    id: "archivist",
+    tier: "intermediate",
+    glyph: ArchiveGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasArchivedNote(prev.snapshot) && hasArchivedNote(next.snapshot),
     },
   },
   {

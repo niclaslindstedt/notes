@@ -20,6 +20,14 @@ const nav = {
   edit: "Edit",
   undo: "Undo",
   redo: "Redo",
+  // The archive entry and the dialog it opens.
+  archive: "Archive",
+  archiveHeading: "Archive",
+  archiveBlurb:
+    "Notes you've swiped away. Restore one to the overview, or remove it for good.",
+  archiveEmpty:
+    "Nothing archived. Swipe a note right in the overview to file it here.",
+  restore: "Restore",
 } as const;
 
 export type NavCatalog = Widen<typeof nav>;

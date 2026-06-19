@@ -111,6 +111,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Skriver du kod, strukturerade anteckningar eller ett annat språk? Inställningar → Redigerare kan stoppa enheten från att kontrollera stavning och autokorrigera medan du skriver.",
     },
+    archivist: {
+      name: "Arkivarie",
+      condition: "Arkivera en anteckning.",
+      learnMore:
+        "Svep en anteckning åt höger i översikten för att arkivera den — den lämnar listan utan att tas bort. Hitta arkiverade anteckningar under Arkiv i sidomenyn, där du kan återställa eller ta bort dem permanent.",
+    },
     compartments: {
       name: "Fack",
       condition: "Skapa en andra namnrymd.",

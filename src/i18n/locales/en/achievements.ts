@@ -117,6 +117,12 @@ const achievements = {
       learnMore:
         "Writing code, structured notes, or another language? Settings → Editor can stop your device checking spelling and auto-correcting as you type.",
     },
+    archivist: {
+      name: "Archivist",
+      condition: "Archive a note.",
+      learnMore:
+        "Swipe a note right in the overview to archive it — it leaves the list without being deleted. Find archived notes under Archive in the side menu, where you can restore or remove them for good.",
+    },
     compartments: {
       name: "Compartments",
       condition: "Create a second namespace.",

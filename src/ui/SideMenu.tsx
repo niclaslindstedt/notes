@@ -9,6 +9,7 @@ import { useNav } from "./nav-context.ts";
 import { useDraggableMenuButton } from "./hooks/useDraggableMenuButton.ts";
 import { useSwipeReveal } from "./hooks/useSwipeReveal.ts";
 import {
+  ArchiveIcon,
   CheckIcon,
   CodeIcon,
   CogIcon,
@@ -62,6 +63,8 @@ type Props = {
   onAddNote: () => void;
   /** Delete a note permanently. */
   onRemoveNote: (id: string) => void;
+  /** How many notes are archived — shown as a count on the Archive entry. */
+  archivedCount: number;
   /** Revert the most recent recorded edit. */
   onUndo: () => void;
   /** Re-apply the most recently undone edit. */
@@ -84,6 +87,7 @@ export function SideMenu({
   onSelectNote,
   onAddNote,
   onRemoveNote,
+  archivedCount,
   onUndo,
   onRedo,
   canUndo,
@@ -269,6 +273,12 @@ export function SideMenu({
           label={t("menu.privacy")}
           href={privacyUrl}
           onClick={close}
+        />
+        <MenuButton
+          icon={<ArchiveIcon className="h-5 w-5" />}
+          label={t("nav.archive")}
+          count={archivedCount}
+          onClick={() => pick(() => dispatch({ kind: "archive" }))}
         />
         <MenuButton
           icon={<SparklesIcon className="h-5 w-5" />}
@@ -510,10 +520,14 @@ function SwipeToRemove({
 function MenuButton({
   icon,
   label,
+  count,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
+  // Optional trailing tally (e.g. the number of archived notes). Hidden when
+  // zero so an empty archive carries no badge.
+  count?: number;
   onClick: () => void;
 }) {
   return (
@@ -525,6 +539,11 @@ function MenuButton({
     >
       <span className="text-muted">{icon}</span>
       <span className="flex-1">{label}</span>
+      {count !== undefined && count > 0 && (
+        <span className="shrink-0 text-xs text-muted tabular-nums">
+          {count}
+        </span>
+      )}
     </button>
   );
 }
