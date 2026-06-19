@@ -1,8 +1,9 @@
 // The achievement catalog — the single source of truth for which features
-// are unlockable, what tier each sits in, which glyph it wears, how it reads,
-// and how its unlock fires. Display copy (name / condition / learnMore) is
-// inlined here rather than routed through an i18n layer, which notes doesn't
-// have yet.
+// are unlockable, what tier each sits in, which glyph it wears, and how its
+// unlock fires. Display copy (name / condition / optional learnMore) lives in
+// the `achievements` i18n namespace (`src/i18n/locales/{en,sv}/achievements.ts`)
+// under `achievements.catalog.<id>.*`; the renderer composes the lookup by id.
+// `learnMore: true` flags entries that carry an expanded body.
 
 import type { Snapshot } from "../domain/note.ts";
 import {
@@ -12,6 +13,7 @@ import {
   CodeGlyph,
   EyeOffGlyph,
   FolderGlyph,
+  GlobeGlyph,
   LayersGlyph,
   LockGlyph,
   MedalGlyph,
@@ -50,10 +52,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "firstNote",
     tier: "beginner",
     glyph: PlusGlyph,
-    name: "First note",
-    condition: "Write your first note.",
-    learnMore:
-      "Tap the + button (or press Enter on the empty list) to start a note. Everything you type is saved automatically as you go.",
+    learnMore: true,
     trigger: {
       kind: "derived",
       slices: (s) => [s.snapshot],
@@ -65,10 +64,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "wordsmith",
     tier: "beginner",
     glyph: TypeGlyph,
-    name: "Wordsmith",
-    condition: "Write a note that runs to more than one line.",
-    learnMore:
-      "The first non-empty line becomes the note's title in the list; everything below it is the body. Notes render Markdown as you write.",
+    learnMore: true,
     trigger: {
       kind: "derived",
       slices: (s) => [s.snapshot],
@@ -80,10 +76,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "interiorDesigner",
     tier: "beginner",
     glyph: PaletteGlyph,
-    name: "Interior designer",
-    condition: "Switch to a different theme.",
-    learnMore:
-      "Settings → Appearance offers a range of light and dark editor themes. Your choice is saved on this device (and travels with cloud sync).",
+    learnMore: true,
     trigger: {
       kind: "derived",
       slices: (s) => [s.appearance.theme],
@@ -95,10 +88,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "biggerPicture",
     tier: "beginner",
     glyph: ScaleTextGlyph,
-    name: "The bigger picture",
-    condition: "Change the interface text size.",
-    learnMore:
-      "Settings → Appearance scales the whole UI up or down, so the app reads comfortably on any screen.",
+    learnMore: true,
     trigger: {
       kind: "derived",
       slices: (s) => [s.appearance.fontScale],
@@ -110,20 +100,14 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "secondThoughts",
     tier: "beginner",
     glyph: UndoGlyph,
-    name: "Second thoughts",
-    condition: "Undo an edit.",
-    learnMore:
-      "Use the side menu's Undo (or Ctrl/Cmd+Z) to step back through your edits — creating, deleting, and writing are all reversible.",
+    learnMore: true,
     trigger: { kind: "manual" },
   },
   {
     id: "homeScreen",
     tier: "beginner",
     glyph: SmartphoneGlyph,
-    name: "Home screen",
-    condition: "Install the app to your device.",
-    learnMore:
-      "notes is a Progressive Web App: add it to your home screen or launcher and it opens full-screen and works offline, just like a native app.",
+    learnMore: true,
     trigger: { kind: "manual" },
   },
 
@@ -134,10 +118,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "collector",
     tier: "intermediate",
     glyph: LayersGlyph,
-    name: "Collector",
-    condition: "Keep five notes at once.",
-    learnMore:
-      "There's no limit on how many notes you keep. The list sorts the most recently edited to the top so what you're working on stays in reach.",
+    learnMore: true,
     trigger: {
       kind: "derived",
       slices: (s) => [s.snapshot.notes],
@@ -149,8 +130,6 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "fontFanatic",
     tier: "intermediate",
     glyph: TypeGlyph,
-    name: "Font fanatic",
-    condition: "Pick a different font family.",
     trigger: {
       kind: "derived",
       slices: (s) => [s.appearance.fontFamily],
@@ -162,10 +141,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "marginalia",
     tier: "intermediate",
     glyph: MoveGlyph,
-    name: "Marginalia",
-    condition: "Adjust the editor's writing-column margins.",
-    learnMore:
-      "Settings → Editor narrows the writing column for a more focused, page-like feel — or lets it run the full width of the screen.",
+    learnMore: true,
     trigger: {
       kind: "derived",
       slices: (s) => [s.appearance.editor.margin],
@@ -177,10 +153,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "plainText",
     tier: "intermediate",
     glyph: CodeGlyph,
-    name: "Plain and simple",
-    condition: "Turn live Markdown rendering off.",
-    learnMore:
-      "Prefer raw text? Settings → Editor switches the live preview off so notes stay plain, unformatted source.",
+    learnMore: true,
     trigger: {
       kind: "derived",
       slices: (s) => [s.appearance.editor.renderMarkdown],
@@ -193,10 +166,14 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "compartments",
     tier: "intermediate",
     glyph: BoxesGlyph,
-    name: "Compartments",
-    condition: "Create a second namespace.",
-    learnMore:
-      "Namespaces are separate, self-contained sets of notes — work and home, say. Switch between them from the side menu; each can sync to its own folder.",
+    learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "polyglot",
+    tier: "intermediate",
+    glyph: GlobeGlyph,
+    learnMore: true,
     trigger: { kind: "manual" },
   },
 
@@ -207,40 +184,28 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "localVault",
     tier: "pro",
     glyph: FolderGlyph,
-    name: "Local vault",
-    condition: "Connect a folder on your device.",
-    learnMore:
-      "Settings → Storage can keep each note as a plain Markdown file in a folder you pick, so your notes live as ordinary files you fully own.",
+    learnMore: true,
     trigger: { kind: "manual" },
   },
   {
     id: "cloudWalker",
     tier: "pro",
     glyph: CloudGlyph,
-    name: "Cloud walker",
-    condition: "Connect a cloud backend.",
-    learnMore:
-      "Connect Dropbox or Google Drive and your notes sync to your own cloud storage, so they follow you to every device you sign in on.",
+    learnMore: true,
     trigger: { kind: "manual" },
   },
   {
     id: "freshPull",
     tier: "pro",
     glyph: RefreshGlyph,
-    name: "Fresh pull",
-    condition: "Reload your notes from the backend.",
-    learnMore:
-      "The sync details dialog can re-read the document from the connected backend, pulling in edits another device made.",
+    learnMore: true,
     trigger: { kind: "manual" },
   },
   {
     id: "peacemaker",
     tier: "pro",
     glyph: MergeGlyph,
-    name: "Peacemaker",
-    condition: "Resolve a sync conflict.",
-    learnMore:
-      "When two devices edit the same notes while apart, the app surfaces the clash and lets you keep yours or take theirs — no edits silently lost.",
+    learnMore: true,
     trigger: { kind: "manual" },
   },
 
@@ -251,20 +216,14 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "paranoidMode",
     tier: "expert",
     glyph: LockGlyph,
-    name: "Paranoid mode",
-    condition: "Turn on at-rest encryption.",
-    learnMore:
-      "Settings → Storage encrypts your notes with a passphrase only you hold. They're sealed on disk and in the cloud until you unlock them.",
+    learnMore: true,
     trigger: { kind: "manual" },
   },
   {
     id: "themeWizard",
     tier: "expert",
     glyph: WandGlyph,
-    name: "Theme wizard",
-    condition: "Build your own custom theme.",
-    learnMore:
-      "The Custom theme in Settings → Appearance opens every colour, the corner radius, and the row density up to you for a look that's entirely your own.",
+    learnMore: true,
     trigger: {
       kind: "derived",
       slices: (s) => [s.appearance.theme],
@@ -277,8 +236,6 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "stillness",
     tier: "expert",
     glyph: AccessibilityGlyph,
-    name: "Stillness",
-    condition: "Turn on reduced motion.",
     trigger: {
       kind: "derived",
       slices: (s) => [s.appearance.customTheme.reduceMotion],
@@ -291,20 +248,14 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "minimalist",
     tier: "expert",
     glyph: EyeOffGlyph,
-    name: "Minimalist",
-    condition: "Hide the floating menu button.",
-    learnMore:
-      "On the installed mobile app you can hide the floating menu button entirely and open the side menu with an inward swipe from the screen edge.",
+    learnMore: true,
     trigger: { kind: "manual" },
   },
   {
     id: "completionist",
     tier: "expert",
     glyph: MedalGlyph,
-    name: "Completionist",
-    condition: "Unlock every other achievement.",
-    learnMore:
-      "The last trophy on the board — earned the moment you've collected all the others.",
+    learnMore: true,
     trigger: {
       kind: "derived",
       slices: (s) => [s.appearance.achievements],

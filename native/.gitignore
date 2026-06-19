@@ -1,3 +1,7 @@
+# Dependency lockfile — generated on install; this Expo project pins exact
+# versions in package.json and has never tracked a lockfile.
+package-lock.json
+
 # Expo / native build artifacts
 .expo/
 dist/

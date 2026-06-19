@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { unlock, useAchievementWatcher } from "../achievements/index.ts";
 import { isBlank, noteTitle, notePreview, type Note } from "../domain/note.ts";
+import { useT } from "../i18n/index.ts";
 import { isStandaloneMobile } from "../pwa/standalone.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
@@ -214,6 +215,7 @@ function NoteList({
   onNew: () => void;
   syncSlot: ReactNode;
 }) {
+  const t = useT();
   // With no notes yet, pressing Enter (a physical keyboard, so desktop) starts
   // the first note — the empty state's primary action without a tap.
   const empty = notes.length === 0;
@@ -243,11 +245,7 @@ function NoteList({
 
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
         {notes.length === 0 ? (
-          <p className="mt-16 text-center text-muted">
-            No notes yet. Tap <span className="text-accent">+</span> (or press{" "}
-            <kbd className="rounded border border-line px-1 text-xs">Enter</kbd>
-            ) to write your first one.
-          </p>
+          <p className="mt-16 text-center text-muted">{t("app.empty")}</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {notes.map((note) => (
@@ -262,7 +260,7 @@ function NoteList({
       <button
         type="button"
         onClick={onNew}
-        aria-label="New note"
+        aria-label={t("app.newNote")}
         className="fixed inset-x-0 bottom-0 z-20 mx-auto mb-[max(1rem,env(safe-area-inset-bottom))] flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-accent text-3xl font-light text-page-bg shadow-lg active:scale-95"
       >
         +
@@ -302,6 +300,7 @@ function Editor({
   onDelete: () => void;
   syncSlot: ReactNode;
 }) {
+  const t = useT();
   const maxWidth = editorMarginMaxWidth(editor.margin);
 
   return (
@@ -310,8 +309,8 @@ function Editor({
         <button
           type="button"
           onClick={onClose}
-          title="Back"
-          aria-label="Back"
+          title={t("app.back")}
+          aria-label={t("app.back")}
           className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-accent/40 bg-transparent text-accent hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
         >
           <ArrowLeftIcon className="h-[18px] w-[18px]" />
@@ -322,8 +321,8 @@ function Editor({
           <button
             type="button"
             onClick={onDelete}
-            title="Delete note"
-            aria-label="Delete note"
+            title={t("app.deleteNote")}
+            aria-label={t("app.deleteNote")}
             className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-danger/50 bg-transparent text-danger hover:bg-danger/10 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
           >
             <TrashIcon className="h-[18px] w-[18px]" />
@@ -363,6 +362,7 @@ function PlainEditor({
   wordWrap: boolean;
   maxWidth: string;
 }) {
+  const t = useT();
   const [value, setValue] = useState(body);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -385,7 +385,7 @@ function PlainEditor({
         setValue(e.target.value);
         onChange(e.target.value);
       }}
-      placeholder="Start writing…"
+      placeholder={t("app.startWriting")}
       style={maxWidth === "none" ? undefined : { maxWidth }}
       className={`mx-auto w-full flex-1 resize-none bg-page-bg px-4 py-4 text-fg outline-none placeholder:text-muted/60 ${
         wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"

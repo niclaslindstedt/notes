@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 
+import { useT, type MessageKey } from "../../i18n/index.ts";
 import type { UseStorageBackend } from "../../storage/useStorageBackend.ts";
 import { updateAppearance, useAppearance } from "../../theme/useTheme.ts";
 import {
@@ -28,13 +29,13 @@ type TabId = "general" | "appearance" | "editor" | "storage";
 
 type IconComponent = ComponentType<{ className?: string }>;
 
-type TabDef = { id: TabId; label: string; Icon: IconComponent };
+type TabDef = { id: TabId; labelKey: MessageKey; Icon: IconComponent };
 
 const TABS: readonly TabDef[] = [
-  { id: "general", label: "General", Icon: SlidersIcon },
-  { id: "appearance", label: "Appearance", Icon: PaletteIcon },
-  { id: "editor", label: "Editor", Icon: PencilIcon },
-  { id: "storage", label: "Storage", Icon: DatabaseIcon },
+  { id: "general", labelKey: "settings.tab.general", Icon: SlidersIcon },
+  { id: "appearance", labelKey: "settings.tab.appearance", Icon: PaletteIcon },
+  { id: "editor", labelKey: "settings.tab.editor", Icon: PencilIcon },
+  { id: "storage", labelKey: "settings.tab.storage", Icon: DatabaseIcon },
 ];
 
 type Props = {
@@ -108,10 +109,11 @@ function SettingsHeader({
   onSelectTab: (id: TabId) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const [menuOpen, setMenuOpen] = useState(false);
   const activeDef = TABS.find((tab) => tab.id === activeTab);
   const ActiveIcon = activeDef?.Icon ?? CogIcon;
-  const activeLabel = activeDef?.label ?? "Settings";
+  const activeLabel = activeDef ? t(activeDef.labelKey) : t("settings.title");
 
   return (
     <header className="relative flex shrink-0 items-center justify-between gap-2 border-b border-line bg-surface-3 px-4 py-3">
@@ -122,7 +124,7 @@ function SettingsHeader({
             onClick={() => setMenuOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            aria-label="Choose section"
+            aria-label={t("settings.chooseSection")}
             className={`-ml-1 inline-flex cursor-pointer items-center gap-2 rounded border px-2 py-1 text-sm font-bold tracking-wide text-fg-bright ${
               menuOpen
                 ? "border-accent bg-accent/15"
@@ -168,7 +170,7 @@ function SettingsHeader({
                       }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
-                      <span>{tab.label}</span>
+                      <span>{t(tab.labelKey)}</span>
                     </button>
                   );
                 })}
@@ -184,14 +186,14 @@ function SettingsHeader({
             <span className="inline-flex shrink-0 text-accent">
               <CogIcon className="h-3.5 w-3.5" />
             </span>
-            <span className="min-w-0">Settings</span>
+            <span className="min-w-0">{t("settings.title")}</span>
           </span>
         </h2>
       </div>
       <button
         type="button"
         onClick={onClose}
-        aria-label="Close settings"
+        aria-label={t("settings.close")}
         className="-mr-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg"
       >
         <CloseIcon className="h-5 w-5" />
@@ -210,6 +212,7 @@ function TabSidebar({
   activeTab: TabId;
   onSelect: (id: TabId) => void;
 }) {
+  const t = useT();
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   function handleKeyDown(
@@ -240,7 +243,7 @@ function TabSidebar({
     <div
       role="tablist"
       aria-orientation="vertical"
-      aria-label="Settings sections"
+      aria-label={t("settings.sections")}
       className="hidden w-40 shrink-0 flex-col gap-0.5 overflow-y-auto overscroll-contain border-r border-line bg-surface-3 p-2 sm:flex"
     >
       {TABS.map((tab, idx) => {
@@ -267,7 +270,7 @@ function TabSidebar({
             }`}
           >
             <Icon className="h-3.5 w-3.5" />
-            <span>{tab.label}</span>
+            <span>{t(tab.labelKey)}</span>
           </button>
         );
       })}

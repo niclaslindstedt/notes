@@ -19,9 +19,17 @@ import {
   View,
 } from "react-native";
 
+import { useT, type Lang } from "../../../src/i18n/index.ts";
 import type { BackendOption, NativeBackendId } from "../storage/backends.ts";
-import { glyphs, strings } from "../strings.ts";
+import { glyphs } from "../strings.ts";
 import { radius, spacing, useTokens } from "../theme.ts";
+
+// Language names are shown as endonyms (each in its own language), the same
+// way the web language picker does — so they are not run through `t()`.
+const LANGUAGE_LABELS: Record<Lang, string> = {
+  en: "English",
+  sv: "Svenska",
+};
 
 export function MenuSheet({
   visible,
@@ -29,6 +37,8 @@ export function MenuSheet({
   backends,
   activeBackendId,
   onSelectBackend,
+  lang,
+  onSelectLanguage,
   canUndo,
   canRedo,
   onUndo,
@@ -40,12 +50,15 @@ export function MenuSheet({
   backends: BackendOption[];
   activeBackendId: NativeBackendId;
   onSelectBackend: (id: NativeBackendId) => void;
+  lang: Lang;
+  onSelectLanguage: (lang: Lang) => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
 }) {
   const tokens = useTokens();
+  const t = useT();
 
   return (
     <Modal
@@ -63,11 +76,11 @@ export function MenuSheet({
       >
         <View style={styles.sheetHeader}>
           <Text style={[styles.heading, { color: tokens.textBright }]}>
-            {strings.menu.heading}
+            {t("native.menu.heading")}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={strings.menu.close}
+            accessibilityLabel={t("native.menu.close")}
             hitSlop={8}
             onPress={onClose}
           >
@@ -79,12 +92,12 @@ export function MenuSheet({
 
         <ScrollView>
           <Text style={[styles.sectionLabel, { color: tokens.textMuted }]}>
-            {strings.menu.edit}
+            {t("native.menu.edit")}
           </Text>
           <View style={styles.undoRow}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={strings.menu.undo}
+              accessibilityLabel={t("native.menu.undo")}
               disabled={!canUndo}
               onPress={onUndo}
               style={styles.undoButton}
@@ -95,12 +108,12 @@ export function MenuSheet({
                   { color: canUndo ? tokens.text : tokens.textMuted },
                 ]}
               >
-                {glyphs.undo} {strings.menu.undo}
+                {glyphs.undo} {t("native.menu.undo")}
               </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={strings.menu.redo}
+              accessibilityLabel={t("native.menu.redo")}
               disabled={!canRedo}
               onPress={onRedo}
               style={styles.undoButton}
@@ -111,7 +124,7 @@ export function MenuSheet({
                   { color: canRedo ? tokens.text : tokens.textMuted },
                 ]}
               >
-                {glyphs.redo} {strings.menu.redo}
+                {glyphs.redo} {t("native.menu.redo")}
               </Text>
             </Pressable>
           </View>
@@ -122,7 +135,7 @@ export function MenuSheet({
                 style={[styles.divider, { backgroundColor: tokens.border }]}
               />
               <Text style={[styles.sectionLabel, { color: tokens.textMuted }]}>
-                {strings.menu.storage}
+                {t("native.menu.storage")}
               </Text>
               {backends.map((b) => {
                 const isActive = b.id === activeBackendId;
@@ -151,13 +164,50 @@ export function MenuSheet({
                         },
                       ]}
                     >
-                      {b.label}
+                      {t(b.labelKey)}
                     </Text>
                   </Pressable>
                 );
               })}
             </>
           ) : null}
+
+          <View style={[styles.divider, { backgroundColor: tokens.border }]} />
+          <Text style={[styles.sectionLabel, { color: tokens.textMuted }]}>
+            {t("native.menu.language")}
+          </Text>
+          {(["en", "sv"] as const).map((code) => {
+            const isActive = code === lang;
+            return (
+              <Pressable
+                key={code}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: isActive }}
+                style={styles.backendRow}
+                onPress={() => onSelectLanguage(code)}
+              >
+                <Text
+                  style={[
+                    styles.radio,
+                    { color: isActive ? tokens.accent : tokens.textMuted },
+                  ]}
+                >
+                  {isActive ? glyphs.radioOn : glyphs.radioOff}
+                </Text>
+                <Text
+                  style={[
+                    styles.backendLabel,
+                    {
+                      color: isActive ? tokens.accent : tokens.text,
+                      fontWeight: isActive ? "700" : "500",
+                    },
+                  ]}
+                >
+                  {LANGUAGE_LABELS[code]}
+                </Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
       </View>
     </Modal>

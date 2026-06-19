@@ -1,5 +1,6 @@
 import { useAppearance } from "../../theme/useTheme.ts";
 import { TrophyGlyph } from "../../achievements/glyphs.tsx";
+import { useT } from "../../i18n/index.ts";
 import { useModalDispatch } from "../modal-bus.ts";
 
 // Header affordance for achievements, sitting beside the sync glyph. Two
@@ -17,6 +18,7 @@ import { useModalDispatch } from "../modal-bus.ts";
 // When achievements are switched off the trophy — the feature's only entry
 // point — hides itself, removing the system wholesale.
 export function TrophyButton() {
+  const t = useT();
   const dispatch = useModalDispatch();
   const { unseenAchievements, disableAchievements } = useAppearance();
   if (disableAchievements) return null;
@@ -24,9 +26,9 @@ export function TrophyButton() {
   const lit = unseenCount > 0;
   const label = lit
     ? unseenCount === 1
-      ? "1 new achievement"
-      : `${unseenCount} new achievements`
-    : "Achievements";
+      ? t("achievements.button.unseenOne")
+      : t("achievements.button.unseenOther", { n: unseenCount })
+    : t("achievements.button.open");
   return (
     <button
       type="button"

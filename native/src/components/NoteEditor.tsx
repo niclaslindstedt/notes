@@ -13,8 +13,9 @@
 import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { useT } from "../../../src/i18n/index.ts";
 import type { Note } from "../../../src/domain/note.ts";
-import { glyphs, strings } from "../strings.ts";
+import { glyphs } from "../strings.ts";
 import { spacing, useTokens } from "../theme.ts";
 
 export function NoteEditor({
@@ -29,6 +30,7 @@ export function NoteEditor({
   onDelete: () => void;
 }) {
   const tokens = useTokens();
+  const t = useT();
   // Hold the body locally so the field stays responsive; the shared `update`
   // verb is called alongside every change so persistence and undo see it too.
   const [value, setValue] = useState(note.body);
@@ -44,22 +46,22 @@ export function NoteEditor({
       <View style={[styles.header, { borderColor: tokens.border }]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={strings.editor.back}
+          accessibilityLabel={t("native.back")}
           hitSlop={8}
           onPress={onClose}
         >
           <Text style={[styles.back, { color: tokens.accent }]}>
-            {glyphs.back} {strings.editor.back}
+            {glyphs.back} {t("native.back")}
           </Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={strings.editor.deleteNote}
+          accessibilityLabel={t("native.deleteNote")}
           hitSlop={8}
           onPress={onDelete}
         >
           <Text style={[styles.delete, { color: tokens.danger }]}>
-            {strings.editor.delete}
+            {t("native.delete")}
           </Text>
         </Pressable>
       </View>
@@ -71,7 +73,7 @@ export function NoteEditor({
         multiline
         autoFocus
         textAlignVertical="top"
-        placeholder={strings.editor.placeholder}
+        placeholder={t("native.placeholder")}
         placeholderTextColor={tokens.textMuted}
         style={[styles.input, { color: tokens.text }]}
       />

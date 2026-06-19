@@ -213,6 +213,16 @@ export function EyeOffGlyph({ className }: IconProps) {
   );
 }
 
+export function GlobeGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z" />
+    </Svg>
+  );
+}
+
 export function MedalGlyph({ className }: IconProps) {
   return (
     <Svg className={className}>

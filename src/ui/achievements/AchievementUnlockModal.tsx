@@ -1,5 +1,6 @@
 import { ACHIEVEMENT_BY_ID, TIER_POINTS } from "../../achievements/index.ts";
 import { TrophyGlyph } from "../../achievements/glyphs.tsx";
+import { useT, type MessageKey } from "../../i18n/index.ts";
 import { CloseIcon } from "../icons.tsx";
 import { Modal } from "../Modal.tsx";
 
@@ -17,14 +18,15 @@ type Props = {
 };
 
 export function AchievementUnlockModal({ open, unseenIds, onClose }: Props) {
+  const t = useT();
   const items = unseenIds
     .map((id) => ACHIEVEMENT_BY_ID.get(id))
     .filter((a): a is NonNullable<typeof a> => a !== undefined);
   if (!open || items.length === 0) return null;
   const title =
     items.length === 1
-      ? "Achievement unlocked!"
-      : `${items.length} achievements unlocked!`;
+      ? t("achievements.unlockModal.titleOne")
+      : t("achievements.unlockModal.titleOther", { n: items.length });
 
   return (
     <Modal
@@ -44,7 +46,7 @@ export function AchievementUnlockModal({ open, unseenIds, onClose }: Props) {
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t("common.close")}
           className="-mr-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg"
         >
           <CloseIcon className="h-5 w-5" />
@@ -66,13 +68,17 @@ export function AchievementUnlockModal({ open, unseenIds, onClose }: Props) {
                 <div className="flex-1">
                   <div className="flex items-baseline gap-2">
                     <span className="text-sm font-bold text-fg-bright">
-                      {ach.name}
+                      {t(`achievements.catalog.${ach.id}.name` as MessageKey)}
                     </span>
                     <span className="text-xs text-muted">
                       +{TIER_POINTS[ach.tier]}
                     </span>
                   </div>
-                  <p className="text-xs text-muted">{ach.condition}</p>
+                  <p className="text-xs text-muted">
+                    {t(
+                      `achievements.catalog.${ach.id}.condition` as MessageKey,
+                    )}
+                  </p>
                 </div>
               </article>
             );
@@ -86,7 +92,7 @@ export function AchievementUnlockModal({ open, unseenIds, onClose }: Props) {
           onClick={onClose}
           className="cursor-pointer rounded border border-accent bg-accent/15 px-4 py-1.5 text-sm font-medium text-accent hover:bg-accent/25 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
         >
-          Awesome!
+          {t("achievements.unlockModal.dismiss")}
         </button>
       </footer>
     </Modal>

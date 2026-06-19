@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { classifyLines } from "../domain/markdown.ts";
+import { useT } from "../i18n/index.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
 
@@ -35,6 +36,7 @@ type Props = {
 };
 
 export function MarkdownEditor({ body, onChange, wordWrap, maxWidth }: Props) {
+  const t = useT();
   // Local source of truth, seeded from the note. App keys the editor by note
   // id, so a different note remounts rather than reconciling mid-edit.
   const [value, setValue] = useState(body);
@@ -290,7 +292,9 @@ export function MarkdownEditor({ body, onChange, wordWrap, maxWidth }: Props) {
               wrap={wordWrap ? "soft" : "off"}
               value={line}
               spellCheck
-              placeholder={lines.length === 1 ? "Start writing…" : undefined}
+              placeholder={
+                lines.length === 1 ? t("app.startWriting") : undefined
+              }
               onChange={(e) => onTextChange(e.target.value)}
               onKeyDown={onKeyDown}
               className={`block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-fg outline-none placeholder:text-muted/60 ${wrapClass} ${lineTextClass(

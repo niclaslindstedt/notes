@@ -1,5 +1,6 @@
 import { useId } from "react";
 
+import { useT } from "../i18n/index.ts";
 import type { NotesSync } from "../app/use-notes-sync.ts";
 import { Button } from "./form/Button.tsx";
 import { Modal } from "./Modal.tsx";
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function ConflictModal({ sync }: Props) {
+  const t = useT();
   const titleId = useId();
   const conflict = sync.conflict;
   if (!conflict) return null;
@@ -31,26 +33,31 @@ export function ConflictModal({ sync }: Props) {
     >
       <div className="flex flex-col gap-3 p-4">
         <h2 id={titleId} className="text-sm font-bold text-fg-bright">
-          These notes changed on another device
+          {t("sync.conflict.title")}
         </h2>
-        <p className="text-xs text-muted">
-          Your copy on this device and the copy on the backend have both moved
-          on. Keep one — nothing is merged automatically.
-        </p>
+        <p className="text-xs text-muted">{t("sync.conflict.hint")}</p>
         <div className="flex flex-col gap-2">
           <Button
             variant="primary"
             onClick={() => sync.resolveConflict("local")}
           >
-            Keep this device&apos;s copy ({mineCount}{" "}
-            {mineCount === 1 ? "note" : "notes"})
+            {t(
+              mineCount === 1
+                ? "sync.conflict.keepMineOne"
+                : "sync.conflict.keepMineOther",
+              { n: mineCount },
+            )}
           </Button>
           <Button
             variant="secondary"
             onClick={() => sync.resolveConflict("remote")}
           >
-            Keep the other copy ({theirsCount}{" "}
-            {theirsCount === 1 ? "note" : "notes"})
+            {t(
+              theirsCount === 1
+                ? "sync.conflict.keepTheirsOne"
+                : "sync.conflict.keepTheirsOther",
+              { n: theirsCount },
+            )}
           </Button>
         </div>
       </div>

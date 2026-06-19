@@ -5,7 +5,13 @@
 // screen-local UI state (which note is open, the menu sheet, the active
 // backend), mirroring the web shell in src/app/App.tsx.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -20,6 +26,23 @@ import { StatusBar } from "expo-status-bar";
 
 import { useNotes } from "../../src/app/use-notes.ts";
 import { isBlank } from "../../src/domain/note.ts";
+import {
+  LanguageProvider as SharedLanguageProvider,
+  ensureCatalog,
+  useT,
+  type Lang,
+} from "../../src/i18n/index.ts";
+
+// The shared i18n layer is typed against the web app's `@types/react`, while
+// this Expo project pins its own (older) copy — so the two `ReactNode`
+// definitions don't line up and `SharedLanguageProvider` reads as an invalid
+// JSX component here. It's the same component at runtime; re-type it against
+// this project's React so it renders cleanly (cf. the `crypto.randomUUID`
+// runtime shim in `polyfills.ts`).
+const LanguageProvider = SharedLanguageProvider as (props: {
+  value: Lang;
+  children: ReactNode;
+}) => ReactNode;
 
 import { Header } from "./components/Header.tsx";
 import { MenuSheet } from "./components/MenuSheet.tsx";
@@ -34,11 +57,22 @@ import {
   loadBackendPreference,
   saveBackendPreference,
 } from "./storage/backendPreference.ts";
-import { glyphs, strings } from "./strings.ts";
+import {
+  loadLanguagePreference,
+  saveLanguagePreference,
+} from "./i18n/language.ts";
+import { glyphs } from "./strings.ts";
 import { spacing, useTokens } from "./theme.ts";
 
-function AppInner() {
+function AppInner({
+  lang,
+  onSelectLanguage,
+}: {
+  lang: Lang;
+  onSelectLanguage: (lang: Lang) => void;
+}) {
   const tokens = useTokens();
+  const t = useT();
 
   // Which storage backend is active. Starts on the on-device default and is
   // reconciled with the persisted choice once it loads from AsyncStorage.
@@ -138,13 +172,13 @@ function AppInner() {
               )}
               ListEmptyComponent={
                 <Text style={[styles.empty, { color: tokens.textMuted }]}>
-                  {strings.app.empty}
+                  {t("native.empty")}
                 </Text>
               }
             />
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={strings.app.newNote}
+              accessibilityLabel={t("native.newNote")}
               onPress={openNew}
               style={[styles.fab, { backgroundColor: tokens.accent }]}
             >
@@ -162,6 +196,8 @@ function AppInner() {
         backends={backends}
         activeBackendId={backendId}
         onSelectBackend={selectBackend}
+        lang={lang}
+        onSelectLanguage={onSelectLanguage}
         canUndo={store.canUndo}
         canRedo={store.canRedo}
         onUndo={store.undo}
@@ -174,10 +210,38 @@ function AppInner() {
 }
 
 export default function App() {
+  // The active UI language. Starts on English and is reconciled with the
+  // persisted choice once it loads from AsyncStorage — mirroring how the
+  // backend preference is hydrated in `AppInner`.
+  const [lang, setLang] = useState<Lang>("en");
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadLanguagePreference().then((stored) =>
+      ensureCatalog(stored).then(() => {
+        if (!cancelled) setLang(stored);
+      }),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load the target catalog before switching so the first paint in the new
+  // language never falls back to English, then persist the choice on-device.
+  const selectLanguage = useCallback((next: Lang) => {
+    void ensureCatalog(next).then(() => {
+      setLang(next);
+      void saveLanguagePreference(next);
+    });
+  }, []);
+
   return (
-    <SafeAreaProvider>
-      <AppInner />
-    </SafeAreaProvider>
+    <LanguageProvider value={lang}>
+      <SafeAreaProvider>
+        <AppInner lang={lang} onSelectLanguage={selectLanguage} />
+      </SafeAreaProvider>
+    </LanguageProvider>
   );
 }
 

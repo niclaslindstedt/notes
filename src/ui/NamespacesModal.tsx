@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 
+import { useT } from "../i18n/index.ts";
 import {
   DEFAULT_NAMESPACE_SLUG,
   type Namespace,
@@ -47,6 +48,7 @@ export function NamespacesModal({
   onSetAppearance,
   onRemove,
 }: Props) {
+  const t = useT();
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState<string | null>(null);
   const [newGlyph, setNewGlyph] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export function NamespacesModal({
     e.preventDefault();
     const trimmed = newName.trim();
     if (!trimmed) {
-      setError("A name is required");
+      setError(t("namespace.nameRequired"));
       return;
     }
     onCreate(trimmed, { glyph: newGlyph, color: newColor });
@@ -74,12 +76,12 @@ export function NamespacesModal({
           id="namespaces-title"
           className="text-sm font-bold tracking-wide text-fg-bright"
         >
-          Namespaces
+          {t("namespace.heading")}
         </h2>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t("common.close")}
           className="-mr-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg"
         >
           <CloseIcon className="h-5 w-5" />
@@ -87,11 +89,7 @@ export function NamespacesModal({
       </header>
 
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
-        <p className="mb-4 text-xs text-muted">
-          A namespace is a self-contained group of notes. Switch between them to
-          keep, say, personal and shared notes apart. Each namespace can carry
-          its own icon and colour.
-        </p>
+        <p className="mb-4 text-xs text-muted">{t("namespace.blurb")}</p>
 
         <ul className="flex flex-col gap-1">
           {namespaces.map((ns) => (
@@ -103,6 +101,7 @@ export function NamespacesModal({
               onRename={(name) => onRename(ns.slug, name)}
               onSetAppearance={(patch) => onSetAppearance(ns.slug, patch)}
               onRemove={() => onRemove(ns.slug)}
+              t={t}
             />
           ))}
         </ul>
@@ -112,7 +111,7 @@ export function NamespacesModal({
             htmlFor="namespace-new"
             className="text-xs font-semibold tracking-wide text-muted uppercase"
           >
-            New namespace
+            {t("namespace.newLabel")}
           </label>
           <div className="flex items-center gap-2">
             <input
@@ -123,12 +122,12 @@ export function NamespacesModal({
                 setNewName(e.target.value);
                 if (error) setError(null);
               }}
-              placeholder="e.g. Work, Family"
-              aria-label="Namespace name"
+              placeholder={t("namespace.namePlaceholder")}
+              aria-label={t("namespace.nameLabel")}
               className={INPUT_CLASS}
             />
             <Button type="submit" variant="primary">
-              Create
+              {t("common.create")}
             </Button>
           </div>
           {error && (
@@ -142,26 +141,26 @@ export function NamespacesModal({
               the editor to skin. */}
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold tracking-wide text-muted uppercase">
-              Colour
+              {t("namespace.colorLabel")}
             </span>
             <ColorPalette
               colors={NAMESPACE_COLORS}
               value={newColor}
               onChange={setNewColor}
-              ariaLabelPrefix="New namespace colour"
+              ariaLabelPrefix={t("namespace.newColorPrefix")}
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold tracking-wide text-muted uppercase">
-              Icon
+              {t("namespace.glyphLabel")}
             </span>
             <GlyphGrid
               glyphs={NAMESPACE_GLYPH_NAMES}
               value={newGlyph}
               onChange={setNewGlyph}
               tintColor={newColor}
-              noneLabel="New namespace, no icon"
-              ariaLabelPrefix="New namespace icon"
+              noneLabel={t("namespace.newGlyphNone")}
+              ariaLabelPrefix={t("namespace.newGlyphPrefix")}
             />
           </div>
         </form>
@@ -177,6 +176,7 @@ function NamespaceRow({
   onRename,
   onSetAppearance,
   onRemove,
+  t,
 }: {
   namespace: Namespace;
   active: boolean;
@@ -184,6 +184,7 @@ function NamespaceRow({
   onRename: (name: string) => void;
   onSetAppearance: (patch: NamespaceAppearance) => void;
   onRemove: () => Promise<void>;
+  t: ReturnType<typeof useT>;
 }) {
   const isDefault = namespace.slug === DEFAULT_NAMESPACE_SLUG;
   const [editing, setEditing] = useState(false);
@@ -228,11 +229,11 @@ function NamespaceRow({
             type="text"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            aria-label="Namespace name"
+            aria-label={t("namespace.nameLabel")}
             className={INPUT_CLASS}
           />
           <Button type="submit" variant="primary">
-            Save
+            {t("common.save")}
           </Button>
           <Button
             type="button"
@@ -242,7 +243,7 @@ function NamespaceRow({
               setEditing(false);
             }}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
         </form>
 
@@ -251,26 +252,26 @@ function NamespaceRow({
             favicon update immediately. */}
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-semibold tracking-wide text-muted uppercase">
-            Colour
+            {t("namespace.colorLabel")}
           </span>
           <ColorPalette
             colors={NAMESPACE_COLORS}
             value={namespace.color ?? null}
             onChange={(color) => onSetAppearance({ color })}
-            ariaLabelPrefix="Colour"
+            ariaLabelPrefix={t("namespace.colorLabel")}
           />
         </div>
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-semibold tracking-wide text-muted uppercase">
-            Icon
+            {t("namespace.glyphLabel")}
           </span>
           <GlyphGrid
             glyphs={NAMESPACE_GLYPH_NAMES}
             value={namespace.glyph ?? null}
             onChange={(glyph) => onSetAppearance({ glyph })}
             tintColor={namespace.color}
-            noneLabel="No icon"
-            ariaLabelPrefix="Icon"
+            noneLabel={t("namespace.noIcon")}
+            ariaLabelPrefix={t("namespace.glyphLabel")}
           />
         </div>
       </li>
@@ -287,7 +288,7 @@ function NamespaceRow({
         type="button"
         onClick={onSwitch}
         aria-current={active ? "true" : undefined}
-        aria-label={`Switch to ${namespace.name}`}
+        aria-label={t("namespace.switchTo", { name: namespace.name })}
         className="flex flex-1 cursor-pointer items-center gap-2 text-left"
       >
         <span className="shrink-0">{glyphTile}</span>
@@ -303,7 +304,7 @@ function NamespaceRow({
         </span>
         {isDefault && (
           <span className="rounded-full bg-surface-3 px-2 py-0.5 text-xs text-muted">
-            Default
+            {t("namespace.defaultBadge")}
           </span>
         )}
       </button>
@@ -313,7 +314,7 @@ function NamespaceRow({
           setDraft(namespace.name);
           setEditing(true);
         }}
-        aria-label="Rename"
+        aria-label={t("namespace.rename")}
         className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-3 hover:text-fg"
       >
         <PencilIcon className="h-4 w-4" />
@@ -329,14 +330,14 @@ function NamespaceRow({
             disabled={busy}
             className="inline-flex h-8 cursor-pointer items-center justify-center rounded bg-danger px-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Confirm
+            {t("common.confirm")}
           </button>
         ) : (
           <button
             type="button"
             onClick={() => setConfirmingRemove(true)}
             disabled={busy}
-            aria-label="Delete namespace"
+            aria-label={t("namespace.deleteAction")}
             className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded text-muted hover:bg-danger/15 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
           >
             <TrashIcon className="h-4 w-4" />

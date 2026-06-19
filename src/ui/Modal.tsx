@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
+import { useT } from "../i18n/index.ts";
 import { APP_VIEWPORT_RECT } from "./appViewportRect.ts";
 
 // Minimal accessible modal: a dimmed backdrop with a centered card. Closes
@@ -44,6 +45,7 @@ export function Modal({
   size = "max-w-md",
   children,
 }: Props) {
+  const t = useT();
   const cardRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const tokenRef = useRef<symbol>(Symbol("modal"));
@@ -103,7 +105,7 @@ export function Modal({
     <div className={wrapperClass} style={APP_VIEWPORT_RECT}>
       <button
         type="button"
-        aria-label="Close"
+        aria-label={t("common.close")}
         tabIndex={-1}
         onClick={onClose}
         className="absolute inset-0 cursor-default bg-black/50"

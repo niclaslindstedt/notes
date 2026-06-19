@@ -14,13 +14,15 @@ import {
   WandGlyph,
   WorkflowGlyph,
 } from "../../achievements/glyphs.tsx";
+import { useT, type MessageKey, type TFunction } from "../../i18n/index.ts";
 import { CheckIcon, CloseIcon } from "../icons.tsx";
 import { Modal } from "../Modal.tsx";
 
 // The in-app achievements tour: a four-tier (Beginner → Intermediate → Pro →
 // Expert) browse of the whole catalog, every feature an unlockable trophy.
 // Reads the unlocked map straight from the synced appearance settings passed
-// in from App, so it stays correct under any storage backend.
+// in from App, so it stays correct under any storage backend. Display copy is
+// resolved by achievement id through the `achievements` i18n namespace.
 
 type UnlockedMap = Record<string, number>;
 
@@ -31,20 +33,6 @@ const TIER_GLYPH: Record<AchievementTier, Glyph> = {
   expert: WandGlyph,
 };
 
-const TIER_TITLE: Record<AchievementTier, string> = {
-  beginner: "Beginner",
-  intermediate: "Intermediate",
-  pro: "Pro",
-  expert: "Expert",
-};
-
-const TIER_SUBTITLE: Record<AchievementTier, string> = {
-  beginner: "Just opened the app — finding your feet.",
-  intermediate: "Making it yours.",
-  pro: "Sync it, secure it, take it everywhere.",
-  expert: "Bend the app to your exact workflow.",
-};
-
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -52,6 +40,8 @@ type Props = {
 };
 
 export function AchievementsModal({ open, onClose, unlocked }: Props) {
+  const t = useT();
+
   const knownIds = Object.keys(unlocked).filter((id) =>
     ACHIEVEMENTS.some((a) => a.id === id),
   );
@@ -73,12 +63,12 @@ export function AchievementsModal({ open, onClose, unlocked }: Props) {
           className="flex items-center gap-2 text-sm font-bold tracking-wide text-fg-bright"
         >
           <TrophyGlyph className="h-4 w-4 text-accent" />
-          Achievements
+          {t("achievements.modal.title")}
         </h2>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t("common.close")}
           className="-mr-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg"
         >
           <CloseIcon className="h-5 w-5" />
@@ -92,21 +82,22 @@ export function AchievementsModal({ open, onClose, unlocked }: Props) {
               <TrophyGlyph className="h-5 w-5" />
             </span>
             <p className="flex-1 text-xs text-muted">
-              {unlockedCount} of {ACHIEVEMENTS.length} unlocked · {totalPoints}/
-              {maxPoints} points
+              {t("achievements.modal.counter", {
+                unlocked: unlockedCount,
+                total: ACHIEVEMENTS.length,
+                earned: totalPoints,
+                max: maxPoints,
+              })}
             </p>
           </header>
 
-          <p>
-            Every feature in the app is also a trophy. As you use it — writing a
-            note, switching themes, connecting the cloud — you quietly earn
-            achievements. You don't chase them; they find you.
-          </p>
+          <p>{t("achievements.modal.intro")}</p>
 
           {TIER_ORDER.map((tier) => (
             <TierSection
               key={tier}
               tier={tier}
+              t={t}
               unlocked={unlocked}
               achievements={ACHIEVEMENTS.filter((a) => a.tier === tier)}
             />
@@ -121,10 +112,12 @@ function TierSection({
   tier,
   achievements,
   unlocked,
+  t,
 }: {
   tier: AchievementTier;
   achievements: readonly Achievement[];
   unlocked: UnlockedMap;
+  t: TFunction;
 }) {
   const Icon = TIER_GLYPH[tier];
   const points = TIER_POINTS[tier];
@@ -139,12 +132,14 @@ function TierSection({
         </span>
         <div className="flex flex-col">
           <h3 className="text-base font-bold tracking-wide text-fg-bright">
-            {TIER_TITLE[tier]}{" "}
+            {t(`achievements.modal.tier.${tier}.title` as MessageKey)}{" "}
             <span className="text-xs font-normal text-muted">
               {tierEarned}/{tierMax} points
             </span>
           </h3>
-          <p className="text-xs text-muted">{TIER_SUBTITLE[tier]}</p>
+          <p className="text-xs text-muted">
+            {t(`achievements.modal.tier.${tier}.subtitle` as MessageKey)}
+          </p>
         </div>
       </header>
       <div className="flex flex-col gap-2">
@@ -153,6 +148,7 @@ function TierSection({
             key={ach.id}
             achievement={ach}
             unlockedAt={unlocked[ach.id]}
+            t={t}
           />
         ))}
       </div>
@@ -163,14 +159,22 @@ function TierSection({
 function AchievementRow({
   achievement,
   unlockedAt,
+  t,
 }: {
   achievement: Achievement;
   unlockedAt: number | undefined;
+  t: TFunction;
 }) {
   const Icon = achievement.glyph;
   const isUnlocked = unlockedAt !== undefined;
   const points = TIER_POINTS[achievement.tier];
-  const learnMore = achievement.learnMore ?? null;
+  const name = t(`achievements.catalog.${achievement.id}.name` as MessageKey);
+  const condition = t(
+    `achievements.catalog.${achievement.id}.condition` as MessageKey,
+  );
+  const learnMore = achievement.learnMore
+    ? t(`achievements.catalog.${achievement.id}.learnMore` as MessageKey)
+    : null;
   return (
     <details
       className={
@@ -186,7 +190,7 @@ function AchievementRow({
               ? "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded border border-accent bg-accent/15 text-accent"
               : "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded border border-line bg-surface-2 text-muted"
           }
-          aria-label={isUnlocked ? undefined : "Locked"}
+          aria-label={isUnlocked ? undefined : t("achievements.modal.locked")}
         >
           {isUnlocked ? (
             <Icon className="h-[14px] w-[14px]" />
@@ -203,17 +207,17 @@ function AchievementRow({
                   : "text-sm font-bold text-muted"
               }
             >
-              {achievement.name}
+              {name}
             </span>
             <span className="text-xs text-muted">+{points}</span>
             {isUnlocked && <CheckIcon className="h-3 w-3 text-accent" />}
           </div>
           <p className={isUnlocked ? "text-xs text-fg" : "text-xs text-muted"}>
-            {achievement.condition}
+            {condition}
           </p>
           {learnMore ? (
             <span className="text-xs text-link group-open:hidden">
-              Learn more
+              {t("achievements.modal.learnMore")}
             </span>
           ) : null}
         </div>
