@@ -20,6 +20,7 @@ import {
 } from "react-native";
 
 import type { BackendOption, NativeBackendId } from "../storage/backends.ts";
+import { glyphs, strings } from "../strings.ts";
 import { radius, spacing, useTokens } from "../theme.ts";
 
 export function MenuSheet({
@@ -62,26 +63,28 @@ export function MenuSheet({
       >
         <View style={styles.sheetHeader}>
           <Text style={[styles.heading, { color: tokens.textBright }]}>
-            Menu
+            {strings.menu.heading}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close"
+            accessibilityLabel={strings.menu.close}
             hitSlop={8}
             onPress={onClose}
           >
-            <Text style={[styles.close, { color: tokens.textMuted }]}>✕</Text>
+            <Text style={[styles.close, { color: tokens.textMuted }]}>
+              {glyphs.close}
+            </Text>
           </Pressable>
         </View>
 
         <ScrollView>
           <Text style={[styles.sectionLabel, { color: tokens.textMuted }]}>
-            Edit
+            {strings.menu.edit}
           </Text>
           <View style={styles.undoRow}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Undo"
+              accessibilityLabel={strings.menu.undo}
               disabled={!canUndo}
               onPress={onUndo}
               style={styles.undoButton}
@@ -92,12 +95,12 @@ export function MenuSheet({
                   { color: canUndo ? tokens.text : tokens.textMuted },
                 ]}
               >
-                ↶ Undo
+                {glyphs.undo} {strings.menu.undo}
               </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Redo"
+              accessibilityLabel={strings.menu.redo}
               disabled={!canRedo}
               onPress={onRedo}
               style={styles.undoButton}
@@ -108,7 +111,7 @@ export function MenuSheet({
                   { color: canRedo ? tokens.text : tokens.textMuted },
                 ]}
               >
-                ↷ Redo
+                {glyphs.redo} {strings.menu.redo}
               </Text>
             </Pressable>
           </View>
@@ -119,7 +122,7 @@ export function MenuSheet({
                 style={[styles.divider, { backgroundColor: tokens.border }]}
               />
               <Text style={[styles.sectionLabel, { color: tokens.textMuted }]}>
-                Storage
+                {strings.menu.storage}
               </Text>
               {backends.map((b) => {
                 const isActive = b.id === activeBackendId;
@@ -137,7 +140,7 @@ export function MenuSheet({
                         { color: isActive ? tokens.accent : tokens.textMuted },
                       ]}
                     >
-                      {isActive ? "◉" : "○"}
+                      {isActive ? glyphs.radioOn : glyphs.radioOff}
                     </Text>
                     <Text
                       style={[

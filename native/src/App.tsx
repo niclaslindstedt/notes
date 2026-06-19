@@ -34,6 +34,7 @@ import {
   loadBackendPreference,
   saveBackendPreference,
 } from "./storage/backendPreference.ts";
+import { glyphs, strings } from "./strings.ts";
 import { spacing, useTokens } from "./theme.ts";
 
 function AppInner() {
@@ -137,18 +138,18 @@ function AppInner() {
               )}
               ListEmptyComponent={
                 <Text style={[styles.empty, { color: tokens.textMuted }]}>
-                  No notes yet. Tap + to write your first one.
+                  {strings.app.empty}
                 </Text>
               }
             />
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="New note"
+              accessibilityLabel={strings.app.newNote}
               onPress={openNew}
               style={[styles.fab, { backgroundColor: tokens.accent }]}
             >
               <Text style={[styles.fabGlyph, { color: tokens.accentText }]}>
-                +
+                {glyphs.add}
               </Text>
             </Pressable>
           </>

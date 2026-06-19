@@ -5,6 +5,7 @@
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { glyphs, strings } from "../strings.ts";
 import { radius, spacing, useTokens } from "../theme.ts";
 
 export function Header({
@@ -19,7 +20,9 @@ export function Header({
   return (
     <View style={[styles.header, { borderColor: tokens.border }]}>
       <View style={styles.titleWrap}>
-        <Text style={[styles.title, { color: tokens.textBright }]}>notes</Text>
+        <Text style={[styles.title, { color: tokens.textBright }]}>
+          {strings.app.title}
+        </Text>
         {count > 0 ? (
           <Text style={[styles.count, { color: tokens.textMuted }]}>
             {count}
@@ -28,12 +31,14 @@ export function Header({
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Open menu"
+        accessibilityLabel={strings.app.openMenu}
         hitSlop={8}
         onPress={onOpenMenu}
         style={[styles.menuButton, { backgroundColor: tokens.surfaceAlt }]}
       >
-        <Text style={[styles.menuGlyph, { color: tokens.text }]}>☰</Text>
+        <Text style={[styles.menuGlyph, { color: tokens.text }]}>
+          {glyphs.menu}
+        </Text>
       </Pressable>
     </View>
   );

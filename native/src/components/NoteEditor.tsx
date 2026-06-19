@@ -14,6 +14,7 @@ import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import type { Note } from "../../../src/domain/note.ts";
+import { glyphs, strings } from "../strings.ts";
 import { spacing, useTokens } from "../theme.ts";
 
 export function NoteEditor({
@@ -43,19 +44,23 @@ export function NoteEditor({
       <View style={[styles.header, { borderColor: tokens.border }]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={strings.editor.back}
           hitSlop={8}
           onPress={onClose}
         >
-          <Text style={[styles.back, { color: tokens.accent }]}>← Back</Text>
+          <Text style={[styles.back, { color: tokens.accent }]}>
+            {glyphs.back} {strings.editor.back}
+          </Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Delete note"
+          accessibilityLabel={strings.editor.deleteNote}
           hitSlop={8}
           onPress={onDelete}
         >
-          <Text style={[styles.delete, { color: tokens.danger }]}>Delete</Text>
+          <Text style={[styles.delete, { color: tokens.danger }]}>
+            {strings.editor.delete}
+          </Text>
         </Pressable>
       </View>
 
@@ -66,7 +71,7 @@ export function NoteEditor({
         multiline
         autoFocus
         textAlignVertical="top"
-        placeholder="Start writing…"
+        placeholder={strings.editor.placeholder}
         placeholderTextColor={tokens.textMuted}
         style={[styles.input, { color: tokens.text }]}
       />

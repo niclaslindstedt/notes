@@ -12,6 +12,7 @@ import { Platform } from "react-native";
 
 import type { StorageAdapter } from "../../../src/storage/adapter.ts";
 
+import { strings } from "../strings.ts";
 import { AsyncStorageAdapter } from "./asyncStorageAdapter.ts";
 
 /** Stable id for a native backend choice, persisted per device. */
@@ -30,13 +31,13 @@ export interface BackendOption {
 
 const browserBackend: BackendOption = {
   id: "browser",
-  label: "This device",
+  label: strings.storage.thisDevice,
   create: (namespace) => new AsyncStorageAdapter(namespace),
 };
 
 const icloudBackend: BackendOption = {
   id: "icloud",
-  label: "iCloud",
+  label: strings.storage.icloud,
   // Required lazily so the iOS-only native module behind the adapter is never
   // loaded on Android/web, where this branch is unreachable.
   create: (namespace) => {
