@@ -74,6 +74,13 @@ export default [
         "warn",
         { allowConstantExport: true },
       ],
+      // Rules that arrived enabled-by-default in the recommended presets of
+      // the ESLint 10 / eslint-plugin-react-hooks 7 majors. They fire on
+      // deliberate, working patterns here, so they're turned off to preserve
+      // the pre-bump lint surface; adopting them is a separate refactor.
+      "no-useless-assignment": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
     },
   },
   {
