@@ -24,7 +24,7 @@ export type MigrationTable = Record<number, MigrationStep>;
 // Typed as a literal so `serialize.ts` can stamp the same constant onto
 // every freshly-written document. Bump this and add a step below in the same
 // commit when the persisted shape changes.
-export const LATEST_VERSION = 1 as const;
+export const LATEST_VERSION = 2 as const;
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -41,7 +41,33 @@ const migrations: MigrationTable = {
     version: 1,
     notes: Array.isArray(doc.notes) ? doc.notes : [],
   }),
+  // v1 → v2: the title became its own field. Before this, a note's title was
+  // its first non-empty body line; lift that line into a new `title` field and
+  // drop it from the body so existing notes look unchanged but the title is
+  // now separately editable.
+  1: (doc) => ({
+    ...doc,
+    version: 2,
+    notes: (Array.isArray(doc.notes) ? doc.notes : []).map(liftTitle),
+  }),
 };
+
+// Move a note's first non-empty body line into a `title` field. A note that
+// already carries a string `title` is left as-is (idempotent / forward-safe).
+function liftTitle(note: unknown): unknown {
+  if (!isObj(note)) return note;
+  if (typeof note.title === "string") return note;
+  const body = typeof note.body === "string" ? note.body : "";
+  const lines = body.split("\n");
+  const titleIndex = lines.findIndex((line) => line.trim().length > 0);
+  if (titleIndex === -1) return { ...note, title: "", body };
+  const title = lines[titleIndex]!.trim();
+  // Drop the title line, then any blank lines immediately after it, so the
+  // remaining body doesn't start with the gap the title used to sit above.
+  let rest = titleIndex + 1;
+  while (rest < lines.length && lines[rest]!.trim().length === 0) rest += 1;
+  return { ...note, title, body: lines.slice(rest).join("\n") };
+}
 
 export type MigrationResult = {
   data: Versioned;

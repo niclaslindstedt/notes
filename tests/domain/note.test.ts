@@ -6,33 +6,43 @@ import {
   isBlank,
   noteTitle,
   notePreview,
+  retitleNote,
   sortByUpdated,
 } from "../../src/domain/note.ts";
 
 describe("note domain", () => {
   it("creates a blank note stamped at the given time", () => {
     const note = createNote(1000);
+    expect(note.title).toBe("");
     expect(note.body).toBe("");
     expect(note.createdAt).toBe(1000);
     expect(note.updatedAt).toBe(1000);
     expect(isBlank(note)).toBe(true);
   });
 
-  it("derives the title from the first non-empty line", () => {
-    const note = editNote(createNote(0), "\n  Hello world  \nmore", 1);
+  it("shows the title field, trimmed, and previews the whole body", () => {
+    const titled = retitleNote(createNote(0), "  Hello world  ", 1);
+    const note = editNote(titled, "first\nmore", 2);
     expect(noteTitle(note)).toBe("Hello world");
-    expect(notePreview(note)).toBe("more");
+    expect(notePreview(note)).toBe("first more");
   });
 
-  it("falls back to a placeholder title for an empty body", () => {
+  it("falls back to a placeholder title for a title-less note", () => {
     expect(noteTitle(createNote(0))).toBe("Untitled note");
+    expect(noteTitle(editNote(createNote(0), "body only", 1))).toBe(
+      "Untitled note",
+    );
   });
 
-  it("bumps updatedAt on edit without touching createdAt", () => {
+  it("bumps updatedAt on edit / retitle without touching createdAt", () => {
     const note = editNote(createNote(100), "hi", 200);
     expect(note.createdAt).toBe(100);
     expect(note.updatedAt).toBe(200);
     expect(isBlank(note)).toBe(false);
+    const renamed = retitleNote(createNote(100), "Title", 300);
+    expect(renamed.createdAt).toBe(100);
+    expect(renamed.updatedAt).toBe(300);
+    expect(isBlank(renamed)).toBe(false);
   });
 
   it("sorts most-recently-edited first without mutating the input", () => {

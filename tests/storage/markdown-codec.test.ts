@@ -8,16 +8,22 @@ import {
   snapshotToFiles,
 } from "../../src/storage/markdown/codec.ts";
 
-function note(id: string, body: string, created = 1, updated = 2): Note {
-  return { id, body, createdAt: created, updatedAt: updated };
+function note(
+  id: string,
+  title: string,
+  body = "",
+  created = 1,
+  updated = 2,
+): Note {
+  return { id, title, body, createdAt: created, updatedAt: updated };
 }
 
 describe("markdown codec", () => {
   it("round-trips a snapshot through files and back", () => {
     const snapshot = {
       notes: [
-        note("11111111", "Groceries\nmilk\neggs", 100, 200),
-        note("22222222", "Trip ideas\nKyoto", 300, 400),
+        note("11111111", "Groceries", "milk\neggs", 100, 200),
+        note("22222222", "Trip ideas", "Kyoto", 300, 400),
       ],
     };
     const files = snapshotToFiles(snapshot);
@@ -25,15 +31,25 @@ describe("markdown codec", () => {
     expect(restored.notes).toEqual(snapshot.notes);
   });
 
+  it("carries the title through the frontmatter, not the body", () => {
+    const file = snapshotToFiles({
+      notes: [note("abc", "My title", "the body")],
+    })[0]!;
+    expect(file.text).toContain("title: My title");
+    const parsed = parseNote(file.text);
+    expect(parsed?.title).toBe("My title");
+    expect(parsed?.body).toBe("the body");
+  });
+
   it("derives a slug-of-title filename suffixed with the id tail", () => {
     const stem = noteFileStem(note("abcdef123456", "My First Note"));
-    expect(stem).toBe("my-first-note-123456.md".replace(/\.md$/, ""));
+    expect(stem).toBe("my-first-note-123456");
     expect(
       snapshotToFiles({ notes: [note("abcdef123456", "Hi there")] })[0]!.path,
     ).toBe("hi-there-123456.md");
   });
 
-  it("falls back to a stable stem for a blank note", () => {
+  it("falls back to a stable stem for a title-less note", () => {
     expect(noteFileStem(createNote(0)).startsWith("note-")).toBe(true);
   });
 

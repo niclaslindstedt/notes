@@ -55,7 +55,13 @@ const achievements = {
       name: "Wordsmith",
       condition: "Write a note that runs to more than one line.",
       learnMore:
-        "The first non-empty line becomes the note's title in the list; everything below it is the body. Notes render Markdown as you write.",
+        "A note's title is its own field at the top; everything below it is the body. Notes render Markdown as you write.",
+    },
+    headliner: {
+      name: "Headliner",
+      condition: "Give a note a title.",
+      learnMore:
+        "The title is its own row at the top of the note — type it there rather than as the first line of the body. It can't be reached by backspacing from the body, and it names the note's file when you sync to a folder or the cloud.",
     },
     interiorDesigner: {
       name: "Interior designer",

@@ -3,11 +3,13 @@
 // reuse the exact same logic (the eslint config enforces the no-ui /
 // no-storage / no-DOM boundary). Storage and UI build on top of it.
 
-// A single note. `body` is plain text / Markdown; the title is derived
-// from the first non-empty line rather than stored separately so there's
-// one source of truth to keep in sync.
+// A single note. `title` is a short heading the user edits in its own field
+// (it is *not* the first body line); `body` is the plain text / Markdown
+// below it. Both are stored — the title rides the markdown frontmatter so it
+// survives a round-trip through any editor.
 export type Note = {
   id: string;
+  title: string;
   body: string;
   // Epoch milliseconds. `createdAt` is set once; `updatedAt` moves on
   // every edit and is what the list sorts by (most-recent first).
@@ -23,7 +25,13 @@ export function newNoteId(): string {
 
 /** Create an empty note stamped at `now` (defaults to the current time). */
 export function createNote(now: number = Date.now()): Note {
-  return { id: newNoteId(), body: "", createdAt: now, updatedAt: now };
+  return {
+    id: newNoteId(),
+    title: "",
+    body: "",
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 /** Return a copy of `note` with a new body and a bumped `updatedAt`. */
@@ -35,31 +43,34 @@ export function editNote(
   return { ...note, body, updatedAt: now };
 }
 
-// The title shown in the list: the first non-empty line, trimmed. Falls
-// back to a placeholder so a brand-new, still-empty note is still legible.
-export function noteTitle(note: Note): string {
-  const firstLine = note.body
-    .split("\n")
-    .map((line) => line.trim())
-    .find((line) => line.length > 0);
-  return firstLine ?? "Untitled note";
+/** Return a copy of `note` with a new title and a bumped `updatedAt`. */
+export function retitleNote(
+  note: Note,
+  title: string,
+  now: number = Date.now(),
+): Note {
+  return { ...note, title, updatedAt: now };
 }
 
-// A one-line preview of the body below the title: everything after the
-// title line, collapsed to a single spaced string.
+// The title shown in the list, trimmed. Falls back to a placeholder so a note
+// that only has a body (no title yet) is still legible.
+export function noteTitle(note: Note): string {
+  return note.title.trim() || "Untitled note";
+}
+
+// A one-line preview of the body below the title, collapsed to a single
+// spaced string.
 export function notePreview(note: Note): string {
-  const lines = note.body.split("\n").map((line) => line.trim());
-  const titleIndex = lines.findIndex((line) => line.length > 0);
-  if (titleIndex === -1) return "";
-  return lines
-    .slice(titleIndex + 1)
+  return note.body
+    .split("\n")
+    .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .join(" ");
 }
 
 /** True when a note carries no user content and is safe to discard. */
 export function isBlank(note: Note): boolean {
-  return note.body.trim().length === 0;
+  return note.title.trim().length === 0 && note.body.trim().length === 0;
 }
 
 // Sort newest-edited first. Returns a new array; never mutates the input.

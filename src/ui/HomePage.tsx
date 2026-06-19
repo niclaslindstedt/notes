@@ -74,7 +74,10 @@ export function HomePage() {
 
         <Section title="What you can do with it">
           <ul className="ml-5 list-disc space-y-1.5">
-            <li>Write, edit, and organise plain-text notes.</li>
+            <li>
+              Write, edit, and organise plain-text notes — each with its own
+              title and a Markdown body that formats as you type.
+            </li>
             <li>
               Undo and redo your changes — bring back a deleted note or step
               back through your edits, with <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+

@@ -10,10 +10,10 @@
 // `domain/` keeps working with the `Snapshot` shape.
 //
 // A note's body is stored verbatim under a small YAML-ish frontmatter block
-// that carries the fields the body can't express (the stable id and the
-// created / updated timestamps). The title shown in the app is derived from
-// the body's first line, so it isn't stored separately — there's nothing to
-// keep in sync.
+// that carries the fields the body can't express (the stable id, the user's
+// title, and the created / updated timestamps). The title is its own field —
+// edited separately from the body — so it rides the frontmatter rather than
+// being recovered from the first body line.
 
 import { type Note, type Snapshot } from "../../domain/note.ts";
 
@@ -28,24 +28,16 @@ export type MarkdownFile = {
 // -- Filenames --------------------------------------------------------
 
 /**
- * Folder-/tool-friendly file stem for a note: a slug of its title (first
- * line), suffixed with a short slice of its id so two notes that share a
- * title never collide and the stem is deterministic from (title, id). An
- * edit that changes the title changes the stem, so the old file is reconciled
- * away on the next save (see the directory adapter).
+ * Folder-/tool-friendly file stem for a note: a slug of its title, suffixed
+ * with a short slice of its id so two notes that share a title never collide
+ * and the stem is deterministic from (title, id). An edit that changes the
+ * title changes the stem, so the old file is reconciled away on the next save
+ * (see the directory adapter) — but routine body typing no longer renames the
+ * file, since the stem rides the title rather than the first body line.
  */
 export function noteFileStem(note: Note): string {
-  const base = slugify(firstLine(note.body)) || "note";
+  const base = slugify(note.title) || "note";
   return `${base}-${idSuffix(note.id)}`;
-}
-
-function firstLine(body: string): string {
-  return (
-    body
-      .split("\n")
-      .map((line) => line.trim())
-      .find((line) => line.length > 0) ?? ""
-  );
 }
 
 function idSuffix(id: string): string {
@@ -75,6 +67,8 @@ export function snapshotToFiles(snapshot: Snapshot): MarkdownFile[] {
 export function noteToMarkdown(note: Note): string {
   const front = renderFrontmatter({
     id: note.id,
+    // Only written when set, so a title-less note's frontmatter stays minimal.
+    ...(note.title ? { title: note.title } : {}),
     created: String(note.createdAt),
     updated: String(note.updatedAt),
   });
@@ -113,11 +107,12 @@ export function parseNote(text: string): Note | null {
   if (!front) return null;
   const id = front.id ?? "";
   if (!id) return null;
+  const title = front.title ?? "";
   const createdAt = toEpoch(front.created);
   const updatedAt = front.updated ? toEpoch(front.updated) : createdAt;
   // Drop the single trailing newline `noteToMarkdown` adds; keep the body
   // otherwise verbatim.
-  return { id, body: body.replace(/\n$/, ""), createdAt, updatedAt };
+  return { id, title, body: body.replace(/\n$/, ""), createdAt, updatedAt };
 }
 
 // Frontmatter timestamps are epoch-ms numbers written as strings. Tolerate a
