@@ -83,6 +83,20 @@ make fmt-check   # prettier --check (CI)
 make icons       # regenerate PWA icons from public/favicon.svg
 ```
 
+## Development workflow
+
+- **Run `npm install` first in a fresh checkout.** The `make` targets shell
+  straight into `vitest` / `eslint` / `prettier`, so they fail with
+  `command not found` until dependencies are installed.
+- **Run `make fmt` before committing, not just `make lint`.** Formatting is a
+  separate CI gate (`fmt-check`) that `lint` won't catch — new files routinely
+  trip it.
+- **A user-facing feature fans out across lockstep files.** Before opening the
+  PR, walk the "Documentation sync points" and "Achievements" tables and land
+  the changeset fragment, the achievement (catalog + glyph + `en`/`sv`
+  strings), the `en`/`sv` UI strings, and the `/home` showcase in the *same*
+  PR — they're easy to forget as follow-ups.
+
 ## Commit and PR conventions
 
 - All commits follow [Conventional Commits](https://www.conventionalcommits.org/).
