@@ -55,10 +55,6 @@ export function GeneralSection() {
           />
         </Section>
       )}
-
-      <Section title={t("settings.general.aboutTitle")}>
-        <p className="text-xs text-muted">{t("settings.general.blurb")}</p>
-      </Section>
     </>
   );
 }
