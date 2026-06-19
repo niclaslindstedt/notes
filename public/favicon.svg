@@ -5,26 +5,27 @@
       <stop offset="100%" stop-color="#34d399" />
     </linearGradient>
   </defs>
-  <rect width="64" height="64" fill="#1f2933" />
-  <path
-    d="M20 16 H38 L46 24 V48 H20 Z"
-    fill="none"
-    stroke="url(#ink)"
-    stroke-width="4"
-    stroke-linejoin="round"
-  />
-  <path
-    d="M38 16 V24 H46"
-    fill="none"
-    stroke="url(#ink)"
-    stroke-width="4"
-    stroke-linejoin="round"
-  />
-  <path
-    d="M26 31 H40 M26 38 H40"
-    fill="none"
-    stroke="url(#ink)"
-    stroke-width="4"
-    stroke-linecap="round"
-  />
+  <g transform="translate(32 32) scale(1.75) translate(-32 -32)">
+    <path
+      d="M20 16 H38 L46 24 V48 H20 Z"
+      fill="none"
+      stroke="url(#ink)"
+      stroke-width="4"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M38 16 V24 H46"
+      fill="none"
+      stroke="url(#ink)"
+      stroke-width="4"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M26 31 H40 M26 38 H40"
+      fill="none"
+      stroke="url(#ink)"
+      stroke-width="4"
+      stroke-linecap="round"
+    />
+  </g>
 </svg>
