@@ -875,7 +875,8 @@ function TitleField({
       onChange={(e) => setDraft(e.target.value)}
       onBlur={flush}
       onMouseDown={(e) => {
-        if (document.activeElement !== e.currentTarget) focusingClick.current = true;
+        if (document.activeElement !== e.currentTarget)
+          focusingClick.current = true;
       }}
       onFocus={(e) => e.currentTarget.select()}
       onMouseUp={(e) => {
