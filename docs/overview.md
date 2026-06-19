@@ -193,19 +193,18 @@ blob rather than as separate files. The local "This device" backend has no
 
 ### Copy button
 
-`CopyNoteButton` (`src/ui/CopyNoteButton.tsx`) — a split-button to the left of
+`CopyNoteButton` (`src/ui/CopyNoteButton.tsx`) — a single button to the left of
 the [sync glyph](#sync-status) in the editor and the read-only archived-note
-view. The left half copies the open note to the clipboard in the saved
-`copyScope`; the caret opens a menu to pick a different scope for this copy and
-remembers it as the new default (it writes the `copyScope` field of the
-[editor settings](#editor-settings)). The three scopes are a `CopyScope`
-(`src/domain/note.ts`): `body` (the body verbatim — the default, never the
-title), `titleBody` (the title prepended as a `# ` heading), and `frontMatter`
-(the whole `.md` file the way the file backends store it). `buildCopyText`
-(`src/ui/copy-note.ts`) assembles the text — the `frontMatter` case reuses the
-[markdown codec](#markdown-codec)'s `noteToMarkdown` so a copied note is
-byte-identical to its on-disk file. Copying is the **Copycat** achievement
-(fired via `unlock("copycat")`).
+view. One tap copies the open note to the clipboard; what it copies is the saved
+`copyScope` [editor setting](#editor-settings), chosen from the dropdown in the
+Editor tab of the settings modal (`EditorSection`). The three scopes are a
+`CopyScope` (`src/domain/note.ts`): `body` (the body verbatim — the default,
+never the title), `titleBody` (the title prepended as a `# ` heading), and
+`frontMatter` (the whole `.md` file the way the file backends store it).
+`buildCopyText` (`src/ui/copy-note.ts`) assembles the text — the `frontMatter`
+case reuses the [markdown codec](#markdown-codec)'s `noteToMarkdown` so a copied
+note is byte-identical to its on-disk file. Copying is the **Copycat**
+achievement (fired via `unlock("copycat")`).
 
 ## The note model and operations
 

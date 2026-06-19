@@ -107,9 +107,10 @@ export function HomePage() {
             </li>
             <li>
               <em>Copy</em> a note to your clipboard with the button beside the
-              sync glyph — just the body, the title and body, or the whole
-              Markdown file with its frontmatter. It stays on your device; the
-              clipboard is written locally.
+              sync glyph — by default just the body, or, if you choose so in
+              Settings, the title and body or the whole Markdown file with its
+              frontmatter. It stays on your device; the clipboard is written
+              locally.
             </li>
             <li>
               Group notes into separate <em>namespaces</em> — independent

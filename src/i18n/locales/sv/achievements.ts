@@ -145,7 +145,7 @@ const achievements: AchievementsCatalog = {
       name: "Kopiekatt",
       condition: "Kopiera en anteckning till urklipp.",
       learnMore:
-        "Kopieringsknappen bredvid synkglyfen lägger den öppna anteckningen på urklipp. Pilmenyn väljer hur mycket som tas med — bara brödtexten, titel och brödtext, eller hela .md-filen med dess YAML-frontmatter — och minns ditt val.",
+        "Kopieringsknappen bredvid synkglyfen lägger den öppna anteckningen på urklipp. Inställningar → Redigerare väljer hur mycket som tas med — bara brödtexten, titel och brödtext, eller hela .md-filen med dess YAML-frontmatter.",
     },
 
     // ── Proffs ────────────────────────────────────────────────────────

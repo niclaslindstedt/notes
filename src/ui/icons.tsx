@@ -172,25 +172,6 @@ export function ArrowDownIcon({ className }: IconProps) {
   );
 }
 
-/** A downward chevron — the disclosure caret on the copy split-button. */
-export function ChevronDownIcon({ className }: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      focusable={false}
-      className={className}
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
 // A document with a down-arrow into it — the import/drop affordance. Used by
 // the drag-and-drop overlay and re-exported as the "Importer" achievement glyph.
 export function ImportIcon({ className }: IconProps) {

@@ -17,10 +17,6 @@ const app: AppCatalog = {
   copy: {
     label: "Kopiera anteckning",
     copied: "Kopierat",
-    menuLabel: "Kopieringsalternativ",
-    body: "Brödtext",
-    titleBody: "Titel och brödtext",
-    frontMatter: "Med frontmatter",
   },
 };
 
