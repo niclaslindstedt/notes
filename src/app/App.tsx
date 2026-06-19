@@ -24,6 +24,7 @@ import { AppTitle } from "../ui/AppTitle.tsx";
 import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
+import { usePullToRefresh } from "../ui/hooks/usePullToRefresh.ts";
 import { useRowSwipe } from "../ui/hooks/useRowSwipe.ts";
 import { useUndoRedoShortcuts } from "../ui/hooks/useUndoRedoShortcuts.ts";
 import { useViewportHeight } from "../ui/hooks/useViewportHeight.ts";
@@ -35,6 +36,7 @@ import {
 } from "../ui/namespace-favicon.ts";
 import { NavContext } from "../ui/nav-context.ts";
 import { SideMenu } from "../ui/SideMenu.tsx";
+import { PullToRefreshIndicator } from "../ui/PullToRefreshIndicator.tsx";
 import { SyncIndicator } from "../ui/SyncIndicator.tsx";
 import { UnlockGate } from "../ui/UnlockGate.tsx";
 import { UpdateToast } from "../ui/UpdateToast.tsx";
@@ -161,6 +163,20 @@ export function App() {
     );
   }
 
+  // Pull-to-refresh: a downward drag from the top of the note list pulls the
+  // latest from the backend. Only on the list (not in the editor), only on a
+  // remote backend (the local store has no remote to refresh from), and the
+  // hook itself stands down while a modal or the drawer owns the screen.
+  const ptr = usePullToRefresh(
+    async () => {
+      await sync.refresh();
+      // A deliberate pull is the "fresh pull" trophy, same as the reload
+      // button — the automatic foreground / open-note refreshes don't count.
+      unlock("freshPull");
+    },
+    { enabled: !editing && !nav.open && storage.backend !== "browser" },
+  );
+
   // Switch what's open in the editor, dropping the note we're leaving if it
   // was never typed into so abandoned "new note" taps don't pile up. Opening
   // an existing note pulls the latest from a remote backend so you read its
@@ -257,6 +273,10 @@ export function App() {
         <AchievementsModalHost />
         <AchievementsUnlockModalHost />
         <ConflictModal sync={sync} />
+        <PullToRefreshIndicator
+          state={ptr.state}
+          pullDistance={ptr.pullDistance}
+        />
         <UpdateToast />
       </ModalBusProvider>
     </NavContext.Provider>
