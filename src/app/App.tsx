@@ -519,7 +519,9 @@ function ArchiveList({
 
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
         {notes.length === 0 ? (
-          <p className="mt-16 text-center text-muted">{t("nav.archiveEmpty")}</p>
+          <p className="mt-16 text-center text-muted">
+            {t("nav.archiveEmpty")}
+          </p>
         ) : (
           <ul className="flex flex-col gap-2">
             {notes.map((note) => (
