@@ -66,6 +66,17 @@ export interface NotesSync {
   setDoc: (next: Snapshot) => void;
   /** Persist the edited document (debounced by the active backend). */
   scheduleSave: (next: Snapshot) => void;
+  /**
+   * Suspend writes to the backend while keeping edits in memory. Held while a
+   * brand-new note is being titled so the file/cloud backends don't create its
+   * file under the throwaway default-title filename (the filename is a slug of
+   * the title) — the write is deferred until the title settles so the file is
+   * born correctly named. A no-op safety net on the local browser backend,
+   * which has no per-note filename to get wrong.
+   */
+  holdSaves: () => void;
+  /** Lift a `holdSaves` hold and schedule a write for what accumulated. */
+  releaseSaves: () => void;
   /** Set when a save collided with a newer remote revision; else null. */
   conflict: ConflictState | null;
   /** Coarse state of the last save, for the cloud-sync status glyph. */
@@ -139,6 +150,12 @@ export function useNotesSync(deps: {
   // window (0 ⇒ save immediately, right for localStorage).
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingDoc = useRef<Snapshot | null>(null);
+  // While true, `scheduleSave` accumulates edits into `pendingDoc` without
+  // arming a write and `flushSave` refuses to fire. Held while a brand-new note
+  // is being titled so its file isn't written under the default-title filename
+  // before the real title lands; lifted (and drained) by `releaseSaves` when
+  // the title settles.
+  const saveHeld = useRef(false);
   // At most one write is in flight at a time. A second save started before the
   // first resolves would base on a revision the in-flight write is about to
   // bump, so the backend rejects the loser as a ConflictError — the device
@@ -256,6 +273,7 @@ export function useNotesSync(deps: {
   );
 
   const flushSave = useCallback(() => {
+    if (saveHeld.current) return;
     if (saveTimer.current !== null) {
       clearTimeout(saveTimer.current);
       saveTimer.current = null;
@@ -276,6 +294,7 @@ export function useNotesSync(deps: {
     (next: Snapshot) => {
       pendingDoc.current = next;
       setDirty(true);
+      if (saveHeld.current) return;
       const ms = adapterRef.current.saveDebounceMs ?? 0;
       if (ms <= 0) {
         flushSave();
@@ -286,6 +305,24 @@ export function useNotesSync(deps: {
     },
     [flushSave],
   );
+
+  // Hold/release the debounced-save loop while a brand-new note is being
+  // titled. Holding also cancels any armed timer so a save scheduled just
+  // before can't slip through the window; releasing schedules a fresh
+  // debounced write for whatever piled up, now that the title — and so the
+  // filename — has settled.
+  const holdSaves = useCallback(() => {
+    saveHeld.current = true;
+    if (saveTimer.current !== null) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+  }, []);
+  const releaseSaves = useCallback(() => {
+    if (!saveHeld.current) return;
+    saveHeld.current = false;
+    if (pendingDoc.current !== null) scheduleSave(pendingDoc.current);
+  }, [scheduleSave]);
 
   // Reload whenever the active adapter instance changes. On first mount this
   // re-confirms the loadSync seed (same bytes, no flicker); on a mid-session
@@ -461,6 +498,8 @@ export function useNotesSync(deps: {
     doc,
     setDoc,
     scheduleSave,
+    holdSaves,
+    releaseSaves,
     conflict,
     status,
     statusDetail,

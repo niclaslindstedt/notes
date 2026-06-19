@@ -223,6 +223,13 @@ export function App() {
     setReadingId(null);
     setView("notes");
     const title = defaultNoteTitle(editor.defaultTitle, allNotes);
+    // On a file/cloud backend, hold the save until the title is committed so
+    // the note's file is created already bearing the user's title (the
+    // filename is a slug of the title) instead of the throwaway default — no
+    // born-as-default-then-rename churn. The title field releases the hold when
+    // it loses focus. The local browser backend has no per-note filename, so it
+    // keeps saving immediately.
+    if (storage.backend !== "browser") sync.holdSaves();
     const id = create(title);
     pristineNew.current = { id, title };
     setEditingId(id);
@@ -330,6 +337,7 @@ export function App() {
                 editor={editor}
                 onChange={(body) => update(editing.id, body)}
                 onTitleChange={(title) => retitle(editing.id, title)}
+                onTitleSettle={sync.releaseSaves}
                 onDelete={() => removeNote(editing.id)}
                 syncSlot={syncSlot}
               />
@@ -714,6 +722,7 @@ function Editor({
   editor,
   onChange,
   onTitleChange,
+  onTitleSettle,
   onDelete,
   syncSlot,
 }: {
@@ -721,6 +730,7 @@ function Editor({
   editor: EditorSettings;
   onChange: (body: string) => void;
   onTitleChange: (title: string) => void;
+  onTitleSettle: () => void;
   onDelete: () => void;
   syncSlot: ReactNode;
 }) {
@@ -749,6 +759,7 @@ function Editor({
         <TitleField
           value={note.title}
           onChange={onTitleChange}
+          onSettle={onTitleSettle}
           onEnter={focusBody}
           focusOnMount={titleFirst}
           disableSpellcheck={editor.disableSpellcheck}
@@ -804,6 +815,7 @@ function Editor({
 function TitleField({
   value,
   onChange,
+  onSettle,
   onEnter,
   focusOnMount,
   disableSpellcheck,
@@ -811,6 +823,7 @@ function TitleField({
 }: {
   value: string;
   onChange: (title: string) => void;
+  onSettle: () => void;
   onEnter: () => void;
   focusOnMount: boolean;
   disableSpellcheck: boolean;
@@ -839,29 +852,42 @@ function TitleField({
     onChangeRef.current(latest.current);
   }, []);
 
+  // The title settling — losing focus, or the editor tearing down — both
+  // commits the buffered title *and* signals that it's now safe to write the
+  // file (the save was held while the title was in flux so a fresh note's file
+  // is born with the right name). Flush first so the committed title is in the
+  // document before the held save drains.
+  const onSettleRef = useRef(onSettle);
+  onSettleRef.current = onSettle;
+  const settle = useCallback(() => {
+    flush();
+    onSettleRef.current();
+  }, [flush]);
+
   // Focus the title on mount for a fresh note (without the a11y-flagged
-  // focusOnMount attribute), placing the caret at the end.
+  // focusOnMount attribute) and select its default title, so the first
+  // keystroke replaces it — a new note opens ready to be named.
   useEffect(() => {
     if (!focusOnMount) return;
     const el = ref.current;
     if (!el) return;
     el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
+    el.select();
   }, [focusOnMount]);
 
   // Clicking (or tabbing) into the title selects the whole thing, so it can be
   // renamed by just typing — no manual drag-select or erase first. The browser
   // otherwise collapses the focus-time selection to the caret on the click's
   // mouseup, so we suppress that one mouseup (only the click that *gained*
-  // focus, leaving later clicks free to reposition the caret as usual). The
-  // mount-focus path above runs after this onFocus and re-pins the caret to the
-  // end, so a fresh note still opens with the caret trailing its default title.
+  // focus, leaving later clicks free to reposition the caret as usual). A fresh
+  // note's mount-focus selects the default title the same way, so it opens
+  // ready to be typed over.
   const focusingClick = useRef(false);
 
-  // Flush the buffered title when the editor unmounts — the Back button and
+  // Settle the buffered title when the editor unmounts — the Back button and
   // switching notes both tear it down, and on those paths a blur doesn't
   // reliably fire first.
-  useEffect(() => flush, [flush]);
+  useEffect(() => settle, [settle]);
 
   return (
     <input
@@ -873,7 +899,7 @@ function TitleField({
       autoCapitalize={disableAutocorrect ? "off" : "sentences"}
       placeholder={t("app.titlePlaceholder")}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={flush}
+      onBlur={settle}
       onMouseDown={(e) => {
         if (document.activeElement !== e.currentTarget)
           focusingClick.current = true;
