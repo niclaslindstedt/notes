@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { useT } from "../i18n/index.ts";
 import { APP_VIEWPORT_RECT } from "./appViewportRect.ts";
@@ -6,8 +7,14 @@ import { APP_VIEWPORT_RECT } from "./appViewportRect.ts";
 // Minimal accessible modal: a dimmed backdrop with a centered card. Closes
 // on Escape and backdrop click, locks body scroll while open, and moves
 // focus into the card on open / restores it on close. Ported from
-// checklist's `Modal`, pared to what the settings dialog needs (no portal —
-// the app has a single root and no competing stacking contexts).
+// checklist's `Modal`.
+//
+// Rendered through a portal to `document.body` so the overlay escapes any
+// ancestor stacking context. A modal opened from inside the sticky header
+// (the cloud-sync details dialog hangs off the header sync glyph) would
+// otherwise be clamped inside the header's `z-10` context and paint *below*
+// the `z-20` floating "+" button; portaling to the body keeps the `z-50`
+// overlay above every app-shell layer.
 
 // A stack of the currently-open modals. Escape only dismisses the one on
 // top, so a confirmation dialog opened over another modal swallows the
@@ -101,7 +108,7 @@ export function Modal({
     ? `relative flex max-h-[85svh] w-full ${size} flex-col overflow-hidden rounded-lg border border-line bg-surface text-fg shadow-xl outline-none`
     : "relative flex h-full w-full flex-col overflow-hidden bg-surface text-fg shadow-xl outline-none sm:h-[min(90svh,42rem)] sm:max-w-3xl sm:rounded-lg sm:border sm:border-line";
 
-  return (
+  return createPortal(
     <div className={wrapperClass} style={APP_VIEWPORT_RECT}>
       <button
         type="button"
@@ -131,6 +138,7 @@ export function Modal({
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
