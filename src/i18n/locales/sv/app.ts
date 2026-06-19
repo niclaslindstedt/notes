@@ -14,6 +14,14 @@ const app: AppCatalog = {
   archive: "Arkivera",
   archiveNote: "Arkivera anteckning",
   delete: "Ta bort",
+  copy: {
+    label: "Kopiera anteckning",
+    copied: "Kopierat",
+    menuLabel: "Kopieringsalternativ",
+    body: "Brödtext",
+    titleBody: "Titel och brödtext",
+    frontMatter: "Med frontmatter",
+  },
 };
 
 export default app;

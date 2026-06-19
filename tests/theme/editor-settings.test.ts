@@ -29,6 +29,7 @@ describe("editor margin helpers", () => {
       disableSpellcheck: false,
       disableAutocorrect: false,
       defaultTitle: "dateTime",
+      copyScope: "body",
     });
   });
 });
@@ -48,5 +49,12 @@ describe("appearance coercion of editor settings", () => {
     expect(editor.wordWrap).toBe(false);
     // A non-boolean renderMarkdown falls back to the default.
     expect(editor.renderMarkdown).toBe(true);
+  });
+
+  it("keeps a valid copyScope and repairs an unknown one", () => {
+    replaceAppearance({ editor: { copyScope: "frontMatter" } });
+    expect(getAppearance().editor.copyScope).toBe("frontMatter");
+    replaceAppearance({ editor: { copyScope: "everything" } });
+    expect(getAppearance().editor.copyScope).toBe("body");
   });
 });

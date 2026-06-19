@@ -1,5 +1,7 @@
 import {
+  COPY_SCOPES,
   DEFAULT_TITLE_SCHEMES,
+  type CopyScope,
   type DefaultTitleScheme,
 } from "../../domain/note.ts";
 import { useT } from "../../i18n/index.ts";
@@ -40,6 +42,12 @@ export function EditorSection({
     none: t("settings.editor.defaultTitleOff"),
     dateTime: t("settings.editor.defaultTitleDateTime"),
     numbered: t("settings.editor.defaultTitleNumbered"),
+  };
+
+  const copyScopeLabel: Record<CopyScope, string> = {
+    body: t("settings.editor.copyBody"),
+    titleBody: t("settings.editor.copyTitleBody"),
+    frontMatter: t("settings.editor.copyFrontMatter"),
   };
 
   return (
@@ -91,6 +99,20 @@ export function EditorSection({
         checked={editor.disableAutocorrect}
         onChange={(v) => update("disableAutocorrect", v)}
       />
+      <Field label={t("settings.editor.copyScope")}>
+        <SegmentedRow<CopyScope>
+          ariaLabel={t("settings.editor.copyScope")}
+          value={editor.copyScope}
+          options={COPY_SCOPES.map((s) => ({
+            value: s,
+            label: copyScopeLabel[s],
+          }))}
+          onChange={(v) => update("copyScope", v)}
+        />
+        <p className="text-xs text-muted">
+          {t("settings.editor.copyScopeHint")}
+        </p>
+      </Field>
     </Section>
   );
 }

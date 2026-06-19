@@ -13,7 +13,7 @@
 // Custom-theme editor seeds from. Read by the Appearance section,
 // `useTheme`, and the appearance store's validator.
 
-import { type DefaultTitleScheme } from "../domain/note.ts";
+import { type CopyScope, type DefaultTitleScheme } from "../domain/note.ts";
 
 // Theme preset. `dark` / `light` lock to the One Dark / One Light
 // palettes; `dracula`, `monokai`, `githubDark`, `githubLight`,
@@ -204,6 +204,10 @@ export type EditorSettings = {
   // How a freshly created note is named before the user types a title of
   // their own. See `DefaultTitleScheme` in the domain.
   defaultTitle: DefaultTitleScheme;
+  // What the editor's copy button writes to the clipboard — the body alone, the
+  // title and body, or the whole `.md` file with its YAML frontmatter. See
+  // `CopyScope` in the domain.
+  copyScope: CopyScope;
 };
 
 export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
@@ -213,6 +217,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   disableSpellcheck: false,
   disableAutocorrect: false,
   defaultTitle: "dateTime",
+  copyScope: "body",
 };
 
 export type RadiusPreset = "none" | "sm" | "md" | "lg";

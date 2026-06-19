@@ -147,6 +147,12 @@ const achievements = {
       learnMore:
         "On desktop, drop one or more Markdown files anywhere on the window and each becomes a note — the file's name turns into the title and its contents fill the body.",
     },
+    copycat: {
+      name: "Copycat",
+      condition: "Copy a note to the clipboard.",
+      learnMore:
+        "The copy button beside the sync glyph puts the open note on your clipboard. The caret menu chooses how much to take — just the body, the title and body, or the whole .md file with its YAML frontmatter — and remembers your pick.",
+    },
 
     // ── Pro ───────────────────────────────────────────────────────────
     localVault: {

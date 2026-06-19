@@ -131,6 +131,25 @@ export function isDefaultTitleScheme(v: unknown): v is DefaultTitleScheme {
   return v === "none" || v === "dateTime" || v === "numbered";
 }
 
+// What the editor's copy button writes to the clipboard. `body` copies the
+// note body verbatim (the default — just what you wrote, no title); `titleBody`
+// prepends the title as a Markdown `# ` heading; `frontMatter` copies the whole
+// `.md` file the way it's stored on the file/cloud backends — the YAML
+// frontmatter block (id, title, timestamps) followed by the body. The choice is
+// a synced editor setting; the copy menu also writes through it so the button
+// remembers your last pick.
+export type CopyScope = "body" | "titleBody" | "frontMatter";
+
+export const COPY_SCOPES: readonly CopyScope[] = [
+  "body",
+  "titleBody",
+  "frontMatter",
+];
+
+export function isCopyScope(v: unknown): v is CopyScope {
+  return v === "body" || v === "titleBody" || v === "frontMatter";
+}
+
 // Existing "Note" (= 1) / "Note 12" titles, used to find the next free index.
 const NUMBERED_TITLE_RE = /^Note(?: (\d+))?$/;
 

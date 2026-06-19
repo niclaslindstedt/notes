@@ -25,7 +25,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 
-import { isDefaultTitleScheme } from "../domain/note.ts";
+import { isCopyScope, isDefaultTitleScheme } from "../domain/note.ts";
 import { loadFontFamily } from "./fonts.ts";
 import {
   COLOR_KEYS,
@@ -217,6 +217,9 @@ function coerce(raw: unknown): Appearance {
       defaultTitle: isDefaultTitleScheme(editor.defaultTitle)
         ? editor.defaultTitle
         : DEFAULT_EDITOR_SETTINGS.defaultTitle,
+      copyScope: isCopyScope(editor.copyScope)
+        ? editor.copyScope
+        : DEFAULT_EDITOR_SETTINGS.copyScope,
     },
     achievements,
     unseenAchievements: validUnseen(raw.unseenAchievements, achievements),

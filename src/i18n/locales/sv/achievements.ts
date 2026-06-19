@@ -141,6 +141,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "På datorn kan du släppa en eller flera Markdown-filer var som helst på fönstret så blir varje fil en anteckning — filnamnet blir titeln och innehållet fyller anteckningen.",
     },
+    copycat: {
+      name: "Kopiekatt",
+      condition: "Kopiera en anteckning till urklipp.",
+      learnMore:
+        "Kopieringsknappen bredvid synkglyfen lägger den öppna anteckningen på urklipp. Pilmenyn väljer hur mycket som tas med — bara brödtexten, titel och brödtext, eller hela .md-filen med dess YAML-frontmatter — och minns ditt val.",
+    },
 
     // ── Proffs ────────────────────────────────────────────────────────
     localVault: {
