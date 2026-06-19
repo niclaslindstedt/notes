@@ -76,6 +76,8 @@ type Props = {
   onAddNote: () => void;
   /** Delete a note permanently. */
   onRemoveNote: (id: string) => void;
+  /** Archive a note (a right swipe files it into the Archive view). */
+  onArchiveNote: (id: string) => void;
   /** How many notes are archived — shown as a count on the Archive entry. */
   archivedCount: number;
   /** Open the archive page (the list of archived notes). */
@@ -106,6 +108,7 @@ export function SideMenu({
   showAllActive,
   onAddNote,
   onRemoveNote,
+  onArchiveNote,
   archivedCount,
   onOpenArchive,
   archiveActive,
@@ -258,7 +261,9 @@ export function SideMenu({
               key={note.id}
               actionLabel={t("nav.deleteNote")}
               confirmLabel={t("nav.confirmDelete")}
+              archiveLabel={t("nav.archive")}
               onRemove={() => onRemoveNote(note.id)}
+              onArchive={() => onArchiveNote(note.id)}
             >
               {row}
             </SwipeToRemove>
@@ -518,28 +523,36 @@ function NavItem({
   );
 }
 
-// Wraps a drawer row so a left swipe latches it open to reveal a trailing
-// trash button (see `useSwipeReveal`). The first tap on the trash arms a
-// confirming state (the button reads `confirmLabel`) and only the second
-// tap commits — a guard against a stray swipe, even though the deletion is
-// itself undoable from the Edit section. The sliding foreground carries its
-// own surface background so it covers the action while closed.
+// Wraps a drawer row with the same two-outcome swipe as the overview card:
+// a LEFT swipe latches it open to reveal a trailing trash button, and a RIGHT
+// swipe archives the note (see `useSwipeReveal`). The first tap on the trash
+// arms a confirming state (the button reads `confirmLabel`) and only the
+// second tap commits — a guard against a stray swipe, even though the
+// deletion is itself undoable from the Edit section. Archiving fires straight
+// from the gesture: it's undoable too, and the note merely moves to the
+// Archive view, so it needs no confirm. The sliding foreground carries its
+// own surface background so it covers both actions while closed.
 const REMOVE_ACTION_W = 96;
 
 function SwipeToRemove({
   actionLabel,
   confirmLabel,
+  archiveLabel,
   onRemove,
+  onArchive,
   children,
 }: {
   /** Accessible label for the trash button in its resting state. */
   actionLabel: string;
   /** Label the trash button reads while awaiting a confirming second tap. */
   confirmLabel: string;
+  /** Label shown on the archive backdrop a right swipe uncovers. */
+  archiveLabel: string;
   onRemove: () => void | Promise<void>;
+  onArchive: () => void;
   children: ReactNode;
 }) {
-  const swipe = useSwipeReveal(REMOVE_ACTION_W);
+  const swipe = useSwipeReveal(REMOVE_ACTION_W, onArchive);
   const [confirming, setConfirming] = useState(false);
 
   // Closing the row (a tap on an open row, or a swipe back) disarms the
@@ -560,6 +573,18 @@ function SwipeToRemove({
 
   return (
     <div className="relative overflow-hidden">
+      {/* Archive backdrop — uncovered by swiping the row right. Hidden unless
+          the foreground is sliding right so the slide-off never bares it. */}
+      <div
+        aria-hidden={swipe.offset <= 0}
+        className={`absolute inset-0 flex items-center justify-start gap-2 bg-accent/15 pl-5 text-xs font-semibold tracking-wide text-accent uppercase ${
+          swipe.offset > 0 ? "" : "invisible"
+        }`}
+      >
+        <ArchiveIcon className="h-5 w-5" />
+        {archiveLabel}
+      </div>
+      {/* Delete — the trailing trash button a left swipe latches open. */}
       <div className="absolute inset-0 flex items-center justify-end">
         <button
           type="button"

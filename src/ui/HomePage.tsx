@@ -81,9 +81,10 @@ export function HomePage() {
               automatically by date and time or with a running number.
             </li>
             <li>
-              Swipe a note right in the overview to <em>archive</em> it — it
-              leaves the list without being deleted, and you can restore it from
-              the Archive view. Swipe left to uncover a quick Delete.
+              Swipe a note right — in the overview or the side menu — to{" "}
+              <em>archive</em> it: it leaves the list without being deleted, and
+              you can restore it from the Archive view. Swipe left to uncover a
+              quick Delete.
             </li>
             <li>
               Undo and redo your changes — bring back a deleted or archived note

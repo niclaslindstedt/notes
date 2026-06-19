@@ -14,8 +14,9 @@
 //
 // Pointer-based and axis-locked like `useSwipeReveal`: a vertical drag stays a
 // scroll of the panel, only a horizontal one engages the close. A row that
-// carries its own left-swipe-to-reveal (tagged `[data-drawer-swipe-ignore]`)
-// keeps its gesture — the close stands down when the drag starts on one.
+// carries its own swipe gestures (tagged `[data-drawer-swipe-ignore]` —
+// left to reveal delete, right to archive) keeps them: the close stands
+// down when the drag starts on one.
 
 import {
   useCallback,

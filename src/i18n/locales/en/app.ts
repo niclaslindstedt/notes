@@ -9,7 +9,6 @@ const app = {
   empty: "No notes yet. Tap + (or press Enter) to write your first one.",
   newNote: "New note",
   back: "Back",
-  deleteNote: "Delete note",
   startWriting: "Start writing…",
   titlePlaceholder: "Title",
   // Drag-and-drop import overlay (desktop): shown while Markdown files are
