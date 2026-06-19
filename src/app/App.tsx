@@ -43,6 +43,7 @@ import {
   namespaceFaviconHref,
 } from "../ui/namespace-favicon.ts";
 import { NavContext } from "../ui/nav-context.ts";
+import { APP_VIEWPORT_RECT } from "../ui/appViewportRect.ts";
 import { SideMenu } from "../ui/SideMenu.tsx";
 import { PullToRefreshIndicator } from "../ui/PullToRefreshIndicator.tsx";
 import { SyncIndicator } from "../ui/SyncIndicator.tsx";
@@ -293,7 +294,15 @@ export function App() {
   return (
     <NavContext.Provider value={nav}>
       <ModalBusProvider>
-        <div className="flex h-dvh overflow-hidden">
+        {/* Pin the whole shell to the *visual* viewport (the band actually on
+            screen) rather than the layout viewport (`h-dvh`). On iOS the soft
+            keyboard shrinks the visual viewport and scrolls the layout viewport
+            up to keep the caret in view — with an `h-dvh` shell that drag
+            carries the sticky header off the top of the screen, so the toolbar
+            appears to scroll away with the note. Sizing the shell to
+            `--app-height`/`--app-top` (the vars `useViewportHeight` mirrors)
+            keeps it filling the visible band, so the header stays frozen. */}
+        <div className="fixed flex overflow-hidden" style={APP_VIEWPORT_RECT}>
           <SideMenu
             notes={notes}
             activeNoteId={editingId}
