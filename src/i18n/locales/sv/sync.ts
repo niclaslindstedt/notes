@@ -42,10 +42,14 @@ const sync: SyncCatalog = {
   conflict: {
     title: "De här anteckningarna ändrades på en annan enhet",
     hint: "Din kopia på den här enheten och kopian i lagringen har båda ändrats. Behåll en — ingenting slås samman automatiskt.",
-    keepMineOne: "Behåll den här enhetens kopia ({n} anteckning)",
-    keepMineOther: "Behåll den här enhetens kopia ({n} anteckningar)",
-    keepTheirsOne: "Behåll den andra kopian ({n} anteckning)",
-    keepTheirsOther: "Behåll den andra kopian ({n} anteckningar)",
+    mineLabel: "Den här enheten",
+    theirsLabel: "Andra enheten",
+    notesOne: "{n} anteckning",
+    notesOther: "{n} anteckningar",
+    wordsOne: "{n} ord",
+    wordsOther: "{n} ord",
+    keepMine: "Behåll den här enhetens kopia",
+    keepTheirs: "Behåll den andra kopian",
   },
 };
 
