@@ -44,6 +44,11 @@ const hasMultiLineNote = (snap: Snapshot) =>
     (n) => n.body.split("\n").filter((line) => line.trim() !== "").length >= 2,
   );
 
+// A note that has been given a title in its own field — the first time someone
+// uses the dedicated title row rather than letting a note stay untitled.
+const hasTitledNote = (snap: Snapshot) =>
+  snap.notes.some((n) => n.title.trim() !== "");
+
 export const ACHIEVEMENTS: readonly Achievement[] = [
   // ──────────────────────────────────────────────────────────────
   // Beginner — "I just opened the app. What do I do?"
@@ -70,6 +75,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       slices: (s) => [s.snapshot],
       predicate: (prev, next) =>
         !hasMultiLineNote(prev.snapshot) && hasMultiLineNote(next.snapshot),
+    },
+  },
+  {
+    id: "headliner",
+    tier: "beginner",
+    glyph: TypeGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasTitledNote(prev.snapshot) && hasTitledNote(next.snapshot),
     },
   },
   {

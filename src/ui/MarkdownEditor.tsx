@@ -37,6 +37,8 @@ type Props = {
   disableAutocorrect: boolean;
   /** Max width of the writing column (`"none"` for full-bleed) + classes. */
   maxWidth: string;
+  /** Place the caret in the body on mount (false when the title takes focus). */
+  focusOnMount?: boolean;
 };
 
 export function MarkdownEditor({
@@ -46,6 +48,7 @@ export function MarkdownEditor({
   disableSpellcheck,
   disableAutocorrect,
   maxWidth,
+  focusOnMount = true,
 }: Props) {
   const t = useT();
   // Local source of truth, seeded from the note. App keys the editor by note
@@ -61,8 +64,12 @@ export function MarkdownEditor({
   );
   const taRef = useRef<HTMLTextAreaElement>(null);
   // Caret column to install the next time the textarea (re)focuses — set
-  // whenever we move the active line programmatically.
-  const pendingCaret = useRef<number | null>(value.length);
+  // whenever we move the active line programmatically. Null on mount when the
+  // body shouldn't grab focus (a new note focuses its title field instead);
+  // clicks / arrow keys still set it, so the body stays fully editable.
+  const pendingCaret = useRef<number | null>(
+    focusOnMount ? value.length : null,
+  );
 
   const clampedActive = Math.min(active, lines.length - 1);
 

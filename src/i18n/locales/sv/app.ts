@@ -8,6 +8,7 @@ const app: AppCatalog = {
   back: "Tillbaka",
   deleteNote: "Ta bort anteckning",
   startWriting: "Börja skriva…",
+  titlePlaceholder: "Titel",
 };
 
 export default app;

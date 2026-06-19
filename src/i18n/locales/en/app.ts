@@ -11,6 +11,7 @@ const app = {
   back: "Back",
   deleteNote: "Delete note",
   startWriting: "Start writing…",
+  titlePlaceholder: "Title",
 } as const;
 
 export type AppCatalog = Widen<typeof app>;

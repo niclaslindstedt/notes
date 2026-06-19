@@ -22,7 +22,10 @@ export function serialize(snapshot: Snapshot): string {
   );
 }
 
-function isNote(value: unknown): value is Note {
+// `title` is intentionally not required here: the v1 → v2 migration adds it,
+// but tolerating its absence (defaulting it in `parse`) keeps a hand-edited or
+// partially-written note loadable rather than silently dropped.
+function isNote(value: unknown): value is Omit<Note, "title"> {
   if (!value || typeof value !== "object") return false;
   const n = value as Record<string, unknown>;
   return (
@@ -55,7 +58,12 @@ export function parse(text: string | null | undefined): Snapshot {
     log.error("parse: migration failed — falling back to empty document", err);
     return emptySnapshot();
   }
-  const doc = migrated as Partial<Snapshot>;
-  const notes = Array.isArray(doc.notes) ? doc.notes.filter(isNote) : [];
+  const doc = migrated as { notes?: unknown[] };
+  const notes: Note[] = Array.isArray(doc.notes)
+    ? doc.notes.filter(isNote).map((n) => {
+        const title = (n as { title?: unknown }).title;
+        return { ...n, title: typeof title === "string" ? title : "" };
+      })
+    : [];
   return { notes };
 }

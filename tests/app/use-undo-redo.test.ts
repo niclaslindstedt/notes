@@ -7,7 +7,7 @@ import type { Note, Snapshot } from "../../src/domain/note.ts";
 
 // A note whose body doubles as an easy-to-assert tag.
 function note(tag: string): Note {
-  return { id: tag, body: tag, createdAt: 0, updatedAt: 0 };
+  return { id: tag, title: "", body: tag, createdAt: 0, updatedAt: 0 };
 }
 
 // A snapshot identified by the bodies of the notes it holds.

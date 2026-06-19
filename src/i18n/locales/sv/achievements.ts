@@ -49,7 +49,13 @@ const achievements: AchievementsCatalog = {
       name: "Ordkonstnär",
       condition: "Skriv en anteckning som sträcker sig över mer än en rad.",
       learnMore:
-        "Den första icke-tomma raden blir anteckningens titel i listan; allt nedanför är brödtexten. Anteckningar visar Markdown medan du skriver.",
+        "En antecknings titel är ett eget fält högst upp; allt nedanför är brödtexten. Anteckningar visar Markdown medan du skriver.",
+    },
+    headliner: {
+      name: "Rubriksättaren",
+      condition: "Ge en anteckning en titel.",
+      learnMore:
+        "Titeln är en egen rad högst upp i anteckningen — skriv den där i stället för som första raden i brödtexten. Den går inte att nå genom att backa från brödtexten, och den namnger anteckningens fil när du synkar till en mapp eller molnet.",
     },
     interiorDesigner: {
       name: "Inredaren",

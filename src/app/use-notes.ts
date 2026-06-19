@@ -15,6 +15,7 @@ import {
   editNote,
   isBlank,
   noteTitle,
+  retitleNote,
   sortByUpdated,
   type Note,
   type Snapshot,
@@ -32,6 +33,7 @@ export type NotesStore = {
   allNotes: Note[];
   create: () => string;
   update: (id: string, body: string) => void;
+  retitle: (id: string, title: string) => void;
   remove: (id: string) => void;
   /** Revert the most recent recorded edit (create / delete / edit session). */
   undo: () => void;
@@ -110,12 +112,23 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
 
   const update = useCallback(
     (id: string, body: string): void => {
-      // Label off the new body — the title is just its first non-empty line.
-      const title = noteTitle({ id, body, createdAt: 0, updatedAt: 0 });
+      const existing = docRef.current.notes.find((n) => n.id === id);
+      const title = existing ? noteTitle(existing) : "note";
       commit(
         (prev) => prev.map((n) => (n.id === id ? editNote(n, body) : n)),
         `Edited note “${title}”`,
         `edit:${id}`,
+      );
+    },
+    [commit],
+  );
+
+  const retitle = useCallback(
+    (id: string, title: string): void => {
+      commit(
+        (prev) => prev.map((n) => (n.id === id ? retitleNote(n, title) : n)),
+        `Renamed note “${title.trim() || "Untitled note"}”`,
+        `retitle:${id}`,
       );
     },
     [commit],
@@ -155,6 +168,7 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
     allNotes: notes,
     create,
     update,
+    retitle,
     remove,
     undo,
     redo,

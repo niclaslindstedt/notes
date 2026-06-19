@@ -60,6 +60,7 @@ export function App() {
     allNotes,
     create,
     update,
+    retitle,
     remove,
     undo,
     redo,
@@ -177,6 +178,7 @@ export function App() {
                 note={editing}
                 editor={editor}
                 onChange={(body) => update(editing.id, body)}
+                onTitleChange={(title) => retitle(editing.id, title)}
                 onClose={() => switchTo(null)}
                 onDelete={() => removeNote(editing.id)}
                 syncSlot={syncSlot}
@@ -289,6 +291,7 @@ function Editor({
   note,
   editor,
   onChange,
+  onTitleChange,
   onClose,
   onDelete,
   syncSlot,
@@ -296,12 +299,24 @@ function Editor({
   note: Note;
   editor: EditorSettings;
   onChange: (body: string) => void;
+  onTitleChange: (title: string) => void;
   onClose: () => void;
   onDelete: () => void;
   syncSlot: ReactNode;
 }) {
   const t = useT();
   const maxWidth = editorMarginMaxWidth(editor.margin);
+  // A brand-new note opens with the caret in the title; an existing note keeps
+  // the body focused so editing continues where it left off. Captured once for
+  // mount — typing the title doesn't re-route focus mid-session.
+  const titleFirst = useRef(isBlank(note)).current;
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  // Move focus from the title field into the body's editing surface (its
+  // textarea), used when the user presses Enter or Arrow-Down in the title.
+  function focusBody() {
+    bodyRef.current?.querySelector("textarea")?.focus();
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -330,25 +345,104 @@ function Editor({
         </div>
       </header>
 
-      {editor.renderMarkdown ? (
-        <MarkdownEditor
-          body={note.body}
-          onChange={onChange}
-          wordWrap={editor.wordWrap}
-          disableSpellcheck={editor.disableSpellcheck}
-          disableAutocorrect={editor.disableAutocorrect}
-          maxWidth={maxWidth}
-        />
-      ) : (
-        <PlainEditor
-          body={note.body}
-          onChange={onChange}
-          wordWrap={editor.wordWrap}
-          disableSpellcheck={editor.disableSpellcheck}
-          disableAutocorrect={editor.disableAutocorrect}
-          maxWidth={maxWidth}
-        />
-      )}
+      <TitleField
+        value={note.title}
+        onChange={onTitleChange}
+        onEnter={focusBody}
+        focusOnMount={titleFirst}
+        disableSpellcheck={editor.disableSpellcheck}
+        disableAutocorrect={editor.disableAutocorrect}
+        maxWidth={maxWidth}
+      />
+
+      <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">
+        {editor.renderMarkdown ? (
+          <MarkdownEditor
+            body={note.body}
+            onChange={onChange}
+            wordWrap={editor.wordWrap}
+            disableSpellcheck={editor.disableSpellcheck}
+            disableAutocorrect={editor.disableAutocorrect}
+            maxWidth={maxWidth}
+            focusOnMount={!titleFirst}
+          />
+        ) : (
+          <PlainEditor
+            body={note.body}
+            onChange={onChange}
+            wordWrap={editor.wordWrap}
+            disableSpellcheck={editor.disableSpellcheck}
+            disableAutocorrect={editor.disableAutocorrect}
+            maxWidth={maxWidth}
+            focusOnMount={!titleFirst}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// The note's title: its own single-line input above the body, styled to read
+// like the document's top heading (an H1 row) so it looks like part of the
+// note rather than a separate form control. It is *not* part of the body, so
+// backspacing at the start of the body never reaches it. Enter / Arrow-Down
+// hand focus down to the body.
+function TitleField({
+  value,
+  onChange,
+  onEnter,
+  focusOnMount,
+  disableSpellcheck,
+  disableAutocorrect,
+  maxWidth,
+}: {
+  value: string;
+  onChange: (title: string) => void;
+  onEnter: () => void;
+  focusOnMount: boolean;
+  disableSpellcheck: boolean;
+  disableAutocorrect: boolean;
+  maxWidth: string;
+}) {
+  const t = useT();
+  const ref = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState(value);
+
+  // Focus the title on mount for a fresh note (without the a11y-flagged
+  // focusOnMount attribute), placing the caret at the end.
+  useEffect(() => {
+    if (!focusOnMount) return;
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [focusOnMount]);
+
+  return (
+    <div
+      className="px-4 pt-4"
+      style={maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" }}
+    >
+      <input
+        ref={ref}
+        type="text"
+        value={draft}
+        spellCheck={!disableSpellcheck}
+        autoCorrect={disableAutocorrect ? "off" : "on"}
+        autoCapitalize={disableAutocorrect ? "off" : "sentences"}
+        placeholder={t("app.titlePlaceholder")}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          onChange(e.target.value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === "ArrowDown") {
+            e.preventDefault();
+            onEnter();
+          }
+        }}
+        className="w-full border-0 bg-transparent p-0 text-2xl font-bold text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60"
+      />
     </div>
   );
 }
@@ -362,6 +456,7 @@ function PlainEditor({
   disableSpellcheck,
   disableAutocorrect,
   maxWidth,
+  focusOnMount = true,
 }: {
   body: string;
   onChange: (body: string) => void;
@@ -369,20 +464,23 @@ function PlainEditor({
   disableSpellcheck: boolean;
   disableAutocorrect: boolean;
   maxWidth: string;
+  focusOnMount?: boolean;
 }) {
   const t = useT();
   const [value, setValue] = useState(body);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Focus the editor on open without the autoFocus prop (which a11y
+  // Focus the editor on open without the focusOnMount prop (which a11y
   // linting flags) — placing the caret at the end so editing an existing
-  // note continues where it left off.
+  // note continues where it left off. Skipped when the title field takes
+  // focus instead (a brand-new note).
   useEffect(() => {
+    if (!focusOnMount) return;
     const el = textareaRef.current;
     if (!el) return;
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
-  }, []);
+  }, [focusOnMount]);
 
   return (
     <textarea

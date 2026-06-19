@@ -30,4 +30,32 @@ describe("storage migrations", () => {
     expect(result.data.version).toBe(LATEST_VERSION);
     expect(result.data.notes).toEqual([]);
   });
+
+  it("v1 → v2 lifts the first body line into a title field", () => {
+    const result = migrate({
+      version: 1,
+      notes: [
+        {
+          id: "a",
+          body: "Groceries\n\nmilk\neggs",
+          createdAt: 1,
+          updatedAt: 2,
+        },
+      ],
+    });
+    const note = (result.data.notes as Array<Record<string, unknown>>)[0]!;
+    expect(note.title).toBe("Groceries");
+    // The title line and the blank line under it are removed from the body.
+    expect(note.body).toBe("milk\neggs");
+  });
+
+  it("v1 → v2 leaves a body-less note with an empty title", () => {
+    const result = migrate({
+      version: 1,
+      notes: [{ id: "a", body: "", createdAt: 1, updatedAt: 2 }],
+    });
+    const note = (result.data.notes as Array<Record<string, unknown>>)[0]!;
+    expect(note.title).toBe("");
+    expect(note.body).toBe("");
+  });
 });
