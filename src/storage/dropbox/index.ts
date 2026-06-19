@@ -16,7 +16,11 @@ import { createLogger } from "../../dev/logger.ts";
 import { AuthError, RateLimitError, type StorageAdapter } from "../adapter.ts";
 import { createDirectoryAdapter } from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
-import { DEFAULT_NAMESPACE_SLUG, namespaceCloudFolder } from "../namespaces.ts";
+import {
+  DEFAULT_NAMESPACE_SLUG,
+  namespaceCloudFolder,
+  namespaceNotesFolder,
+} from "../namespaces.ts";
 import {
   fileNamespaceStore,
   type NamespaceRegistryStore,
@@ -55,23 +59,29 @@ export function isDropboxConfigured(): boolean {
 // matches the Dropbox app registration's "App folder" name.
 export const DROPBOX_APP_FOLDER = "notes.niclaslindstedt.se";
 
-// Web URL that opens the app folder (or a namespace's folder within it) in
-// Dropbox's web UI.
+// Web URL that opens the namespace's notes folder in Dropbox's web UI.
 export function dropboxWebUrl(
   namespace: string = DEFAULT_NAMESPACE_SLUG,
 ): string {
-  const folder = namespaceCloudFolder(namespace);
-  const suffix = folder ? `/${folder}` : "";
-  return `https://www.dropbox.com/home/Apps/${DROPBOX_APP_FOLDER}${suffix}`;
+  return `https://www.dropbox.com/home/Apps/${DROPBOX_APP_FOLDER}/${namespaceNotesFolder(
+    namespace,
+  )}`;
 }
 
-// The root path a namespace's markdown files live under, relative to the
-// Dropbox app folder. The default namespace keeps the app-folder root (empty
-// path) it has always used; every other namespace gets its own `/<slug>`
-// folder so it can be shared on its own.
+// The Dropbox path a namespace's whole folder lives under, relative to the
+// app folder (empty for the default namespace, `/<slug>` otherwise). Used to
+// delete a namespace wholesale; the note files themselves sit in the `notes/`
+// subfolder of this (see `dropboxNotesPath`).
 export function dropboxNamespacePath(namespace: string): string {
   const folder = namespaceCloudFolder(namespace);
   return folder ? `/${folder}` : "";
+}
+
+// The Dropbox path a namespace's note markdown files live under, relative to
+// the app folder: `/notes` for the default namespace, `/<slug>/notes` for the
+// rest. This is the root the document file store is scoped to.
+export function dropboxNotesPath(namespace: string): string {
+  return `/${namespaceNotesFolder(namespace)}`;
 }
 
 const TOKEN_ENDPOINT = "https://api.dropboxapi.com/oauth2/token";
@@ -139,7 +149,7 @@ export function createDropboxAdapter(
   log.info(`adapter created ns=${namespace}`);
   const store = createDropboxFileStore(
     createAuthedFetch(auth, fetchImpl),
-    dropboxNamespacePath(namespace),
+    dropboxNotesPath(namespace),
   );
   return createDirectoryAdapter(store, {
     id: "dropbox",

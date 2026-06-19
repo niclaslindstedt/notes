@@ -15,7 +15,11 @@ import { createLogger } from "../../dev/logger.ts";
 import { AuthError, RateLimitError, type StorageAdapter } from "../adapter.ts";
 import { createDirectoryAdapter } from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
-import { DEFAULT_NAMESPACE_SLUG, namespaceCloudFolder } from "../namespaces.ts";
+import {
+  DEFAULT_NAMESPACE_SLUG,
+  namespaceCloudFolder,
+  namespaceNotesFolder,
+} from "../namespaces.ts";
 import {
   fileNamespaceStore,
   type NamespaceRegistryStore,
@@ -103,7 +107,11 @@ export function createGdriveAdapter(
   namespace: string = DEFAULT_NAMESPACE_SLUG,
 ): StorageAdapter {
   log.info(`adapter created hasToken=${Boolean(token)} ns=${namespace}`);
-  const store = createGdriveFileStore(token, fetchImpl, namespace);
+  const store = createGdriveFileStore(
+    token,
+    fetchImpl,
+    namespaceNotesFolder(namespace),
+  );
   return createDirectoryAdapter(store, {
     id: "gdrive",
     label: "Google Drive",
@@ -135,12 +143,13 @@ export function createGdriveNamespaceStore(
 function createGdriveFileStore(
   token: string,
   fetchImpl: FetchImpl,
-  namespace: string = "",
+  baseFolder: string = "",
 ): FileStore {
-  // The namespace's folder name under the `notes/` app folder. Empty for the
-  // default namespace (and the root settings / registry stores), so its files
-  // land directly in the app folder.
-  const namespaceFolder = namespace ? namespaceCloudFolder(namespace) : "";
+  // The folder, relative to the `notes/` app folder, this store is rooted at:
+  // `notes` / `<slug>/notes` for a namespace's documents, or empty for the
+  // root settings / registry stores that land directly in the app folder.
+  // Split into segments so a multi-segment base resolves folder by folder.
+  const baseSegments = split(baseFolder);
   // Cache folder ids by their relative directory path ("" = the namespace's
   // base folder). Drive ids are stable, so this only ever grows within an
   // adapter's lifetime.
@@ -214,10 +223,10 @@ function createGdriveFileStore(
     }
 
     let parentId = appId;
-    // An empty namespace folder resolves at the app-folder root (the root
-    // settings / registry stores), so the segment drops out and files land
-    // directly in the `notes/` folder.
-    for (const segment of [namespaceFolder, ...split(relDir)].filter(
+    // An empty base resolves at the app-folder root (the root settings /
+    // registry stores), so the segments drop out and files land directly in
+    // the `notes/` app folder.
+    for (const segment of [...baseSegments, ...split(relDir)].filter(
       (s) => s.length > 0,
     )) {
       let id = await findChildFolder(segment, parentId);

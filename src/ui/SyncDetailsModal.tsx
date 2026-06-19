@@ -8,7 +8,7 @@ import {
   GDRIVE_APP_FOLDER_NAME,
   gdriveWebUrl,
 } from "../storage/gdrive/index.ts";
-import { namespaceCloudFolder } from "../storage/namespaces.ts";
+import { namespaceNotesFolder } from "../storage/namespaces.ts";
 import { Button } from "./form/Button.tsx";
 import {
   CloseIcon,
@@ -64,24 +64,23 @@ type ProviderView = {
 };
 
 function providerView(backend: BackendId, namespace: string): ProviderView {
-  const folder = namespaceCloudFolder(namespace);
-  const suffix = folder ? `/${folder}` : "";
+  const notesFolder = namespaceNotesFolder(namespace);
   if (backend === "dropbox") {
     return {
-      path: `Apps/${DROPBOX_APP_FOLDER}${suffix}`,
+      path: `Apps/${DROPBOX_APP_FOLDER}/${notesFolder}`,
       url: dropboxWebUrl(namespace),
     };
   }
   if (backend === "gdrive") {
     return {
-      path: `My Drive/${GDRIVE_APP_FOLDER_NAME}${suffix}`,
+      path: `My Drive/${GDRIVE_APP_FOLDER_NAME}/${notesFolder}`,
       // Drive home — the folder id isn't threaded here, so the user scrolls to
       // the folder from My Drive.
       url: gdriveWebUrl(null),
     };
   }
   // Picked folder: no web URL, and the OS path isn't exposed to the app.
-  return { path: folder || "the folder you picked", url: null };
+  return { path: notesFolder, url: null };
 }
 
 type StatusView = {
