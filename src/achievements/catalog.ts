@@ -163,6 +163,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     },
   },
   {
+    id: "freehand",
+    tier: "intermediate",
+    glyph: TypeGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.appearance.editor.spellcheck],
+      predicate: (prev, next) =>
+        prev.appearance.editor.spellcheck && !next.appearance.editor.spellcheck,
+    },
+  },
+  {
     id: "compartments",
     tier: "intermediate",
     glyph: BoxesGlyph,

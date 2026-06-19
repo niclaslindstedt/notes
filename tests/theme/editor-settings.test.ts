@@ -26,6 +26,7 @@ describe("editor margin helpers", () => {
       margin: "none",
       wordWrap: true,
       renderMarkdown: true,
+      spellcheck: true,
     });
   });
 });

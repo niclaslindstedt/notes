@@ -55,6 +55,12 @@ export function EditorSection({
         checked={editor.renderMarkdown}
         onChange={(v) => update("renderMarkdown", v)}
       />
+      <ToggleRow
+        label={t("settings.editor.spellcheck")}
+        hint={t("settings.editor.spellcheckHint")}
+        checked={editor.spellcheck}
+        onChange={(v) => update("spellcheck", v)}
+      />
     </Section>
   );
 }

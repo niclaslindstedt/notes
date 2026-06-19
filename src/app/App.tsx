@@ -335,6 +335,7 @@ function Editor({
           body={note.body}
           onChange={onChange}
           wordWrap={editor.wordWrap}
+          spellcheck={editor.spellcheck}
           maxWidth={maxWidth}
         />
       ) : (
@@ -342,6 +343,7 @@ function Editor({
           body={note.body}
           onChange={onChange}
           wordWrap={editor.wordWrap}
+          spellcheck={editor.spellcheck}
           maxWidth={maxWidth}
         />
       )}
@@ -355,11 +357,13 @@ function PlainEditor({
   body,
   onChange,
   wordWrap,
+  spellcheck,
   maxWidth,
 }: {
   body: string;
   onChange: (body: string) => void;
   wordWrap: boolean;
+  spellcheck: boolean;
   maxWidth: string;
 }) {
   const t = useT();
@@ -381,6 +385,9 @@ function PlainEditor({
       ref={textareaRef}
       value={value}
       wrap={wordWrap ? "soft" : "off"}
+      spellCheck={spellcheck}
+      autoCorrect={spellcheck ? "on" : "off"}
+      autoCapitalize={spellcheck ? "sentences" : "off"}
       onChange={(e) => {
         setValue(e.target.value);
         onChange(e.target.value);

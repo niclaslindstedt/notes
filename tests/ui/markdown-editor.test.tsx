@@ -7,7 +7,13 @@ import { MarkdownEditor } from "../../src/ui/MarkdownEditor.tsx";
 function renderEditor(body: string) {
   const onChange = vi.fn();
   const utils = render(
-    <MarkdownEditor body={body} onChange={onChange} wordWrap maxWidth="none" />,
+    <MarkdownEditor
+      body={body}
+      onChange={onChange}
+      wordWrap
+      spellcheck
+      maxWidth="none"
+    />,
   );
   return { onChange, ...utils };
 }

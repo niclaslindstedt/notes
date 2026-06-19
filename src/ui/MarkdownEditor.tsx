@@ -31,11 +31,19 @@ type Props = {
   onChange: (body: string) => void;
   /** Wrap long lines, or keep them on one line and scroll horizontally. */
   wordWrap: boolean;
+  /** Spell check + autocorrect/-capitalise as you type (`false` to disable). */
+  spellcheck: boolean;
   /** Max width of the writing column (`"none"` for full-bleed) + classes. */
   maxWidth: string;
 };
 
-export function MarkdownEditor({ body, onChange, wordWrap, maxWidth }: Props) {
+export function MarkdownEditor({
+  body,
+  onChange,
+  wordWrap,
+  spellcheck,
+  maxWidth,
+}: Props) {
   const t = useT();
   // Local source of truth, seeded from the note. App keys the editor by note
   // id, so a different note remounts rather than reconciling mid-edit.
@@ -291,7 +299,9 @@ export function MarkdownEditor({ body, onChange, wordWrap, maxWidth }: Props) {
               rows={1}
               wrap={wordWrap ? "soft" : "off"}
               value={line}
-              spellCheck
+              spellCheck={spellcheck}
+              autoCorrect={spellcheck ? "on" : "off"}
+              autoCapitalize={spellcheck ? "sentences" : "off"}
               placeholder={
                 lines.length === 1 ? t("app.startWriting") : undefined
               }

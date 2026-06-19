@@ -193,12 +193,17 @@ export type EditorSettings = {
   // Render Markdown inline as you type, Obsidian-style — every line but the
   // one the caret sits on shows formatted, the active line shows its source.
   renderMarkdown: boolean;
+  // Let the browser/OS check spelling and auto-correct/-capitalise what you
+  // type. Off disables the red squiggles plus mobile autocorrect and
+  // auto-capitalisation, handy for code, structured notes, or other languages.
+  spellcheck: boolean;
 };
 
 export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   margin: "none",
   wordWrap: true,
   renderMarkdown: true,
+  spellcheck: true,
 };
 
 export type RadiusPreset = "none" | "sm" | "md" | "lg";
