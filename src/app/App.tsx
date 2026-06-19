@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { unlock, useAchievementWatcher } from "../achievements/index.ts";
 import { isBlank, noteTitle, notePreview, type Note } from "../domain/note.ts";
+import { isStandaloneMobile } from "../pwa/standalone.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
-import { useApplyAppearance } from "../theme/useTheme.ts";
+import { unlockAchievements, useApplyAppearance } from "../theme/useTheme.ts";
+import { TrophyButton } from "../ui/achievements/TrophyButton.tsx";
 import { AppTitle } from "../ui/AppTitle.tsx";
 import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
@@ -20,6 +23,8 @@ import { SideMenu } from "../ui/SideMenu.tsx";
 import { SyncIndicator } from "../ui/SyncIndicator.tsx";
 import { UnlockGate } from "../ui/UnlockGate.tsx";
 import { UpdateToast } from "../ui/UpdateToast.tsx";
+import { AchievementsModalHost } from "./modals/AchievementsModalHost.tsx";
+import { AchievementsUnlockModalHost } from "./modals/AchievementsUnlockModalHost.tsx";
 import { ChangelogModalHost } from "./modals/ChangelogModalHost.tsx";
 import { NamespacesModalHost } from "./modals/NamespacesModalHost.tsx";
 import { SettingsModalHost } from "./modals/SettingsModalHost.tsx";
@@ -41,7 +46,8 @@ export function App() {
   // `100svh` comes up short. Sets the `--app-height` / `--app-top` vars that
   // `appViewportRect.ts` reads.
   useViewportHeight();
-  const { editor } = useApplyAppearance();
+  const appearance = useApplyAppearance();
+  const { editor } = appearance;
   // The active storage backend (this device / a local folder / a cloud) and
   // its sync engine. Appearance settings reconcile against the same backend
   // so they travel with a synced folder too.
@@ -77,6 +83,23 @@ export function App() {
   // stands down while focus is in a text field so the editor's native undo
   // keeps working as you type.
   useUndoRedoShortcuts({ canUndo, canRedo, onUndo: undo, onRedo: redo });
+
+  // Achievements: watch the note document + appearance for derived unlocks and
+  // drain the manual-unlock bus, recording each into the synced appearance
+  // store. The trophy button in the header surfaces what's been earned.
+  useAchievementWatcher({
+    snapshot: sync.doc,
+    appearance,
+    loaded: sync.loaded,
+    enabled: !appearance.disableAchievements,
+    record: unlockAchievements,
+  });
+
+  // Running as an installed PWA is the "Home screen" trophy — fire it once on
+  // mount; the bus + record are idempotent, so a relaunch never re-badges it.
+  useEffect(() => {
+    if (isStandaloneMobile()) unlock("homeScreen");
+  }, []);
 
   // Re-badge the browser-tab favicon to the active namespace's glyph (in its
   // accent colour) so a glance tells you which namespace you're in. A
@@ -170,6 +193,8 @@ export function App() {
         <SettingsModalHost storage={storage} />
         <NamespacesModalHost storage={storage} />
         <ChangelogModalHost />
+        <AchievementsModalHost />
+        <AchievementsUnlockModalHost />
         <ConflictModal sync={sync} />
         <UpdateToast />
       </ModalBusProvider>
@@ -209,7 +234,10 @@ function NoteList({
     <div className="flex h-full flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
         <AppTitle />
-        <div className="flex items-center gap-2">{syncSlot}</div>
+        <div className="flex items-center gap-2">
+          <TrophyButton />
+          {syncSlot}
+        </div>
       </header>
 
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
@@ -286,6 +314,7 @@ function Editor({
           ← Back
         </button>
         <div className="flex items-center gap-2">
+          <TrophyButton />
           {syncSlot}
           <button
             type="button"

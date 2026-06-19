@@ -89,6 +89,11 @@ export function HomePage() {
               remembered on the device.
             </li>
             <li>
+              Earn <em>achievements</em> as you discover features — an optional,
+              for-fun tour of everything the app can do, which you can switch
+              off whenever you like.
+            </li>
+            <li>
               Install it as an app and keep using it offline — no connection
               required once it has loaded.
             </li>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { unlock } from "../achievements/index.ts";
 import type { UseStorageBackend } from "../storage/useStorageBackend.ts";
 import type { NotesSync } from "../app/use-notes-sync.ts";
 import { SyncDetailsModal } from "./SyncDetailsModal.tsx";
@@ -56,7 +57,10 @@ export function SyncIndicator({ sync, storage }: Props) {
         dirty={sync.dirty}
         offline={sync.offline}
         onSaveNow={sync.saveNow}
-        onReload={() => void sync.reload()}
+        onReload={() => {
+          unlock("freshPull");
+          void sync.reload();
+        }}
         onReconnect={reconnect}
         onClose={() => setOpen(false)}
       />

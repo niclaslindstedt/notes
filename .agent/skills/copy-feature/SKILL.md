@@ -301,6 +301,27 @@ reuse them rather than re-porting:
   are inlined (no i18n). The `TYPE_COLOR` map collapses checklist's
   positive/negative/success slots — which notes dropped — onto
   `accent`/`danger`/`muted`; the bold label text carries the distinction.
+- **Achievements** — `src/achievements/` (`catalog.ts`, pure `derive.ts`,
+  in-memory `bus.ts`, `useAchievementWatcher.ts`, `glyphs.tsx`, `types.ts`,
+  `index.ts`) + `src/ui/achievements/` (`TrophyButton`, `AchievementsModal`
+  tour, `AchievementUnlockModal`) + the two `app/modals/*Host.tsx`, opened by
+  `{ kind: "achievements" }` / `{ kind: "achievements-unlock" }`. Key notes
+  adaptations vs checklist: (1) **no i18n** — name/condition/learnMore are
+  inlined straight into the catalog entries, not looked up by id; (2) **no
+  separate `Settings` doc** — the unlock map, unseen queue, and `disable`
+  flag live on the synced `Appearance` store (`theme/useTheme.ts`:
+  `unlockAchievements` / `clearUnseenAchievements` / `setDisableAchievements`),
+  so the `AchState` slice is `appearance`, not `settings`, and trophies travel
+  with `settings.json` for free; (3) **no toast** — `onUnlocked` was dropped,
+  the lit-trophy badge (driven by `unseenAchievements`) is the only surfacing;
+  (4) **no `achievements-context`** — `TrophyButton` reads `useAppearance()`
+  directly (notes' header isn't memoised, so the budget/checklist context
+  dance to avoid re-rendering a list isn't needed); (5) tones collapse onto
+  notes' palette (`flag`→`accent`, `pipe`→`link`, `meta`/`success`→
+  `muted`/`accent`). Manual unlocks fire `unlock(id)` from the storage backend
+  (aliased `unlockAchievement` there — that module already has a passphrase
+  `unlock`), `use-notes` (undo), `use-notes-sync` (conflict), `use-nav`
+  (hide-button), `SyncIndicator` (reload), and an App effect (install).
 
 ### Privacy / clean-URL routing
 

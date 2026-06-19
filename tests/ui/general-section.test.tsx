@@ -5,6 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GeneralSection } from "../../src/ui/settings/GeneralSection.tsx";
 import { NavContext, type NavContextValue } from "../../src/ui/nav-context.ts";
 import { useStandaloneMobile } from "../../src/pwa/standalone.ts";
+import {
+  getAppearance,
+  setDisableAchievements,
+} from "../../src/theme/useTheme.ts";
 
 // The Show-menu-button toggle is only offered in the installed PWA on a
 // phone / tablet, so the standalone detector is mocked per test.
@@ -40,11 +44,21 @@ function renderWithNav(overrides: Partial<NavContextValue> = {}) {
 describe("GeneralSection", () => {
   afterEach(() => {
     mockStandalone.mockReturnValue(false);
+    setDisableAchievements(false);
   });
 
   it("always shows the local-first blurb", () => {
     renderWithNav();
     expect(screen.getByText(/local-first/i)).toBeTruthy();
+  });
+
+  it("toggles the achievements system off", () => {
+    renderWithNav();
+    const toggle = screen.getByLabelText("Disable achievements");
+    expect(toggle).toBeTruthy();
+    // Off by default (achievements on); ticking it disables the system.
+    fireEvent.click(toggle);
+    expect(getAppearance().disableAchievements).toBe(true);
   });
 
   it("hides the menu-button toggle outside a standalone mobile PWA", () => {

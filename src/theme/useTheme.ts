@@ -52,8 +52,12 @@ export type {
   ThemePreset,
 } from "./themes.ts";
 
-// The persisted appearance document. Plain JSON so it round-trips through
-// localStorage unchanged.
+// The persisted appearance document — and, since it's the one preferences
+// blob that already travels with the synced `settings.json`, the home for the
+// achievement state too (so earned trophies follow the user across devices,
+// the same way checklist keeps them in its synced `Settings`). The theme
+// projection ignores the achievement fields; only the achievements feature
+// reads them. Plain JSON so it round-trips through localStorage unchanged.
 export type Appearance = {
   theme: ThemePreset;
   fontFamily: FontFamilyId;
@@ -62,6 +66,18 @@ export type Appearance = {
   customTheme: CustomTheme;
   // Note-writing surface preferences (margins, wrap, live Markdown).
   editor: EditorSettings;
+  // Earned achievements: a map of achievement `id` → unlock timestamp (ms
+  // epoch). Idempotent — an id already present keeps its first timestamp.
+  achievements: Record<string, number>;
+  // Achievements unlocked since the user last opened the unlock notification.
+  // Drives the trophy button's badge; cleared when that modal is dismissed. A
+  // subset of the keys in `achievements`.
+  unseenAchievements: string[];
+  // Whether the achievements system is switched off. When on, the watcher
+  // stops recording unlocks and the header trophy button hides itself.
+  // Already-earned achievements are preserved, so flipping it back reveals
+  // the same progress.
+  disableAchievements: boolean;
 };
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -70,6 +86,9 @@ export const DEFAULT_APPEARANCE: Appearance = {
   fontScale: DEFAULT_FONT_SCALE,
   customTheme: DEFAULT_CUSTOM_THEME,
   editor: DEFAULT_EDITOR_SETTINGS,
+  achievements: {},
+  unseenAchievements: [],
+  disableAchievements: false,
 };
 
 const STORAGE_KEY = "notes/appearance";
@@ -115,6 +134,27 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
+// Coerce a stored value into the achievements map: a plain object whose values
+// are finite numbers (unlock timestamps). Anything else is dropped.
+function validAchievements(v: unknown): Record<string, number> {
+  if (!isRecord(v)) return {};
+  const out: Record<string, number> = {};
+  for (const [id, ts] of Object.entries(v)) {
+    if (typeof ts === "number" && Number.isFinite(ts)) out[id] = ts;
+  }
+  return out;
+}
+
+// Coerce a stored value into the unseen-achievements list: a string array
+// narrowed to ids that actually appear in the unlocked map (a stale unseen
+// id whose unlock was dropped would otherwise badge the trophy forever).
+function validUnseen(v: unknown, unlocked: Record<string, number>): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(
+    (id): id is string => typeof id === "string" && unlocked[id] !== undefined,
+  );
+}
+
 // Coerce arbitrary stored JSON into a valid `Appearance`, falling back to
 // the defaults slot-by-slot so a partial or stale document never crashes
 // the boot — a forward/backward-compatible read, like checklist's store.
@@ -126,6 +166,7 @@ function coerce(raw: unknown): Appearance {
   const custom = isRecord(raw.customTheme) ? raw.customTheme : {};
   const colors = isRecord(custom.colors) ? custom.colors : {};
   const editor = isRecord(raw.editor) ? raw.editor : {};
+  const achievements = validAchievements(raw.achievements);
   return {
     theme:
       typeof theme === "string" && (THEME_SET as Set<string>).has(theme)
@@ -171,6 +212,9 @@ function coerce(raw: unknown): Appearance {
           ? editor.renderMarkdown
           : DEFAULT_EDITOR_SETTINGS.renderMarkdown,
     },
+    achievements,
+    unseenAchievements: validUnseen(raw.unseenAchievements, achievements),
+    disableAchievements: raw.disableAchievements === true,
   };
 }
 
@@ -244,6 +288,40 @@ export function subscribeAppearance(listener: () => void): () => void {
 /** Set just the theme preset — the quick-toggle path. */
 export function setTheme(theme: ThemePreset): void {
   updateAppearance("theme", theme);
+}
+
+/**
+ * Record one or more freshly-earned achievements, returning the ids that were
+ * genuinely new. Idempotent per id — an id already unlocked keeps its original
+ * timestamp and is not re-queued as unseen — so the achievement watcher can
+ * call this on every transition without drift. New ids land in both the
+ * unlocked map (stamped now) and the unseen queue (so the trophy badges).
+ */
+export function unlockAchievements(ids: readonly string[]): string[] {
+  const now = Date.now();
+  const achievements = { ...current.achievements };
+  const unseen = [...current.unseenAchievements];
+  const newly: string[] = [];
+  for (const id of ids) {
+    if (achievements[id] !== undefined) continue;
+    achievements[id] = now;
+    if (!unseen.includes(id)) unseen.push(id);
+    newly.push(id);
+  }
+  if (newly.length === 0) return [];
+  persist({ ...current, achievements, unseenAchievements: unseen });
+  return newly;
+}
+
+/** Clear the unseen-achievements queue (the trophy badge empties). */
+export function clearUnseenAchievements(): void {
+  if (current.unseenAchievements.length === 0) return;
+  persist({ ...current, unseenAchievements: [] });
+}
+
+/** Switch the achievements system on or off. */
+export function setDisableAchievements(disabled: boolean): void {
+  updateAppearance("disableAchievements", disabled);
 }
 
 /** Read the active appearance and re-render on change. */

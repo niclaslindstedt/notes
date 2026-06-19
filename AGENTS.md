@@ -205,6 +205,16 @@ The source tree under `src/` is organized by concern, not by file type:
 - `src/styles/` — the CSS-variable token system (`theme.css`).
 - `src/pwa/` — service-worker registration and update lifecycle
   (`usePwaUpdate.ts`), standalone/install detection (`standalone.ts`).
+- `src/achievements/` — the achievements feature: a `catalog.ts` of
+  unlockable trophies (each one a feature of the app), a pure `derive.ts`
+  over an `AchState` (`{ snapshot, appearance }`) transition, an in-memory
+  `bus.ts` for the manual unlocks fired from outside that state
+  (folder/cloud connect, encryption, namespace create, install, undo,
+  reload, conflict resolve), and the `useAchievementWatcher` mounted once in
+  `App`. The unlock map lives in the synced appearance store
+  (`theme/useTheme.ts`), so earned trophies travel with cloud sync; the UI
+  is in `src/ui/achievements/` (the header `TrophyButton`, the four-tier
+  tour modal, and the unlock-notification modal).
 - `src/ui/` — presentational components (e.g. `UpdateToast.tsx`). Two of
   these are **standalone public pages** mounted by a path switch in
   `main.tsx` rather than rendered inside the app shell: `PrivacyPage.tsx`
@@ -226,6 +236,7 @@ the DOM. This keeps `domain/` portable to the planned React Native app.
 | Top-level state / a new view             | `src/app/`                         |
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |
 | PWA / service-worker behaviour           | `src/pwa/`                         |
+| A new achievement / its unlock trigger   | `src/achievements/catalog.ts`      |
 
 ### The public pages
 
@@ -282,8 +293,44 @@ pasting it verbatim.
 | The `src/` layout or boundaries   | This file's Architecture summary      |
 | The `copy-feature` skill behaviour| `.agent/skills/copy-feature/SKILL.md` |
 | A user-visible feature            | a fragment in `.changes/unreleased/`, and the `/home` showcase (`src/ui/HomePage.tsx`) |
+| A user-facing feature / surface (shipped or removed) | **Add (or retire) a matching achievement** in the same PR — see "Achievements". Every feature is also an unlockable trophy. |
 | What data the app reads/writes/sends, or an OAuth scope | `src/ui/HomePage.tsx` **and** `src/ui/PrivacyPage.tsx` |
 | Release / deploy / changelog flow | this file's "Releases and changelog"  |
+
+## Achievements
+
+The app ships an **achievements** system, ported from checklist: every
+user-facing feature is also an unlockable trophy, sorted into four tiers that
+mirror how far the user has grown into the app —
+**Beginner → Intermediate → Pro → Expert**. The trophy button in the header
+opens the guided tour of the whole catalog when it's quiet; when one or more
+unlocks are unacknowledged it lights up with a badge and instead opens an
+unlock-notification modal listing just the new ones (closing that clears the
+queue). The whole system can be switched off in Settings → General.
+
+It lives in two places that must stay in lockstep:
+
+- **The catalog** — `src/achievements/catalog.ts`: each entry's `id`
+  (stable, write-once), `tier`, `glyph`, unlock `trigger`, and — unlike
+  checklist, which has an i18n layer — its display copy (`name`, `condition`,
+  optional `learnMore`) **inlined right on the entry**. Glyphs are inline SVGs
+  in `src/achievements/glyphs.tsx` (the app stays dependency-free — no
+  `lucide-react`); reuse one of `src/ui/icons.tsx`'s glyphs where it fits.
+- **The renderer** — `src/ui/achievements/AchievementsModal.tsx` reads the
+  catalog by `id`. New entries appear automatically without touching it.
+
+A trigger is either **`derived`** — a predicate over `(prev, next)` of the
+combined `{ snapshot, appearance }` state that flips false→true (use this
+whenever the feature mutates the persisted note document or the synced
+appearance store) — or **`manual`**, fired by calling `unlock("<id>")` from
+the chokepoint that observes the gesture (folder/cloud connect, encryption,
+namespace create, install, undo, reload, conflict resolve). The watcher
+(`src/achievements/useAchievementWatcher.ts`, mounted once in `App`) runs the
+derived pass on every transition and drains the manual-unlock bus
+(`src/achievements/bus.ts`). **Every `manual` entry must have a wired
+`unlock("<id>")` call.** Progress lives in the synced appearance store's
+`achievements` map (`src/theme/useTheme.ts`), so it travels with the user
+across devices on the cloud/folder backends.
 
 ## Maintenance skills
 
