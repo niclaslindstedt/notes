@@ -96,6 +96,7 @@ Honour these when naming a new file, key, or string.
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | **Notes store** / **app state** / **the store hook**       | `useNotes`, `NotesStore` (`src/app/use-notes.ts`). [→](overview.md#notes-store)                              |
 | **Sync engine** / **save status** / **debounced save**     | `useNotesSync`, `NotesSync`, `SaveStatus` (`src/app/use-notes-sync.ts`). [→](overview.md#sync-engine)        |
+| **Live pull** / **live sync** / **watch another device**    | `LIVE_PULL_INTERVAL_MS`, `shouldLivePull`, the polling effect in `useNotesSync` (`src/app/use-notes-sync.ts`); the body-reconcile effect in `MarkdownEditor`/`PlainEditor`. [→](overview.md#live-pull) |
 | **Save hold** / **defer save while titling**               | `holdSaves` / `releaseSaves` (`src/app/use-notes-sync.ts`). [→](overview.md#save-hold)                       |
 | **Undo** / **redo** / **undo timeline** / **history**      | `useUndoRedo`, `UndoRedo`, `UNDO_HISTORY_LIMIT` (`src/app/use-undo-redo.ts`); `useUndoRedoShortcuts` (`src/ui/hooks/useUndoRedoShortcuts.ts`). [→](overview.md#undo--redo) |
 | **Settings sync** / **theme travels with the folder**      | `useSettingsSync` (`src/app/use-settings-sync.ts`); `SettingsStore` (`src/storage/settings-store.ts`). [→](overview.md#settings-sync) |

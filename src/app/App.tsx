@@ -973,6 +973,16 @@ function PlainEditor({
   const [value, setValue] = useState(body);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Adopt an out-of-band change to this note's body — a live cloud pull while
+  // the note is open. Our own keystrokes echo back through `onChange` to the
+  // same string, so a `body` that differs from the local value can only be
+  // another writer's edit arriving during the live-pull quiet window.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  useEffect(() => {
+    if (body !== valueRef.current) setValue(body);
+  }, [body]);
+
   // Focus the editor on open without the focusOnMount prop (which a11y
   // linting flags) — placing the caret at the end so editing an existing
   // note continues where it left off. Skipped when the title field takes

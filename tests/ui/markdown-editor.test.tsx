@@ -19,6 +19,13 @@ function renderEditor(body: string) {
   return { onChange, ...utils };
 }
 
+const editorProps = {
+  wordWrap: true,
+  disableSpellcheck: false,
+  disableAutocorrect: false,
+  maxWidth: "none",
+} as const;
+
 // The active line is the one the caret sits on; it's the only <textarea>.
 function activeTextarea(): HTMLTextAreaElement {
   return screen.getByRole("textbox") as HTMLTextAreaElement;
@@ -160,5 +167,29 @@ describe("MarkdownEditor", () => {
     // The keyboard inserts a character after the sentinel.
     fireEvent.change(ta, { target: { value: `${SENTINEL}x` } });
     expect(onChange).toHaveBeenLastCalledWith("a\nx");
+  });
+
+  // A live cloud pull replaces the open note's `body` prop while the editor is
+  // mounted; the editor must adopt the new text in place (the "write here, see
+  // it there" path) rather than keeping its mount-time copy.
+  it("adopts an out-of-band change to the body prop", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <MarkdownEditor body="first" onChange={onChange} {...editorProps} />,
+    );
+    expect(activeTextarea().value).toBe("first");
+
+    // A remote pull lands a longer document while the note is open.
+    rerender(
+      <MarkdownEditor
+        body={"first\nfrom another device"}
+        onChange={onChange}
+        {...editorProps}
+      />,
+    );
+
+    expect(screen.getByText("from another device")).not.toBeNull();
+    // Adopting a remote change must not be reported back as a local edit.
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

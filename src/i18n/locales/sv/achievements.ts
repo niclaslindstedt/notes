@@ -179,6 +179,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Med en lokal mapp eller molnbackend kan du klistra in (Ctrl/Cmd+V) eller dra en bild rakt in i redigeraren. Den sparas som en riktig bildfil i en attachments-mapp bredvid dina anteckningar och visas inline som en miniatyr du kan klicka på för att öppna i full storlek.",
     },
+    liveSync: {
+      name: "Telepati",
+      condition: "Se en redigering från en annan enhet dyka upp av sig själv.",
+      learnMore:
+        "Med en mapp- eller molnbackend ansluten letar notes tyst efter ändringar med några sekunders mellanrum och hämtar in dem av sig själv — så att en redigering du gör på en enhet dyker upp på en annan medan du tittar, även med anteckningen öppen, så länge du pausat skrivandet.",
+    },
 
     // ── Expert ────────────────────────────────────────────────────────
     paranoidMode: {

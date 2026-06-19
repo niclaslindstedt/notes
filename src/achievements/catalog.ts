@@ -10,6 +10,7 @@ import {
   AccessibilityGlyph,
   ArchiveGlyph,
   BoxesGlyph,
+  BroadcastGlyph,
   CloudGlyph,
   CodeGlyph,
   CopyGlyph,
@@ -306,6 +307,13 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       predicate: (prev, next) =>
         !hasAttachment(prev.snapshot) && hasAttachment(next.snapshot),
     },
+  },
+  {
+    id: "liveSync",
+    tier: "pro",
+    glyph: BroadcastGlyph,
+    learnMore: true,
+    trigger: { kind: "manual" },
   },
 
   // ──────────────────────────────────────────────────────────────
