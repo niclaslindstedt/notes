@@ -346,6 +346,7 @@ export function App() {
             showAllActive={view === "notes" && !editing && !reading}
             onAddNote={openNew}
             onRemoveNote={removeNote}
+            onArchiveNote={archiveNote}
             archivedCount={archived.length}
             onOpenArchive={openArchive}
             archiveActive={view === "archive" && !editing}
@@ -366,7 +367,6 @@ export function App() {
                 onChange={(body) => update(editing.id, body)}
                 onTitleChange={(title) => retitle(editing.id, title)}
                 onTitleSettle={sync.releaseSaves}
-                onDelete={() => removeNote(editing.id)}
                 syncSlot={syncSlot}
               />
             ) : reading ? (
@@ -752,7 +752,6 @@ function Editor({
   onChange,
   onTitleChange,
   onTitleSettle,
-  onDelete,
   syncSlot,
 }: {
   note: Note;
@@ -760,10 +759,8 @@ function Editor({
   onChange: (body: string) => void;
   onTitleChange: (title: string) => void;
   onTitleSettle: () => void;
-  onDelete: () => void;
   syncSlot: ReactNode;
 }) {
-  const t = useT();
   const maxWidth = editorMarginMaxWidth(editor.margin);
   // A brand-new note opens with the caret in the title; an existing note keeps
   // the body focused so editing continues where it left off. Captured once for
@@ -797,15 +794,6 @@ function Editor({
         <div className="flex shrink-0 items-center gap-2">
           <TrophyButton />
           {syncSlot}
-          <button
-            type="button"
-            onClick={onDelete}
-            title={t("app.deleteNote")}
-            aria-label={t("app.deleteNote")}
-            className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-danger/50 bg-transparent text-danger hover:bg-danger/10 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
-          >
-            <TrashIcon className="h-[18px] w-[18px]" />
-          </button>
         </div>
       </header>
 

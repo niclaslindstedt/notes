@@ -24,8 +24,7 @@ const nav = {
   // The archive entry at the foot of the notes list and the page it opens.
   archive: "Archive",
   archiveHeading: "Archive",
-  archiveEmpty:
-    "Nothing archived. Swipe a note right in the overview to file it here.",
+  archiveEmpty: "Nothing archived. Swipe a note right to file it here.",
   restore: "Restore",
 } as const;
 

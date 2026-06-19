@@ -1,7 +1,12 @@
 // Left-swipe-to-reveal for side-menu rows. Latches the foreground open past
 // a small threshold to uncover a single trailing action (a trash button);
-// nothing fires on its own — the revealed button is the only way to act, so
-// a swipe never removes anything by itself.
+// the revealed button is the only way to delete, so a left swipe never
+// removes anything by itself.
+//
+// When an `onArchive` callback is passed the row also mirrors the overview's
+// card: a RIGHT swipe past `ARCHIVE_AT` slides the foreground off and fires
+// `onArchive` (archiving is undoable, so this one acts without a confirm).
+// Without it a right swipe is inert — the row only opens leftward.
 //
 // The caller spreads `handlers` onto the sliding foreground element and
 // applies `translateX(offset)`, with `animating` gating the CSS
@@ -13,6 +18,10 @@ import { useCallback, useRef, useState, type PointerEvent } from "react";
 // Movement before we commit to a horizontal vs. vertical gesture (so a
 // vertical drag still scrolls the drawer instead of arming the swipe).
 const AXIS_LOCK = 8;
+// Right-swipe distance that triggers archive (matches the overview card).
+const ARCHIVE_AT = 96;
+// How long the slide-off animation runs before the row is archived.
+const ARCHIVE_MS = 180;
 
 export interface SwipeReveal {
   offset: number;
@@ -28,7 +37,10 @@ export interface SwipeReveal {
   };
 }
 
-export function useSwipeReveal(actionWidth: number): SwipeReveal {
+export function useSwipeReveal(
+  actionWidth: number,
+  onArchive?: () => void,
+): SwipeReveal {
   // Latch open once the swipe passes the halfway point of the action strip.
   const openAt = actionWidth / 2;
 
@@ -80,14 +92,15 @@ export function useSwipeReveal(actionWidth: number): SwipeReveal {
       e.preventDefault();
       dragged.current = true;
       let next = (wasOpen.current ? -actionWidth : 0) + mx;
-      // Closed is the rightmost extent (there is no right-swipe action);
-      // rubber-band past the open extent so it feels bounded.
-      if (next > 0) next = 0;
+      // Without an archive action, closed is the rightmost extent — clamp a
+      // right swipe to 0. With one, a right swipe tracks the finger so the
+      // foreground can slide off and archive.
+      if (next > 0 && !onArchive) next = 0;
       if (next < -actionWidth) next = -actionWidth + (next + actionWidth) * 0.3;
       dx.current = next;
       setOffset(next);
     },
-    [actionWidth],
+    [actionWidth, onArchive],
   );
 
   const onPointerUp = useCallback(
@@ -103,6 +116,12 @@ export function useSwipeReveal(actionWidth: number): SwipeReveal {
       axis.current = "none";
       const traveled = dx.current;
       setAnimating(true);
+      if (onArchive && traveled >= ARCHIVE_AT) {
+        setOpen(false);
+        setOffset(e.currentTarget.offsetWidth);
+        window.setTimeout(onArchive, ARCHIVE_MS);
+        return;
+      }
       if (traveled <= -openAt) {
         setOpen(true);
         setOffset(-actionWidth);
@@ -111,7 +130,7 @@ export function useSwipeReveal(actionWidth: number): SwipeReveal {
       setOpen(false);
       setOffset(0);
     },
-    [openAt, actionWidth],
+    [openAt, actionWidth, onArchive],
   );
 
   // Swallow the click that trails a drag (so a swipe never activates the

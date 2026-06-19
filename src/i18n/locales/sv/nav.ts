@@ -19,7 +19,7 @@ const nav: NavCatalog = {
   archive: "Arkiv",
   archiveHeading: "Arkiv",
   archiveEmpty:
-    "Inget arkiverat. Svep en anteckning åt höger i översikten för att lägga den här.",
+    "Inget arkiverat. Svep en anteckning åt höger för att lägga den här.",
   restore: "Återställ",
 };
 
