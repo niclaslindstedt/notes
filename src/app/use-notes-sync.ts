@@ -22,6 +22,7 @@ import {
   ConflictError,
   RateLimitError,
   type StorageAdapter,
+  type StoredSnapshot,
 } from "../storage/adapter.ts";
 import { isOfflineError } from "../storage/cache/index.ts";
 import {
@@ -32,6 +33,38 @@ import {
 import { parse, serialize } from "../storage/serialize.ts";
 
 const log = createLogger("notes-sync");
+
+// How often the live-pull loop polls a remote backend for someone else's
+// edits, and — the same window — how long the note must sit quiet (no local
+// keystroke) before a pull is allowed to replace what's on screen. This is the
+// one knob behind "write on one device, watch it appear on another": shorten
+// it for a snappier demo, lengthen it to poll less. Kept as a single named
+// constant so it's trivial to change in one place.
+export const LIVE_PULL_INTERVAL_MS = 10_000;
+
+/**
+ * Decide whether the live-pull loop may pull the remote right now. Pure so the
+ * timing policy is unit-testable away from the interval. A pull is allowed only
+ * on a remote backend, once the first load has settled, with nothing unsaved,
+ * no open conflict, no save in flight, and only after the note has been quiet
+ * for the full window — so a live pull can never clobber a keystroke mid-edit.
+ */
+export function shouldLivePull(opts: {
+  backendId: StorageAdapter["id"];
+  loaded: boolean;
+  dirty: boolean;
+  hasConflict: boolean;
+  inFlight: boolean;
+  msSinceLastEdit: number;
+  intervalMs?: number;
+}): boolean {
+  const intervalMs = opts.intervalMs ?? LIVE_PULL_INTERVAL_MS;
+  if (opts.backendId === "browser") return false;
+  if (!opts.loaded || opts.dirty || opts.hasConflict || opts.inFlight) {
+    return false;
+  }
+  return opts.msSinceLastEdit >= intervalMs;
+}
 
 /** A divergence between the on-screen document and the backend's. */
 export type ConflictState = {
@@ -124,6 +157,16 @@ export function useNotesSync(deps: {
   // Adapter and concurrency token survive re-renders.
   const adapterRef = useRef(active);
   const revisionRef = useRef<string | undefined>(undefined);
+  // The last snapshot we loaded or saved, handed back to `load` as the
+  // `previous` hint so a live pull lists cheaply and re-downloads only the
+  // files whose revision actually moved (the file-per-note backends' read half
+  // of incremental sync) — "pull the metadata, download only what changed".
+  const lastStoredRef = useRef<StoredSnapshot | undefined>(undefined);
+  // Wall-clock time of the last local edit (any `scheduleSave`). The live-pull
+  // loop reads it to honour the quiet window — a pull only lands once the note
+  // has sat untouched for the full interval. 0 ⇒ "never edited", so a device
+  // that's only viewing still receives pulls.
+  const lastEditRef = useRef(0);
 
   // Seed from the adapter's synchronous fast path so the first paint shows
   // stored data instead of a flash of empty list.
@@ -217,6 +260,7 @@ export function useNotesSync(deps: {
           transientRetries.current = 0;
           setOffline(false);
           revisionRef.current = stored.revision;
+          lastStoredRef.current = stored;
           if (pendingDoc.current !== null) {
             flushSaveRef.current();
           } else {
@@ -292,6 +336,9 @@ export function useNotesSync(deps: {
 
   const scheduleSave = useCallback(
     (next: Snapshot) => {
+      // Stamp the edit so the live-pull loop holds off until the note has been
+      // quiet for the full window — this is the keystroke that resets it.
+      lastEditRef.current = Date.now();
       pendingDoc.current = next;
       setDirty(true);
       if (saveHeld.current) return;
@@ -344,6 +391,9 @@ export function useNotesSync(deps: {
     pendingDoc.current = null;
     adapterRef.current = active;
     revisionRef.current = undefined;
+    // A new backend's files are unrelated to the old one's, so drop the
+    // incremental-load hint rather than letting it mislead the reuse check.
+    lastStoredRef.current = undefined;
     setConflict(null);
     setStatus("idle");
     setStatusDetail(null);
@@ -355,6 +405,7 @@ export function useNotesSync(deps: {
       .then((stored) => {
         if (cancelled) return;
         revisionRef.current = stored?.revision;
+        lastStoredRef.current = stored ?? undefined;
         setOffline(stored?.offline ?? false);
         const loadedDoc = parse(stored?.text);
         setDoc(loadedDoc);
@@ -398,13 +449,16 @@ export function useNotesSync(deps: {
     const prevRevision = revisionRef.current;
     let stored;
     try {
-      stored = await adapterRef.current.load();
+      // Hand the last-known snapshot in so a file-per-note backend lists
+      // cheaply and only re-downloads the notes whose revision moved.
+      stored = await adapterRef.current.load(lastStoredRef.current);
     } catch (err) {
       log.warn("reload failed", err);
       if (isOfflineError(err)) setOffline(true);
       return;
     }
     revisionRef.current = stored?.revision;
+    lastStoredRef.current = stored ?? undefined;
     setOffline(stored?.offline ?? false);
     setConflict(null);
     setStatus("idle");
@@ -457,6 +511,47 @@ export function useNotesSync(deps: {
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  // Live pull: poll a remote backend on a fixed cadence so an edit made on
+  // another device appears here on its own — the trick behind "write on one
+  // device, watch it show up on the other", even with the note open in the
+  // editor. `shouldLivePull` gates each tick on the quiet window and the
+  // save/conflict state so a pull never lands mid-keystroke; `refresh` itself
+  // no-ops on the local backend and leaves the document (and undo timeline)
+  // untouched when the remote hasn't moved. State is read through refs so the
+  // interval is armed once, not re-created on every render.
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const conflictRef = useRef(conflict);
+  conflictRef.current = conflict;
+  const loadedRef = useRef(loaded);
+  loadedRef.current = loaded;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = setInterval(() => {
+      if (
+        !shouldLivePull({
+          backendId: adapterRef.current.id,
+          loaded: loadedRef.current,
+          dirty: dirtyRef.current,
+          hasConflict: conflictRef.current !== null,
+          inFlight: inFlight.current,
+          msSinceLastEdit: Date.now() - lastEditRef.current,
+        })
+      ) {
+        return;
+      }
+      const before = revisionRef.current;
+      void refreshRef.current().then(() => {
+        // A pull that actually moved the document is another device's edit
+        // arriving live, all on its own — the "live sync" trophy.
+        if (before !== undefined && revisionRef.current !== before) {
+          unlock("liveSync");
+        }
+      });
+    }, LIVE_PULL_INTERVAL_MS);
+    return () => clearInterval(id);
   }, []);
 
   const saveNow = useCallback(() => {

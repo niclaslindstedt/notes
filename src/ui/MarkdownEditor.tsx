@@ -79,6 +79,21 @@ export function MarkdownEditor({
   const [active, setActive] = useState(() =>
     Math.max(0, value.split("\n").length - 1),
   );
+
+  // Adopt an out-of-band change to this note's body — a live cloud pull while
+  // the note is open — without disturbing the user's own typing. Our own
+  // keystrokes echo back through `onChange` to the identical string, so a
+  // `body` that differs from the local value can only be another writer's edit
+  // (the upstream live-pull quiet window guarantees it never arrives
+  // mid-keystroke). Clamp the active line so the caret stays in range against
+  // the freshly pulled, possibly shorter document.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  useEffect(() => {
+    if (body === valueRef.current) return;
+    setValue(body);
+    setActive((a) => Math.min(a, body.split("\n").length - 1));
+  }, [body]);
   const taRef = useRef<HTMLTextAreaElement>(null);
   // Caret column to install the next time the textarea (re)focuses — set
   // whenever we move the active line programmatically. Null on mount when the

@@ -307,7 +307,30 @@ a debounced save (per-backend `saveDebounceMs`). It owns `SaveStatus` (`idle` /
 exponential-backoff retry of transient failures, rate-limit cooldowns, offline
 fallback, and conflict detection (every save carries a `baseRevision`). `setDoc`
 and `scheduleSave` are the only paths that mutate the document; `refresh` pulls
-without resetting history, `reload` replaces the document and resets it.
+without resetting history, `reload` replaces the document and resets it. A
+fixed-cadence [live pull](#live-pull) drives `refresh` on its own so another
+device's edits arrive without a gesture.
+
+### Live pull
+
+The live-sync loop in `useNotesSync` (`src/app/use-notes-sync.ts`) — a
+`setInterval` every `LIVE_PULL_INTERVAL_MS` (10s, the one knob behind "write on
+one device, watch it appear on the other") that calls `refresh` so a remote
+edit shows up here on its own, even with the note open in the editor. The pure
+`shouldLivePull` predicate gates each tick: only on a remote backend, only once
+the first load has settled, and only after the note has sat **quiet for the
+full window** (no keystroke within the interval — tracked by `lastEditRef`,
+stamped in `scheduleSave`) with nothing unsaved, no open conflict, and no save
+in flight. So a pull never clobbers a keystroke mid-edit; it waits for a pause,
+then adopts the remote. Each pull passes the last `StoredSnapshot`
+(`lastStoredRef`) to `load` as the `previous` hint, so a file-per-note backend
+lists cheaply and re-downloads only the notes whose revision moved. When a pull
+actually moves the document it fires the `liveSync` ("Telepathy") trophy. The
+open editor reflects the pulled change through a body-reconcile effect in
+`MarkdownEditor` / `PlainEditor`: since the user's own keystrokes echo back to
+the identical `body`, a `body` that differs from the editor's local value can
+only be another writer's edit, so it's adopted (and the active line clamped)
+without disturbing in-progress typing.
 
 ### Save hold
 

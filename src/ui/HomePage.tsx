@@ -137,6 +137,13 @@ export function HomePage() {
               folder on your computer, your own Dropbox, or your own Google
               Drive (see below).
             </li>
+            <li>
+              With a folder or cloud backend connected, edits made on one device
+              show up on your others on their own — notes checks the backend for
+              changes every few seconds and pulls them in while you read, even
+              with a note open. It waits for a pause in your typing first, so it
+              never overwrites what you&apos;re writing.
+            </li>
           </ul>
         </Section>
 

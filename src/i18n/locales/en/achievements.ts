@@ -185,6 +185,12 @@ const achievements = {
       learnMore:
         "On a local folder or cloud backend you can paste (Ctrl/Cmd+V) or drag an image straight into the editor. It's saved as a real image file under an attachments folder beside your notes and shows inline as a thumbnail you can click to open full-size.",
     },
+    liveSync: {
+      name: "Telepathy",
+      condition: "Watch an edit from another device arrive on its own.",
+      learnMore:
+        "With a folder or cloud backend connected, notes quietly checks for changes every few seconds and pulls them in by itself — so an edit you make on one device appears on another while you watch, even with the note open, as long as you've paused typing.",
+    },
 
     // ── Expert ────────────────────────────────────────────────────────
     paranoidMode: {
