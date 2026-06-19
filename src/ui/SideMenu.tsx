@@ -26,6 +26,7 @@ import {
   UndoIcon,
 } from "./icons.tsx";
 import { useModalDispatch } from "./modal-bus.ts";
+import { AchievementsMenuItem } from "./achievements/AchievementsMenuItem.tsx";
 import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
 
 // The navigation drawer. On viewports narrower than the smallest iPad it
@@ -337,6 +338,7 @@ export function SideMenu({
           href={privacyUrl}
           onClick={close}
         />
+        <AchievementsMenuItem onClose={close} />
         <MenuButton
           icon={<SparklesIcon className="h-5 w-5" />}
           label={t("menu.changelog")}

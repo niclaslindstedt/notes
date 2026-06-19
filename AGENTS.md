@@ -283,8 +283,8 @@ The source tree under `src/` is organized by concern, not by file type:
   reload, conflict resolve), and the `useAchievementWatcher` mounted once in
   `App`. The unlock map lives in the synced appearance store
   (`theme/useTheme.ts`), so earned trophies travel with cloud sync; the UI
-  is in `src/ui/achievements/` (the header `TrophyButton`, the four-tier
-  tour modal, and the unlock-notification modal).
+  is in `src/ui/achievements/` (the side-menu `AchievementsMenuItem`, the
+  four-tier tour modal, and the unlock-notification modal).
 - `src/ui/` — presentational components (e.g. `UpdateToast.tsx`). Two of
   these are **standalone public pages** mounted by a path switch in
   `main.tsx` rather than rendered inside the app shell: `PrivacyPage.tsx`
