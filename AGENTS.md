@@ -293,8 +293,44 @@ pasting it verbatim.
 | The `src/` layout or boundaries   | This file's Architecture summary      |
 | The `copy-feature` skill behaviour| `.agent/skills/copy-feature/SKILL.md` |
 | A user-visible feature            | a fragment in `.changes/unreleased/`, and the `/home` showcase (`src/ui/HomePage.tsx`) |
+| A user-facing feature / surface (shipped or removed) | **Add (or retire) a matching achievement** in the same PR — see "Achievements". Every feature is also an unlockable trophy. |
 | What data the app reads/writes/sends, or an OAuth scope | `src/ui/HomePage.tsx` **and** `src/ui/PrivacyPage.tsx` |
 | Release / deploy / changelog flow | this file's "Releases and changelog"  |
+
+## Achievements
+
+The app ships an **achievements** system, ported from checklist: every
+user-facing feature is also an unlockable trophy, sorted into four tiers that
+mirror how far the user has grown into the app —
+**Beginner → Intermediate → Pro → Expert**. The trophy button in the header
+opens the guided tour of the whole catalog when it's quiet; when one or more
+unlocks are unacknowledged it lights up with a badge and instead opens an
+unlock-notification modal listing just the new ones (closing that clears the
+queue). The whole system can be switched off in Settings → General.
+
+It lives in two places that must stay in lockstep:
+
+- **The catalog** — `src/achievements/catalog.ts`: each entry's `id`
+  (stable, write-once), `tier`, `glyph`, unlock `trigger`, and — unlike
+  checklist, which has an i18n layer — its display copy (`name`, `condition`,
+  optional `learnMore`) **inlined right on the entry**. Glyphs are inline SVGs
+  in `src/achievements/glyphs.tsx` (the app stays dependency-free — no
+  `lucide-react`); reuse one of `src/ui/icons.tsx`'s glyphs where it fits.
+- **The renderer** — `src/ui/achievements/AchievementsModal.tsx` reads the
+  catalog by `id`. New entries appear automatically without touching it.
+
+A trigger is either **`derived`** — a predicate over `(prev, next)` of the
+combined `{ snapshot, appearance }` state that flips false→true (use this
+whenever the feature mutates the persisted note document or the synced
+appearance store) — or **`manual`**, fired by calling `unlock("<id>")` from
+the chokepoint that observes the gesture (folder/cloud connect, encryption,
+namespace create, install, undo, reload, conflict resolve). The watcher
+(`src/achievements/useAchievementWatcher.ts`, mounted once in `App`) runs the
+derived pass on every transition and drains the manual-unlock bus
+(`src/achievements/bus.ts`). **Every `manual` entry must have a wired
+`unlock("<id>")` call.** Progress lives in the synced appearance store's
+`achievements` map (`src/theme/useTheme.ts`), so it travels with the user
+across devices on the cloud/folder backends.
 
 ## Maintenance skills
 
