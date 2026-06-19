@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { createNote, type Note } from "../../src/domain/note.ts";
+import { createNote, editNote, type Note } from "../../src/domain/note.ts";
 import { ConflictError } from "../../src/storage/adapter.ts";
 import {
   BLOB_FILE_NAME,
   createDirectoryAdapter,
 } from "../../src/storage/directory-adapter.ts";
 import type { FileEntry, FileStore } from "../../src/storage/file-store.ts";
+import { noteFileStem } from "../../src/storage/markdown/codec.ts";
 import { parse, serialize } from "../../src/storage/serialize.ts";
+
+function notePath(note: Note): string {
+  return `${noteFileStem(note)}.md`;
+}
 
 // In-memory FileStore: each write bumps a global counter used as the file's
 // revision, so the directory adapter's aggregate-revision drift detection has
@@ -69,15 +74,65 @@ describe("directory adapter", () => {
     expect(await store.list()).toHaveLength(1);
   });
 
-  it("raises ConflictError when the directory moved past the base revision", async () => {
+  it("raises ConflictError only when a note we're writing moved remotely", async () => {
     const store = memoryStore();
     const a = adapter(store);
-    const stored = await a.save(serialize({ notes: notes() }));
-    // A second writer bumps a file behind our back.
-    await store.write("intruder.md", "---\nid: z\ncreated: 1\n---\nhi\n");
+    const [first, second] = notes();
+    const stored = await a.save(serialize({ notes: [first!, second!] }));
+    // Another device edits the SAME note we're about to write.
+    await store.write(
+      notePath(first!),
+      "---\nid: a\ncreated: 1\n---\nremote\n",
+    );
     await expect(
-      a.save(serialize({ notes: [] }), stored.revision),
+      a.save(
+        serialize({ notes: [editNote(first!, "local", 9), second!] }),
+        stored.revision,
+      ),
     ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("does not conflict on (or delete) a note another device added", async () => {
+    const store = memoryStore();
+    const a = adapter(store);
+    const [first, second] = notes();
+    const stored = await a.save(serialize({ notes: [first!, second!] }));
+    // A note we've never seen appears in the folder. We aren't touching it.
+    await store.write("intruder.md", "---\nid: z\ncreated: 1\n---\nhi\n");
+    // Editing one of our own notes must succeed and leave the stranger intact.
+    await expect(
+      a.save(
+        serialize({ notes: [editNote(first!, "edited", 9), second!] }),
+        stored.revision,
+      ),
+    ).resolves.toBeDefined();
+    const paths = (await store.list()).map((e) => e.path);
+    expect(paths).toContain("intruder.md");
+  });
+
+  it("writes only the notes whose bytes changed", async () => {
+    const store = memoryStore();
+    let writes = 0;
+    const counting: FileStore = {
+      list: () => store.list(),
+      read: (p) => store.read(p),
+      write: (p, t) => {
+        writes += 1;
+        return store.write(p, t);
+      },
+      remove: (p) => store.remove(p),
+    };
+    const a = adapter(counting);
+    const [first, second] = notes();
+    const s1 = await a.save(serialize({ notes: [first!, second!] }));
+    expect(writes).toBe(2);
+    writes = 0;
+    // Touch only the first note; the second's file must not be re-uploaded.
+    await a.save(
+      serialize({ notes: [editNote(first!, "changed", 9), second!] }),
+      s1.revision,
+    );
+    expect(writes).toBe(1);
   });
 
   it("stores an encrypted envelope as a single blob and clears the markdown", async () => {
@@ -118,6 +173,47 @@ describe("directory adapter", () => {
     // so the next save bases on a matching baseline.
     await expect(
       a.save(serialize({ notes: [] }), stored.revision),
+    ).resolves.toBeDefined();
+  });
+
+  it("tolerates a divergence confined to a file whose write lost its ack", async () => {
+    // A network blip can drop the HTTP *response* to a write the backend
+    // already committed (Dropbox logs this as `TypeError: Load failed` right
+    // after the upload reached the server). The file's rev then moves to a
+    // value this adapter caused but never got to record, so the next save sees
+    // a divergence it can't find in `produced` — and used to raise a phantom
+    // CONFLICT even though no other device touched anything.
+    const real = memoryStore();
+    let dropAckFor: string | null = null;
+    const store: FileStore = {
+      list: () => real.list(),
+      read: (p) => real.read(p),
+      async write(path, text) {
+        // The server commits the bytes (rev moves), but the ack is lost.
+        const rev = await real.write(path, text);
+        if (path === dropAckFor) throw new TypeError("Load failed");
+        return rev;
+      },
+      remove: (p) => real.remove(p),
+    };
+    const a = adapter(store);
+
+    const one = createNote(1);
+    const two = createNote(2);
+    const s1 = await a.save(serialize({ notes: [one, two] }));
+
+    // Edit note two; its write commits server-side but loses its ack, so this
+    // save throws and never records the new revision for that file.
+    const editedTwo = editNote(two, "kept body", 9);
+    dropAckFor = notePath(two);
+    await expect(
+      a.save(serialize({ notes: [one, editedTwo] }), s1.revision),
+    ).rejects.toBeInstanceOf(TypeError);
+    // The retry, still based on s1, must not read its own lost-ack write as a
+    // remote edit — the only diverging file is the one whose ack we dropped.
+    dropAckFor = null;
+    await expect(
+      a.save(serialize({ notes: [one, editedTwo] }), s1.revision),
     ).resolves.toBeDefined();
   });
 
