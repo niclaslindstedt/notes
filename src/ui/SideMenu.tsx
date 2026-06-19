@@ -396,6 +396,7 @@ export function SideMenu({
         <div
           className={`fixed z-50 flex ${onRight ? "justify-end" : ""}`}
           style={APP_VIEWPORT_RECT}
+          {...swipeClose.handlers}
         >
           <button
             type="button"
@@ -403,14 +404,14 @@ export function SideMenu({
             tabIndex={-1}
             onClick={close}
             style={{ opacity: swipeClose.progress }}
-            className={`drawer-backdrop absolute inset-0 cursor-default bg-black/50 ${
+            className={`drawer-backdrop absolute inset-0 cursor-default bg-black/50 [touch-action:none] ${
               swipeClose.animating ? "transition-opacity duration-200" : ""
             }`}
           />
           <nav
             id={drawerId}
+            ref={swipeClose.panelRef}
             aria-label={t("nav.label")}
-            {...swipeClose.handlers}
             style={{ transform: `translateX(${swipeClose.offset}px)` }}
             className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl [touch-action:pan-y] [padding-bottom:max(env(safe-area-inset-bottom),calc(1.25rem_-_var(--density-row-py)))] [padding-top:env(safe-area-inset-top)] ${
               swipeClose.animating ? "transition-transform duration-200" : ""

@@ -1,13 +1,16 @@
 // Swipe-to-close for the navigation drawer. The drawer opens from its resting
 // edge (the floating button or the edge swipe); this lets the same gesture
-// reverse it — drag the panel back toward that edge and, past a threshold or
-// on a flick, it flies the rest of the way out and unmounts. A drag that
-// doesn't reach the threshold snaps back open. Closing this way *follows the
-// finger*, where a backdrop tap (handled separately) is an instant dismiss.
+// reverse it — drag back toward that edge and, past a threshold or on a flick,
+// the panel flies the rest of the way out and unmounts. A drag that doesn't
+// reach the threshold snaps back open. Closing this way *follows the finger*,
+// where a plain tap on the backdrop is an instant dismiss.
 //
-// The caller spreads `handlers` onto the drawer panel and applies
-// `translateX(offset)`; `progress` (1 = fully open) dims the backdrop in step
-// with the drag. `animating` gates the settle transition.
+// The caller spreads `handlers` onto the whole drawer overlay (the backdrop +
+// panel wrapper) so the gesture works from the dimmed area outside the menu
+// too, not only on the panel itself. `panelRef` goes on the sliding panel —
+// it both measures the panel width and is the element `translateX(offset)` is
+// applied to; `progress` (1 = fully open) dims the backdrop in step with the
+// drag, and `animating` gates the settle transition.
 //
 // Pointer-based and axis-locked like `useSwipeReveal`: a vertical drag stays a
 // scroll of the panel, only a horizontal one engages the close. A row that
@@ -19,7 +22,9 @@ import {
   useEffect,
   useRef,
   useState,
+  type MouseEvent,
   type PointerEvent,
+  type RefObject,
   type TransitionEvent,
 } from "react";
 
@@ -42,12 +47,16 @@ export interface DrawerSwipeClose {
   progress: number;
   /** Whether the settle (snap-back / fly-out) transition should animate. */
   animating: boolean;
+  /** Attach to the sliding panel: measures its width and (with `offset`)
+   *  carries the translate. */
+  panelRef: RefObject<HTMLElement | null>;
   handlers: {
     onPointerDown: (e: PointerEvent<HTMLElement>) => void;
     onPointerMove: (e: PointerEvent<HTMLElement>) => void;
     onPointerUp: (e: PointerEvent<HTMLElement>) => void;
     onPointerCancel: (e: PointerEvent<HTMLElement>) => void;
     onTransitionEnd: (e: TransitionEvent<HTMLElement>) => void;
+    onClickCapture: (e: MouseEvent<HTMLElement>) => void;
   };
 }
 
@@ -59,6 +68,7 @@ export function useDrawerSwipeClose(
   const [offset, setOffset] = useState(0);
   const [animating, setAnimating] = useState(false);
 
+  const panelRef = useRef<HTMLElement | null>(null);
   const startX = useRef(0);
   const startY = useRef(0);
   const axis = useRef<"none" | "h" | "v">("none");
@@ -66,6 +76,9 @@ export function useDrawerSwipeClose(
   const pointerId = useRef<number | null>(null);
   // The drag started on a row that owns horizontal swipes — leave it alone.
   const ignore = useRef(false);
+  // A real horizontal drag happened, so swallow the tap-to-close click that
+  // would otherwise trail it on release.
+  const dragged = useRef(false);
   const lastX = useRef(0);
   const lastT = useRef(0);
   const velocity = useRef(0);
@@ -101,7 +114,10 @@ export function useDrawerSwipeClose(
     lastT.current = e.timeStamp;
     velocity.current = 0;
     axis.current = "none";
-    width.current = e.currentTarget.offsetWidth || 1;
+    dragged.current = false;
+    // The panel width — not the overlay's — is what the close threshold and
+    // the backdrop dim are measured against.
+    width.current = panelRef.current?.offsetWidth || 1;
     closing.current = false;
     setAnimating(false);
   }, []);
@@ -119,6 +135,7 @@ export function useDrawerSwipeClose(
       }
       if (axis.current !== "h") return;
       e.preventDefault();
+      dragged.current = true;
       const dt = e.timeStamp - lastT.current;
       if (dt > 0) velocity.current = (e.clientX - lastX.current) / dt;
       lastX.current = e.clientX;
@@ -167,18 +184,29 @@ export function useDrawerSwipeClose(
     [onClose],
   );
 
+  // Swallow the click that trails a real drag so a swipe on the backdrop
+  // doesn't also fire its instant tap-to-close (nor a tapped nav row).
+  const onClickCapture = useCallback((e: MouseEvent<HTMLElement>) => {
+    if (!dragged.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragged.current = false;
+  }, []);
+
   const progress = width.current > 0 ? 1 - Math.abs(offset) / width.current : 1;
 
   return {
     offset,
     progress,
     animating,
+    panelRef,
     handlers: {
       onPointerDown,
       onPointerMove,
       onPointerUp: settle,
       onPointerCancel: settle,
       onTransitionEnd,
+      onClickCapture,
     },
   };
 }
