@@ -149,6 +149,16 @@ export function SideMenu({
     handler();
   }
 
+  // Opening the drawer over the editor leaves the mobile soft keyboard up,
+  // where it covers the note list and makes the drawer look empty. Blur the
+  // focused field as the drawer opens so the keyboard retracts and the list
+  // is visible. (Pinned never opens this way, so this is a no-op there.)
+  useEffect(() => {
+    if (!open) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }, [open]);
+
   // Dismiss on Escape while open (the backdrop handles pointer dismissal).
   useEffect(() => {
     if (!open) return;
