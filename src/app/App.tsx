@@ -781,9 +781,7 @@ function Editor({
           disableSpellcheck={editor.disableSpellcheck}
           disableAutocorrect={editor.disableAutocorrect}
         />
-        <div className="flex shrink-0 items-center gap-2">
-          {syncSlot}
-        </div>
+        <div className="flex shrink-0 items-center gap-2">{syncSlot}</div>
       </header>
 
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">
