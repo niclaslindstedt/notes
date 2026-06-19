@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "notes",
+    "slug": "notes",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "scheme": "notes",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1d2027"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "se.niclaslindstedt.notes",
+      "entitlements": {
+        "com.apple.developer.ubiquity-kvstore-identifier": "$(TeamIdentifierPrefix)se.niclaslindstedt.notes"
+      }
+    },
+    "android": {
+      "package": "se.niclaslindstedt.notes",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1f2933"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

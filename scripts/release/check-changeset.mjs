@@ -44,6 +44,10 @@ const SKIP_PATTERNS = [
   /^\.changes\//,
   /^docs\//,
   /^scripts\//,
+  // The React Native app (native/) is a separate Expo project with its own
+  // release train (native/RELEASING.md), not a change to the web app whose
+  // CHANGELOG this guards.
+  /^native\//,
   /^Makefile$/,
   /\.md$/,
   /^\.nvmrc$/,
