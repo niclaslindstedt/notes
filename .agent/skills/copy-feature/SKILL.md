@@ -303,7 +303,7 @@ reuse them rather than re-porting:
   `accent`/`danger`/`muted`; the bold label text carries the distinction.
 - **Achievements** — `src/achievements/` (`catalog.ts`, pure `derive.ts`,
   in-memory `bus.ts`, `useAchievementWatcher.ts`, `glyphs.tsx`, `types.ts`,
-  `index.ts`) + `src/ui/achievements/` (`TrophyButton`, `AchievementsModal`
+  `index.ts`) + `src/ui/achievements/` (`AchievementsMenuItem`, `AchievementsModal`
   tour, `AchievementUnlockModal`) + the two `app/modals/*Host.tsx`, opened by
   `{ kind: "achievements" }` / `{ kind: "achievements-unlock" }`. Key notes
   adaptations vs checklist: (1) **no i18n** — name/condition/learnMore are
@@ -314,9 +314,10 @@ reuse them rather than re-porting:
   so the `AchState` slice is `appearance`, not `settings`, and trophies travel
   with `settings.json` for free; (3) **no toast** — `onUnlocked` was dropped,
   the lit-trophy badge (driven by `unseenAchievements`) is the only surfacing;
-  (4) **no `achievements-context`** — `TrophyButton` reads `useAppearance()`
-  directly (notes' header isn't memoised, so the budget/checklist context
-  dance to avoid re-rendering a list isn't needed); (5) tones collapse onto
+  (4) **no `achievements-context`** — `AchievementsMenuItem` reads
+  `useAppearance()` directly (notes' side menu isn't memoised, so the
+  budget/checklist context dance to avoid re-rendering a list isn't needed);
+  (5) tones collapse onto
   notes' palette (`flag`→`accent`, `pipe`→`link`, `meta`/`success`→
   `muted`/`accent`). Manual unlocks fire `unlock(id)` from the storage backend
   (aliased `unlockAchievement` there — that module already has a passphrase

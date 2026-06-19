@@ -20,7 +20,6 @@ import { isStandaloneMobile } from "../pwa/standalone.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { unlockAchievements, useApplyAppearance } from "../theme/useTheme.ts";
-import { TrophyButton } from "../ui/achievements/TrophyButton.tsx";
 import { AppTitle } from "../ui/AppTitle.tsx";
 import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
@@ -129,7 +128,7 @@ export function App() {
 
   // Achievements: watch the note document + appearance for derived unlocks and
   // drain the manual-unlock bus, recording each into the synced appearance
-  // store. The trophy button in the header surfaces what's been earned.
+  // store. The achievements row in the side menu surfaces what's been earned.
   useAchievementWatcher({
     snapshot: sync.doc,
     appearance,
@@ -455,10 +454,7 @@ function NoteList({
     <div className="flex h-full flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
         <AppTitle />
-        <div className="flex items-center gap-2">
-          <TrophyButton />
-          {syncSlot}
-        </div>
+        <div className="flex items-center gap-2">{syncSlot}</div>
       </header>
 
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
@@ -622,10 +618,7 @@ function ArchiveList({
             {t("nav.archiveHeading")}
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <TrophyButton />
-          {syncSlot}
-        </div>
+        <div className="flex items-center gap-2">{syncSlot}</div>
       </header>
 
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
@@ -696,10 +689,7 @@ function ReadOnlyNote({
         >
           <ArrowLeftIcon className="h-[18px] w-[18px]" />
         </button>
-        <div className="flex items-center gap-2">
-          <TrophyButton />
-          {syncSlot}
-        </div>
+        <div className="flex items-center gap-2">{syncSlot}</div>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -795,7 +785,6 @@ function Editor({
           disableAutocorrect={editor.disableAutocorrect}
         />
         <div className="flex shrink-0 items-center gap-2">
-          <TrophyButton />
           {syncSlot}
           <button
             type="button"
