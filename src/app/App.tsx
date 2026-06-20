@@ -48,7 +48,7 @@ import {
   applyFaviconHref,
   namespaceFaviconHref,
 } from "../ui/namespace-favicon.ts";
-import { NavContext } from "../ui/nav-context.ts";
+import { NavContext, useNav } from "../ui/nav-context.ts";
 import { APP_VIEWPORT_RECT } from "../ui/appViewportRect.ts";
 import { SideMenu } from "../ui/SideMenu.tsx";
 import { PullToRefreshIndicator } from "../ui/PullToRefreshIndicator.tsx";
@@ -770,6 +770,8 @@ function Editor({
   canAttach: boolean;
   onAttach: (attachment: Attachment) => void;
 }) {
+  const t = useT();
+  const nav = useNav();
   const maxWidth = editorMarginMaxWidth(editor.margin);
   // A brand-new note opens with the caret in the title; an existing note keeps
   // the body focused so editing continues where it left off. Captured once for
@@ -787,10 +789,21 @@ function Editor({
     <div className="flex h-full min-h-0 flex-col">
       {/* The title heads the page, prefixed by the app glyph — the editable
           document title, the way checklist heads each list with its name and
-          icon. There is no Back button: the side menu's "Show all" returns to
-          the overview. */}
+          icon. Pressing the glyph opens the side menu, so it doubles as the
+          page's menu button; there is no Back button — the menu's "Show all"
+          returns to the overview. The glyph box matches the title's first-line
+          height (leading-tight on text-lg) and centres the icon within it, so
+          the two stay vertically aligned even when a long title wraps and the
+          header top-aligns the rest. */}
       <header className="sticky top-0 z-10 flex items-start gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <NotesMarkIcon className="mt-0.5 h-6 w-6 shrink-0 text-accent" />
+        <button
+          type="button"
+          onClick={nav.toggle}
+          aria-label={t("nav.open")}
+          className="flex h-[1.40625rem] shrink-0 cursor-pointer items-center text-accent outline-none"
+        >
+          <NotesMarkIcon className="h-6 w-6" />
+        </button>
         <TitleField
           value={note.title}
           onChange={onTitleChange}
