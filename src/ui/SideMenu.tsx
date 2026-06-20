@@ -584,8 +584,15 @@ function SwipeToRemove({
         <ArchiveIcon className="h-5 w-5" />
         {archiveLabel}
       </div>
-      {/* Delete — the trailing trash button a left swipe latches open. */}
-      <div className="absolute inset-0 flex items-center justify-end">
+      {/* Delete — the trailing trash button a left swipe latches open. Kept
+          hidden while the row slides right so the archive slide-off never
+          bares it alongside the archive backdrop. */}
+      <div
+        aria-hidden={swipe.offset >= 0}
+        className={`absolute inset-0 flex items-center justify-end ${
+          swipe.offset < 0 ? "" : "invisible"
+        }`}
+      >
         <button
           type="button"
           onClick={act}
