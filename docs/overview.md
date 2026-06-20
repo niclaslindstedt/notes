@@ -813,6 +813,31 @@ Errors take precedence over the dirty state.
 `SyncIndicator` (`src/ui/SyncIndicator.tsx`) — the presentational glyph
 `SyncStatus` renders, mapping a `SaveStatus` to an icon.
 
+### Per-note upload spinner
+
+The header [sync glyph](#sync-status) reports one global save state; this is its
+per-note counterpart — a small spinner next to exactly the notes whose file is
+being pushed to the backend right now, shown both on the overview
+[note card](#note-card) and the side-menu note row. The signal originates in the
+[directory adapter](#directory-adapter): `save` maps each changed note's file
+path back to its note id and, around the `store.write` of those files, marks
+them in an internal "uploading" set, emitting the full set (and once on
+subscribe) through `watchUploads` on the adapter contract — the push-based
+sibling of the pull-based `getEncryptionStatus`. The set clears in a `finally`,
+so a failed write (conflict, offline, throttle) never leaves a note stuck
+spinning. `watchUploads` is forwarded through the offline-cache wrapper
+(`src/storage/cache/index.ts`) and carried verbatim by the Dropbox / Drive /
+folder adapters (each returns the directory adapter directly); the local browser
+backend doesn't implement it (one synchronous blob, nothing to watch).
+`useUploadStatus` (`src/app/use-upload-status.ts`) subscribes to the active
+adapter and returns the `ReadonlySet<string>` of uploading ids, which `App`
+threads to `NoteList`/`NoteCard` and `SideMenu` exactly like the encryption
+[lock](#note-card) status. The spinner takes precedence over the green lock on a
+row: a note mid-write isn't settled at rest yet, and the lock returns once the
+write (and any encryption) completes. It is the visual surface of cloud sync the
+way the green lock is the visual surface of [encryption](#encryption-migration),
+so — like the lock — it ships no achievement of its own.
+
 ## Storage backends and persistence
 
 ### Storage adapter

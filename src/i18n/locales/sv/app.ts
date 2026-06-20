@@ -21,6 +21,7 @@ const app: AppCatalog = {
     copied: "Kopierat",
   },
   encryptedNote: "Krypterad i vila",
+  uploadingNote: "Synkar…",
 };
 
 export default app;

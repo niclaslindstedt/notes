@@ -25,6 +25,7 @@ import {
   RedoIcon,
   ShieldIcon,
   SparklesIcon,
+  SpinnerIcon,
   TrashIcon,
   UndoIcon,
 } from "./icons.tsx";
@@ -103,6 +104,8 @@ type Props = {
   onSwitchNamespace: (slug: string) => void;
   /** Per-note at-rest encryption status, for the green lock on a note row. */
   encStatus?: Map<string, "encrypted" | "pending">;
+  /** Ids of notes whose file is being uploaded now, for the sync spinner. */
+  uploadingIds?: ReadonlySet<string>;
 };
 
 export function SideMenu({
@@ -123,6 +126,7 @@ export function SideMenu({
   canRedo,
   namespaces,
   encStatus,
+  uploadingIds,
   activeNamespace,
   onSwitchNamespace,
 }: Props) {
@@ -257,7 +261,11 @@ export function SideMenu({
               label={noteTitle(note)}
               active={note.id === activeNoteId}
               trailing={
-                encStatus?.get(note.id) === "encrypted" ? (
+                // The upload spinner wins over the lock: a note being written
+                // isn't settled at rest yet (see the overview card).
+                uploadingIds?.has(note.id) ? (
+                  <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" />
+                ) : encStatus?.get(note.id) === "encrypted" ? (
                   <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
                 ) : undefined
               }
