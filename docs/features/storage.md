@@ -61,6 +61,9 @@ The Dropbox and Google Drive options only appear when their app credentials are
 built in. Set them at build time (see `.env.example`):
 
 - `VITE_DROPBOX_APP_KEY` — a Dropbox "Scoped access / App folder" app key.
+- `VITE_DROPBOX_APP_FOLDER` — the folder name on that app's "App folder"
+  permission (Dropbox creates `Apps/<this>/`). Optional; defaults to
+  `free-notes`.
 - `VITE_GOOGLE_CLIENT_ID` — a Google OAuth client id with the Drive API
   enabled.
 
@@ -68,8 +71,10 @@ Unset, each backend is simply hidden from the picker; This device, Local folder,
 and encryption work without any configuration.
 
 For the **deployed** app these are read from GitHub Actions secrets of the same
-name (`VITE_DROPBOX_APP_KEY`, `VITE_GOOGLE_CLIENT_ID`). Adding the secrets is
-not enough on its own — Actions does not expose secrets to steps automatically,
-so each `npm run build` step in `.github/workflows/pages.yml` maps them into its
-`env:`. If you add a new build step or workflow that ships a deploy, map both
-secrets there too or that build will silently disable the cloud backends.
+name (`VITE_DROPBOX_APP_KEY`, `VITE_GOOGLE_CLIENT_ID`), while the non-secret
+`VITE_DROPBOX_APP_FOLDER` is a repository **variable** (`vars`). Adding them is
+not enough on its own — Actions does not expose secrets or variables to steps
+automatically, so each `npm run build` step in `.github/workflows/pages.yml`
+maps them into its `env:`. If you add a new build step or workflow that ships a
+deploy, map them there too or that build will silently disable the cloud
+backends.

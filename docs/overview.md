@@ -878,7 +878,8 @@ adapter](#directory-adapter); each file's `lastModified` is its revision.
 ### Dropbox backend
 
 `createDropboxAdapter` (`src/storage/dropbox/index.ts`) — notes as `.md` files
-under the scoped app folder `notes.niclaslindstedt.se`. It uses the PKCE
+under the scoped app folder (`free-notes` by default, overridable at build time
+via `VITE_DROPBOX_APP_FOLDER`). It uses the PKCE
 full-page-redirect [OAuth](#oauth) flow and refresh tokens for silent re-auth on
 401 (coalescing concurrent refreshes), honours 429 rate limits with a cooldown,
 and lists non-recursively so the default namespace doesn't pick up other

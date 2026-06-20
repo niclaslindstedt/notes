@@ -119,6 +119,7 @@ jobs:
           # repo secrets or the deployed build silently disables Drive/Dropbox.
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
+          VITE_DROPBOX_APP_FOLDER: ${{ vars.VITE_DROPBOX_APP_FOLDER }}
 
       - name: Stash production dist
         if: steps.tag.outputs.has_release == 'true'
@@ -143,6 +144,7 @@ jobs:
           VITE_BASE: ${{ steps.tag.outputs.has_release == 'true' && '/preview/' || '/' }}
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
+          VITE_DROPBOX_APP_FOLDER: ${{ vars.VITE_DROPBOX_APP_FOLDER }}
 
       # ---- Optional /branch/ build + persist to orphan branch ----
       - name: Stash preview dist
@@ -166,6 +168,7 @@ jobs:
           VITE_BASE: /branch/
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
+          VITE_DROPBOX_APP_FOLDER: ${{ vars.VITE_DROPBOX_APP_FOLDER }}
 
       - name: Persist /branch/ build to orphan branch
         if: steps.dispatch.outputs.has_dispatch == 'true'
