@@ -588,8 +588,23 @@ legible on a phone without reaching for devtools.
 ### Developer settings
 
 `DeveloperSection` (`src/ui/settings/DeveloperSection.tsx`) — appears only when
-[dev mode](#dev-mode) is on; surfaces the log-capture toggle and other
-diagnostics.
+[dev mode](#dev-mode) is on; surfaces the log-capture toggle and the
+[fake-data](#fake-data) toggle.
+
+### Fake data
+
+The developer "Fake data" toggle (`useDevSeed`, `src/dev/useDevSeed.ts`), shown
+in [Developer settings](#developer-settings). While on, `App` swaps the active
+storage adapter for an ephemeral in-memory seed adapter
+(`createDevSeedAdapter`, `src/storage/dev-seed/index.ts`) preloaded with the
+combined sample document (`buildSeedSnapshot`, `src/dev/seed.ts`), so a varied
+note list can be previewed without touching the real notes on the device. The
+flag is in-memory only — a reload (or leaving the app) drops straight back to
+the real backend, and edits made against the sample are never saved. Turning it
+on unlocks the **Holodeck** achievement. This is the in-app sibling of the
+env-driven seed (`make dev-seed` / `VITE_SEED`, `seedDevData` in the same
+module), which instead writes the multi-namespace dataset into the real
+localStorage keys for debugging across reloads.
 
 ### Logs
 

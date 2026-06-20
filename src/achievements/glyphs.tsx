@@ -258,6 +258,18 @@ export function ImageGlyph({ className }: IconProps) {
   );
 }
 
+// A conical lab flask — the "Fake data" / holodeck glyph (a generated sample
+// dataset to experiment with).
+export function FlaskGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M10 2v6.292a2 2 0 0 1-.293 1.045L4.06 18.71A1 1 0 0 0 4.92 20.2h14.16a1 1 0 0 0 .86-1.49l-5.647-9.373A2 2 0 0 1 14 8.292V2" />
+      <path d="M8.5 2h7" />
+      <path d="M7 16h10" />
+    </Svg>
+  );
+}
+
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;

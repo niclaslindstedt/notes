@@ -15,6 +15,7 @@ import {
   CodeGlyph,
   CopyGlyph,
   EyeOffGlyph,
+  FlaskGlyph,
   FolderGlyph,
   GlobeGlyph,
   ImageGlyph,
@@ -363,6 +364,12 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     tier: "expert",
     glyph: CodeGlyph,
     learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "holodeck",
+    tier: "expert",
+    glyph: FlaskGlyph,
     trigger: { kind: "manual" },
   },
   {

@@ -221,6 +221,10 @@ const achievements = {
       learnMore:
         "Settings → General → Developer mode reveals a Developer tab whose diagnostics — like capturing the in-app log across reloads — help track down a sync problem from the device it happens on.",
     },
+    holodeck: {
+      name: "Holodeck",
+      condition: "Load the sample data set.",
+    },
     completionist: {
       name: "Completionist",
       condition: "Unlock every other achievement.",

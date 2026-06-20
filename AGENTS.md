@@ -141,21 +141,31 @@ make icons       # regenerate PWA icons from public/favicon.svg
 
 ### Seeding fake data when debugging
 
-`make dev-seed` (or `npm run dev:seed`) starts the dev server with `VITE_SEED`
-set, which makes `src/dev/seed.ts` populate localStorage with a realistic
-sample dataset on first load — several **namespaces** (Default, Work, Recipes,
-Travel, Journal), each holding notes of varying length and shape (one-liners,
-checklists, long-form Markdown, a couple of archived notes). Use it to exercise
-the UI against lifelike content instead of hand-typing notes. `npm run
-build:seed` / `npm run preview:seed` bake the same flag into a production-mode
-build (driven by `.env.seed`, loaded only under `--mode seed`).
+`src/dev/seed.ts` is the shared sample dataset, consumed two ways:
 
-The seed is **dev tooling, not a shipped feature**: it has no UI surface, no
-changeset, and no achievement. It is guarded by a `SEED_VERSION` sentinel so it
-writes **once** per version (a reload keeps your edits); bump `SEED_VERSION`
-when you change the dataset to force a re-seed. It **overwrites the local
-document of every namespace it touches**, so it never runs under a plain
-`make dev` or a normal build — only behind the explicit flag.
+- **Env seed (`make dev-seed` / `npm run dev:seed`)** — starts the dev server
+  with `VITE_SEED` set, which makes `seedDevData` populate localStorage on first
+  load with several **namespaces** (Default, Work, Recipes, Travel, Journal),
+  each holding notes of varying length and shape (one-liners, checklists,
+  long-form Markdown, a couple of archived notes). `npm run build:seed` /
+  `npm run preview:seed` bake the same flag into a production-mode build (driven
+  by `.env.seed`, loaded only under `--mode seed`). This is **dev tooling, not a
+  shipped feature** — no UI surface, no changeset, no achievement. It is guarded
+  by a `SEED_VERSION` sentinel so it writes **once** per version (a reload keeps
+  your edits; bump `SEED_VERSION` to force a re-seed), and it **overwrites the
+  local document of every namespace it touches**, so it never runs under a plain
+  `make dev` or a normal build.
+
+- **In-app "Fake data" toggle (Developer settings)** — `useDevSeed`
+  (`src/dev/useDevSeed.ts`) flips an in-memory flag; while on, `App` swaps the
+  storage adapter for an ephemeral in-memory seed adapter
+  (`src/storage/dev-seed/index.ts`) serving `buildSeedSnapshot` (the namespaces
+  flattened into one document), so fake data can be previewed **without touching
+  the real notes**. A reload (or turning it off) restores the real backend. This
+  one **is** a user-facing feature: it ships the **Holodeck** achievement and
+  its `en`/`sv` strings, the toggle's `settings.developer.fakeData*` strings,
+  and a changeset — but no `/home` entry (it's a hidden dev diagnostic behind
+  dev mode that reads/writes/sends no data).
 
 ## Commit and PR conventions
 

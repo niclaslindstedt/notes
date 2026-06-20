@@ -43,6 +43,9 @@ const settings: SettingsCatalog = {
     captureLogs: "Spara loggar",
     captureLogsHint:
       "Spela in den inbyggda loggen i den här webbläsaren så att den överlever en omladdning, och visa fliken Loggar. Av som standard.",
+    fakeData: "Falska data",
+    fakeDataHint:
+      "Ersätt dina anteckningar med ett exempeldokument i minnet för den här sessionen. Ladda om (eller stäng av) för att återgå till dina riktiga anteckningar — exemplet sparas aldrig.",
   },
 
   editor: {

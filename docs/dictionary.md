@@ -143,6 +143,7 @@ Honour these when naming a new file, key, or string.
 | **Storage settings** / **pick a backend / encryption**     | `StorageSection` (`src/ui/settings/StorageSection.tsx`). [→](overview.md#storage-settings)                    |
 | **Encryption status bar** / **encryption progress** / **turn-on/off spinner** | status-bar + `ButtonLabel` spinner in `EncryptionSection` (`src/ui/settings/StorageSection.tsx`); `EncryptionProgress`, `EncryptionProgressStep` (`src/storage/useStorageBackend.ts`). [→](overview.md#storage-settings) |
 | **Developer settings** / **dev mode**                      | `DeveloperSection` (`src/ui/settings/DeveloperSection.tsx`); `useDevMode` (`src/dev/useDevMode.ts`). [→](overview.md#developer-settings) |
+| **Fake data** / **sample data** / **seed** / **Holodeck**  | `useDevSeed` (`src/dev/useDevSeed.ts`) + `createDevSeedAdapter` (`src/storage/dev-seed/index.ts`); env seed `seedDevData` / `buildSeed` (`src/dev/seed.ts`). [→](overview.md#fake-data) |
 | **Logs tab** / **captured logs**                           | `LogsSection` (`src/ui/settings/LogsSection.tsx`); `logger` (`src/dev/logger.ts`). [→](overview.md#logs)      |
 | **Language picker** / **switch language**                  | `LanguagePicker` (`src/ui/settings/LanguagePicker.tsx`). [→](overview.md#language-picker)                     |
 | **Settings layout helpers** (Section / Field / ToggleRow)  | `src/ui/settings/shared.tsx`. [→](overview.md#settings-layout-helpers)                                        |
