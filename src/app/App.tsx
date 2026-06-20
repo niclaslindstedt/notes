@@ -497,7 +497,7 @@ function NoteList({
         <div className="flex items-center gap-2">{syncSlot}</div>
       </header>
 
-      <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
+      <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 pt-3 pb-24 md:pb-3">
         {notes.length === 0 ? (
           <p className="mt-16 text-center text-muted">{t("app.empty")}</p>
         ) : (
@@ -518,13 +518,31 @@ function NoteList({
         )}
       </div>
 
+      {/* The "new note" affordance. On narrow viewports — where the side menu
+          is a floating drawer — it's a circular floating action button centred
+          at the bottom of the screen, thumb-reachable and hard to miss. From
+          the `md` breakpoint up, where the side menu docks as a permanent
+          sidebar (`nav.pinned`, see `use-nav.ts`), it relaxes into a normal,
+          clearly-styled accent button in flow under the list — the floating
+          puck reads as awkward beside a pinned chrome. */}
       <button
         type="button"
         onClick={onNew}
         aria-label={t("app.newNote")}
-        className="fixed inset-x-0 bottom-0 z-20 mx-auto mb-[max(1rem,env(safe-area-inset-bottom))] flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-accent text-3xl font-light text-page-bg shadow-lg active:scale-95"
+        className="
+          fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-1/2 z-20
+          flex h-14 w-14 -translate-x-1/2 cursor-pointer items-center justify-center gap-0
+          rounded-full bg-accent text-3xl leading-none font-light text-page-bg
+          shadow-lg transition-all duration-200 active:scale-95
+          md:static md:mx-auto md:mt-3 md:h-auto md:w-auto md:translate-x-0
+          md:gap-2 md:rounded-md md:bg-accent/10 md:px-4 md:py-2 md:text-base md:font-semibold
+          md:text-accent md:shadow-none md:hover:bg-accent/20
+        "
       >
-        +
+        <span aria-hidden className="-mt-0.5 md:mt-0">
+          +
+        </span>
+        <span className="hidden md:inline">{t("app.newNote")}</span>
       </button>
     </div>
   );
