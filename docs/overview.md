@@ -205,9 +205,10 @@ by filename), with `ImageViewer` showing the original on click. The provider
 tracks the **index** of the open image into the note's attachments, so the
 viewer is a small gallery: the close button (X), Escape, a backdrop click, or a
 swipe up/down dismisses it; the on-screen arrows, the arrow keys, or a left/
-right swipe step through the note's images, and on a wide screen the
-neighbouring images peek in at the edges, smaller and dimmed, the way Finder's
-Quick Look gallery shows them.
+right swipe step through the note's images. The images sit side by side on a
+single horizontal track, so a swipe drags the neighbouring image into place and
+the release animates the rest of the way — a real slide, not a snap-back-and-
+swap.
 
 Deleting an image's `![](attachments/…)` reference from the body **prunes its
 attachment**: `editNote` (`src/domain/note.ts`) drops any attachment the new

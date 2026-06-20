@@ -15,8 +15,9 @@ import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../icons.tsx";
 // clicking an inline thumbnail; dismissed with Escape, the close button, a
 // backdrop click, or a swipe up/down. With more than one image it is a small
 // gallery — arrow keys, the on-screen arrows, or a left/right swipe step
-// through the set, and on a wide screen the neighbouring images peek in at the
-// edges, smaller and dimmed, the way Finder's Quick Look gallery shows them.
+// through the set. The images sit side by side on a single track that slides
+// horizontally, so a swipe drags the neighbouring image into place and the
+// commit animates the rest of the way — a real swipe, not a snap-back-and-swap.
 // Deliberately not the shared `Modal` — an image wants the whole screen, edge
 // to edge, not a bordered card.
 
@@ -62,13 +63,18 @@ export function ImageViewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, goPrev, goNext]);
 
-  // Live drag: `drag` drives the active image's transform; the refs carry the
+  // Live drag: `drag` drives the track's transform; the refs carry the
   // committed axis and last delta into the pointer-up decision without leaning
   // on a possibly-stale render closure.
-  const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null);
+  const [drag, setDrag] = useState<{ axis: "h" | "v"; delta: number } | null>(
+    null,
+  );
   const start = useRef<{ x: number; y: number } | null>(null);
   const axis = useRef<"none" | "h" | "v">("none");
-  const last = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const last = useRef<{ axis: "none" | "h" | "v"; delta: number }>({
+    axis: "none",
+    delta: 0,
+  });
   const dragged = useRef(false);
   const pointerId = useRef<number | null>(null);
 
@@ -77,7 +83,7 @@ export function ImageViewer({
     pointerId.current = e.pointerId;
     start.current = { x: e.clientX, y: e.clientY };
     axis.current = "none";
-    last.current = { dx: 0, dy: 0 };
+    last.current = { axis: "none", delta: 0 };
     dragged.current = false;
   };
 
@@ -95,26 +101,29 @@ export function ImageViewer({
       }
     }
     dragged.current = true;
-    const next = axis.current === "h" ? { dx, dy: 0 } : { dx: 0, dy };
-    last.current = next;
-    setDrag(next);
+    const a = axis.current;
+    const delta = a === "h" ? dx : dy;
+    last.current = { axis: a, delta };
+    setDrag({ axis: a, delta });
   };
 
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (pointerId.current !== e.pointerId) return;
     pointerId.current = null;
-    const a = axis.current;
-    const { dx, dy } = last.current;
+    const { axis: a, delta } = last.current;
     axis.current = "none";
     start.current = null;
     setDrag(null);
-    if (a === "v" && Math.abs(dy) > DISMISS_DISTANCE) {
+    if (a === "v" && Math.abs(delta) > DISMISS_DISTANCE) {
       onClose();
       return;
     }
     if (a === "h") {
-      if (dx > NAV_DISTANCE) goPrev();
-      else if (dx < -NAV_DISTANCE) goNext();
+      // A horizontal release commits to the neighbour; resetting `drag` to null
+      // lets the track's transition animate the remaining distance into place
+      // (or snap back at the ends, where goPrev/goNext is a no-op).
+      if (delta > NAV_DISTANCE) goPrev();
+      else if (delta < -NAV_DISTANCE) goNext();
     }
   };
 
@@ -131,12 +140,14 @@ export function ImageViewer({
 
   if (!current) return null;
 
-  const dragStyle = drag
-    ? {
-        transform: `translate(${drag.dx}px, ${drag.dy}px)`,
-        opacity: 1 - Math.min(Math.abs(drag.dy) / 320, 0.6),
-      }
-    : undefined;
+  const horiz = drag?.axis === "h" ? drag.delta : 0;
+  const vert = drag?.axis === "v" ? drag.delta : 0;
+  // The track holds every image side by side; sliding it -index×100% parks the
+  // current one on screen, and the live drag adds the finger's pixel offset.
+  const trackStyle: React.CSSProperties = {
+    transform: `translate3d(calc(${-index * 100}% + ${horiz}px), ${vert}px, 0)`,
+    opacity: vert ? 1 - Math.min(Math.abs(vert) / 320, 0.6) : 1,
+  };
 
   return (
     <div
@@ -160,38 +171,29 @@ export function ImageViewer({
         className="absolute inset-0 cursor-zoom-out bg-transparent"
       />
 
-      {/* The gallery layer is click-through (`pointer-events-none`) so empty
-          space falls to the backdrop and the swipe handlers on the root. The
-          neighbouring images are a decorative Finder-style peek (the arrow
-          buttons, swipe, and arrow keys do the actual navigation). */}
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
-        {hasPrev && (
-          <img
-            src={attachments[index - 1]!.data}
-            alt=""
-            aria-hidden
-            draggable={false}
-            className="absolute left-0 hidden max-h-[45vh] max-w-[20vw] -translate-x-[28%] rounded-[var(--radius)] object-contain opacity-40 shadow-2xl sm:block"
-          />
-        )}
-        {hasNext && (
-          <img
-            src={attachments[index + 1]!.data}
-            alt=""
-            aria-hidden
-            draggable={false}
-            className="absolute right-0 hidden max-h-[45vh] max-w-[20vw] translate-x-[28%] rounded-[var(--radius)] object-contain opacity-40 shadow-2xl sm:block"
-          />
-        )}
-        <img
-          src={current.data}
-          alt={current.filename}
-          draggable={false}
-          style={dragStyle}
-          className={`pointer-events-auto relative z-[1] max-h-full max-w-full rounded-[var(--radius)] object-contain shadow-2xl ${
-            drag ? "" : "transition-[transform,opacity] duration-200"
-          }`}
-        />
+      {/* The sliding gallery track. It's click-through (`pointer-events-none`)
+          so empty space falls to the backdrop and the swipe handlers on the
+          root; only the images themselves take pointer events. */}
+      <div
+        style={trackStyle}
+        className={`pointer-events-none absolute inset-0 flex h-full w-full ${
+          drag ? "" : "transition-[transform,opacity] duration-200"
+        }`}
+      >
+        {attachments.map((a, i) => (
+          <div
+            key={a.filename}
+            className="flex h-full w-full flex-shrink-0 items-center justify-center p-4"
+          >
+            <img
+              src={a.data}
+              alt={i === index ? a.filename : ""}
+              aria-hidden={i === index ? undefined : true}
+              draggable={false}
+              className="pointer-events-auto max-h-full max-w-full rounded-[var(--radius)] object-contain shadow-2xl"
+            />
+          </div>
+        ))}
       </div>
 
       <button
@@ -225,7 +227,7 @@ export function ImageViewer({
       )}
 
       {count > 1 && (
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-sm text-white tabular-nums pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+        <div className="pointer-events-none absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-sm text-white tabular-nums">
           {index + 1} / {count}
         </div>
       )}
