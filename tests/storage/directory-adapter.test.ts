@@ -6,6 +6,7 @@ import {
   BLOB_FILE_NAME,
   createDirectoryAdapter,
 } from "../../src/storage/directory-adapter.ts";
+import { isEncryptedEnvelope } from "../../src/storage/crypto.ts";
 import type { FileEntry, FileStore } from "../../src/storage/file-store.ts";
 import { noteFileStem } from "../../src/storage/markdown/codec.ts";
 import { parse, serialize } from "../../src/storage/serialize.ts";
@@ -165,6 +166,31 @@ describe("directory adapter", () => {
     const paths = (await store.list()).map((e) => e.path);
     expect(paths).toEqual([BLOB_FILE_NAME]);
     expect((await adapter(store).load())?.text).toBe(envelope);
+  });
+
+  // A backend can drift into holding BOTH the plaintext markdown and a stale
+  // `notes.json` envelope. `load` surfaces the markdown (it wins over the
+  // blob), so disabling encryption re-saves that markdown — which must drop the
+  // orphaned envelope, otherwise the encrypted file lingers forever.
+  it("clears a shadowed encrypted blob when the surfaced markdown is re-saved (disable from a both-representations state)", async () => {
+    const store = memoryStore();
+    await adapter(store).save(serialize({ notes: notes() }));
+    // A stale envelope sits beside the markdown.
+    await store.write(
+      BLOB_FILE_NAME,
+      JSON.stringify({ encrypted: "notes.encrypted.v1" }),
+    );
+
+    const a = adapter(store);
+    const loaded = await a.load();
+    // The markdown is what surfaces, not the envelope — which is exactly why
+    // the disable path can't gate its re-save on "did the load return a blob".
+    expect(isEncryptedEnvelope(loaded!.text)).toBe(false);
+    await a.save(loaded!.text, loaded!.revision);
+
+    const paths = (await store.list()).map((e) => e.path).sort();
+    expect(paths).not.toContain(BLOB_FILE_NAME);
+    expect(paths.every((p) => p.endsWith(".md"))).toBe(true);
   });
 
   // The symmetric case: disabling encryption writes markdown through whatever
