@@ -126,6 +126,8 @@ export interface UseStorageBackend {
   getEncryptionStatus?: () => Map<string, "encrypted" | "pending">;
   /** Convert one note to encrypted at rest (idempotent), if supported. */
   migrateNote?: (note: Note) => Promise<boolean>;
+  /** Upgrade a legacy whole-document encrypted blob to per-file form (one-time). */
+  splitLegacyBlob?: () => Promise<boolean>;
   /**
    * The active backend's root settings store — `settings.json` at the
    * app-folder root, stored as plaintext JSON even when the notes are
@@ -925,6 +927,7 @@ export function useStorageBackend(): UseStorageBackend {
     fetchAttachment,
     getEncryptionStatus: adapter.getEncryptionStatus?.bind(adapter),
     migrateNote: adapter.migrateNote?.bind(adapter),
+    splitLegacyBlob: adapter.splitLegacyBlob?.bind(adapter),
     settingsStore,
     backend,
     dropboxConfigured: isDropboxConfigured(),

@@ -23,6 +23,8 @@ type Options = {
   getStatus?: () => Map<string, NoteEncStatus>;
   /** Convert one note to encrypted at rest (idempotent). */
   migrateNote?: (note: Note) => Promise<boolean>;
+  /** Upgrade a legacy whole-document blob to per-file form (one-time). */
+  splitLegacyBlob?: () => Promise<boolean>;
 };
 
 export function useEncryptionMigration({
@@ -30,6 +32,7 @@ export function useEncryptionMigration({
   notes,
   getStatus,
   migrateNote,
+  splitLegacyBlob,
 }: Options): Map<string, NoteEncStatus> {
   const [status, setStatus] = useState<Map<string, NoteEncStatus>>(new Map());
   const runningRef = useRef(false);
@@ -51,6 +54,13 @@ export function useEncryptionMigration({
     let cancelled = false;
     void (async () => {
       try {
+        // First upgrade a legacy whole-document blob (existing users) to the
+        // per-file form, then seal any remaining plaintext notes.
+        if (splitLegacyBlob) {
+          const split = await splitLegacyBlob();
+          if (split && !cancelled)
+            setStatus(new Map(getStatus?.() ?? new Map()));
+        }
         await runEncryptionMigration({
           notes,
           migrateNote,
@@ -68,7 +78,7 @@ export function useEncryptionMigration({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, notesKey, migrateNote]);
+  }, [enabled, notesKey, migrateNote, splitLegacyBlob]);
 
   return status;
 }

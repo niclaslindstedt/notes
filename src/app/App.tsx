@@ -158,6 +158,7 @@ export function App() {
     notes: sync.doc.notes,
     getStatus: storage.getEncryptionStatus,
     migrateNote: storage.migrateNote,
+    splitLegacyBlob: storage.splitLegacyBlob,
   });
 
   // When the floating button is hidden (only possible in the standalone

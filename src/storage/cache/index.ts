@@ -263,5 +263,9 @@ export function withLocalCache(
     migrateNote: inner.migrateNote
       ? (note) => inner.migrateNote!(note)
       : undefined,
+
+    splitLegacyBlob: inner.splitLegacyBlob
+      ? () => inner.splitLegacyBlob!()
+      : undefined,
   };
 }

@@ -108,6 +108,11 @@ export type StorageAdapter = {
   // conversion doesn't burst the cloud API. Returns true when work was done.
   migrateNote?(note: Note): Promise<boolean>;
 
+  // One-time upgrade of a legacy whole-document `notes.json` envelope to the
+  // per-file encrypted form, atomically. Idempotent (no-op once split). Returns
+  // true when it performed the split.
+  splitLegacyBlob?(): Promise<boolean>;
+
   // Milliseconds to wait after the last edit before pushing a save. Defaults
   // to 0 (save immediately) — right for localStorage. Cloud adapters set
   // this around a second to coalesce keystrokes into one request.

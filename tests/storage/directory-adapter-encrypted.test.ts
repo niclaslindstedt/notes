@@ -377,3 +377,41 @@ describe("directory adapter — paced per-note migration", () => {
     expect(await after.migrateNote!(reloaded)).toBe(false);
   });
 });
+
+describe("directory adapter — legacy notes.json split", () => {
+  it("upgrades a legacy whole-document blob to per-file form, then removes it", async () => {
+    const { encryptText } = await import("../../src/storage/crypto.ts");
+    const store = memoryStore();
+    const att = memoryAttachments();
+    // A legacy encrypted blob: the whole snapshot (attachments inline) in one
+    // envelope at notes.json — the old at-rest format.
+    const { note } = noteWithImage(1);
+    const legacy = await encryptText(serialize({ notes: [note] }), "pw");
+    store.files.set("notes.json", { text: legacy, rev: 1 });
+
+    const ref = { current: "pw" as string | null };
+    const a = encAdapter(store, att, ref);
+
+    // Load decrypts the legacy blob so the document is readable.
+    const loaded = parse((await a.load())!.text);
+    expect(loaded.notes[0]!.body).toContain(SECRET_BODY);
+
+    // The split converts it to per-file form and drops notes.json.
+    expect(await a.splitLegacyBlob!()).toBe(true);
+    const paths = [...store.files.keys()];
+    expect(paths).not.toContain("notes.json");
+    expect(paths.filter((p) => p.endsWith(".enc"))).toHaveLength(1);
+    expect([...att.files.keys()][0]).not.toContain("/"); // opaque blob
+
+    // A cold adapter reads the per-file form, and the bytes still decrypt.
+    const b = encAdapter(store, att, ref);
+    const reloaded = parse((await b.load())!.text).notes[0]!;
+    expect(reloaded.body).toContain(SECRET_BODY);
+    expect(b.getEncryptionStatus!().get(reloaded.id)).toBe("encrypted");
+    const got = await b.fetchAttachment!(reloaded, "abcd1234-pic.png");
+    expect([...got!.bytes]).toEqual([72, 101, 108, 108, 111]);
+
+    // Idempotent — nothing to split now.
+    expect(await b.splitLegacyBlob!()).toBe(false);
+  });
+});

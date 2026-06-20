@@ -1023,6 +1023,35 @@ export function createDirectoryAdapter(
     return true;
   }
 
+  // One-time upgrade for existing users: a legacy whole-document `notes.json`
+  // envelope is decrypted and re-saved as the per-file form, then the blob is
+  // removed (the save's representation-switch supersede handles that atomically:
+  // the per-file notes + attachment blobs are written and verified before the
+  // blob goes). The legacy blob folds attachment bytes inline, so the decrypted
+  // snapshot carries them and they land in their own encrypted blobs. Idempotent
+  // and a no-op once split. Returns true when it did the split.
+  async function splitLegacyBlob(): Promise<boolean> {
+    const keys = await ensureKeys();
+    if (!keys) return false;
+    const password = crypto?.passwordRef.current;
+    if (!password) return false;
+    const entries = await store.list();
+    if (!entries.some((e) => e.path === BLOB_FILE_NAME)) return false;
+    // Already split (per-file notes exist) — nothing to do.
+    if (entries.some((e) => isEncNotePath(e.path))) return false;
+    const blob = await store.read(BLOB_FILE_NAME);
+    if (!blob || !isEncryptedEnvelope(blob)) return false;
+    log.info(`${options.id}: splitting legacy notes.json into per-file form`);
+    const plaintext = await decryptEnvelope(blob, password);
+    // save() in encrypted mode writes per-file + reconciles attachment blobs
+    // from the inline data + supersedes (removes) notes.json after verifying.
+    await save(plaintext);
+    for (const note of parse(plaintext).notes) {
+      encStatus.set(note.id, "encrypted");
+    }
+    return true;
+  }
+
   const capabilities = new Set<AdapterCapability>();
   if (attachments) capabilities.add("attachments");
 
@@ -1036,5 +1065,6 @@ export function createDirectoryAdapter(
     fetchAttachment,
     getEncryptionStatus,
     migrateNote,
+    splitLegacyBlob,
   };
 }
