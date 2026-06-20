@@ -187,6 +187,28 @@ describe("MarkdownEditor", () => {
     expect(activeTextarea().value).toBe("plain");
   });
 
+  // Clicking the empty space below the note must always land the caret on a
+  // blank line at the very bottom, creating one when the note doesn't already
+  // end in a newline — otherwise the click would roll edit mode onto the last
+  // content line (e.g. an image), turning it back into raw source.
+  it("appends a trailing blank line when clicking below a note that lacks one", () => {
+    const { onChange, container } = renderEditor("![img](attachments/a.png)");
+    // The outer scroll container is the empty note space below the content.
+    const scroll = container.firstElementChild as HTMLElement;
+    fireEvent.mouseDown(scroll, { target: scroll });
+    expect(onChange).toHaveBeenLastCalledWith("![img](attachments/a.png)\n");
+    // The caret now sits on the fresh empty last line.
+    expect(activeTextarea().value).toBe(SENTINEL);
+  });
+
+  it("does not add another blank line when the note already ends in one", () => {
+    const { onChange, container } = renderEditor("hello\n");
+    const scroll = container.firstElementChild as HTMLElement;
+    fireEvent.mouseDown(scroll, { target: scroll });
+    // The note already ends in a blank line, so clicking below adds nothing.
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   // A live cloud pull replaces the open note's `body` prop while the editor is
   // mounted; the editor must adopt the new text in place (the "write here, see
   // it there" path) rather than keeping its mount-time copy.

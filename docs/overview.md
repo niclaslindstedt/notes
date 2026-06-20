@@ -126,6 +126,13 @@ the body explicitly; it reads the parsed blocks from `classifyLines`
 (`src/domain/markdown.ts`) and honours the `EditorSettings` (word-wrap,
 spell-check, autocorrect, margin width).
 
+Clicking the empty space below the note (`activateEnd`) always lands the caret
+on a blank line at the very bottom, **appending one when the document doesn't
+already end in a newline**. Without that trailing blank line the click would
+have nowhere to go but the last content line, rolling edit mode onto it and
+turning a rendered image (or any formatted line) back into raw source — so a
+note that ends in an image gains a fresh line to keep typing on instead.
+
 ### Rendered line
 
 `RenderedLine` (`src/ui/MarkdownLine.tsx`) — renders one parsed `LineBlock` as

@@ -398,25 +398,35 @@ export function MarkdownEditor({
   }
 
   // A click anywhere in the empty note space (the scroll container or the
-  // padding around the lines) drops the caret at the end of the note and
-  // opens the editor. When the last line is already the active line — the
-  // single-line case — `setActive` would be a no-op, so the layout effect
-  // that installs the caret never runs; focus the textarea directly here so
-  // editing always starts, regardless of how tall the document is.
+  // padding around the lines) drops the caret on a blank line at the very
+  // bottom of the note and opens the editor. When the document doesn't already
+  // end in an empty line, append one and put the caret there — otherwise the
+  // click would roll the editing textarea onto the last *content* line, turning
+  // a rendered image (or any formatted line) back into raw source just to give
+  // the caret somewhere to land. Creating the trailing newline keeps the caret
+  // below the content, where the user expects to keep typing.
   function activateEnd(e: ReactMouseEvent) {
     e.preventDefault();
     const last = lines.length - 1;
-    const col = lines[last]!.length;
+    if (lines[last] !== "") {
+      const next = [...lines, ""];
+      commit(next, next.length - 1, 0);
+      return;
+    }
+    // The document already ends in a blank line; just land the caret on it.
+    // When that blank line is already the active line — the single empty-line
+    // case — `setActive` would be a no-op, so the layout effect that installs
+    // the caret never runs; focus the textarea directly here so editing always
+    // starts, regardless of how tall the document is.
     if (last === clampedActive) {
       const ta = taRef.current;
       if (ta) {
         ta.focus();
-        const c = Math.min(col, ta.value.length);
-        ta.setSelectionRange(c, c);
+        ta.setSelectionRange(0, 0);
       }
       return;
     }
-    moveTo(last, col);
+    moveTo(last, 0);
   }
 
   const widthStyle =
