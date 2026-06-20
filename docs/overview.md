@@ -148,8 +148,13 @@ keystroke, which is why it lives in `domain/`.
 
 `TitleField` in `src/app/App.tsx` — the note's title field above the editor. It
 is an auto-growing textarea, so a long title wraps onto further lines and the
-field grows to fit instead of scrolling out of view; the header top-aligns so
-the app glyph and the copy/sync buttons stay pinned to the first line. Enter and
+field grows to fit instead of scrolling out of view. A single-line title is
+vertically centred against the app glyph and the copy/sync buttons; once it
+wraps the header top-aligns so those stay pinned to the first line (the field
+reports the one-line↔multi-line transition up via `onMultilineChange`). Opening
+an existing note focuses nothing, so the soft keyboard stays down until the user
+taps where to type — only a brand-new note opens with the title focused, ready
+to be named. Enter and
 Arrow-Down hand focus down to the body, so the field never holds a literal
 newline. Edits route through `useNotes().retitle` → `retitleNote`
 (`src/domain/note.ts`). On file/cloud backends the [save hold](#save-hold) keeps
