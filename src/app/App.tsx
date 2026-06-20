@@ -34,6 +34,7 @@ import { useFileDrop } from "../ui/hooks/useFileDrop.ts";
 import { useMediaQuery } from "../ui/hooks/useMediaQuery.ts";
 import { usePullToRefresh } from "../ui/hooks/usePullToRefresh.ts";
 import { useRowSwipe } from "../ui/hooks/useRowSwipe.ts";
+import { useSuppressSwipeNavigation } from "../ui/hooks/useSuppressSwipeNavigation.ts";
 import { useUndoRedoShortcuts } from "../ui/hooks/useUndoRedoShortcuts.ts";
 import { useViewportHeight } from "../ui/hooks/useViewportHeight.ts";
 import {
@@ -138,6 +139,11 @@ export function App() {
     enabled: !nav.showButton && !nav.pinned && !nav.open,
     onOpen: nav.toggle,
   });
+
+  // Kill the browser's native edge-swipe history navigation (swipe in from the
+  // left edge to go back / the right to go forward) so it stops hijacking the
+  // side menu's own horizontal swipe gestures, which live on the same edges.
+  useSuppressSwipeNavigation();
 
   // Cmd/Ctrl+Z / Cmd/Ctrl+Shift+Z mirror the side-menu undo & redo. The hook
   // stands down while focus is in a text field so the editor's native undo
