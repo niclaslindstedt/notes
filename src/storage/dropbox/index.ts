@@ -50,19 +50,24 @@ const log = createLogger("dropbox");
 // picker.
 //
 // The matching app is registered at https://www.dropbox.com/developers/apps
-// as "Scoped access" with permission type "App folder" (folder name
-// `notes.niclaslindstedt.se`). Its redirect URIs must include the prod and
-// dev origins with no trailing slash — `startAuth` derives the URI from
-// `window.location.origin` + pathname and Dropbox requires an exact match.
+// as "Scoped access" with permission type "App folder". Its redirect URIs
+// must include the prod and dev origins with no trailing slash — `startAuth`
+// derives the URI from `window.location.origin` + pathname and Dropbox
+// requires an exact match.
 export const DROPBOX_APP_KEY = import.meta.env.VITE_DROPBOX_APP_KEY ?? "";
 
 export function isDropboxConfigured(): boolean {
   return DROPBOX_APP_KEY.length > 0;
 }
 
-// Public folder name inside the user's Dropbox `Apps/` directory. This
-// matches the Dropbox app registration's "App folder" name.
-export const DROPBOX_APP_FOLDER = "notes.niclaslindstedt.se";
+// Public folder name inside the user's Dropbox `Apps/` directory. This must
+// match the folder name on the Dropbox app registration's "App folder"
+// permission — Dropbox creates `Apps/<this>/` on first connect. Read from a
+// build-time env var (`VITE_DROPBOX_APP_FOLDER`) so a fork can point at its
+// own app folder without editing source; defaults to the production app's
+// `free-notes`.
+export const DROPBOX_APP_FOLDER =
+  import.meta.env.VITE_DROPBOX_APP_FOLDER ?? "free-notes";
 
 // Web URL that opens the namespace's notes folder in Dropbox's web UI.
 export function dropboxWebUrl(
