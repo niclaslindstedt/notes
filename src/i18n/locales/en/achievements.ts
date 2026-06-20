@@ -123,6 +123,12 @@ const achievements = {
       learnMore:
         "Settings → Editor decides what a brand-new note is called before you title it yourself — the date and time, an auto-incrementing “Note”, “Note 2”, … , or nothing at all.",
     },
+    tidyUp: {
+      name: "Tidy up",
+      condition: "Change how notes are tidied when saved.",
+      learnMore:
+        "Settings → Editor tidies each note as it's saved — trimming trailing spaces from every line and ending the note with a single newline. Turn either off to keep your notes exactly as typed.",
+    },
     archivist: {
       name: "Archivist",
       condition: "Archive a note.",

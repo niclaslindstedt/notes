@@ -11,6 +11,7 @@ import {
   ArchiveGlyph,
   BoxesGlyph,
   BroadcastGlyph,
+  BroomGlyph,
   CloudGlyph,
   CodeGlyph,
   CopyGlyph,
@@ -223,6 +224,24 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       predicate: (prev, next) =>
         prev.appearance.editor.defaultTitle !==
         next.appearance.editor.defaultTitle,
+    },
+  },
+  {
+    id: "tidyUp",
+    tier: "intermediate",
+    glyph: BroomGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [
+        s.appearance.editor.trimTrailingSpaces,
+        s.appearance.editor.trailingNewline,
+      ],
+      predicate: (prev, next) =>
+        prev.appearance.editor.trimTrailingSpaces !==
+          next.appearance.editor.trimTrailingSpaces ||
+        prev.appearance.editor.trailingNewline !==
+          next.appearance.editor.trailingNewline,
     },
   },
   {

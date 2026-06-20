@@ -120,6 +120,21 @@ export function EditorSection({
         />
       </Section>
 
+      <Section title={t("settings.editor.formattingTitle")}>
+        <ToggleRow
+          label={t("settings.editor.trimTrailingSpaces")}
+          hint={t("settings.editor.trimTrailingSpacesHint")}
+          checked={editor.trimTrailingSpaces}
+          onChange={(v) => update("trimTrailingSpaces", v)}
+        />
+        <ToggleRow
+          label={t("settings.editor.trailingNewline")}
+          hint={t("settings.editor.trailingNewlineHint")}
+          checked={editor.trailingNewline}
+          onChange={(v) => update("trailingNewline", v)}
+        />
+      </Section>
+
       <Section title={t("settings.editor.copyTitle")}>
         <Field label={t("settings.editor.copyScope")}>
           <SelectPicker<CopyScope>

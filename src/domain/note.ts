@@ -228,3 +228,53 @@ export type Snapshot = {
 export function emptySnapshot(): Snapshot {
   return { notes: [] };
 }
+
+// How a note's body is tidied each time it is persisted ("format on save").
+// Both default on. The normalisation is applied to the *stored* bytes only —
+// the in-memory body the editor holds stays exactly as typed, so trimming
+// never fights the caret (the live-preview editor treats a body that differs
+// from what it echoed as another writer's edit and would clobber the keystroke
+// otherwise). The tidied form lands in memory the next time the note is read
+// back from the backend. The synced editor settings carry the two flags.
+export type SaveFormatting = {
+  // Strip trailing spaces / tabs from the end of every line.
+  trimTrailingSpaces: boolean;
+  // Ensure the body ends with a single trailing newline (the POSIX text-file
+  // convention), without disturbing a body that already does.
+  trailingNewline: boolean;
+};
+
+export const DEFAULT_SAVE_FORMATTING: SaveFormatting = {
+  trimTrailingSpaces: true,
+  trailingNewline: true,
+};
+
+// Tidy one note body per the chosen formatting. Pure; an empty body is left
+// empty (no newline is forced onto a note with nothing in it).
+export function formatBody(body: string, fmt: SaveFormatting): string {
+  let out = body;
+  // `$` under the `m` flag matches before each newline and at the very end, so
+  // this clears trailing whitespace on every line including the last.
+  if (fmt.trimTrailingSpaces) out = out.replace(/[ \t]+$/gm, "");
+  if (fmt.trailingNewline && out.length > 0 && !out.endsWith("\n")) {
+    out += "\n";
+  }
+  return out;
+}
+
+// Apply `formatBody` across a snapshot's notes, returning the same snapshot
+// reference when nothing changed so an unaffected save doesn't churn identity.
+export function formatSnapshotForSave(
+  snapshot: Snapshot,
+  fmt: SaveFormatting,
+): Snapshot {
+  if (!fmt.trimTrailingSpaces && !fmt.trailingNewline) return snapshot;
+  let changed = false;
+  const notes = snapshot.notes.map((note) => {
+    const body = formatBody(note.body, fmt);
+    if (body === note.body) return note;
+    changed = true;
+    return { ...note, body };
+  });
+  return changed ? { ...snapshot, notes } : snapshot;
+}

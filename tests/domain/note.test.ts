@@ -5,7 +5,10 @@ import {
   archivedNotes,
   createNote,
   defaultNoteTitle,
+  DEFAULT_SAVE_FORMATTING,
   editNote,
+  formatBody,
+  formatSnapshotForSave,
   isBlank,
   isDefaultTitleScheme,
   noteTitle,
@@ -19,6 +22,47 @@ import type { Attachment } from "../../src/domain/attachment.ts";
 function attach(filename: string): Attachment {
   return { filename, mime: "image/png", data: "data:image/png;base64,AAA" };
 }
+
+describe("save formatting", () => {
+  const fmt = DEFAULT_SAVE_FORMATTING;
+
+  it("trims trailing spaces from every line", () => {
+    expect(formatBody("foo   \nbar\t\nbaz", fmt)).toBe("foo\nbar\nbaz\n");
+  });
+
+  it("ensures a single trailing newline without doubling one", () => {
+    expect(formatBody("foo", fmt)).toBe("foo\n");
+    expect(formatBody("foo\n", fmt)).toBe("foo\n");
+    expect(formatBody("foo\n\n", fmt)).toBe("foo\n\n");
+  });
+
+  it("leaves an empty body empty", () => {
+    expect(formatBody("", fmt)).toBe("");
+  });
+
+  it("honours each flag independently", () => {
+    expect(
+      formatBody("foo  ", { trimTrailingSpaces: true, trailingNewline: false }),
+    ).toBe("foo");
+    expect(
+      formatBody("foo  ", { trimTrailingSpaces: false, trailingNewline: true }),
+    ).toBe("foo  \n");
+  });
+
+  it("returns the same snapshot reference when nothing changes", () => {
+    const snapshot = { notes: [editNote(createNote(0), "tidy\n", 1)] };
+    expect(formatSnapshotForSave(snapshot, fmt)).toBe(snapshot);
+  });
+
+  it("tidies the bodies that need it across a snapshot", () => {
+    const snapshot = {
+      notes: [editNote(createNote(0), "needs trim  ", 1)],
+    };
+    const out = formatSnapshotForSave(snapshot, fmt);
+    expect(out).not.toBe(snapshot);
+    expect(out.notes[0]!.body).toBe("needs trim\n");
+  });
+});
 
 describe("note domain", () => {
   it("creates a blank note stamped at the given time", () => {

@@ -21,6 +21,7 @@ import {
   setArchived,
   sortByUpdated,
   type Note,
+  type SaveFormatting,
   type Snapshot,
 } from "../domain/note.ts";
 import { importedNote } from "../domain/import.ts";
@@ -64,7 +65,10 @@ export type NotesStore = {
   sync: NotesSync;
 };
 
-export function useNotes(adapter: StorageAdapter): NotesStore {
+export function useNotes(
+  adapter: StorageAdapter,
+  formatting?: SaveFormatting,
+): NotesStore {
   // The undo timeline is built after the sync engine (it needs the engine's
   // `setDoc` / `scheduleSave` to apply a stepped-to snapshot), but the
   // engine's load / reload / conflict-adopt paths must reset that timeline.
@@ -72,7 +76,7 @@ export function useNotes(adapter: StorageAdapter): NotesStore {
   // it exists.
   const resetHistory = useRef<(seed: Snapshot) => void>(() => {});
 
-  const sync = useNotesSync({ active: adapter, resetHistory });
+  const sync = useNotesSync({ active: adapter, resetHistory, formatting });
   const notes = sync.doc.notes;
 
   // Latest document, read from the mutation callbacks so a rapid

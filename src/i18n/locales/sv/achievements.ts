@@ -117,6 +117,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Inställningar → Redigerare avgör vad en helt ny anteckning heter innan du själv titulerar den — datum och tid, en automatiskt räknande ”Note”, ”Note 2”, … , eller ingenting alls.",
     },
+    tidyUp: {
+      name: "Städa upp",
+      condition: "Ändra hur anteckningar städas när de sparas.",
+      learnMore:
+        "Inställningar → Redigerare städar varje anteckning när den sparas — tar bort släpande blanksteg från varje rad och avslutar anteckningen med en enda radbrytning. Stäng av endera för att behålla dina anteckningar precis som du skrev dem.",
+    },
     archivist: {
       name: "Arkivarie",
       condition: "Arkivera en anteckning.",

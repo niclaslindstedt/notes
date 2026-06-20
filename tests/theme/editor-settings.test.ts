@@ -28,6 +28,8 @@ describe("editor margin helpers", () => {
       renderMarkdown: true,
       disableSpellcheck: false,
       disableAutocorrect: false,
+      trimTrailingSpaces: true,
+      trailingNewline: true,
       defaultTitle: "dateTime",
       copyScope: "body",
     });
@@ -49,6 +51,17 @@ describe("appearance coercion of editor settings", () => {
     expect(editor.wordWrap).toBe(false);
     // A non-boolean renderMarkdown falls back to the default.
     expect(editor.renderMarkdown).toBe(true);
+  });
+
+  it("defaults the save-formatting flags on and honours a stored false", () => {
+    replaceAppearance({ theme: "light" });
+    expect(getAppearance().editor.trimTrailingSpaces).toBe(true);
+    expect(getAppearance().editor.trailingNewline).toBe(true);
+    replaceAppearance({
+      editor: { trimTrailingSpaces: false, trailingNewline: false },
+    });
+    expect(getAppearance().editor.trimTrailingSpaces).toBe(false);
+    expect(getAppearance().editor.trailingNewline).toBe(false);
   });
 
   it("keeps a valid copyScope and repairs an unknown one", () => {

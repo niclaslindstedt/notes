@@ -59,6 +59,7 @@ const settings = {
     layoutTitle: "Writing column",
     markdownTitle: "Markdown",
     typingTitle: "Typing aids",
+    formattingTitle: "Formatting on save",
     copyTitle: "Copying",
     defaultTitle: "Default note title",
     defaultTitleHint:
@@ -79,6 +80,12 @@ const settings = {
     disableAutocorrect: "Disable auto correct",
     disableAutocorrectHint:
       "Stop your device auto-correcting and auto-capitalising as you type (mostly affects mobile keyboards).",
+    trimTrailingSpaces: "Trim trailing spaces",
+    trimTrailingSpacesHint:
+      "Remove spaces left at the end of every line when a note is saved.",
+    trailingNewline: "End with a newline",
+    trailingNewlineHint:
+      "Make sure a saved note ends with a single trailing newline.",
     copyScope: "Copy",
     copyScopeHint:
       "What the editor's copy button puts on the clipboard. Body is just what you wrote; the others add the title, or the whole .md file with its YAML frontmatter.",

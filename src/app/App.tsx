@@ -18,6 +18,7 @@ import {
   noteTitle,
   notePreview,
   type Note,
+  type SaveFormatting,
 } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { isStandaloneMobile } from "../pwa/standalone.ts";
@@ -102,6 +103,15 @@ export function App() {
     () => (fakeData ? createDevSeedAdapter() : null),
     [fakeData],
   );
+  // Format-on-save settings handed to the persistence engine: tidy each note's
+  // body (trim trailing spaces, end with a newline) as it's written.
+  const formatting = useMemo<SaveFormatting>(
+    () => ({
+      trimTrailingSpaces: editor.trimTrailingSpaces,
+      trailingNewline: editor.trailingNewline,
+    }),
+    [editor.trimTrailingSpaces, editor.trailingNewline],
+  );
   const {
     notes,
     allNotes,
@@ -119,7 +129,7 @@ export function App() {
     canUndo,
     canRedo,
     sync,
-  } = useNotes(seedAdapter ?? storage.adapter);
+  } = useNotes(seedAdapter ?? storage.adapter, formatting);
   const [editingId, setEditingId] = useState<string | null>(null);
   // Which list the main area shows when nothing is open in the editor / reader.
   const [view, setView] = useState<"notes" | "archive">("notes");

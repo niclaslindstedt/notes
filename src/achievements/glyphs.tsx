@@ -258,6 +258,19 @@ export function ImageGlyph({ className }: IconProps) {
   );
 }
 
+// A broom sweeping — the format-on-save glyph (tidy a note as it's saved:
+// trim trailing spaces, end with a newline).
+export function BroomGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="m21 3-7.5 7.5" />
+      <path d="M12.5 9.5 6 16a3 3 0 0 0-1 2.5L4 21l2.5-1a3 3 0 0 0 2.5-1l6.5-6.5z" />
+      <path d="m9 13 2 2" />
+      <path d="m11.5 10.5 2 2" />
+    </Svg>
+  );
+}
+
 // A conical lab flask — the "Fake data" / holodeck glyph (a generated sample
 // dataset to experiment with).
 export function FlaskGlyph({ className }: IconProps) {
