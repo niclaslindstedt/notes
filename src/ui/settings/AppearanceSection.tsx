@@ -14,6 +14,7 @@ import {
   FONT_FAMILIES,
   FONT_SCALE_PRESETS,
   LIGHT_THEMES,
+  LIST_LAYOUTS,
   PRESET_PALETTES,
   RADIUS_PRESETS,
   themeFamily,
@@ -21,6 +22,7 @@ import {
   type CustomTheme,
   type CustomThemeColors,
   type FontFamilyId,
+  type ListLayout,
   type ThemeFamily,
   type ThemePreset,
 } from "../../theme/themes.ts";
@@ -112,6 +114,26 @@ export function AppearanceSection({
             />
           </Field>
         )}
+      </Section>
+
+      <Section title={t("settings.appearance.list")}>
+        <Field label={t("settings.appearance.listLayout")}>
+          <SegmentedRow<ListLayout>
+            ariaLabel={t("settings.appearance.listLayout")}
+            value={appearance.listLayout}
+            options={LIST_LAYOUTS.map((id) => ({
+              value: id,
+              label:
+                id === "cards"
+                  ? t("settings.appearance.listLayoutCards")
+                  : t("settings.appearance.listLayoutRows"),
+            }))}
+            onChange={(v) => onUpdate("listLayout", v)}
+          />
+          <p className="w-full text-xs text-muted">
+            {t("settings.appearance.listLayoutHint")}
+          </p>
+        </Field>
       </Section>
 
       <Section title={t("settings.appearance.font")}>

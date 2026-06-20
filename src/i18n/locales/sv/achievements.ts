@@ -93,6 +93,12 @@ const achievements: AchievementsCatalog = {
       name: "Typsnittsnörd",
       condition: "Välj ett annat typsnitt.",
     },
+    gallery: {
+      name: "Galleri",
+      condition: "Växla anteckningslistan mellan rader och kort.",
+      learnMore:
+        "Inställningar → Utseende visar översikten på två sätt: kompakta enradsrader, eller högre kort som visar flera rader av varje anteckning och tonar ut slutet. Välj det som är lättast för dig att överblicka.",
+    },
     marginalia: {
       name: "Marginalanteckningar",
       condition: "Justera redigerarens skrivkolumnmarginaler.",

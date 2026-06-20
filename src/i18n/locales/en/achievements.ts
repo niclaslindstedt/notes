@@ -99,6 +99,12 @@ const achievements = {
       name: "Font fanatic",
       condition: "Pick a different font family.",
     },
+    gallery: {
+      name: "Gallery",
+      condition: "Switch the note list between rows and cards.",
+      learnMore:
+        "Settings → Appearance lays the overview out two ways: compact one-line rows, or taller cards that show several lines of each note and fade the tail out. Pick whichever you like to scan.",
+    },
     marginalia: {
       name: "Marginalia",
       condition: "Adjust the editor's writing-column margins.",

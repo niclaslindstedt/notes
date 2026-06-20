@@ -35,15 +35,18 @@ import {
   DEFAULT_EDITOR_SETTINGS,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SCALE,
+  DEFAULT_LIST_LAYOUT,
   DEFAULT_THEME,
   FONT_FAMILIES,
   FONT_SCALE_PRESETS,
   isEditorMargin,
+  isListLayout,
   LINK_SHORTEN_LENGTHS,
   type CustomTheme,
   type DensityPreset,
   type EditorSettings,
   type FontFamilyId,
+  type ListLayout,
   type RadiusPreset,
   type ThemePreset,
 } from "./themes.ts";
@@ -52,6 +55,7 @@ export type {
   CustomTheme,
   CustomThemeColors,
   EditorSettings,
+  ListLayout,
   ThemePreset,
 } from "./themes.ts";
 
@@ -67,6 +71,9 @@ export type Appearance = {
   // UI text-size multiplier; one of `FONT_SCALE_PRESETS`.
   fontScale: number;
   customTheme: CustomTheme;
+  // How the overview lays each note out — a compact one-line `rows` list or
+  // the taller, multi-line `cards` treatment.
+  listLayout: ListLayout;
   // Note-writing surface preferences (margins, wrap, live Markdown).
   editor: EditorSettings;
   // Earned achievements: a map of achievement `id` → unlock timestamp (ms
@@ -88,6 +95,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   fontFamily: DEFAULT_FONT_FAMILY,
   fontScale: DEFAULT_FONT_SCALE,
   customTheme: DEFAULT_CUSTOM_THEME,
+  listLayout: DEFAULT_LIST_LAYOUT,
   editor: DEFAULT_EDITOR_SETTINGS,
   achievements: {},
   unseenAchievements: [],
@@ -202,6 +210,9 @@ function coerce(raw: unknown): Appearance {
           : DEFAULT_CUSTOM_THEME.density,
       reduceMotion: custom.reduceMotion === true,
     },
+    listLayout: isListLayout(raw.listLayout)
+      ? raw.listLayout
+      : DEFAULT_LIST_LAYOUT,
     editor: {
       margin: isEditorMargin(editor.margin)
         ? editor.margin
