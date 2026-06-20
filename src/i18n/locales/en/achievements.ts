@@ -129,6 +129,12 @@ const achievements = {
       learnMore:
         "Settings → Editor tidies each note as it's saved — trimming trailing spaces from every line and ending the note with a single newline. Turn either off to keep your notes exactly as typed.",
     },
+    appendix: {
+      name: "Appendix",
+      condition: "Show attachments at the end of the note.",
+      learnMore:
+        "Settings → Editor can collect a note's images and files into a block at the foot of the note instead of showing them inline where you pasted them — handy when the attachments are references, not part of the flow. Images and files toggle independently.",
+    },
     archivist: {
       name: "Archivist",
       condition: "Archive a note.",
@@ -190,6 +196,12 @@ const achievements = {
       condition: "Paste or drop an image into a note.",
       learnMore:
         "On a local folder or cloud backend you can paste (Ctrl/Cmd+V) or drag an image straight into the editor. It's saved as a real image file under an attachments folder beside your notes and shows inline as a thumbnail you can click to open full-size.",
+    },
+    paperTrail: {
+      name: "Paper trail",
+      condition: "Attach a file to a note.",
+      learnMore:
+        "On a local folder or cloud backend you can paste or drag any file — a PDF, an archive, a spreadsheet — straight into the editor. It's saved as a real file under an attachments folder beside your notes and shows as a chip with its type icon you can click to download.",
     },
     liveSync: {
       name: "Telepathy",

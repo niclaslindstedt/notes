@@ -50,11 +50,12 @@ export function createNote(now: number = Date.now()): Note {
 }
 
 // Return a copy of `note` with a new body and a bumped `updatedAt`. Erasing an
-// image's `![](attachments/…)` reference from the body orphans its attachment,
-// so any attachment the new body no longer references is dropped here — the
-// body is the source of truth for which images the note keeps. This is what
-// makes a deleted image shed its bytes from the document (and, on the file
-// backends, lets the next save reconcile the on-disk file away).
+// attachment's `![](attachments/…)` / `[file](attachments/…)` reference from
+// the body orphans its attachment, so any attachment the new body no longer
+// references is dropped here — the body is the source of truth for which
+// attachments the note keeps. This is what makes a deleted attachment shed its
+// bytes from the document (and, on the file backends, lets the next save
+// reconcile the on-disk file away).
 export function editNote(
   note: Note,
   body: string,
@@ -103,17 +104,21 @@ export function noteTitle(note: Note): string {
   return note.title.trim() || "Untitled note";
 }
 
-// Image-attachment markdown (`![alt](attachments/…)`, or any `![](…)` image
-// reference): noise in a one-line text excerpt, so it is stripped from the
-// preview rather than shown as raw syntax.
+// Attachment markdown: an image reference (`![alt](…)`, any image) or a file
+// reference (`[file](attachments/…)`). Both are noise in a one-line text
+// excerpt, so they're stripped from the preview rather than shown as raw
+// syntax. A normal link (`[text](https://…)`) is left alone — only links into
+// the `attachments/` tree are dropped.
 const IMAGE_MARKDOWN_RE = /!\[[^\]]*\]\([^)]*\)/g;
+const FILE_ATTACHMENT_MARKDOWN_RE = /\[[^\]]*\]\([^)]*attachments\/[^)]*\)/g;
 
 // A one-line preview of the body below the title, collapsed to a single
-// spaced string, with image markdown removed (it adds nothing to a text
+// spaced string, with attachment markdown removed (it adds nothing to a text
 // excerpt and would otherwise show as `![…](…)` clutter).
 export function notePreview(note: Note): string {
   return note.body
     .replace(IMAGE_MARKDOWN_RE, " ")
+    .replace(FILE_ATTACHMENT_MARKDOWN_RE, " ")
     .split("\n")
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter((line) => line.length > 0)

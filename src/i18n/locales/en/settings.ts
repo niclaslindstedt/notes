@@ -74,6 +74,13 @@ const settings = {
     renderMarkdown: "Render Markdown",
     renderMarkdownHint:
       "Format Markdown as you type — every line but the one you're on shows formatted, like Obsidian.",
+    attachmentsTitle: "Attachments",
+    imagesAtEnd: "Images at the end",
+    imagesAtEndHint:
+      "Collect pasted or dropped images in a block at the foot of the note instead of showing them inline where you added them.",
+    filesAtEnd: "Files at the end",
+    filesAtEndHint:
+      "Collect attached files (anything that isn't an image) in a block at the foot of the note instead of inline.",
     disableSpellcheck: "Disable spell check",
     disableSpellcheckHint:
       "Stop your device checking spelling as you type, hiding the red squiggles.",

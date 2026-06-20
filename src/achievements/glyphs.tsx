@@ -271,6 +271,27 @@ export function BroomGlyph({ className }: IconProps) {
   );
 }
 
+// A paperclip — the file-attachment glyph (paste or drop a non-image file
+// into a note and it rides along as a downloadable attachment).
+export function PaperclipGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M13.234 20.252 21 12.3a4.243 4.243 0 0 0-6-6L5.764 15.7a2.829 2.829 0 0 0 4 4l7.07-7.071a1.414 1.414 0 0 0-2-2L7.93 17.5" />
+    </Svg>
+  );
+}
+
+// A panel with a filled foot — the "attachments at the end" glyph (collect a
+// note's images / files into a block at the bottom rather than inline).
+export function PanelBottomGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 15h18" />
+    </Svg>
+  );
+}
+
 // A conical lab flask — the "Fake data" / holodeck glyph (a generated sample
 // dataset to experiment with).
 export function FlaskGlyph({ className }: IconProps) {

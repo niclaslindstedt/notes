@@ -30,6 +30,8 @@ describe("editor margin helpers", () => {
       disableAutocorrect: false,
       trimTrailingSpaces: true,
       trailingNewline: true,
+      imagesAtEnd: false,
+      filesAtEnd: false,
       defaultTitle: "dateTime",
       copyScope: "body",
     });

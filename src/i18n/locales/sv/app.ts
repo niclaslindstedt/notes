@@ -8,6 +8,7 @@ const app: AppCatalog = {
   back: "Tillbaka",
   startWriting: "Börja skriva…",
   titlePlaceholder: "Titel",
+  attachments: "Bilagor",
   dropTitle: "Släpp för att importera",
   dropHint:
     "Släpp för att lägga till dina Markdown-filer som anteckningar — varje filnamn blir anteckningens titel.",

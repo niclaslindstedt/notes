@@ -11,6 +11,9 @@ const app = {
   back: "Back",
   startWriting: "Start writing…",
   titlePlaceholder: "Title",
+  // Heading of the collected attachments block at the foot of a note, shown
+  // when images / files are set to render at the end rather than inline.
+  attachments: "Attachments",
   // Drag-and-drop import overlay (desktop): shown while Markdown files are
   // dragged over the window.
   dropTitle: "Drop to import",

@@ -10,14 +10,19 @@ import { createContext, useContext } from "react";
 
 import {
   type Attachment,
+  type AttachmentPlacement,
   attachmentFilenameFromHref,
 } from "../../domain/attachment.ts";
 
 export type AttachmentsContextValue = {
-  /** The note attachment a body image-reference points at, or null. */
+  /** The note attachment a body reference points at, or null. */
   resolve: (href: string) => Attachment | null;
-  /** Open an attachment full-size in the viewer overlay. */
+  /** Open an image attachment full-size in the viewer overlay. */
   open: (attachment: Attachment) => void;
+  /** The note's attachments, for the collected end-of-note block. */
+  attachments: readonly Attachment[];
+  /** Whether images / files render inline or collected at the note's foot. */
+  placement: AttachmentPlacement;
 };
 
 export const AttachmentsContext = createContext<AttachmentsContextValue | null>(

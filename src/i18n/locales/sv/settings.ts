@@ -69,6 +69,13 @@ const settings: SettingsCatalog = {
     renderMarkdown: "Rendera Markdown",
     renderMarkdownHint:
       "Formatera Markdown medan du skriver — varje rad utom den du står på visas formaterad, som i Obsidian.",
+    attachmentsTitle: "Bilagor",
+    imagesAtEnd: "Bilder i slutet",
+    imagesAtEndHint:
+      "Samla inklistrade eller släppta bilder i ett block längst ned i anteckningen istället för att visa dem inline där du lade till dem.",
+    filesAtEnd: "Filer i slutet",
+    filesAtEndHint:
+      "Samla bifogade filer (allt som inte är en bild) i ett block längst ned i anteckningen istället för inline.",
     disableSpellcheck: "Inaktivera stavningskontroll",
     disableSpellcheckHint:
       "Sluta låta enheten kontrollera stavning medan du skriver, döljer de röda vågorna.",

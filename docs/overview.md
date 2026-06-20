@@ -159,7 +159,7 @@ em, code, link, image, strikethrough), each leaf carrying a source-column
 a `link` node, so a pasted or typed URL renders and clicks through without the
 `[…](…)` ceremony (`www.` gets an `https://` href; trailing sentence
 punctuation and an unbalanced `)` stay outside the link). The `image` node (`![alt](href)`) is what
-the [attachment renderer](#image-attachments) turns into an inline thumbnail. It is pure (no DOM/IO) and fast enough to run on every
+the [attachment renderer](#attachments) turns into an inline thumbnail. It is pure (no DOM/IO) and fast enough to run on every
 keystroke, which is why it lives in `domain/`.
 
 ### Title field
@@ -215,48 +215,82 @@ markdown file backends already end every `.md` file with a newline via the
 [markdown codec](#markdown-codec) independent of these flags; the toggles
 govern the note body's own canonical form.)
 
-### Image attachments
+### Attachments
 
-Paste (`Ctrl`/`Cmd`+`V`) or drag-and-drop an image into the editor and it
-becomes a note **attachment** — shown inline as a small thumbnail you click to
-open full-size. The model is `Attachment`
+Paste (`Ctrl`/`Cmd`+`V`) or drag-and-drop a file into the editor and it
+becomes a note **attachment**. Two kinds, told apart by MIME
+(`isImageAttachment`): an **image** shows inline as a small thumbnail you click
+to open full-size; **any other file** (a PDF, an archive, a spreadsheet, …)
+shows as a **file chip** — a type icon plus the filename, with no preview —
+that downloads the file on click. The model is `Attachment`
 (`{ filename, mime, data }`, `src/domain/attachment.ts`); it rides on the
-`Note` as `attachments?: Attachment[]`, with the full image held in memory as a
-`data:` URL and the body carrying a flat `![file](attachments/<file>)`
-reference. `MarkdownEditor`'s paste / drop handlers build the attachment
-(`src/ui/attachments/fromFile.ts`), persist it via `useNotes().attach`, and
-insert the reference; `imageFilesFrom` filters the payload to images so a
-dropped `.md` still falls through to the [drag-and-drop import](#drag-and-drop-import).
-Rendering goes through `AttachmentsProvider` (`src/ui/attachments/`): the
-`image` `InlineNode` resolves its reference to one of the note's attachments and
-renders an `InlineImage` thumbnail (`useThumbnail` downscales via canvas, cached
-by filename), with `ImageViewer` showing the original on click. The provider
-tracks the **index** of the open image into the note's attachments, so the
-viewer is a small gallery: the close button (X), Escape, a backdrop click, or a
-swipe up/down dismisses it; the on-screen arrows, the arrow keys, or a left/
-right swipe step through the note's images. The images sit side by side on a
-single horizontal track, so a swipe drags the neighbouring image into place and
-the release animates the rest of the way — a real slide, not a snap-back-and-
-swap.
+`Note` as `attachments?: Attachment[]`, with the full file held in memory as a
+`data:` URL and the body carrying a flat reference: an image is
+`![file](attachments/<file>)`, an other-file is a plain
+`[file](attachments/<file>)` link, so the renderer knows whether to draw a
+thumbnail or a chip.
 
-Deleting an image's `![](attachments/…)` reference from the body **prunes its
-attachment**: `editNote` (`src/domain/note.ts`) drops any attachment the new
-body no longer references (via `referencedAttachments`), so an erased image
-sheds its bytes from the document on every backend — and on the file backends
-the next save reconciles the now-orphaned image file off disk
+`MarkdownEditor`'s paste / drop handlers build the attachment
+(`src/ui/attachments/fromFile.ts`), persist it via `useNotes().attach`, and
+insert the reference; `attachableFilesFrom` takes images plus any file that
+isn't an importable markdown/text note, so a dropped `.md` still falls through
+to the [drag-and-drop import](#drag-and-drop-import). Image filenames take their
+extension from the MIME (`attachmentFilename`); a file keeps its own extension
+(`fileAttachmentFilename`), since its type may be unknown.
+
+Rendering goes through `AttachmentsProvider` (`src/ui/attachments/`): an `image`
+`InlineNode` resolves to one of the note's attachments and renders an
+`InlineImage` thumbnail (`useThumbnail` downscales via canvas, cached by
+filename); a `link` node whose href points into `attachments/` resolves to a
+`FileAttachment` chip (`FileTypeIcon`, `file-icons.tsx`, maps the extension to
+one of a handful of type glyphs). `ImageViewer` shows the original image on
+click — the provider tracks the **index** of the open image into the note's
+*images* (the gallery is images-only; a file chip never opens it), so the close
+button (X), Escape, a backdrop click, or a swipe up/down dismisses it, and the
+on-screen arrows, the arrow keys, or a left/right swipe step through the note's
+images. The images sit side by side on a single horizontal track, so a swipe
+drags the neighbouring image into place and the release animates the rest of the
+way — a real slide, not a snap-back-and-swap.
+
+Deleting an attachment's `![](attachments/…)` / `[file](attachments/…)`
+reference from the body **prunes its attachment**: `editNote`
+(`src/domain/note.ts`) drops any attachment the new body no longer references
+(via `referencedAttachments`, which matches both reference forms), so an erased
+attachment sheds its bytes from the document on every backend — and on the file
+backends the next save reconciles the now-orphaned file off disk
 ([directory adapter](#directory-adapter)).
 
 Attachments are **only offered on a folder / cloud backend** — the editor gates
 paste / drop on the adapter's `"attachments"` capability, which the
 [directory adapter](#directory-adapter) advertises when an `AttachmentStore`
 (`src/storage/attachment-store.ts`) is wired. On save the directory adapter
-externalises each referenced image to a real file at
+externalises each referenced file to a real file at
 `attachments/<note-name>/<filename>` (a sibling of the `notes/` folder, via each
 backend's binary `AttachmentStore`); on load it reads the files back into the
-`data:` URLs, reusing the offline cache's copies so unchanged images aren't
-re-downloaded. Under encryption the images stay inside the single encrypted
-blob rather than as separate files. The local "This device" backend has no
-`AttachmentStore`, so it never accepts an image.
+`data:` URLs (recovering the MIME from the extension via `mimeForFilename`),
+reusing the offline cache's copies so unchanged files aren't re-downloaded.
+Under encryption the files stay inside the single encrypted blob rather than as
+separate files. The local "This device" backend has no `AttachmentStore`, so it
+never accepts an attachment.
+
+### Attachments at the end
+
+By default each attachment renders inline where its reference sits. The
+**Images at the end** / **Files at the end** [editor settings](#editor-settings)
+(`imagesAtEnd` / `filesAtEnd`, governed independently) instead collect the
+relocated kind into a block at the foot of the note. The reference stays put in
+the body source — only where it *renders* moves: the inline node renders nothing
+(`ImageNode` / `LinkNode` return null when their kind is relocated), a whole
+line that is just that reference is hidden (`hiddenAttachmentLines`, which also
+absorbs the blank line the editor inserts after each attachment so no gap is
+left), and `AttachmentsEndBlock` re-renders the relocated images (as
+thumbnails opening the same viewer) and files (as chips) at the end.
+`relocatedAttachments` splits the note's attachments into the two lists by kind
+and placement. Both `MarkdownEditor` and the read-only `ReadOnlyNote` view share
+this through the `placement` they pass `AttachmentsProvider`; navigating the
+caret onto a hidden line in the editor reveals its raw source (it becomes the
+active line), so the reference stays editable. Turning either toggle on unlocks
+the **Appendix** achievement.
 
 ### Copy button
 

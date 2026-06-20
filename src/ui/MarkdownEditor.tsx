@@ -10,11 +10,21 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 
-import { type Attachment, attachmentMarkdown } from "../domain/attachment.ts";
+import {
+  type Attachment,
+  type AttachmentPlacement,
+  attachmentMarkdown,
+  hiddenAttachmentLines,
+  INLINE_PLACEMENT,
+} from "../domain/attachment.ts";
 import { classifyLines } from "../domain/markdown.ts";
 import { useT } from "../i18n/index.ts";
+import { AttachmentsEndBlock } from "./attachments/AttachmentsEndBlock.tsx";
 import { AttachmentsProvider } from "./attachments/AttachmentsProvider.tsx";
-import { fileToAttachment, imageFilesFrom } from "./attachments/fromFile.ts";
+import {
+  attachableFilesFrom,
+  fileToAttachment,
+} from "./attachments/fromFile.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
 
@@ -47,12 +57,14 @@ type Props = {
   maxWidth: string;
   /** Place the caret in the body on mount (false when the title takes focus). */
   focusOnMount?: boolean;
-  /** The note's image attachments, for resolving `![](attachments/…)` refs. */
+  /** The note's attachments, for resolving `[…](attachments/…)` references. */
   attachments?: Attachment[];
-  /** Whether the active backend can store image attachments (file backends). */
+  /** Whether the active backend can store attachments (the file backends). */
   canAttach?: boolean;
-  /** Persist a pasted / dropped image onto the note. */
+  /** Persist a pasted / dropped file onto the note. */
   onAttach?: (attachment: Attachment) => void;
+  /** Render images / files inline (default) or collected at the note's foot. */
+  placement?: AttachmentPlacement;
 };
 
 export function MarkdownEditor({
@@ -66,6 +78,7 @@ export function MarkdownEditor({
   attachments,
   canAttach = false,
   onAttach,
+  placement = INLINE_PLACEMENT,
 }: Props) {
   const t = useT();
   // Local source of truth, seeded from the note. App keys the editor by note
@@ -73,6 +86,11 @@ export function MarkdownEditor({
   const [value, setValue] = useState(body);
   const lines = useMemo(() => value.split("\n"), [value]);
   const blocks = useMemo(() => classifyLines(value), [value]);
+  // Lines hidden because their attachment renders in the end block instead.
+  const hidden = useMemo(
+    () => hiddenAttachmentLines(value, placement),
+    [value, placement],
+  );
 
   // The line currently being edited as raw text. Starts on the last line so
   // opening an existing note continues where it left off.
@@ -160,9 +178,9 @@ export function MarkdownEditor({
     commit(next, i, text.length);
   }
 
-  // Insert one image per line at the active line, followed by an empty line to
-  // keep typing on. Replaces the active line when it's blank so a paste into an
-  // empty note doesn't leave a stray gap above the image.
+  // Insert one attachment reference per line at the active line, followed by an
+  // empty line to keep typing on. Replaces the active line when it's blank so a
+  // paste into an empty note doesn't leave a stray gap above the attachment.
   function insertAttachments(atts: readonly Attachment[]) {
     if (atts.length === 0) return;
     const i = clampedActive;
@@ -174,10 +192,10 @@ export function MarkdownEditor({
     commit(next, base + inserted.length - 1, 0);
   }
 
-  // Read each image file into an attachment, persist it onto the note, and drop
-  // its reference into the body. A no-op when the backend can't store files or
-  // nothing in the payload was an image.
-  async function attachImages(files: File[]) {
+  // Read each file into an attachment, persist it onto the note, and drop its
+  // reference into the body. A no-op when the backend can't store files or
+  // nothing in the payload was attachable.
+  async function attachFiles(files: File[]) {
     if (!canAttach || files.length === 0) return;
     const built = await Promise.all(files.map(fileToAttachment));
     const atts = built.filter((a): a is Attachment => a !== null);
@@ -188,21 +206,21 @@ export function MarkdownEditor({
 
   function onPaste(e: ReactClipboardEvent<HTMLTextAreaElement>) {
     if (!canAttach) return;
-    const images = imageFilesFrom(e.clipboardData);
-    if (images.length === 0) return; // let normal text paste through
+    const files = attachableFilesFrom(e.clipboardData);
+    if (files.length === 0) return; // let normal text paste through
     e.preventDefault();
-    void attachImages(images);
+    void attachFiles(files);
   }
 
   function onDrop(e: ReactDragEvent<HTMLDivElement>) {
     if (!canAttach) return;
-    const images = imageFilesFrom(e.dataTransfer);
-    if (images.length === 0) return; // not an image — leave it to file-import
+    const files = attachableFilesFrom(e.dataTransfer);
+    if (files.length === 0) return; // nothing to attach — leave it to import
     // Claim the drop so the global markdown-import handler ignores it and the
-    // browser doesn't navigate to the dropped image.
+    // browser doesn't navigate to the dropped file.
     e.preventDefault();
     e.stopPropagation();
-    void attachImages(images);
+    void attachFiles(files);
   }
 
   // Size the textarea to its content (so it never scrolls internally) and
@@ -436,7 +454,7 @@ export function MarkdownEditor({
     : "whitespace-pre";
 
   return (
-    <AttachmentsProvider attachments={attachments}>
+    <AttachmentsProvider attachments={attachments} placement={placement}>
       {/* This is one editing widget, not a set of independent controls: the
         textarea is the focusable, keyboard-driven surface, and the line
         <div>s are non-interactive visual proxies for source the textarea
@@ -468,28 +486,37 @@ export function MarkdownEditor({
             if (e.target === e.currentTarget) activateEnd(e);
           }}
         >
-          {lines.map((line, index) =>
-            index === clampedActive ? (
-              <textarea
-                key="active"
-                ref={taRef}
-                rows={1}
-                wrap={wordWrap ? "soft" : "off"}
-                value={useSentinel ? SENTINEL : line}
-                spellCheck={!disableSpellcheck}
-                autoCorrect={disableAutocorrect ? "off" : "on"}
-                autoCapitalize={disableAutocorrect ? "off" : "sentences"}
-                placeholder={
-                  lines.length === 1 ? t("app.startWriting") : undefined
-                }
-                onChange={(e) => onTextChange(e.currentTarget)}
-                onKeyDown={onKeyDown}
-                onPaste={onPaste}
-                className={`block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-fg outline-none placeholder:text-muted/60 ${wrapClass} ${lineTextClass(
-                  blocks[clampedActive]!,
-                )}`}
-              />
-            ) : (
+          {lines.map((line, index) => {
+            if (index === clampedActive) {
+              return (
+                <textarea
+                  key="active"
+                  ref={taRef}
+                  rows={1}
+                  wrap={wordWrap ? "soft" : "off"}
+                  value={useSentinel ? SENTINEL : line}
+                  spellCheck={!disableSpellcheck}
+                  autoCorrect={disableAutocorrect ? "off" : "on"}
+                  autoCapitalize={disableAutocorrect ? "off" : "sentences"}
+                  placeholder={
+                    lines.length === 1 ? t("app.startWriting") : undefined
+                  }
+                  onChange={(e) => onTextChange(e.currentTarget)}
+                  onKeyDown={onKeyDown}
+                  onPaste={onPaste}
+                  className={`block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-fg outline-none placeholder:text-muted/60 ${wrapClass} ${lineTextClass(
+                    blocks[clampedActive]!,
+                  )}`}
+                />
+              );
+            }
+            // A line that is just an attachment reference rendered in the
+            // collected end-of-note block instead is hidden in place. It's
+            // still walked (as nothing) so the line indices the editor keys its
+            // caret off stay aligned with the source; navigating onto it makes
+            // it the active line, which reveals its raw source.
+            if (hidden.has(index)) return null;
+            return (
               // A visual proxy for one source line; clicking rolls the editing
               // textarea here. See the widget note above.
               // eslint-disable-next-line jsx-a11y/no-static-element-interactions
@@ -500,8 +527,9 @@ export function MarkdownEditor({
               >
                 <RenderedLine block={blocks[index]!} />
               </div>
-            ),
-          )}
+            );
+          })}
+          <AttachmentsEndBlock />
         </div>
       </div>
     </AttachmentsProvider>

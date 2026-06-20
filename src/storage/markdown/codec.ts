@@ -91,17 +91,20 @@ export function noteToMarkdown(note: Note): string {
 
 // -- Attachment references --------------------------------------------
 //
-// In memory a note body references an image by the flat `attachments/<file>`
-// (no note-name segment, so it survives a rename); on disk the note lives in
-// `notes/<stem>.md` and the image in the sibling `attachments/<stem>/<file>`,
-// so the reference is rewritten to the relative `../attachments/<stem>/<file>`
-// on the way out and collapsed back to the basename on the way in.
+// In memory a note body references an attachment by the flat
+// `attachments/<file>` (no note-name segment, so it survives a rename) — an
+// image as `![file](…)`, any other file as a plain `[file](…)` link. On disk
+// the note lives in `notes/<stem>.md` and the file in the sibling
+// `attachments/<stem>/<file>`, so the reference is rewritten to the relative
+// `../attachments/<stem>/<file>` on the way out and collapsed back to the
+// basename on the way in. The optional leading `!` matches both forms; a
+// non-attachment href (an ordinary link) is left untouched.
 
-const IMAGE_REF_RE = /(!\[[^\]]*\]\()([^)]+)(\))/g;
+const ATTACHMENT_REF_RE = /(!?\[[^\]]*\]\()([^)]+)(\))/g;
 
 function refsToDisk(body: string, stem: string): string {
   return body.replace(
-    IMAGE_REF_RE,
+    ATTACHMENT_REF_RE,
     (whole, open: string, href: string, close: string) => {
       const filename = attachmentFilenameFromHref(href);
       if (!filename) return whole;
@@ -112,7 +115,7 @@ function refsToDisk(body: string, stem: string): string {
 
 function refsFromDisk(body: string): string {
   return body.replace(
-    IMAGE_REF_RE,
+    ATTACHMENT_REF_RE,
     (whole, open: string, href: string, close: string) => {
       const filename = attachmentFilenameFromHref(href);
       if (!filename) return whole;

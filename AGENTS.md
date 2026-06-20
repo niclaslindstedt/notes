@@ -280,9 +280,9 @@ The source tree under `src/` is organized by concern, not by file type:
   cloud backends); `markdown/codec.ts` is the one-`.md`-file-per-note codec
   the file backends share via `directory-adapter.ts`. `attachment-store.ts` is
   the binary sibling of the markdown `FileStore`: each file backend also stores
-  a note's pasted **image attachments** as real image files under
+  a note's pasted **attachments** (images and other files) as real files under
   `attachments/<note-name>/`, which the directory adapter externalises on save
-  and re-hydrates on load (see `docs/overview.md#image-attachments`).
+  and re-hydrates on load (see `docs/overview.md#attachments`).
   `useStorageBackend.ts`
   selects and wires the active backend; `settings-store.ts` carries the
   appearance settings alongside the notes on the file/cloud backends.
@@ -336,7 +336,7 @@ the DOM. This keeps `domain/` portable to the planned React Native app.
 | ---------------------------------------- | ---------------------------------- |
 | A pure transform over the note model     | `src/domain/note.ts`               |
 | A new persistence backend                | `src/storage/<backend>/index.ts`   |
-| Image-attachment behaviour               | `src/domain/attachment.ts`, `src/storage/attachment-store.ts`, `src/ui/attachments/` |
+| Attachment behaviour (image / file)      | `src/domain/attachment.ts`, `src/storage/attachment-store.ts`, `src/ui/attachments/` |
 | A presentational component               | `src/ui/`                          |
 | Top-level state / a new view             | `src/app/`                         |
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |
