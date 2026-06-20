@@ -200,7 +200,7 @@ export function ImageViewer({
         type="button"
         onClick={onClose}
         aria-label={t("common.close")}
-        className="absolute top-3 right-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none pt-[max(0px,env(safe-area-inset-top))]"
+        className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
       >
         <CloseIcon className="h-5 w-5" />
       </button>
