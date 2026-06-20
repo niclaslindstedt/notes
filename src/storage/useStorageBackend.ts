@@ -659,9 +659,19 @@ export function useStorageBackend(): UseStorageBackend {
     if (password === null) {
       throw new Error("Unlock before turning encryption off");
     }
+    // Rewrite the document at rest as plaintext and drop the encrypted blob.
+    // Decrypt when the load surfaced the envelope; when a stale plaintext copy
+    // shadows the blob (a both-representations state a backend can drift into),
+    // the load returns that markdown instead, so re-save it as-is. Either way
+    // the plaintext write makes the directory adapter clear the superseded
+    // `notes.json`, so disabling can't leave the envelope behind — gating the
+    // re-save on the load happening to surface the envelope is what let the
+    // file linger.
     const snap = await inner.load();
-    if (snap && isEncryptedEnvelope(snap.text)) {
-      const plaintext = await decryptEnvelope(snap.text, password);
+    if (snap) {
+      const plaintext = isEncryptedEnvelope(snap.text)
+        ? await decryptEnvelope(snap.text, password)
+        : snap.text;
       await inner.save(plaintext, snap.revision);
     }
     persistEncryption("plaintext");
