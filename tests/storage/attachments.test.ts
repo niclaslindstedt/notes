@@ -164,6 +164,25 @@ describe("directory adapter attachments", () => {
     expect(attachments.files.size).toBe(0);
   });
 
+  it("clears externalised image files when the document is encrypted", async () => {
+    const store = memoryStore();
+    const attachments = memoryAttachments();
+    const a = createDirectoryAdapter(
+      store,
+      { id: "folder", label: "T" },
+      attachments,
+    );
+    const { note } = noteWithImage();
+    await a.save(serialize({ notes: [note] }));
+    expect(attachments.files.size).toBe(1);
+
+    // Enabling encryption folds the image into the envelope, so the plaintext
+    // copy on disk must be removed — leaving it would be a plaintext leak.
+    const envelope = JSON.stringify({ encrypted: "notes.encrypted.v1" });
+    await a.save(envelope);
+    expect(attachments.files.size).toBe(0);
+  });
+
   it("advertises the attachments capability only when a store is wired", () => {
     const withStore = createDirectoryAdapter(
       memoryStore(),

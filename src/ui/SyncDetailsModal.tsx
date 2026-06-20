@@ -213,6 +213,12 @@ export function SyncDetailsModal({
   }, [status]);
 
   const view = providerView(backend, namespace);
+  // The "Open in …" link names the destination service itself — Dropbox,
+  // Google Drive — not the at-rest encryption state. `providerName` is the
+  // adapter label, which the encryption wrapper suffixes with " (encrypted)";
+  // strip that so the button reads "Open in Dropbox", not
+  // "Open in Dropbox (encrypted)".
+  const baseProviderName = providerName.replace(/\s*\(encrypted\)$/, "");
   const state = statusView(
     t,
     status,
@@ -359,7 +365,7 @@ export function SyncDetailsModal({
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius)] border border-accent bg-accent/10 px-3 py-1.5 text-sm font-bold text-accent hover:bg-accent/20"
           >
             <ExternalLinkIcon className="h-3.5 w-3.5" />
-            {t("sync.openIn", { provider: providerName })}
+            {t("sync.openIn", { provider: baseProviderName })}
           </a>
         )}
       </footer>

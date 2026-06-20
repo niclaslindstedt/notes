@@ -147,6 +147,46 @@ describe("directory adapter", () => {
     expect((await a.load())?.text).toBe(envelope);
   });
 
+  // Enabling encryption re-wraps through a fresh adapter when the load that
+  // preceded the toggle was served from the offline cache, or when a backend /
+  // namespace swap rebuilt the adapter — so the markdown files were never
+  // tracked by the instance doing the encrypted write. The blob write must
+  // still clear them, otherwise the next load reads the plaintext markdown back
+  // and encryption silently has no effect at rest.
+  it("clears untracked plaintext markdown when an envelope is written (enable encryption)", async () => {
+    const store = memoryStore();
+    // One adapter lays down the plaintext notes…
+    await adapter(store).save(serialize({ notes: notes() }));
+    // …and a *different*, fresh adapter writes the envelope without loading.
+    const fresh = adapter(store);
+    const envelope = JSON.stringify({ encrypted: "notes.encrypted.v1" });
+    await fresh.save(envelope);
+
+    const paths = (await store.list()).map((e) => e.path);
+    expect(paths).toEqual([BLOB_FILE_NAME]);
+    expect((await adapter(store).load())?.text).toBe(envelope);
+  });
+
+  // The symmetric case: disabling encryption writes markdown through whatever
+  // adapter is live; a stranded `notes.json` must not linger beside it (and the
+  // next load must read the decrypted markdown, not the stale ciphertext).
+  it("clears an untracked encrypted blob when markdown is written (disable encryption)", async () => {
+    const store = memoryStore();
+    const envelope = JSON.stringify({ encrypted: "notes.encrypted.v1" });
+    await adapter(store).save(envelope);
+    // A fresh adapter writes the decrypted markdown without loading first.
+    const fresh = adapter(store);
+    const snapshot = { notes: notes() };
+    await fresh.save(serialize(snapshot));
+
+    const paths = (await store.list()).map((e) => e.path).sort();
+    expect(paths).not.toContain(BLOB_FILE_NAME);
+    expect(paths.every((p) => p.endsWith(".md"))).toBe(true);
+    expect(parse((await adapter(store).load())?.text).notes).toEqual(
+      snapshot.notes,
+    );
+  });
+
   it("returns null when nothing is stored", async () => {
     expect(await adapter(memoryStore()).load()).toBeNull();
   });

@@ -682,6 +682,10 @@ backends. It reads every `*.md` into a snapshot, writes only changed notes
 so another device's edit to a different note never blocks a save. It remembers
 the revisions it produced to tell listing lag from a real remote edit, and
 tolerates lost acks. Encrypted stores fall back to a single `notes.json` blob.
+A format conversion (toggling encryption) is the one case it removes files it
+didn't author: writing the blob clears every `*.md` (and the externalised image
+files), and writing markdown clears the blob — so a toggle can't strand the old
+representation, which the next load would otherwise read back.
 
 ### Markdown codec
 
@@ -719,7 +723,10 @@ from the passphrase by `src/storage/crypto.ts` (PBKDF2-SHA256, 600k iterations;
 `encryptText` / `decryptEnvelope`; the envelope is itself JSON so it shares the
 storage slot with plaintext). The passphrase is held in a `PasswordRef` per
 session — after reload the store is locked until the [unlock gate](#unlock-gate)
-takes it.
+takes it. Toggling the mode rewrites the document at rest: enabling re-wraps the
+existing notes into ciphertext and disabling decrypts them back, and the
+[directory adapter](#directory-adapter) clears the superseded representation so
+no plaintext copy lingers behind a `notes.json` (or vice versa).
 
 ### Offline cache
 

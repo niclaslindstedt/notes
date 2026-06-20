@@ -455,6 +455,26 @@ export function createDirectoryAdapter(
     await Promise.all(toRemove.map((path) => attachments!.remove(path)));
   }
 
+  // Remove every externalised attachment file. Run when the document is
+  // converted to an encrypted blob: the images now ride inside the envelope, so
+  // the plaintext copies under `attachments/` are both redundant and a leak.
+  // Best-effort listing — a failure leaves the files for a later pass rather
+  // than failing the (already committed) document write.
+  async function clearAttachments(): Promise<void> {
+    let current: { path: string }[];
+    try {
+      current = await attachments!.list();
+    } catch (err) {
+      log.warn(`${options.id} save: listing attachments to clear failed`, err);
+      return;
+    }
+    if (current.length === 0) return;
+    log.info(
+      `${options.id} save: clearing ${current.length} attachment file(s) (encrypting)`,
+    );
+    await Promise.all(current.map((entry) => attachments!.remove(entry.path)));
+  }
+
   // Decide which owned files a save must touch and whether any of them
   // conflicts with the remote. `desired` is the path -> bytes the new snapshot
   // wants on disk (one entry for the blob, or one per note).
@@ -544,6 +564,27 @@ export function createDirectoryAdapter(
       }
     }
 
+    // A format conversion (plaintext markdown <-> encrypted blob) rewrites the
+    // whole document into the other representation, superseding the previous
+    // one wholesale: the encrypted blob holds every note, so every markdown
+    // file is stale; decrypted markdown supersedes the blob. Remove the
+    // superseded representation unconditionally — including files this adapter
+    // instance never tracked, because the load before an encryption toggle can
+    // be served from the offline cache and a backend / namespace swap rebuilds
+    // the adapter with an empty `tracked`. Without this, enabling encryption
+    // leaves the plaintext `.md` sitting beside the new `notes.json` (and the
+    // next load reads the markdown back, so encryption silently has no effect
+    // at rest), and disabling it strands the ciphertext beside the markdown.
+    const writingBlob = desired.has(BLOB_FILE_NAME);
+    const superseded = before
+      .map((e) => e.path)
+      .filter(
+        (path) =>
+          isOwnedPath(path) &&
+          !desired.has(path) &&
+          (writingBlob ? isMarkdownPath(path) : path === BLOB_FILE_NAME),
+      );
+
     const { toWrite, toRemove, conflicts } = plan(desired, current, base);
     log.info(
       `${options.id} save: write=${toWrite.length} remove=${toRemove.length} conflicts=${conflicts.length} tracked=${tracked.size}`,
@@ -567,8 +608,11 @@ export function createDirectoryAdapter(
     }
 
     const written = await writeFiles(desired, toWrite);
+    // The superseded-format files are removed alongside the tracked ones; the
+    // union dedupes the overlap (a tracked file that is also a stale format).
+    const removals = [...new Set([...toRemove, ...superseded])];
     await Promise.all(
-      toRemove.map(async (path) => {
+      removals.map(async (path) => {
         await store.remove(path);
         tracked.delete(path);
         producedRevs.delete(path);
@@ -576,12 +620,21 @@ export function createDirectoryAdapter(
       }),
     );
 
-    // Externalise the note images alongside the markdown (plaintext only — an
-    // encrypted blob keeps its images inside the envelope). Independent of the
-    // markdown revision: an image's reference is what lives in the `.md`, so an
-    // attachment set change already moves the aggregate revision.
-    if (attachments && !isEncryptedEnvelope(text)) {
-      await reconcileAttachments(parse(text));
+    // Keep the externalised images in step with the representation just
+    // written. Plaintext markdown carries only image *references*, so the bytes
+    // live beside it under `attachments/`; an encrypted blob folds the images
+    // into the envelope. On the plaintext→encrypted conversion (signalled by
+    // markdown files being superseded) the plaintext copies must be cleared —
+    // both because they're now redundant and because leaving them is a
+    // plaintext leak that would defeat enabling encryption. A steady-state
+    // encrypted save supersedes nothing, so it skips the attachment listing
+    // entirely rather than paying for it on every keystroke.
+    if (attachments) {
+      if (isEncryptedEnvelope(text)) {
+        if (superseded.length > 0) await clearAttachments();
+      } else {
+        await reconcileAttachments(parse(text));
+      }
     }
 
     // Build the post-save revision from what we know per file: the rev each
