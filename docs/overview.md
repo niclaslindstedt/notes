@@ -190,7 +190,20 @@ dropped `.md` still falls through to the [drag-and-drop import](#drag-and-drop-i
 Rendering goes through `AttachmentsProvider` (`src/ui/attachments/`): the
 `image` `InlineNode` resolves its reference to one of the note's attachments and
 renders an `InlineImage` thumbnail (`useThumbnail` downscales via canvas, cached
-by filename), with `ImageViewer` showing the original on click.
+by filename), with `ImageViewer` showing the original on click. The provider
+tracks the **index** of the open image into the note's attachments, so the
+viewer is a small gallery: the close button (X), Escape, a backdrop click, or a
+swipe up/down dismisses it; the on-screen arrows, the arrow keys, or a left/
+right swipe step through the note's images, and on a wide screen the
+neighbouring images peek in at the edges, smaller and dimmed, the way Finder's
+Quick Look gallery shows them.
+
+Deleting an image's `![](attachments/…)` reference from the body **prunes its
+attachment**: `editNote` (`src/domain/note.ts`) drops any attachment the new
+body no longer references (via `referencedAttachments`), so an erased image
+sheds its bytes from the document on every backend — and on the file backends
+the next save reconciles the now-orphaned image file off disk
+([directory adapter](#directory-adapter)).
 
 Attachments are **only offered on a folder / cloud backend** — the editor gates
 paste / drop on the adapter's `"attachments"` capability, which the
@@ -282,7 +295,9 @@ litter the list. Blank notes are hidden from the visible `notes` set but live in
 ### Preview
 
 `notePreview` (`src/domain/note.ts`) — the one-line body excerpt shown on the
-[note card](#note-card).
+[note card](#note-card). Image-attachment markdown (`![alt](attachments/…)`,
+and any `![](…)` image reference) is stripped from it — the raw syntax is noise
+in a text excerpt, not content.
 
 ### Sort order
 

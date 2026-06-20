@@ -14,6 +14,8 @@ const common: CommonCatalog = {
   reload: "Läs in igen",
   tryAgain: "Försök igen",
   dismiss: "Avfärda",
+  previous: "Föregående",
+  next: "Nästa",
 };
 
 export default common;

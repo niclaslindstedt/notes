@@ -3,7 +3,7 @@
 // reuse the exact same logic (the eslint config enforces the no-ui /
 // no-storage / no-DOM boundary). Storage and UI build on top of it.
 
-import type { Attachment } from "./attachment.ts";
+import { type Attachment, referencedAttachments } from "./attachment.ts";
 
 // A single note. `title` is a short heading the user edits in its own field
 // (it is *not* the first body line); `body` is the plain text / Markdown
@@ -49,13 +49,25 @@ export function createNote(now: number = Date.now()): Note {
   };
 }
 
-/** Return a copy of `note` with a new body and a bumped `updatedAt`. */
+// Return a copy of `note` with a new body and a bumped `updatedAt`. Erasing an
+// image's `![](attachments/…)` reference from the body orphans its attachment,
+// so any attachment the new body no longer references is dropped here — the
+// body is the source of truth for which images the note keeps. This is what
+// makes a deleted image shed its bytes from the document (and, on the file
+// backends, lets the next save reconcile the on-disk file away).
 export function editNote(
   note: Note,
   body: string,
   now: number = Date.now(),
 ): Note {
-  return { ...note, body, updatedAt: now };
+  const next: Note = { ...note, body, updatedAt: now };
+  if (note.attachments && note.attachments.length > 0) {
+    const kept = referencedAttachments(body, note.attachments);
+    if (kept.length !== note.attachments.length) {
+      next.attachments = kept.length > 0 ? kept : undefined;
+    }
+  }
+  return next;
 }
 
 /** Return a copy of `note` with a new title and a bumped `updatedAt`. */
@@ -91,12 +103,19 @@ export function noteTitle(note: Note): string {
   return note.title.trim() || "Untitled note";
 }
 
+// Image-attachment markdown (`![alt](attachments/…)`, or any `![](…)` image
+// reference): noise in a one-line text excerpt, so it is stripped from the
+// preview rather than shown as raw syntax.
+const IMAGE_MARKDOWN_RE = /!\[[^\]]*\]\([^)]*\)/g;
+
 // A one-line preview of the body below the title, collapsed to a single
-// spaced string.
+// spaced string, with image markdown removed (it adds nothing to a text
+// excerpt and would otherwise show as `![…](…)` clutter).
 export function notePreview(note: Note): string {
   return note.body
+    .replace(IMAGE_MARKDOWN_RE, " ")
     .split("\n")
-    .map((line) => line.trim())
+    .map((line) => line.replace(/\s+/g, " ").trim())
     .filter((line) => line.length > 0)
     .join(" ");
 }

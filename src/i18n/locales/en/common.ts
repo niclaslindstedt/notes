@@ -18,6 +18,8 @@ const common = {
   reload: "Reload",
   tryAgain: "Try again",
   dismiss: "Dismiss",
+  previous: "Previous",
+  next: "Next",
 } as const;
 
 export type CommonCatalog = Widen<typeof common>;
