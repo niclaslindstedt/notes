@@ -35,7 +35,10 @@ import {
   useApplyAppearance,
 } from "../theme/useTheme.ts";
 import { AppTitle } from "../ui/AppTitle.tsx";
-import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
+import {
+  MarkdownEditor,
+  type MarkdownEditorHandle,
+} from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { DropOverlay } from "../ui/DropOverlay.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
@@ -980,15 +983,26 @@ function Editor({
   // mount — typing the title doesn't re-route focus mid-session.
   const titleFirst = useRef(isBlank(note)).current;
   const bodyRef = useRef<HTMLDivElement>(null);
+  // Handle on the live-preview editor so the title can hand focus down into the
+  // body even when no line is active yet (the body has no textarea until then).
+  const markdownEditorRef = useRef<MarkdownEditorHandle>(null);
   // The header centres a single-line title against the glyph and the copy/sync
   // buttons, and top-aligns once the title wraps so those stay pinned to the
   // first line (the title field reports the transition as it grows).
   const [titleMultiline, setTitleMultiline] = useState(false);
 
-  // Move focus from the title field into the body's editing surface (its
-  // textarea), used when the user presses Enter or Arrow-Down in the title.
+  // Move focus from the title field into the body's editing surface, used when
+  // the user presses Enter or Arrow-Down in the title. The live-preview editor
+  // opens with no active line (so the note renders fully formatted), so there
+  // may be no textarea to focus yet — ask the editor to open one at the end via
+  // its handle. The plain editor always has a textarea, so fall back to that.
   function focusBody() {
-    bodyRef.current?.querySelector("textarea")?.focus();
+    const ta = bodyRef.current?.querySelector("textarea");
+    if (ta) {
+      ta.focus();
+      return;
+    }
+    markdownEditorRef.current?.focus();
   }
 
   return (
@@ -1041,6 +1055,7 @@ function Editor({
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">
         {editor.renderMarkdown ? (
           <MarkdownEditor
+            ref={markdownEditorRef}
             body={note.body}
             onChange={onChange}
             wordWrap={editor.wordWrap}
