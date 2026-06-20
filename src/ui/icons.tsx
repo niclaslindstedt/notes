@@ -231,6 +231,27 @@ export function CheckIcon({ className }: IconProps) {
   );
 }
 
+// Slim downward chevron worn as the disclosure caret on custom dropdown
+// triggers (the `SelectPicker`). Distinct from a full-stemmed arrow — this
+// is the thin "v" a closed `<select>` shows.
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="m4 6 4 4 4-4" />
+    </svg>
+  );
+}
+
 export function CloseIcon({ className }: IconProps) {
   return (
     <svg
