@@ -332,7 +332,12 @@ whole `Snapshot`s.
 `createNote` (`src/domain/note.ts`) mints a blank note with a UUID and
 timestamps; `useNotes().create` swaps it into the document and records an undo
 step; `openNew` (`src/app/App.tsx`) opens it in the editor. A note never typed
-into is a [blank note](#blank-note) and discards itself on close.
+into is a [blank note](#blank-note) and discards itself on close. The trigger
+is the add control at the foot of the [note list](#note-list--overview): a
+circular floating action button on narrow viewports, which relaxes into an
+in-flow, labelled "New note" pill from the `md` breakpoint up — where the side
+menu docks as a permanent [sidebar](#side-menu) (`nav.pinned`), beside
+which a floating puck reads as awkward.
 
 ### Edit a note
 
