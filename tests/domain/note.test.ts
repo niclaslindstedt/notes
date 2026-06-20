@@ -14,6 +14,11 @@ import {
   setArchived,
   sortByUpdated,
 } from "../../src/domain/note.ts";
+import type { Attachment } from "../../src/domain/attachment.ts";
+
+function attach(filename: string): Attachment {
+  return { filename, mime: "image/png", data: "data:image/png;base64,AAA" };
+}
 
 describe("note domain", () => {
   it("creates a blank note stamped at the given time", () => {
@@ -30,6 +35,39 @@ describe("note domain", () => {
     const note = editNote(titled, "first\nmore", 2);
     expect(noteTitle(note)).toBe("Hello world");
     expect(notePreview(note)).toBe("first more");
+  });
+
+  it("strips image-attachment markdown from the preview", () => {
+    const note = editNote(
+      createNote(0),
+      "before\n![photo.png](attachments/photo.png)\nafter",
+      1,
+    );
+    expect(notePreview(note)).toBe("before after");
+    const inline = editNote(
+      createNote(0),
+      "see ![shot](attachments/shot.png) here",
+      1,
+    );
+    expect(notePreview(inline)).toBe("see here");
+  });
+
+  it("prunes attachments whose body reference was erased", () => {
+    const withImage = editNote(
+      { ...createNote(0), attachments: [attach("a.png"), attach("b.png")] },
+      "![a](attachments/a.png)\n![b](attachments/b.png)",
+      1,
+    );
+    expect(withImage.attachments?.map((a) => a.filename)).toEqual([
+      "a.png",
+      "b.png",
+    ]);
+
+    const afterDelete = editNote(withImage, "![a](attachments/a.png)", 2);
+    expect(afterDelete.attachments?.map((a) => a.filename)).toEqual(["a.png"]);
+
+    const afterClear = editNote(afterDelete, "just text", 3);
+    expect(afterClear.attachments).toBeUndefined();
   });
 
   it("falls back to a placeholder title for a title-less note", () => {

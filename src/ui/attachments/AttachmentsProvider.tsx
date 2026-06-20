@@ -8,7 +8,8 @@ import { ImageViewer } from "./ImageViewer.tsx";
 // Both the live-preview editor and the read-only note view wrap their rendered
 // Markdown in this, so any `![alt](attachments/<file>)` line inside renders as
 // a clickable thumbnail that opens the original. Owns the viewer overlay's
-// open/close state so a click anywhere in the subtree can surface it.
+// open/close state — tracked as an index into the note's attachments so the
+// viewer can step left/right through the whole set, not just the one clicked.
 
 type Props = {
   attachments: readonly Attachment[] | undefined;
@@ -16,19 +17,29 @@ type Props = {
 };
 
 export function AttachmentsProvider({ attachments, children }: Props) {
-  const [viewing, setViewing] = useState<Attachment | null>(null);
+  const list = useMemo(() => attachments ?? [], [attachments]);
+  const [viewingIndex, setViewingIndex] = useState<number | null>(null);
   const value = useMemo(
     () => ({
-      resolve: (href: string) => resolveAttachment(href, attachments),
-      open: (attachment: Attachment) => setViewing(attachment),
+      resolve: (href: string) => resolveAttachment(href, list),
+      open: (attachment: Attachment) => {
+        const i = list.findIndex((a) => a.filename === attachment.filename);
+        setViewingIndex(i >= 0 ? i : null);
+      },
     }),
-    [attachments],
+    [list],
   );
+  const viewing = viewingIndex !== null ? list[viewingIndex] : undefined;
   return (
     <AttachmentsContext.Provider value={value}>
       {children}
-      {viewing && (
-        <ImageViewer attachment={viewing} onClose={() => setViewing(null)} />
+      {viewingIndex !== null && viewing && (
+        <ImageViewer
+          attachments={list}
+          index={viewingIndex}
+          onIndexChange={setViewingIndex}
+          onClose={() => setViewingIndex(null)}
+        />
       )}
     </AttachmentsContext.Provider>
   );
