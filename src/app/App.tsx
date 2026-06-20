@@ -434,6 +434,7 @@ export function App() {
                   onTitleChange={(title) => retitle(editing.id, title)}
                   onTitleSettle={sync.releaseSaves}
                   syncSlot={syncSlot}
+                  uploading={uploadingIds.has(editing.id)}
                   canAttach={storage.adapter.capabilities.has("attachments")}
                   onAttach={(attachment) => attach(editing.id, attachment)}
                 />
@@ -923,6 +924,7 @@ function Editor({
   onTitleChange,
   onTitleSettle,
   syncSlot,
+  uploading = false,
   canAttach,
   onAttach,
 }: {
@@ -932,6 +934,8 @@ function Editor({
   onTitleChange: (title: string) => void;
   onTitleSettle: () => void;
   syncSlot: ReactNode;
+  /** The open note's file is being uploaded — swap the glyph for a spinner. */
+  uploading?: boolean;
   canAttach: boolean;
   onAttach: (attachment: Attachment) => void;
 }) {
@@ -976,7 +980,15 @@ function Editor({
           aria-label={t("nav.open")}
           className="flex h-[1.40625rem] shrink-0 cursor-pointer items-center text-accent outline-none"
         >
-          <NotesMarkIcon className="h-6 w-6" />
+          {/* While the open note is being written to the backend, the brand
+              glyph becomes a spinner so the note you're editing shows its own
+              sync state (the header cloud glyph means "any sync", this one
+              means "this note"). The button still opens the menu. */}
+          {uploading ? (
+            <SpinnerIcon className="h-6 w-6 animate-spin text-muted" />
+          ) : (
+            <NotesMarkIcon className="h-6 w-6" />
+          )}
         </button>
         <TitleField
           value={note.title}

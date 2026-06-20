@@ -817,8 +817,11 @@ Errors take precedence over the dirty state.
 
 The header [sync glyph](#sync-status) reports one global save state; this is its
 per-note counterpart — a small spinner next to exactly the notes whose file is
-being pushed to the backend right now, shown both on the overview
-[note card](#note-card) and the side-menu note row. The signal originates in the
+being pushed to the backend right now, shown on the overview
+[note card](#note-card), the side-menu note row, and (for the note open in the
+editor) in place of the brand glyph left of the title, so the note you're
+editing shows its own sync state while the header cloud glyph keeps meaning
+"any sync, including other notes". The signal originates in the
 [directory adapter](#directory-adapter): `save` maps each changed note's file
 path back to its note id and, around the `store.write` of those files, marks
 them in an internal "uploading" set, emitting the full set (and once on
