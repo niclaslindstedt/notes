@@ -5,14 +5,15 @@ import { useStandaloneMobile } from "../../pwa/standalone.ts";
 import { setDisableAchievements, useAppearance } from "../../theme/useTheme.ts";
 import { useNav } from "../nav-context.ts";
 import { LanguagePicker } from "./LanguagePicker.tsx";
-import { Field, Section, ToggleRow } from "./shared.tsx";
+import { Field, Section, SegmentedRow, ToggleRow } from "./shared.tsx";
 
 // The landing settings tab, split into focused bordered sections (mirroring
 // budget's General tab): a flag-based language picker, a short note on where
 // the app keeps its data, the achievements on/off switch, the developer-mode
 // switch that reveals the Developer tab, plus — only in the installed PWA on a
-// phone / tablet — the toggle that hides the floating menu button in favour of
-// an inward edge swipe. Appearance, editor, and storage live on their own tabs.
+// phone / tablet — a segmented control choosing how the side menu is opened:
+// the floating button, or an inward edge swipe in its place. Appearance,
+// editor, and storage live on their own tabs.
 export function GeneralSection() {
   const t = useT();
   const lang = useLang();
@@ -49,12 +50,26 @@ export function GeneralSection() {
 
       {standaloneMobile && (
         <Section title={t("settings.general.menuTitle")}>
-          <ToggleRow
-            label={t("settings.general.menuButton")}
-            hint={t("settings.general.menuButtonHint")}
-            checked={showMenuButton}
-            onChange={setShowMenuButton}
-          />
+          <Field label={t("settings.general.menuActivation")}>
+            <SegmentedRow<"swipe" | "button">
+              ariaLabel={t("settings.general.menuActivation")}
+              value={showMenuButton ? "button" : "swipe"}
+              options={[
+                {
+                  value: "swipe",
+                  label: t("settings.general.menuActivationSwipe"),
+                },
+                {
+                  value: "button",
+                  label: t("settings.general.menuActivationButton"),
+                },
+              ]}
+              onChange={(next) => setShowMenuButton(next === "button")}
+            />
+            <p className="text-xs text-muted">
+              {t("settings.general.menuActivationHint")}
+            </p>
+          </Field>
         </Section>
       )}
 

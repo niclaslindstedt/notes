@@ -386,16 +386,16 @@ commands on the [modal bus](#modal-bus).
 `useDraggableMenuButton` (`src/ui/hooks/useDraggableMenuButton.ts`) and
 `src/ui/sideMenuPosition.ts` — the rounded menu button pinned to either screen
 edge. A tap toggles the drawer; a drag repositions it and snaps to the nearer
-edge, persisting the spot. On a standalone mobile PWA it can be hidden
-(`showButton` in `nav-context.ts`) in favour of the [edge
-swipe](#edge-swipe-to-open).
+edge, persisting the spot. On a standalone mobile PWA the General-tab
+menu-activation segmented control can swap it (`showButton` in
+`nav-context.ts`) for the [edge swipe](#edge-swipe-to-open).
 
 ### Edge swipe to open
 
 `useEdgeSwipeOpen` (`src/ui/hooks/useEdgeSwipeOpen.ts`) — touch-only: a swipe
 starting ≤30px from the drawer's resting edge and travelling inward >48px opens
-the drawer. Gated by the show-button toggle, disabled while a modal is open, and
-axis-locked so vertical scrolls don't trigger it.
+the drawer. Gated by the menu-activation choice, disabled while a modal is open,
+and axis-locked so vertical scrolls don't trigger it.
 
 ### Drawer swipe to close
 
@@ -530,8 +530,9 @@ the gate. See [encryption](#encryption).
 ### General settings
 
 `GeneralSection` (`src/ui/settings/GeneralSection.tsx`) — the language picker,
-the toggle that disables achievements (and hides the trophy button), the toggle
-that hides the floating menu button (mobile PWA only), and the dev-mode toggle.
+the toggle that disables achievements (and hides the trophy button), a
+segmented control choosing how the side menu is opened (floating button vs.
+edge swipe; mobile PWA only), and the dev-mode toggle.
 
 ### Appearance settings
 
