@@ -2,12 +2,14 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 
 import { unlock, useAchievementWatcher } from "../achievements/index.ts";
+import { useDevSeed } from "../dev/useDevSeed.ts";
 import { type Attachment } from "../domain/attachment.ts";
 import { classifyLines } from "../domain/markdown.ts";
 import {
@@ -19,6 +21,7 @@ import {
 } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { isStandaloneMobile } from "../pwa/standalone.ts";
+import { createDevSeedAdapter } from "../storage/dev-seed/index.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { unlockAchievements, useApplyAppearance } from "../theme/useTheme.ts";
@@ -88,6 +91,16 @@ export function App() {
   // so they travel with a synced folder too.
   const storage = useStorageBackend();
   useSettingsSync(storage.settingsStore);
+  // Developer "Fake data" toggle: while active, a fresh ephemeral in-memory
+  // seed adapter overrides the real backend for the session (each enable
+  // starts from a pristine sample), so fake data can be previewed without
+  // touching the notes on the device. The flag is in-memory only, so a reload
+  // drops straight back to the real adapter.
+  const { active: fakeData } = useDevSeed();
+  const seedAdapter = useMemo(
+    () => (fakeData ? createDevSeedAdapter() : null),
+    [fakeData],
+  );
   const {
     notes,
     allNotes,
@@ -105,7 +118,7 @@ export function App() {
     canUndo,
     canRedo,
     sync,
-  } = useNotes(storage.adapter);
+  } = useNotes(seedAdapter ?? storage.adapter);
   const [editingId, setEditingId] = useState<string | null>(null);
   // Which list the main area shows when nothing is open in the editor / reader.
   const [view, setView] = useState<"notes" | "archive">("notes");

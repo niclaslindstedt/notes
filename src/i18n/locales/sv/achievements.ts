@@ -215,6 +215,10 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Inställningar → Allmänt → Utvecklarläge visar en Utvecklare-flik vars diagnostik — som att spara den inbyggda loggen mellan omladdningar — hjälper dig spåra ett synkproblem från enheten där det inträffar.",
     },
+    holodeck: {
+      name: "Holodäck",
+      condition: "Ladda exempeldatan.",
+    },
     completionist: {
       name: "Fullbordaren",
       condition: "Lås upp alla andra bedrifter.",

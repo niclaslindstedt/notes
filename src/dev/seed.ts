@@ -450,6 +450,17 @@ export function buildSeed(now: number = Date.now()): SeededNamespace[] {
   ];
 }
 
+/**
+ * One combined sample document — every seeded namespace's notes flattened into
+ * a single `Snapshot`. This is what the in-memory dev-seed adapter
+ * (`src/storage/dev-seed/index.ts`) serves for the in-app "Fake data" toggle,
+ * which works against one document rather than the whole namespace registry.
+ * Pure: a fresh document each call, stamped relative to `now`.
+ */
+export function buildSeedSnapshot(now: number = Date.now()): Snapshot {
+  return { notes: buildSeed(now).flatMap((s) => s.snapshot.notes) };
+}
+
 function readSentinel(): string | null {
   try {
     if (typeof localStorage === "undefined") return null;

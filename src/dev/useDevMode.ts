@@ -14,10 +14,11 @@
 // the hook stay in sync within the same render — flipping the toggle in the
 // General tab needs to update the modal's tab list immediately, not on the
 // next reload. (The browser only fires the `storage` event in *other* tabs.)
-// Ported from checklist's `useDevMode`, minus its `useDevSeed` fake-data
-// pairing — notes seeds fake data through the env-driven `VITE_SEED` flow
-// (`src/dev/seed.ts`, the `dev:seed` script) rather than an in-app toggle, so
-// there's no dev-seed adapter to swap here.
+// Ported from checklist's `useDevMode`; its `useDevSeed` fake-data pairing
+// lives alongside it (`src/dev/useDevSeed.ts`) — the Developer settings "Fake
+// data" toggle swapping in an in-memory seed adapter — and notes additionally
+// seeds real localStorage through the env-driven `VITE_SEED` flow
+// (`src/dev/seed.ts`, the `dev:seed` script).
 
 import { useEffect, useState } from "react";
 

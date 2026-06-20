@@ -48,6 +48,9 @@ const settings = {
     captureLogs: "Capture logs",
     captureLogsHint:
       "Record the in-app log to this browser so it survives a reload, and show the Logs tab. Off by default.",
+    fakeData: "Fake data",
+    fakeDataHint:
+      "Replace your notes with an in-memory sample document for this session. Reload (or turn it off) to return to your real notes — the sample is never saved.",
   },
 
   editor: {
