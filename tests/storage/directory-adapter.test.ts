@@ -425,3 +425,54 @@ describe("directory adapter upload progress", () => {
     expect(seen).toEqual([[]]);
   });
 });
+
+describe("directory adapter — folders sidecar", () => {
+  it("round-trips the folder registry and note grouping", async () => {
+    const store = memoryStore();
+    const a = adapter(store);
+    const folder = { id: "f1", name: "Login feature", createdAt: 5 };
+    const filed = { ...createNote(1), folderId: "f1" };
+    await a.save(serialize({ notes: [filed], folders: [folder] }));
+
+    // The registry is written as a plaintext sidecar beside the note files.
+    expect(await store.read("folders.json")).not.toBeNull();
+
+    const loaded = parse((await a.load())!.text);
+    expect(loaded.folders).toEqual([folder]);
+    expect(loaded.notes[0]?.folderId).toBe("f1");
+  });
+
+  it("persists an empty folder (no notes reference it)", async () => {
+    const store = memoryStore();
+    const a = adapter(store);
+    const folder = { id: "f1", name: "Empty", createdAt: 5 };
+    await a.save(serialize({ notes: [createNote(1)], folders: [folder] }));
+
+    const loaded = parse((await a.load())!.text);
+    expect(loaded.folders).toEqual([folder]);
+  });
+
+  it("loads a namespace whose only content is empty folders", async () => {
+    const store = memoryStore();
+    const a = adapter(store);
+    const folder = { id: "f1", name: "Empty", createdAt: 5 };
+    await a.save(serialize({ notes: [], folders: [folder] }));
+
+    const loaded = await a.load();
+    expect(loaded).not.toBeNull();
+    expect(parse(loaded!.text).folders).toEqual([folder]);
+  });
+
+  it("clears the registry when the last folder is removed", async () => {
+    const store = memoryStore();
+    const a = adapter(store);
+    await a.save(
+      serialize({
+        notes: [createNote(1)],
+        folders: [{ id: "f1", name: "F", createdAt: 5 }],
+      }),
+    );
+    await a.save(serialize({ notes: [createNote(1)] }));
+    expect(parse((await a.load())!.text).folders).toBeUndefined();
+  });
+});

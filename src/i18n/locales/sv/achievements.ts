@@ -153,6 +153,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Namnrymder är separata, fristående uppsättningar anteckningar — jobb och hem, till exempel. Växla mellan dem från sidomenyn; var och en kan synka till sin egen mapp.",
     },
+    organizer: {
+      name: "Arkiveringssystem",
+      condition: "Skapa en mapp för att gruppera anteckningar.",
+      learnMore:
+        "Mappar grupperar anteckningar inuti en namnrymd — en ”Inloggningsfunktion”, en ”Semester 2025”. Tryck på mappknappen vid Anteckningar-rubriken i sidomenyn för att skapa en, och dra sedan anteckningar till den (eller använd en antecknings ”Flytta till mapp”) för att lägga undan dem. En mapp kan fällas ut för att skapa en ny anteckning direkt i den.",
+    },
     polyglot: {
       name: "Polyglott",
       condition: "Byt appens språk.",

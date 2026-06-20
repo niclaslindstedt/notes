@@ -10,7 +10,12 @@
 // `Snapshot` shape.
 
 import type { Attachment } from "../domain/attachment.ts";
-import { emptySnapshot, type Note, type Snapshot } from "../domain/note.ts";
+import {
+  emptySnapshot,
+  type Folder,
+  type Note,
+  type Snapshot,
+} from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 import { LATEST_VERSION, migrate } from "./migrations.ts";
 
@@ -59,7 +64,7 @@ export function parse(text: string | null | undefined): Snapshot {
     log.error("parse: migration failed — falling back to empty document", err);
     return emptySnapshot();
   }
-  const doc = migrated as { notes?: unknown[] };
+  const doc = migrated as { notes?: unknown[]; folders?: unknown };
   const notes: Note[] = Array.isArray(doc.notes)
     ? doc.notes.filter(isNote).map((n) => {
         const title = (n as { title?: unknown }).title;
@@ -72,10 +77,57 @@ export function parse(text: string | null | undefined): Snapshot {
         };
         if (attachments.length > 0) note.attachments = attachments;
         else delete note.attachments;
+        // Keep a folder reference only when it's a non-empty string; a junk
+        // value (or a stray `null`) drops to "ungrouped" rather than riding
+        // through via the `...n` spread.
+        const folderId = (n as { folderId?: unknown }).folderId;
+        if (typeof folderId === "string" && folderId.length > 0) {
+          note.folderId = folderId;
+        } else {
+          delete note.folderId;
+        }
         return note;
       })
     : [];
-  return { notes };
+  const folders = parseFolders(doc.folders);
+  const snapshot: Snapshot = { notes };
+  if (folders.length > 0) snapshot.folders = folders;
+  return snapshot;
+}
+
+function isFolder(value: unknown): value is Folder {
+  if (!value || typeof value !== "object") return false;
+  const f = value as Record<string, unknown>;
+  return (
+    typeof f.id === "string" &&
+    f.id.length > 0 &&
+    typeof f.name === "string" &&
+    typeof f.createdAt === "number"
+  );
+}
+
+/**
+ * Parse a folder registry defensively: drop malformed entries and collapse
+ * duplicate ids to the first seen, mirroring how `parse` drops bad notes. A
+ * missing or non-array value yields none. Exported so the file backends can
+ * parse a standalone `folders.json` sidecar through the same validation.
+ */
+export function parseFolders(value: unknown): Folder[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: Folder[] = [];
+  for (const entry of value) {
+    if (!isFolder(entry)) continue;
+    if (seen.has(entry.id)) continue;
+    seen.add(entry.id);
+    out.push({ id: entry.id, name: entry.name, createdAt: entry.createdAt });
+  }
+  return out;
+}
+
+/** Serialize a folder registry to the JSON stored in a `folders.json` sidecar. */
+export function serializeFolders(folders: readonly Folder[]): string {
+  return JSON.stringify(folders);
 }
 
 // Drop any malformed attachment entry rather than failing the whole note, the

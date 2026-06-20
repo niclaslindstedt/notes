@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   activeNotes,
   archivedNotes,
+  createFolder,
   createNote,
   defaultNoteTitle,
   DEFAULT_SAVE_FORMATTING,
@@ -13,9 +14,12 @@ import {
   isDefaultTitleScheme,
   noteTitle,
   notePreview,
+  notesInFolder,
   retitleNote,
   setArchived,
+  setNoteFolder,
   sortByUpdated,
+  sortFoldersByCreated,
 } from "../../src/domain/note.ts";
 import type { Attachment } from "../../src/domain/attachment.ts";
 
@@ -198,5 +202,60 @@ describe("note domain", () => {
     const sorted = sortByUpdated(input);
     expect(sorted.map((n) => n.body)).toEqual(["b", "c", "a"]);
     expect(input.map((n) => n.body)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("folders", () => {
+  it("creates a folder with a trimmed name, a stable id, and a timestamp", () => {
+    const folder = createFolder("  Login feature  ", 123);
+    expect(folder.name).toBe("Login feature");
+    expect(folder.createdAt).toBe(123);
+    expect(folder.id).toMatch(/.+/);
+    // Two folders never share an id.
+    expect(createFolder("a").id).not.toBe(createFolder("a").id);
+  });
+
+  it("files a note into a folder without bumping updatedAt", () => {
+    const original = editNote(createNote(0), "body", 10);
+    const filed = setNoteFolder(original, "folder-1");
+    expect(filed.folderId).toBe("folder-1");
+    expect(filed.updatedAt).toBe(10);
+    expect(original.folderId).toBeUndefined();
+  });
+
+  it("removes a note from its folder when given null/undefined", () => {
+    const filed = setNoteFolder(createNote(0), "folder-1");
+    const ungrouped = setNoteFolder(filed, null);
+    expect(ungrouped.folderId).toBeUndefined();
+    expect(setNoteFolder(filed, undefined).folderId).toBeUndefined();
+  });
+
+  it("returns the same reference when the folder doesn't change", () => {
+    const note = createNote(0);
+    expect(setNoteFolder(note, null)).toBe(note);
+    const filed = setNoteFolder(note, "folder-1");
+    expect(setNoteFolder(filed, "folder-1")).toBe(filed);
+  });
+
+  it("sorts folders by creation order without mutating the input", () => {
+    const a = createFolder("a", 30);
+    const b = createFolder("b", 10);
+    const c = createFolder("c", 20);
+    const input = [a, b, c];
+    expect(sortFoldersByCreated(input).map((f) => f.name)).toEqual([
+      "b",
+      "c",
+      "a",
+    ]);
+    expect(input.map((f) => f.name)).toEqual(["a", "b", "c"]);
+  });
+
+  it("partitions notes into a folder and the ungrouped remainder", () => {
+    const inFolder = setNoteFolder(createNote(0), "f1");
+    const elsewhere = setNoteFolder(createNote(0), "f2");
+    const loose = createNote(0);
+    const notes = [inFolder, elsewhere, loose];
+    expect(notesInFolder(notes, "f1")).toEqual([inFolder]);
+    expect(notesInFolder(notes, null)).toEqual([loose]);
   });
 });

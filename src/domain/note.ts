@@ -30,6 +30,28 @@ export type Note = {
   // empty array, so an older document needs no migration and a JSON note with
   // none stays minimal.
   attachments?: Attachment[];
+  // The folder this note sits in within the namespace, by `Folder.id`. A note
+  // with no `folderId` lives at the top level (ungrouped). Folders group notes
+  // *inside* a namespace (a namespace's "Login feature", "Vacation 2025", …);
+  // the registry of folders rides on the `Snapshot`. Absent on an ungrouped
+  // note rather than written as `null`, so an older document needs no migration
+  // and a note with no folder stays minimal. On the file backends it rides the
+  // markdown frontmatter so the grouping survives a round-trip.
+  folderId?: string;
+};
+
+// A folder: a named bucket grouping notes *within* a single namespace. The
+// `id` is stable (a note points at it by `folderId`); the `name` is an
+// editable label. A folder can be empty — it exists in the `Snapshot`'s
+// folder registry independently of whether any note references it — so a
+// freshly-created, still-unfilled folder persists. The whole model is pure
+// and framework-free so the React Native app reuses it verbatim.
+export type Folder = {
+  id: string;
+  name: string;
+  // Epoch milliseconds, set once. Folders sort by creation order so the list
+  // stays stable as notes move in and out.
+  createdAt: number;
 };
 
 // Cheap, collision-resistant id. `crypto.randomUUID` is available in every
@@ -84,6 +106,43 @@ export function retitleNote(
   now: number = Date.now(),
 ): Note {
   return { ...note, title, updatedAt: now };
+}
+
+/** Create an empty folder named `name`, stamped at `now`. The name is trimmed. */
+export function createFolder(name: string, now: number = Date.now()): Folder {
+  return { id: newNoteId(), name: name.trim(), createdAt: now };
+}
+
+// Return a copy of `note` moved into `folderId` (or out of any folder when
+// `folderId` is undefined / null). `updatedAt` is left untouched: moving a note
+// between folders is an organisational change, not an edit, so it keeps its
+// place in the most-recently-edited ordering rather than jumping to the top.
+// Returns the same note reference when the folder doesn't actually change so a
+// no-op move doesn't churn identity.
+export function setNoteFolder(
+  note: Note,
+  folderId: string | null | undefined,
+): Note {
+  const target = folderId || undefined;
+  if ((note.folderId || undefined) === target) return note;
+  const next: Note = { ...note };
+  if (target) next.folderId = target;
+  else delete next.folderId;
+  return next;
+}
+
+/** Folders in stable creation order (oldest first). Never mutates the input. */
+export function sortFoldersByCreated(folders: readonly Folder[]): Folder[] {
+  return [...folders].sort((a, b) => a.createdAt - b.createdAt);
+}
+
+/** The notes that sit directly in `folderId` (or ungrouped when `null`). */
+export function notesInFolder(
+  notes: readonly Note[],
+  folderId: string | null,
+): Note[] {
+  if (folderId === null) return notes.filter((n) => !n.folderId);
+  return notes.filter((n) => n.folderId === folderId);
 }
 
 // Return a copy of `note` marked archived (hidden from the overview) or
@@ -249,6 +308,11 @@ export function defaultNoteTitle(
 // codec splits it into one file per note, and the JSON codec writes it whole.
 export type Snapshot = {
   notes: Note[];
+  // The folders defined in this namespace, by which notes are grouped (a note
+  // points at one by `Note.folderId`). Kept on the snapshot — not derived from
+  // the notes — so an empty folder persists. Absent rather than an empty array
+  // when no folders exist, so an older document needs no migration.
+  folders?: Folder[];
 };
 
 /** An empty document — the fallback for a first run or an unreadable blob. */

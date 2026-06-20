@@ -99,3 +99,20 @@ describe("markdown codec", () => {
     expect(result.notes[0]!.id).toBe("aaa111");
   });
 });
+
+describe("markdown codec — folder frontmatter", () => {
+  it("writes a note's folderId to frontmatter and reads it back", () => {
+    const n: Note = { ...note("a", "Title", "body"), folderId: "f1" };
+    const md = snapshotToFiles({ notes: [n] })[0]!.text;
+    expect(md).toContain("folder: f1");
+    const parsed = parseNote(md);
+    expect(parsed?.folderId).toBe("f1");
+  });
+
+  it("leaves an ungrouped note's frontmatter without a folder line", () => {
+    const md = snapshotToFiles({ notes: [note("a", "Title", "body")] })[0]!
+      .text;
+    expect(md).not.toContain("folder:");
+    expect(parseNote(md)?.folderId).toBeUndefined();
+  });
+});

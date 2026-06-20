@@ -205,6 +205,16 @@ Honour these when naming a new file, key, or string.
 | **Namespace color**                                        | `src/ui/namespace-colors.ts`. [→](overview.md#namespace-color)                                               |
 | **Namespace favicon** / **per-namespace tab icon**         | `src/ui/namespace-favicon.ts`. [→](overview.md#namespace-favicon)                                            |
 
+## Folders
+
+| Term                                                       | Refers to                                                                                                   |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Folder** / **group notes** / **folders inside a namespace** / **file a note** | `Folder`, `createFolder`, `setNoteFolder`, `notesInFolder`, `sortFoldersByCreated`, `Note.folderId`, `Snapshot.folders` (`src/domain/note.ts`); `folders` + `moveNote` / `createFolder` / `renameFolder` / `removeFolder` (`src/app/use-notes.ts`). [→](overview.md#folders) |
+| **Folder row** / **expand a folder** / **new folder** (sidebar) | `FolderRow`, `FolderEditRow`, the folders block in `SideMenu` (`src/ui/SideMenu.tsx`); drag-to-file via `NOTE_DND_TYPE`. [→](overview.md#folders-in-the-side-menu) |
+| **Folder section** / **drag a note into a folder** (overview) | the folder grouping + drop targets in `NoteList` (`src/app/App.tsx`). [→](overview.md#folders-in-the-overview) |
+| **Folder picker** (editor)                                 | `FolderPicker` (`src/app/App.tsx`), built on `SelectPicker`. [→](overview.md#folder-picker)                  |
+| **Folders sidecar** / **`folders.json`**                   | `FOLDERS_FILE_NAME`, `readFolders` / `injectFolders` / `persistFolders` (`src/storage/directory-adapter.ts`); `parseFolders` / `serializeFolders` (`src/storage/serialize.ts`). [→](overview.md#folders-sidecar) |
+
 ## Theme and appearance
 
 | Term                                                       | Refers to                                                                                                   |

@@ -192,6 +192,17 @@ export function FolderGlyph({ className }: IconProps) {
   );
 }
 
+// A folder with notes filed inside it — the "Filing system" trophy for
+// grouping notes into folders within a namespace.
+export function FolderTreeGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 4h4l1.5 2H21a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />
+      <path d="M8 11h8M8 15h5" />
+    </Svg>
+  );
+}
+
 export function MergeGlyph({ className }: IconProps) {
   return (
     <Svg className={className}>

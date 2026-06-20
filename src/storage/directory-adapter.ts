@@ -78,13 +78,18 @@ import {
   noteToMarkdown,
   snapshotToFiles,
 } from "./markdown/codec.ts";
-import { parse, serialize } from "./serialize.ts";
+import {
+  parse,
+  parseFolders,
+  serialize,
+  serializeFolders,
+} from "./serialize.ts";
 import {
   type Attachment,
   mimeForFilename,
   referencedAttachments,
 } from "../domain/attachment.ts";
-import type { Note, Snapshot } from "../domain/note.ts";
+import type { Folder, Note, Snapshot } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 
 const log = createLogger("sync");
@@ -101,6 +106,13 @@ export const BLOB_FILE_NAME = "notes.json";
 // The non-secret KDF salts for this folder's encryption, so any device with the
 // passphrase derives the same keys and resolves the same opaque names.
 export const KEY_PARAMS_FILE = ".keyparams.json";
+// The folder registry sidecar (display names + empty folders), beside the note
+// files in the namespace's notes folder. Like the namespace / settings
+// registries it's plaintext JSON — folder names aren't secret, and a note's
+// `folder` frontmatter only carries the id — and metadata, not a note: it's
+// never read as a note nor removed on a representation switch. Notes carry only
+// the folder *id*; this maps id → name and keeps a folder that holds no notes.
+export const FOLDERS_FILE_NAME = "folders.json";
 // Suffix of an encrypted per-note file. The stem is the opaque keyed-HMAC ref.
 const ENC_SUFFIX = ".enc";
 
@@ -221,6 +233,7 @@ function noteToEncJson(note: Note): string {
     updatedAt: note.updatedAt,
   };
   if (note.archived) obj.archived = true;
+  if (note.folderId) obj.folderId = note.folderId;
   if (meta.length > 0) obj.attachments = meta;
   return JSON.stringify(obj);
 }
@@ -250,6 +263,9 @@ function encJsonToNote(json: string): Note | null {
     updatedAt: n.updatedAt,
   };
   if (n.archived === true) note.archived = true;
+  if (typeof n.folderId === "string" && n.folderId.length > 0) {
+    note.folderId = n.folderId;
+  }
   if (Array.isArray(n.attachments)) {
     const meta: Attachment[] = [];
     for (const a of n.attachments) {
@@ -285,6 +301,64 @@ export function createDirectoryAdapter(
 
   let attachmentsTouched = false;
   const uncertain = new Set<string>();
+
+  // The canonical JSON of the folder registry as it currently stands on disk
+  // (null = no `folders.json` sidecar exists). Set on every load and after each
+  // write so `save` skips a redundant rewrite when the folders didn't change.
+  let lastFoldersJson: string | null = null;
+
+  // Read the folder registry sidecar, tolerating a missing / corrupt file by
+  // yielding no folders. Records the canonical bytes so the next save can tell
+  // whether the registry actually changed. Skips the read entirely when the
+  // listing shows no sidecar, so a folder-less document costs no extra fetch.
+  async function readFolders(entries: readonly FileEntry[]): Promise<Folder[]> {
+    if (!entries.some((e) => e.path === FOLDERS_FILE_NAME)) {
+      lastFoldersJson = null;
+      return [];
+    }
+    let raw: string | null;
+    try {
+      raw = await store.read(FOLDERS_FILE_NAME);
+    } catch {
+      raw = null;
+    }
+    if (raw === null) {
+      lastFoldersJson = null;
+      return [];
+    }
+    let folders: Folder[];
+    try {
+      folders = parseFolders(JSON.parse(raw));
+    } catch {
+      folders = [];
+    }
+    lastFoldersJson = serializeFolders(folders);
+    return folders;
+  }
+
+  // Fold the registry's folders into a snapshot's text on load — the notes are
+  // rebuilt from the `.md` / `.enc` files and carry only a folder *id*, so the
+  // names (and any empty folders) come from the sidecar. The legacy single-blob
+  // envelope is opaque, so it's left untouched.
+  function injectFolders(text: string, folders: readonly Folder[]): string {
+    if (folders.length === 0 || isEncryptedEnvelope(text)) return text;
+    const snap = parse(text);
+    snap.folders = [...folders];
+    return serialize(snap);
+  }
+
+  // Write the folder registry sidecar when it changed. Writes `[]` to clear a
+  // sidecar whose folders were all removed; skips entirely on a folder-less
+  // document that never had one, so a plain note folder gains no stray file.
+  async function persistFolders(snapshot: Snapshot | null): Promise<void> {
+    if (!snapshot) return;
+    const folders = snapshot.folders ?? [];
+    if (folders.length === 0 && lastFoldersJson === null) return;
+    const json = serializeFolders(folders);
+    if (json === lastFoldersJson) return;
+    await store.write(FOLDERS_FILE_NAME, json);
+    lastFoldersJson = json;
+  }
 
   // Per-note upload progress: the ids of notes whose file is being written to
   // the backend right now. `save` marks a note's id while its `store.write` is
@@ -552,17 +626,25 @@ export function createDirectoryAdapter(
     tracked.clear();
     uncertain.clear();
     const revision = aggregateRevision(entries);
+    // Folder registry sidecar — read alongside the notes so an empty folder (or
+    // the display names the note files don't carry) survives. A namespace whose
+    // only content is empty folders still loads as a real, non-null document.
+    const folders = await readFolders(entries);
+    const emptyWithFolders = (): StoredSnapshot | null =>
+      folders.length === 0
+        ? null
+        : { text: injectFolders(serialize({ notes: [] }), folders), revision };
 
     if (keys) {
       const text = await readEncryptedSnapshot(keys, entries);
-      if (text === null) return null;
+      if (text === null) return emptyWithFolders();
       log.info(`${options.id} load (encrypted): rev=${shortRev(revision)}`);
-      return { text, revision };
+      return { text: injectFolders(text, folders), revision };
     }
 
     const reuse = reusableFiles(previous, entries);
     const text = await readSnapshot(entries, reuse);
-    if (text === null) return null;
+    if (text === null) return emptyWithFolders();
     const mdCount = entries.filter((e) => isMarkdownPath(e.path)).length;
     log.info(
       `${options.id} load: rev=${shortRev(revision)} files=${mdCount} reused=${reuse.size} fetched=${mdCount - reuse.size}`,
@@ -571,7 +653,7 @@ export function createDirectoryAdapter(
       attachments && !isEncryptedEnvelope(text)
         ? await hydrateAttachments(text)
         : text;
-    return { text: hydrated, revision };
+    return { text: injectFolders(hydrated, folders), revision };
   }
 
   // -- Plaintext attachment hydration / reconcile (unchanged) ----------------
@@ -964,6 +1046,12 @@ export function createDirectoryAdapter(
         await clearAttachmentsWhere((p) => isPlaintextAttachmentPath(p));
       }
     }
+
+    // Persist the folder registry sidecar (names + empty folders). The note
+    // files carry only the folder id, so this is what makes a renamed or empty
+    // folder survive on the file/cloud backends. Skipped on the legacy blob
+    // path (no parsed snapshot) and a no-op when the registry didn't change.
+    await persistFolders(snapshotForAttachments);
 
     const needsRelist = [...written.values()].some((rev) => rev === undefined);
     let revisions: Map<string, string>;

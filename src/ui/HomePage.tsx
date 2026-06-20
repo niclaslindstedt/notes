@@ -125,6 +125,11 @@ export function HomePage() {
               buckets you can switch between, each with its own icon and colour.
             </li>
             <li>
+              Organise the notes within a namespace into <em>folders</em> — make
+              one from the side menu, then drag notes into it or create new ones
+              straight inside it.
+            </li>
+            <li>
               Pick a theme and appearance that suits you — including whether the
               overview lists notes as compact rows or roomier cards; your
               preferences are remembered on the device.

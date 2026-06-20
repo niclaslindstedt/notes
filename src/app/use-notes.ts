@@ -14,12 +14,16 @@ import { type Attachment, withAttachment } from "../domain/attachment.ts";
 import {
   archivedNotes,
   createNote,
+  createFolder as createFolderRecord,
   editNote,
   isBlank,
   noteTitle,
   retitleNote,
   setArchived,
+  setNoteFolder,
   sortByUpdated,
+  sortFoldersByCreated,
+  type Folder,
   type Note,
   type SaveFormatting,
   type Snapshot,
@@ -38,7 +42,12 @@ export type NotesStore = {
   allNotes: Note[];
   // Archived notes, most-recently-edited first — what the archive view lists.
   archived: Note[];
-  create: (title?: string) => string;
+  // The folders defined in the active namespace, in stable creation order.
+  // Notes are grouped under these in the side menu and overview.
+  folders: Folder[];
+  // Open a new note. A `folderId` drops it straight into that folder (used by
+  // the per-folder "New note" rows); omitted, it lands ungrouped.
+  create: (title?: string, folderId?: string) => string;
   // Import dropped markdown files as notes — each file's name (sans extension)
   // becomes the title and its contents the body. Lands them in one undo step
   // and returns how many were added.
@@ -52,6 +61,14 @@ export type NotesStore = {
   archive: (id: string) => void;
   /** Bring an archived note back into the overview. */
   restore: (id: string) => void;
+  /** Move a note into `folderId`, or out of any folder when `null`. */
+  moveNote: (id: string, folderId: string | null) => void;
+  /** Create a folder and return its id. */
+  createFolder: (name: string) => string;
+  /** Rename a folder (its id, and the notes in it, stay put). */
+  renameFolder: (id: string, name: string) => void;
+  /** Delete a folder; its notes survive and fall back to ungrouped. */
+  removeFolder: (id: string) => void;
   /** Revert the most recent recorded edit (create / delete / edit session). */
   undo: () => void;
   /** Re-apply the most recently undone edit. */
@@ -106,16 +123,16 @@ export function useNotes(
   resetHistory.current = reset;
 
   // Apply a producer over the latest snapshot, render it immediately, queue
-  // the debounced save, and record the result on the undo timeline. The
-  // single seam every mutation runs through. `mergeKey` coalesces a run of
-  // continuous edits (typing in one note) into a single undo step.
-  const commit = useCallback(
+  // the debounced save, and record the result on the undo timeline. The single
+  // seam every mutation runs through. `mergeKey` coalesces a run of continuous
+  // edits (typing in one note) into a single undo step.
+  const commitSnapshot = useCallback(
     (
-      producer: (prev: Note[]) => Note[],
+      producer: (prev: Snapshot) => Snapshot,
       label: string,
       mergeKey: string | null = null,
     ): void => {
-      const next: Snapshot = { notes: producer(docRef.current.notes) };
+      const next = producer(docRef.current);
       docRef.current = next;
       sync.setDoc(next);
       sync.scheduleSave(next);
@@ -124,12 +141,30 @@ export function useNotes(
     [sync, record],
   );
 
+  // The common case: a producer over just the notes list, preserving the
+  // folder registry (and any other snapshot field) untouched.
+  const commit = useCallback(
+    (
+      producer: (prev: Note[]) => Note[],
+      label: string,
+      mergeKey: string | null = null,
+    ): void => {
+      commitSnapshot(
+        (prev) => ({ ...prev, notes: producer(prev.notes) }),
+        label,
+        mergeKey,
+      );
+    },
+    [commitSnapshot],
+  );
+
   // A new note opens with the title the caller supplies — the default-title
   // scheme stamps one in (date & time, or the next "Note N"); an empty title
   // leaves the note blank until it's typed into.
   const create = useCallback(
-    (title = ""): string => {
-      const note = { ...createNote(), title };
+    (title = "", folderId?: string): string => {
+      const note: Note = { ...createNote(), title };
+      if (folderId) note.folderId = folderId;
       commit((prev) => [note, ...prev], "New note");
       return note.id;
     },
@@ -240,6 +275,75 @@ export function useNotes(
     [commit],
   );
 
+  // Move a note into a folder (or out of every folder when `folderId` is null).
+  // Not coalesced with edits — a move is its own undo step.
+  const moveNote = useCallback(
+    (id: string, folderId: string | null): void => {
+      const target = docRef.current.notes.find((n) => n.id === id);
+      if (!target) return;
+      if ((target.folderId ?? null) === folderId) return;
+      const title = noteTitle(target);
+      commit(
+        (prev) =>
+          prev.map((n) => (n.id === id ? setNoteFolder(n, folderId) : n)),
+        folderId
+          ? `Moved note “${title}” to a folder`
+          : `Moved note “${title}” out of its folder`,
+      );
+    },
+    [commit],
+  );
+
+  const createFolder = useCallback(
+    (name: string): string => {
+      const folder = createFolderRecord(name);
+      commitSnapshot(
+        (prev) => ({ ...prev, folders: [...(prev.folders ?? []), folder] }),
+        `Created folder “${folder.name}”`,
+      );
+      unlock("organizer");
+      return folder.id;
+    },
+    [commitSnapshot],
+  );
+
+  const renameFolder = useCallback(
+    (id: string, name: string): void => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      commitSnapshot(
+        (prev) => ({
+          ...prev,
+          folders: (prev.folders ?? []).map((f) =>
+            f.id === id ? { ...f, name: trimmed } : f,
+          ),
+        }),
+        `Renamed folder “${trimmed}”`,
+      );
+    },
+    [commitSnapshot],
+  );
+
+  // Delete a folder: drop it from the registry and unset it on every note it
+  // held, so the notes survive and reappear at the top level (undoable).
+  const removeFolder = useCallback(
+    (id: string): void => {
+      const target = docRef.current.folders?.find((f) => f.id === id);
+      const name = target ? target.name : "folder";
+      commitSnapshot(
+        (prev) => ({
+          ...prev,
+          folders: (prev.folders ?? []).filter((f) => f.id !== id),
+          notes: prev.notes.map((n) =>
+            n.folderId === id ? setNoteFolder(n, null) : n,
+          ),
+        }),
+        `Deleted folder “${name}”`,
+      );
+    },
+    [commitSnapshot],
+  );
+
   const undo = useCallback(() => {
     undoTimeline();
     unlock("secondThoughts");
@@ -264,10 +368,19 @@ export function useNotes(
     [notes],
   );
 
+  // Folders in stable creation order. A note's `folderId` may point at a folder
+  // the registry no longer carries (a stale link); the UI treats such a note as
+  // ungrouped, so the list never has to defend against a dangling reference.
+  const folders = useMemo(
+    () => sortFoldersByCreated(sync.doc.folders ?? []),
+    [sync.doc.folders],
+  );
+
   return {
     notes: visible,
     allNotes: notes,
     archived: archivedList,
+    folders,
     create,
     importFiles,
     update,
@@ -276,6 +389,10 @@ export function useNotes(
     remove,
     archive,
     restore,
+    moveNote,
+    createFolder,
+    renameFolder,
+    removeFolder,
     undo,
     redo,
     canUndo,
