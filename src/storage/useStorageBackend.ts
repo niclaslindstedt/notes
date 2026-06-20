@@ -96,6 +96,20 @@ import {
 
 const log = createLogger("storage");
 
+// The ordered phases turning encryption on/off passes through, surfaced to the
+// settings UI so it can flash a one-line status while the work runs. `reading`,
+// `saving`, and `finalizing` bracket the storage round-trip; the key-derivation
+// and cipher phases (`derivingKey` / `encrypting` / `decrypting`) bubble up from
+// the crypto layer — the superset keeps a single callback driving both.
+export type EncryptionProgressStep =
+  | "reading"
+  | "derivingKey"
+  | "encrypting"
+  | "decrypting"
+  | "saving"
+  | "finalizing";
+export type EncryptionProgress = (step: EncryptionProgressStep) => void;
+
 export interface UseStorageBackend {
   /** The adapter to hand to the sync engine. A no-op placeholder while locked. */
   adapter: StorageAdapter;
@@ -140,10 +154,19 @@ export interface UseStorageBackend {
   disconnectDropbox: () => void;
   connectGdrive: () => Promise<void>;
   disconnectGdrive: () => void;
-  /** Turn encryption on with a fresh passphrase, re-wrapping stored bytes. */
-  enableEncryption: (password: string) => Promise<void>;
-  /** Turn encryption off, decrypting stored bytes back to plaintext. */
-  disableEncryption: () => Promise<void>;
+  /**
+   * Turn encryption on with a fresh passphrase, re-wrapping stored bytes.
+   * `onProgress` (optional) fires once per phase so the UI can show progress.
+   */
+  enableEncryption: (
+    password: string,
+    onProgress?: EncryptionProgress,
+  ) => Promise<void>;
+  /**
+   * Turn encryption off, decrypting stored bytes back to plaintext.
+   * `onProgress` (optional) fires once per phase so the UI can show progress.
+   */
+  disableEncryption: (onProgress?: EncryptionProgress) => Promise<void>;
   /** Supply the passphrase for an already-encrypted store; throws if wrong. */
   unlock: (password: string) => Promise<void>;
   /** Namespaces known on this device (default always first). */
@@ -637,47 +660,60 @@ export function useStorageBackend(): UseStorageBackend {
   }, []);
 
   const enableEncryption = useCallback(
-    async (next: string) => {
+    async (next: string, onProgress?: EncryptionProgress) => {
       if (!next) throw new Error("Passphrase is required");
+      log.info("enable encryption: start");
       // Re-wrap whatever the inner backend currently holds so existing
       // plaintext becomes an envelope. A first run with no data is a no-op
       // beyond flipping the flag.
+      onProgress?.("reading");
       const snap = await inner.load();
       if (snap && !isEncryptedEnvelope(snap.text)) {
-        const payload = await encryptText(snap.text, next);
+        const payload = await encryptText(snap.text, next, onProgress);
+        onProgress?.("saving");
         await inner.save(payload, snap.revision);
       }
+      onProgress?.("finalizing");
       persistEncryption("encrypted");
       setEncryptionState("encrypted");
       setPassword(next);
+      log.info("enable encryption: done");
       unlockAchievement("paranoidMode");
     },
     [inner],
   );
 
-  const disableEncryption = useCallback(async () => {
-    if (password === null) {
-      throw new Error("Unlock before turning encryption off");
-    }
-    // Rewrite the document at rest as plaintext and drop the encrypted blob.
-    // Decrypt when the load surfaced the envelope; when a stale plaintext copy
-    // shadows the blob (a both-representations state a backend can drift into),
-    // the load returns that markdown instead, so re-save it as-is. Either way
-    // the plaintext write makes the directory adapter clear the superseded
-    // `notes.json`, so disabling can't leave the envelope behind — gating the
-    // re-save on the load happening to surface the envelope is what let the
-    // file linger.
-    const snap = await inner.load();
-    if (snap) {
-      const plaintext = isEncryptedEnvelope(snap.text)
-        ? await decryptEnvelope(snap.text, password)
-        : snap.text;
-      await inner.save(plaintext, snap.revision);
-    }
-    persistEncryption("plaintext");
-    setEncryptionState("plaintext");
-    setPassword(null);
-  }, [inner, password]);
+  const disableEncryption = useCallback(
+    async (onProgress?: EncryptionProgress) => {
+      if (password === null) {
+        throw new Error("Unlock before turning encryption off");
+      }
+      log.info("disable encryption: start");
+      // Rewrite the document at rest as plaintext and drop the encrypted blob.
+      // Decrypt when the load surfaced the envelope; when a stale plaintext copy
+      // shadows the blob (a both-representations state a backend can drift
+      // into), the load returns that markdown instead, so re-save it as-is.
+      // Either way the plaintext write makes the directory adapter clear the
+      // superseded `notes.json`, so disabling can't leave the envelope behind —
+      // gating the re-save on the load happening to surface the envelope is what
+      // let the file linger.
+      onProgress?.("reading");
+      const snap = await inner.load();
+      if (snap) {
+        const plaintext = isEncryptedEnvelope(snap.text)
+          ? await decryptEnvelope(snap.text, password, onProgress)
+          : snap.text;
+        onProgress?.("saving");
+        await inner.save(plaintext, snap.revision);
+      }
+      onProgress?.("finalizing");
+      persistEncryption("plaintext");
+      setEncryptionState("plaintext");
+      setPassword(null);
+      log.info("disable encryption: done");
+    },
+    [inner, password],
+  );
 
   const unlock = useCallback(
     async (candidate: string) => {

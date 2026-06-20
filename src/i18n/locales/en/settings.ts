@@ -130,6 +130,18 @@ const settings = {
       "There is no recovery. If you forget this passphrase your notes can't be read.",
     passphraseTooShort: "Use a passphrase of at least 4 characters.",
     passphraseMismatch: "The passphrases don't match.",
+    encryptionBusyEnabling: "Turning encryption on…",
+    encryptionBusyDisabling: "Turning encryption off…",
+    encryptionStepReading: "Reading your notes…",
+    encryptionStepDerivingKey: "Deriving encryption key…",
+    encryptionStepEncrypting: "Encrypting your notes…",
+    encryptionStepDecrypting: "Decrypting your notes…",
+    encryptionStepSaving: "Saving your notes…",
+    encryptionStepFinalizing: "Finalizing…",
+    encryptionFailed: "Something went wrong. Tap to see the log.",
+    encryptionStatusAria: "Encryption progress",
+    encryptionLogTitle: "Encryption log",
+    encryptionLogEmpty: "Nothing was logged.",
   },
 
   unlock: {

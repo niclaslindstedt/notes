@@ -130,6 +130,7 @@ Honour these when naming a new file, key, or string.
 | **Unlock modal** / **achievement notification**            | `AchievementUnlockModal` (`src/ui/achievements/AchievementUnlockModal.tsx`). [→](overview.md#unlock-modal)    |
 | **Sync details modal** / **what went wrong with sync**     | `SyncDetailsModal` (`src/ui/SyncDetailsModal.tsx`). [→](overview.md#sync-details-modal)                       |
 | **Conflict modal** / **another device edited** / **keep mine** | `ConflictModal` (`src/ui/ConflictModal.tsx`). [→](overview.md#conflict-modal)                                 |
+| **Encryption log modal** / **encryption log**              | `EncryptionLogModal` (`src/ui/settings/EncryptionLogModal.tsx`). [→](overview.md#encryption-log-modal)        |
 | **Unlock gate** / **passphrase prompt**                    | `UnlockGate` (`src/ui/UnlockGate.tsx`). [→](overview.md#unlock-gate)                                          |
 
 ## Settings tabs
@@ -140,6 +141,7 @@ Honour these when naming a new file, key, or string.
 | **Appearance settings** / **theme picker / font / density** | `AppearanceSection` (`src/ui/settings/AppearanceSection.tsx`); `ColorPalette` (`src/ui/ColorPalette.tsx`). [→](overview.md#appearance-settings) |
 | **Editor settings** / **margin / word-wrap / spell-check** | `EditorSection` (`src/ui/settings/EditorSection.tsx`). [→](overview.md#editor-settings)                       |
 | **Storage settings** / **pick a backend / encryption**     | `StorageSection` (`src/ui/settings/StorageSection.tsx`). [→](overview.md#storage-settings)                    |
+| **Encryption status bar** / **encryption progress** / **turn-on/off spinner** | status-bar + `ButtonLabel` spinner in `EncryptionSection` (`src/ui/settings/StorageSection.tsx`); `EncryptionProgress`, `EncryptionProgressStep` (`src/storage/useStorageBackend.ts`). [→](overview.md#storage-settings) |
 | **Developer settings** / **dev mode**                      | `DeveloperSection` (`src/ui/settings/DeveloperSection.tsx`); `useDevMode` (`src/dev/useDevMode.ts`). [→](overview.md#developer-settings) |
 | **Logs tab** / **captured logs**                           | `LogsSection` (`src/ui/settings/LogsSection.tsx`); `logger` (`src/dev/logger.ts`). [→](overview.md#logs)      |
 | **Language picker** / **switch language**                  | `LanguagePicker` (`src/ui/settings/LanguagePicker.tsx`). [→](overview.md#language-picker)                     |

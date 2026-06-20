@@ -559,7 +559,28 @@ default-title scheme, and the [copy](#copy-button) scope. The values are the
 `StorageSection` (`src/ui/settings/StorageSection.tsx`) — the radio picker for
 the backend (This device / Local folder / Dropbox / Google Drive) with connect
 buttons, plus the at-rest-encryption toggle. Driven entirely by the
-[storage backend hook](#storage-backend-hook).
+[storage backend hook](#storage-backend-hook). Turning encryption on or off is
+the heaviest thing the tab does (key derivation, re-wrapping every note,
+re-saving), so the toggle buttons spin while it runs and a one-line
+**encryption status bar** flashes the phase it's on — `Reading…`,
+`Deriving encryption key…`, `Encrypting…`, `Saving…`, `Finalizing…` — fed by the
+`onProgress` callback the hook reports each phase through. The messages flash by
+too fast to read in full by design; they're there to show *something is
+happening* during the otherwise-silent key-derivation pause. On success the bar
+vanishes and the heading's "Encryption is on / off" is all that's left. On
+failure the bar turns red and becomes a button that opens the
+[encryption log modal](#encryption-log-modal) with the whole phase sequence plus
+the error that stopped it.
+
+### Encryption log modal
+
+`EncryptionLogModal` (`src/ui/settings/EncryptionLogModal.tsx`) — the full log
+behind a failed [encryption status bar](#storage-settings). The status line only
+ever shows the single phase it's on; when a turn-on / turn-off throws, the red
+status line becomes tappable and opens this modal, which replays every phase
+(timestamped) and the terminating error — the [Logs tab](#logs) experience
+scoped to the one operation that just broke, so a passphrase or storage error is
+legible on a phone without reaching for devtools.
 
 ### Developer settings
 
@@ -747,7 +768,11 @@ session — after reload the store is locked until the [unlock gate](#unlock-gat
 takes it. Toggling the mode rewrites the document at rest: enabling re-wraps the
 existing notes into ciphertext and disabling decrypts them back, and the
 [directory adapter](#directory-adapter) clears the superseded representation so
-no plaintext copy lingers behind a `notes.json` (or vice versa).
+no plaintext copy lingers behind a `notes.json` (or vice versa). Both
+`enableEncryption` / `disableEncryption` (and `encryptText` / `decryptEnvelope`
+underneath) take an optional `onProgress` callback that fires once per phase
+(`reading → derivingKey → encrypting`/`decrypting → saving → finalizing`); the
+[storage settings](#storage-settings) tab feeds it into its status bar.
 
 ### Offline cache
 
