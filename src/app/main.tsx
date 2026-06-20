@@ -15,10 +15,16 @@ import "@fontsource/jetbrains-mono/latin-400.css";
 import "@fontsource/jetbrains-mono/latin-ext-400.css";
 import "@fontsource/jetbrains-mono/latin-700.css";
 import "@fontsource/jetbrains-mono/latin-ext-700.css";
+import { maybeSeedDevData } from "../dev/seed.ts";
 import { LanguageRoot } from "../i18n/LanguageRoot.tsx";
 import { HomePage } from "../ui/HomePage.tsx";
 import { PrivacyPage } from "../ui/PrivacyPage.tsx";
 import { App } from "./App.tsx";
+
+// Developer fake-data seeding. A no-op unless the `VITE_SEED` flag is set by
+// the `dev:seed` / `build:seed` npm scripts; runs before React mounts so the
+// local backend's first synchronous load already sees the seeded document.
+maybeSeedDevData();
 
 const root = document.getElementById("app");
 if (!root) throw new Error("missing #app mount point");

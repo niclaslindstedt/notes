@@ -15,7 +15,9 @@
 // General tab needs to update the modal's tab list immediately, not on the
 // next reload. (The browser only fires the `storage` event in *other* tabs.)
 // Ported from checklist's `useDevMode`, minus its `useDevSeed` fake-data
-// pairing — notes has no dev-seed backend.
+// pairing — notes seeds fake data through the env-driven `VITE_SEED` flow
+// (`src/dev/seed.ts`, the `dev:seed` script) rather than an in-app toggle, so
+// there's no dev-seed adapter to swap here.
 
 import { useEffect, useState } from "react";
 
