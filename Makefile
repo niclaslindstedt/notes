@@ -1,10 +1,16 @@
-.PHONY: build test lint fmt fmt-check icons dev preview clean install changelog
+.PHONY: build test lint fmt fmt-check icons dev dev-seed preview clean install changelog
 
 install:
 	npm ci
 
 dev:
 	npm run dev
+
+# Dev server seeded with realistic fake data (sets VITE_SEED). Populates
+# localStorage with several namespaces of varied notes on first load so the
+# UI can be debugged against lifelike content. Overwrites local sample data.
+dev-seed:
+	npm run dev:seed
 
 build:
 	npm run build

@@ -115,6 +115,7 @@ When you close any deferred item above, delete its bullet here in the same PR.
 
 ```sh
 make dev         # vite dev server (hot reload)
+make dev-seed    # dev server seeded with realistic fake data (VITE_SEED)
 make build       # production build → dist/ (also emits the service worker)
 make preview     # serve the production build locally
 make test        # vitest run
@@ -137,6 +138,24 @@ make icons       # regenerate PWA icons from public/favicon.svg
   the changeset fragment, the achievement (catalog + glyph + `en`/`sv`
   strings), the `en`/`sv` UI strings, and the `/home` showcase in the *same*
   PR — they're easy to forget as follow-ups.
+
+### Seeding fake data when debugging
+
+`make dev-seed` (or `npm run dev:seed`) starts the dev server with `VITE_SEED`
+set, which makes `src/dev/seed.ts` populate localStorage with a realistic
+sample dataset on first load — several **namespaces** (Default, Work, Recipes,
+Travel, Journal), each holding notes of varying length and shape (one-liners,
+checklists, long-form Markdown, a couple of archived notes). Use it to exercise
+the UI against lifelike content instead of hand-typing notes. `npm run
+build:seed` / `npm run preview:seed` bake the same flag into a production-mode
+build (driven by `.env.seed`, loaded only under `--mode seed`).
+
+The seed is **dev tooling, not a shipped feature**: it has no UI surface, no
+changeset, and no achievement. It is guarded by a `SEED_VERSION` sentinel so it
+writes **once** per version (a reload keeps your edits); bump `SEED_VERSION`
+when you change the dataset to force a re-seed. It **overwrites the local
+document of every namespace it touches**, so it never runs under a plain
+`make dev` or a normal build — only behind the explicit flag.
 
 ## Commit and PR conventions
 

@@ -6,8 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:seed": "vite --mode seed",
     "build": "vite build",
+    "build:seed": "vite build --mode seed",
     "preview": "vite preview",
+    "preview:seed": "npm run build:seed && vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint . && tsc --noEmit",
