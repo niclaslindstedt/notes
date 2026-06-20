@@ -2,10 +2,15 @@ import { unlock } from "../../achievements/index.ts";
 import { useDevMode } from "../../dev/useDevMode.ts";
 import { useLang, useT, writeLanguagePreference } from "../../i18n/index.ts";
 import { useStandaloneMobile } from "../../pwa/standalone.ts";
-import { setDisableAchievements, useAppearance } from "../../theme/useTheme.ts";
+import type { Appearance } from "../../theme/useTheme.ts";
 import { useNav } from "../nav-context.ts";
 import { LanguagePicker } from "./LanguagePicker.tsx";
 import { Field, Section, SegmentedRow, ToggleRow } from "./shared.tsx";
+
+type UpdateAppearance = <K extends keyof Appearance>(
+  key: K,
+  value: Appearance[K],
+) => void;
 
 // The landing settings tab, split into focused bordered sections (mirroring
 // budget's General tab): a flag-based language picker, a short note on where
@@ -14,12 +19,23 @@ import { Field, Section, SegmentedRow, ToggleRow } from "./shared.tsx";
 // phone / tablet — a segmented control choosing how the side menu is opened:
 // the floating button, or an inward edge swipe in its place. Appearance,
 // editor, and storage live on their own tabs.
-export function GeneralSection() {
+//
+// The achievements switch is part of the persisted appearance document, so it
+// edits the dialog's `draft` and only takes effect on Save. The language,
+// menu-activation, and developer-mode controls live in their own device-local
+// stores and apply immediately.
+export function GeneralSection({
+  appearance,
+  onUpdate,
+}: {
+  appearance: Appearance;
+  onUpdate: UpdateAppearance;
+}) {
   const t = useT();
   const lang = useLang();
   const standaloneMobile = useStandaloneMobile();
   const { showMenuButton, setShowMenuButton } = useNav();
-  const { disableAchievements } = useAppearance();
+  const { disableAchievements } = appearance;
   const { devMode, setDevMode } = useDevMode();
   return (
     <>
@@ -44,7 +60,7 @@ export function GeneralSection() {
           label={t("settings.general.disableAchievements")}
           hint={t("settings.general.disableAchievementsHint")}
           checked={disableAchievements}
-          onChange={setDisableAchievements}
+          onChange={(v) => onUpdate("disableAchievements", v)}
         />
       </Section>
 

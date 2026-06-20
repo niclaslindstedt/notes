@@ -37,9 +37,9 @@ function capitalise(s: string): string {
 }
 
 // The Appearance settings, ported from checklist's Appearance tab. Edits
-// apply live through the appearance store (notes has no draft/Save step),
-// so the theme engine repaints as the user picks. checklist routes the
-// font / text-size pickers through a custom SelectPicker; notes uses the
+// mutate the dialog's `draft`, which streams to the theme engine so it
+// previews live as the user picks, but only persist on Save. checklist routes
+// the font / text-size pickers through a custom SelectPicker; notes uses the
 // lighter wrap-radio + segmented patterns to avoid pulling that subsystem
 // over.
 export function AppearanceSection({

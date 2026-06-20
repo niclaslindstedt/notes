@@ -287,8 +287,9 @@ export type CustomTheme = {
 // here (plus registering its id in `ThemePreset` / `THEMES` and the
 // matching family array). Colours mirror the rules in `palettes.css`.
 //
-// `dark` / `light` keep notes' own shipped values (a slightly-raised
-// surface-3); the rest are the checklist presets reduced to notes' slots.
+// All presets mirror checklist's palettes exactly (reduced to notes' slots),
+// so the Custom-theme seed and the picker swatches match what the CSS
+// palettes paint.
 export const PRESET_PALETTES: Record<
   Exclude<ThemePreset, "system" | "custom">,
   CustomThemeColors
@@ -298,7 +299,7 @@ export const PRESET_PALETTES: Record<
     pageBg: "#1d2027",
     surface: "#282c34",
     surface2: "#2c313a",
-    surface3: "#313742",
+    surface3: "#21252b",
     fg: "#abb2bf",
     fgBright: "#e6e6e6",
     muted: "#9097a8",
@@ -312,14 +313,14 @@ export const PRESET_PALETTES: Record<
     pageBg: "#eef0f2",
     surface: "#f8f9fa",
     surface2: "#f1f3f5",
-    surface3: "#e7eaed",
+    surface3: "#e4e7eb",
     fg: "#2f323a",
     fgBright: "#15171c",
     muted: "#6a6f7c",
     line: "#ccd0d6",
     accent: "#3f8c3e",
     danger: "#c9434c",
-    link: "#1d6fd0",
+    link: "#2960c2",
   },
   dracula: {
     pageBg: "#21222c",

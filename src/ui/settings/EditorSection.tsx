@@ -23,8 +23,8 @@ type UpdateAppearance = <K extends keyof Appearance>(
 // word wrap) and whether it renders Markdown live as you type. Split into
 // focused bordered sections (mirroring the General tab) so the controls group
 // by what they affect — new notes, the writing column, Markdown rendering,
-// typing aids, and copying. Each control applies immediately through the
-// appearance store, like the other tabs.
+// typing aids, and copying. Each control edits the dialog's `draft` and only
+// takes effect on Save, like the other appearance tabs.
 export function EditorSection({
   appearance,
   onUpdate,

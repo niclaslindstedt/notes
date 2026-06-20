@@ -1,4 +1,6 @@
 import {
+  memo,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -7,9 +9,16 @@ import {
 } from "react";
 
 import { useDevMode } from "../../dev/useDevMode.ts";
-import { useT, type MessageKey } from "../../i18n/index.ts";
+import { useT, type MessageKey, type TFunction } from "../../i18n/index.ts";
 import type { UseStorageBackend } from "../../storage/useStorageBackend.ts";
-import { updateAppearance, useAppearance } from "../../theme/useTheme.ts";
+import {
+  commitAppearance,
+  DEFAULT_APPEARANCE,
+  setAppearancePreview,
+  useAppearance,
+  type Appearance,
+} from "../../theme/useTheme.ts";
+import { Button } from "../form/Button.tsx";
 import {
   CloseIcon,
   CodeIcon,
@@ -32,9 +41,17 @@ import { StorageSection } from "./StorageSection.tsx";
 // Settings dialog. Lands on the General tab, with Appearance and Storage as
 // their own tabs alongside it. Modelled on checklist's tabbed SettingsModal —
 // a left rail of labelled, icon-marked tabs on desktop, collapsed into a
-// burger menu in the header on mobile. Unlike checklist there's no draft /
-// Save step: every control here applies live through its own store, so the
-// dialog is just a chooser with a Close button and no footer.
+// burger menu in the header on mobile, with a footer pinned below the content:
+// Reset to defaults on the left, Cancel + Save on the right.
+//
+// The appearance settings the dialog owns (theme, font, the Editor controls,
+// the achievements switch) are edited against a local `draft` and only
+// committed on Save: while open the draft streams to the theme engine through
+// `setAppearancePreview` so the look previews live, Cancel drops the draft (the
+// persisted look snaps back), and Save flushes it through `commitAppearance`.
+// The device-local controls (language, the menu-activation toggle, developer
+// mode) and the storage connections apply immediately — they don't live in the
+// persisted appearance document the draft snapshots.
 //
 // Developer and Logs are diagnostic tabs gated behind the device-local
 // developer-mode flag: Developer appears once dev mode is on, and Logs appears
@@ -79,9 +96,14 @@ type Props = {
 };
 
 export function SettingsModal({ open, onClose, storage }: Props) {
-  const appearance = useAppearance();
+  const t = useT();
+  const persisted = useAppearance();
   const { devMode, captureLogs } = useDevMode();
   const [activeTab, setActiveTab] = useState<TabId>("general");
+  // Local draft of the owned appearance settings. Snapshots the persisted
+  // document and re-syncs while the dialog is closed, so the next open starts
+  // clean and a cancelled edit never lingers.
+  const [draft, setDraft] = useState<Appearance>(persisted);
 
   // Developer is gated on dev mode; Logs is gated on log capture (which can
   // only be on while dev mode is, so the Logs tab never outlives its data).
@@ -103,6 +125,44 @@ export function SettingsModal({ open, onClose, storage }: Props) {
   useEffect(() => {
     if (!tabs.some((tab) => tab.id === activeTab)) setActiveTab("general");
   }, [tabs, activeTab]);
+
+  // Re-sync the draft from the store while the dialog is closed, so a
+  // cancelled edit is dropped and the next open starts from the live look.
+  useEffect(() => {
+    if (open) return;
+    setDraft(persisted);
+  }, [open, persisted]);
+
+  // Stream the draft to the theme engine while open so appearance edits
+  // preview live; clear it on close (that's also how Cancel reverts — the
+  // persisted appearance reasserts and the look snaps back).
+  useEffect(() => {
+    setAppearancePreview(open ? draft : null);
+  }, [open, draft]);
+  // Belt-and-braces clear on unmount.
+  useEffect(() => () => setAppearancePreview(null), []);
+
+  const update = useCallback(
+    <K extends keyof Appearance>(key: K, value: Appearance[K]) => {
+      setDraft((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
+
+  const handleSave = useCallback(() => {
+    commitAppearance(draft);
+    onClose();
+  }, [draft, onClose]);
+
+  // Reset only the owned appearance fields; keep the earned achievements and
+  // the unseen queue the dialog can't edit from here.
+  const handleReset = useCallback(() => {
+    setDraft((prev) => ({
+      ...DEFAULT_APPEARANCE,
+      achievements: prev.achievements,
+      unseenAchievements: prev.unseenAchievements,
+    }));
+  }, []);
 
   return (
     <Modal open={open} onClose={onClose} labelledBy="settings-title">
@@ -126,18 +186,14 @@ export function SettingsModal({ open, onClose, storage }: Props) {
           {/* The Section blocks self-space with `mt-3 first:mt-0`, so the
               wrapper adds no gap of its own. */}
           <div className="mx-auto w-full max-w-2xl">
-            {activeTab === "general" && <GeneralSection />}
+            {activeTab === "general" && (
+              <GeneralSection appearance={draft} onUpdate={update} />
+            )}
             {activeTab === "appearance" && (
-              <AppearanceSection
-                appearance={appearance}
-                onUpdate={updateAppearance}
-              />
+              <AppearanceSection appearance={draft} onUpdate={update} />
             )}
             {activeTab === "editor" && (
-              <EditorSection
-                appearance={appearance}
-                onUpdate={updateAppearance}
-              />
+              <EditorSection appearance={draft} onUpdate={update} />
             )}
             {activeTab === "storage" && <StorageSection storage={storage} />}
             {activeTab === "developer" && <DeveloperSection />}
@@ -145,9 +201,46 @@ export function SettingsModal({ open, onClose, storage }: Props) {
           </div>
         </div>
       </div>
+
+      <SettingsFooter
+        t={t}
+        onReset={handleReset}
+        onCancel={onClose}
+        onSave={handleSave}
+      />
     </Modal>
   );
 }
+
+// Footer pinned below the tab content on every tab. Reset sits on the left;
+// Cancel + Save group on the right, mirroring checklist's settings dialog.
+const SettingsFooter = memo(function SettingsFooter({
+  t,
+  onReset,
+  onCancel,
+  onSave,
+}: {
+  t: TFunction;
+  onReset: () => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-line bg-surface-3 px-4 py-3">
+      <Button variant="secondary" onClick={onReset}>
+        {t("common.resetToDefaults")}
+      </Button>
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" onClick={onCancel}>
+          {t("common.cancel")}
+        </Button>
+        <Button variant="primary" onClick={onSave}>
+          {t("common.save")}
+        </Button>
+      </div>
+    </footer>
+  );
+});
 
 // Header. On mobile the burger + active-tab label form one toggle that opens
 // the section menu; on desktop the sidebar owns selection and the header

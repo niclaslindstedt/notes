@@ -4,12 +4,13 @@
 // onto `<html>` so the CSS variables in `src/styles/` (and every Tailwind
 // utility that resolves through them) follow the picker.
 //
-// Ported from checklist's `useTheme` + appearance store, adapted to notes:
-// checklist edits a draft committed on Save, while notes applies every
-// change live through this single store — the same immediate-apply shape
-// the original three-way theme toggle had. The projection runs as four
-// independent effects so a font change doesn't rewrite the colour overrides
-// (and vice versa):
+// Ported from checklist's `useTheme` + appearance store. Like checklist, the
+// settings dialog edits a draft that only persists on Save: while it's open it
+// streams the draft through `setAppearancePreview`, the projection paints that
+// preview live, and `commitAppearance` / Cancel commit or drop it. Quick
+// toggles outside the dialog (the theme switcher) still persist immediately via
+// `updateAppearance`. The projection runs as four independent effects so a font
+// change doesn't rewrite the colour overrides (and vice versa):
 //
 //   1. `data-theme` on `<html>` from `theme`. CSS owns the preset palettes;
 //      `custom` is a no-op at the CSS layer — effect (4) writes inline
@@ -258,9 +259,22 @@ function readStored(): Appearance {
 
 const listeners = new Set<() => void>();
 let current: Appearance = readStored();
+// Ephemeral preview override. While the settings dialog is open it streams its
+// unsaved draft here so the theme engine repaints live; the persisted `current`
+// is left untouched until Save commits it (or Cancel/close drops the preview).
+// Only the projection onto `<html>` reads this — every other consumer keeps
+// reading the persisted document, so editor/achievement behaviour doesn't shift
+// mid-edit and reverts cleanly on Cancel.
+let preview: Appearance | null = null;
 
 function emit() {
   for (const l of listeners) l();
+}
+
+// The appearance the theme projection should paint: the live preview when one
+// is set, otherwise the persisted document.
+function effective(): Appearance {
+  return preview ?? current;
 }
 
 function subscribe(listener: () => void): () => void {
@@ -287,6 +301,33 @@ export function updateAppearance<K extends keyof Appearance>(
 /** The live appearance, read imperatively (e.g. to seed a backend file). */
 export function getAppearance(): Appearance {
   return current;
+}
+
+/**
+ * Stream an unsaved appearance draft to the theme projection so it repaints
+ * live, or pass `null` to drop the preview and reassert the persisted look.
+ * The settings dialog calls this while open; nothing is persisted.
+ */
+export function setAppearancePreview(next: Appearance | null): void {
+  if (preview === next) return;
+  preview = next;
+  emit();
+}
+
+/**
+ * Commit an edited draft from the settings dialog. Persists the owned fields
+ * but keeps the live achievement progress (the unlocked map + unseen queue),
+ * which the dialog doesn't edit and which may have changed while it was open,
+ * then clears any active preview so the committed look takes over without a
+ * flash.
+ */
+export function commitAppearance(next: Appearance): void {
+  preview = null;
+  persist({
+    ...next,
+    achievements: current.achievements,
+    unseenAchievements: current.unseenAchievements,
+  });
 }
 
 /**
@@ -343,7 +384,7 @@ export function setDisableAchievements(disabled: boolean): void {
   updateAppearance("disableAchievements", disabled);
 }
 
-/** Read the active appearance and re-render on change. */
+/** Read the persisted appearance and re-render on change. */
 export function useAppearance(): Appearance {
   return useSyncExternalStore(
     subscribe,
@@ -353,12 +394,24 @@ export function useAppearance(): Appearance {
 }
 
 /**
- * Read the active appearance and keep `<html>` in sync with it. Call once
- * near the root; the returned value re-renders consumers on change.
+ * Read the appearance the projection should paint — the live preview while the
+ * settings dialog streams a draft, otherwise the persisted document.
+ */
+function useEffectiveAppearance(): Appearance {
+  return useSyncExternalStore(subscribe, effective, () => DEFAULT_APPEARANCE);
+}
+
+/**
+ * Keep `<html>` in sync with the appearance and return the persisted document.
+ * Call once near the root. The projection paints the live preview (so the
+ * settings dialog can repaint as the user edits a draft), but the returned
+ * value is always the persisted document — so consumers that read editor /
+ * achievement settings off it don't shift mid-edit and snap back on Cancel.
  */
 export function useApplyAppearance(): Appearance {
-  const appearance = useAppearance();
-  const { theme, fontFamily, fontScale, customTheme } = appearance;
+  const persisted = useAppearance();
+  const { theme, fontFamily, fontScale, customTheme } =
+    useEffectiveAppearance();
 
   // (1) Theme preset attribute.
   useEffect(() => {
@@ -418,5 +471,5 @@ export function useApplyAppearance(): Appearance {
     );
   }, [theme, customTheme]);
 
-  return appearance;
+  return persisted;
 }
