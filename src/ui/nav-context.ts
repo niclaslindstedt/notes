@@ -29,10 +29,10 @@ export type NavContextValue = {
    * The user's preference for whether the floating button is shown. Only
    * honoured in the installed PWA on a phone / tablet, where the inward edge
    * swipe can safely replace it; everywhere else the button always shows
-   * regardless. Bound to the Show-menu-button toggle on the General tab.
+   * regardless. Bound to the menu-activation control on the General tab.
    */
   showMenuButton: boolean;
-  /** Persist the Show-menu-button preference. */
+  /** Persist the menu-activation (floating button vs. edge swipe) preference. */
   setShowMenuButton: (next: boolean) => void;
   /**
    * Whether the floating menu button is actually rendered — the preference

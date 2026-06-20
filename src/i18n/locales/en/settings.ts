@@ -31,9 +31,11 @@ const settings = {
     disableAchievements: "Disable achievements",
     disableAchievementsHint:
       "Stop tracking achievements and hide the trophy button. Achievements you’ve already earned are kept.",
-    menuButton: "Show menu button",
-    menuButtonHint:
-      "When off, swipe in from the edge of the screen to open the menu.",
+    menuActivation: "Open the menu with",
+    menuActivationHint:
+      "Choose how to open the side menu on this device — tap the floating button, or swipe in from the edge of the screen.",
+    menuActivationSwipe: "Right-swipe",
+    menuActivationButton: "Floating button",
     devMode: "Developer mode",
     devModeHint:
       "Reveal the Developer tab with diagnostic tools. Stays on this device.",

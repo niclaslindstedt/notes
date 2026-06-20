@@ -26,9 +26,11 @@ const settings: SettingsCatalog = {
     disableAchievements: "Inaktivera bedrifter",
     disableAchievementsHint:
       "Sluta spåra bedrifter och dölj troféknappen. Bedrifter du redan låst upp behålls.",
-    menuButton: "Visa menyknapp",
-    menuButtonHint:
-      "När den är av sveper du in från skärmkanten för att öppna menyn.",
+    menuActivation: "Öppna menyn med",
+    menuActivationHint:
+      "Välj hur sidomenyn öppnas på den här enheten — tryck på den flytande knappen eller svep in från skärmkanten.",
+    menuActivationSwipe: "Högersvep",
+    menuActivationButton: "Flytande knapp",
     devMode: "Utvecklarläge",
     devModeHint:
       "Visa fliken Utvecklare med diagnostikverktyg. Stannar på den här enheten.",

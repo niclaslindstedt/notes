@@ -10,7 +10,7 @@ import {
   setDisableAchievements,
 } from "../../src/theme/useTheme.ts";
 
-// The Show-menu-button toggle is only offered in the installed PWA on a
+// The menu-activation control is only offered in the installed PWA on a
 // phone / tablet, so the standalone detector is mocked per test.
 vi.mock("../../src/pwa/standalone.ts", () => ({
   useStandaloneMobile: vi.fn(() => false),
@@ -62,18 +62,21 @@ describe("GeneralSection", () => {
     expect(getAppearance().disableAchievements).toBe(true);
   });
 
-  it("hides the menu-button toggle outside a standalone mobile PWA", () => {
+  it("hides the menu-activation control outside a standalone mobile PWA", () => {
     mockStandalone.mockReturnValue(false);
     renderWithNav();
-    expect(screen.queryByLabelText("Show menu button")).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Floating button" })).toBeNull();
   });
 
-  it("offers the menu-button toggle in a standalone mobile PWA", () => {
+  it("offers the menu-activation segmented control in a standalone mobile PWA", () => {
     mockStandalone.mockReturnValue(true);
     const { setShowMenuButton } = renderWithNav({ showMenuButton: true });
-    const toggle = screen.getByLabelText("Show menu button");
-    expect(toggle).toBeTruthy();
-    fireEvent.click(toggle);
+    const swipe = screen.getByRole("radio", { name: "Right-swipe" });
+    const button = screen.getByRole("radio", { name: "Floating button" });
+    expect(button.getAttribute("aria-checked")).toBe("true");
+    expect(swipe.getAttribute("aria-checked")).toBe("false");
+    // Picking the edge swipe turns the floating button off.
+    fireEvent.click(swipe);
     expect(setShowMenuButton).toHaveBeenCalledWith(false);
   });
 });
