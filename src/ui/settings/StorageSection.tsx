@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 
 import { useT, type MessageKey } from "../../i18n/index.ts";
 import type { BackendId } from "../../storage/backend-preference.ts";
@@ -11,6 +11,7 @@ import { ShieldIcon, SpinnerIcon } from "../icons.tsx";
 import { Button } from "../form/Button.tsx";
 import {
   EncryptionLogModal,
+  type EncryptionConversionState,
   type EncryptionLogEntry,
 } from "./EncryptionLogModal.tsx";
 import { Section } from "./shared.tsx";
@@ -33,9 +34,10 @@ const STEP_MESSAGE_KEY: Record<EncryptionProgressStep, MessageKey> = {
 
 type Props = {
   storage: UseStorageBackend;
+  conversion: EncryptionConversionState;
 };
 
-export function StorageSection({ storage }: Props) {
+export function StorageSection({ storage, conversion }: Props) {
   const t = useT();
   const {
     backend,
@@ -241,6 +243,7 @@ export function StorageSection({ storage }: Props) {
 
       <EncryptionSection
         encryption={encryption}
+        conversion={conversion}
         onEnable={enableEncryption}
         onDisable={disableEncryption}
       />
@@ -250,10 +253,12 @@ export function StorageSection({ storage }: Props) {
 
 function EncryptionSection({
   encryption,
+  conversion,
   onEnable,
   onDisable,
 }: {
   encryption: "encrypted" | "plaintext";
+  conversion: EncryptionConversionState;
   onEnable: (
     password: string,
     onProgress?: EncryptionProgress,
@@ -268,49 +273,67 @@ function EncryptionSection({
   // Synchronous passphrase validation (too short / mismatch) shown inline under
   // the form. The asynchronous flow's own failures live in the status bar.
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  // The single line the status bar flashes while the flow runs. Each phase
-  // overwrites it, so the bar reads as a fast-moving ticker rather than a list.
-  const [current, setCurrent] = useState<EncryptionLogEntry | null>(null);
-  // Every phase plus any terminating error, kept so the log modal can replay
-  // the whole operation once the user taps a failed status bar.
-  const [log, setLog] = useState<EncryptionLogEntry[]>([]);
-  const [failed, setFailed] = useState(false);
+  // True only while the toggle's own promise is in flight — the whole-document
+  // re-save on the browser backend, or the brief mode flip on a file/cloud one.
+  // Once it resolves, the `conversion` snapshot from the background queue drives
+  // the status (the queue keeps sealing / decrypting after the modal closes).
+  const [submitting, setSubmitting] = useState(false);
+  // The phase line the browser backend flashes during its one-pass re-save.
+  const [submitStep, setSubmitStep] = useState<string | null>(null);
+  // A synchronous failure from the toggle itself (vs. the queue's, in
+  // `conversion.error`). Stored as a log entry so its timestamp is captured when
+  // it happens rather than recomputed during render.
+  const [submitError, setSubmitError] = useState<EncryptionLogEntry | null>(
+    null,
+  );
   const [logOpen, setLogOpen] = useState(false);
 
-  // Drive one turn-on / turn-off attempt: reset the status state, feed each
-  // reported phase into the ticker + the running log, and on a thrown failure
-  // park a red, tappable status bar instead. Resolves to whether it succeeded.
-  const runFlow = async (
+  // The background queue is converting note-by-note (file/cloud); the modal can
+  // be closed and it keeps going. `busy` folds in the toggle's own in-flight
+  // promise so the spinner covers both.
+  const queueBusy = conversion.busy;
+  const busy = submitting || queueBusy;
+  const errorText = submitError?.text ?? conversion.error;
+
+  const statusMessage = queueBusy
+    ? (conversion.message ??
+      t(
+        conversion.direction === "decrypt"
+          ? "settings.storage.encryptionBusyDisabling"
+          : "settings.storage.encryptionBusyEnabling",
+      ))
+    : (submitStep ?? null);
+
+  const logEntries = useMemo<EncryptionLogEntry[]>(() => {
+    if (conversion.log.length > 0) return conversion.log;
+    if (submitError) return [submitError];
+    return [];
+  }, [conversion.log, submitError]);
+
+  // Drive one turn-on / turn-off attempt: clear the status state, feed any phase
+  // the browser path reports into the ticker, and park the error on a throw.
+  const runToggle = async (
     op: (onProgress: EncryptionProgress) => Promise<void>,
   ): Promise<boolean> => {
-    setBusy(true);
-    setFailed(false);
-    setCurrent(null);
-    setLog([]);
-    const onProgress: EncryptionProgress = (step) => {
-      const entry: EncryptionLogEntry = {
-        text: t(STEP_MESSAGE_KEY[step]),
-        ts: Date.now(),
-        level: "info",
-      };
-      setCurrent(entry);
-      setLog((prev) => [...prev, entry]);
-    };
+    setSubmitting(true);
+    setSubmitError(null);
+    setSubmitStep(null);
+    const onProgress: EncryptionProgress = (step) =>
+      setSubmitStep(t(STEP_MESSAGE_KEY[step]));
     try {
       await op(onProgress);
-      // Done — drop the ticker so the heading's "on / off" is all that's left.
-      setCurrent(null);
-      setLog([]);
+      setSubmitStep(null);
       return true;
     } catch (err) {
-      const text = err instanceof Error ? err.message : String(err);
-      setLog((prev) => [...prev, { text, ts: Date.now(), level: "error" }]);
-      setCurrent(null);
-      setFailed(true);
+      setSubmitError({
+        text: err instanceof Error ? err.message : String(err),
+        ts: Date.now(),
+        level: "error",
+      });
+      setSubmitStep(null);
       return false;
     } finally {
-      setBusy(false);
+      setSubmitting(false);
     }
   };
 
@@ -326,7 +349,7 @@ function EncryptionSection({
       return;
     }
     setValidationError(null);
-    const ok = await runFlow((onProgress) => onEnable(pass, onProgress));
+    const ok = await runToggle((onProgress) => onEnable(pass, onProgress));
     if (ok) {
       setSetting(false);
       setPass("");
@@ -336,7 +359,7 @@ function EncryptionSection({
 
   const disable = async () => {
     if (busy) return;
-    await runFlow((onProgress) => onDisable(onProgress));
+    await runToggle((onProgress) => onDisable(onProgress));
   };
 
   const inputClass =
@@ -402,7 +425,7 @@ function EncryptionSection({
               onClick={() => {
                 setSetting(false);
                 setValidationError(null);
-                setFailed(false);
+                setSubmitError(null);
                 setPass("");
                 setConfirm("");
               }}
@@ -421,18 +444,25 @@ function EncryptionSection({
         </Button>
       )}
 
-      {busy && current && (
+      {busy && statusMessage && (
         <div
           role="status"
           aria-label={t("settings.storage.encryptionStatusAria")}
-          className="flex items-center gap-2 rounded-[var(--radius)] border border-line bg-surface-2 px-2.5 py-1.5"
+          className="flex flex-col gap-1 rounded-[var(--radius)] border border-line bg-surface-2 px-2.5 py-1.5"
         >
-          <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
-          <span className="truncate text-xs text-muted">{current.text}</span>
+          <div className="flex items-center gap-2">
+            <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
+            <span className="truncate text-xs text-muted">{statusMessage}</span>
+          </div>
+          {queueBusy && (
+            <span className="text-xs text-accent">
+              {t("settings.storage.conversionCanClose")}
+            </span>
+          )}
         </div>
       )}
 
-      {!busy && failed && (
+      {!busy && errorText && (
         <button
           type="button"
           onClick={() => setLogOpen(true)}
@@ -452,7 +482,7 @@ function EncryptionSection({
 
       <EncryptionLogModal
         open={logOpen}
-        entries={log}
+        entries={logEntries}
         onClose={() => setLogOpen(false)}
       />
     </Section>

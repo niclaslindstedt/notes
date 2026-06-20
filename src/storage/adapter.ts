@@ -43,6 +43,16 @@ export type AdapterCapability =
   // backend, which has nowhere to put a file, doesn't accept them.
   | "attachments";
 
+// A single step within converting one note's at-rest representation, surfaced
+// so the UI can flash exactly which note — and which of that note's
+// attachments — is being sealed or unsealed right now. `note` is the note file
+// itself; `attachment` is one of its pasted images / files.
+export type NoteConversionStep =
+  | { phase: "note" }
+  | { phase: "attachment"; filename: string };
+
+export type NoteConversionProgress = (step: NoteConversionStep) => void;
+
 export type StorageAdapter = {
   // Stable identifier so device-local settings (auth tokens, last-used
   // adapter) can be keyed per backend.
@@ -105,8 +115,17 @@ export type StorageAdapter = {
 
   // Convert one note from plaintext to its encrypted per-file form, atomically
   // and idempotently. The paced migration queue calls this per note so a large
-  // conversion doesn't burst the cloud API. Returns true when work was done.
-  migrateNote?(note: Note): Promise<boolean>;
+  // conversion doesn't burst the cloud API. `onStep` fires as each of the note's
+  // attachments and then the note file itself is sealed, so the UI can flash
+  // what it's working on. Returns true when work was done.
+  migrateNote?(note: Note, onStep?: NoteConversionProgress): Promise<boolean>;
+
+  // The exact reverse of `migrateNote`: convert one note from its encrypted
+  // per-file form back to plaintext markdown + plaintext attachment files,
+  // atomically and idempotently. Drives the background de-encryption queue when
+  // the user turns encryption off, so disabling never bursts the cloud API
+  // either. `onStep` mirrors `migrateNote`'s. Returns true when work was done.
+  demigrateNote?(note: Note, onStep?: NoteConversionProgress): Promise<boolean>;
 
   // One-time upgrade of a legacy whole-document `notes.json` envelope to the
   // per-file encrypted form, atomically. Idempotent (no-op once split). Returns

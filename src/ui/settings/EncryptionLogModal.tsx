@@ -18,6 +18,22 @@ export type EncryptionLogEntry = {
   level: "info" | "error";
 };
 
+// A live snapshot of the background encryption conversion (the paced per-note
+// queue that runs after encryption is turned on or off on a file/cloud
+// backend). The storage settings flash `message` while `busy` and tell the user
+// they can close the modal; `log` backs this modal when `error` is set. Defined
+// here, in the UI layer, so both the settings UI and the app-level conversion
+// hook can share the shape without crossing the app → ui boundary.
+export type EncryptionConversionState = {
+  busy: boolean;
+  direction: "encrypt" | "decrypt" | null;
+  message: string | null;
+  done: number;
+  total: number;
+  error: string | null;
+  log: EncryptionLogEntry[];
+};
+
 type Props = {
   open: boolean;
   entries: EncryptionLogEntry[];

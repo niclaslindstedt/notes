@@ -170,6 +170,12 @@ const settings = {
     encryptionStepDecrypting: "Decrypting your notes…",
     encryptionStepSaving: "Saving your notes…",
     encryptionStepFinalizing: "Finalizing…",
+    encryptingNote: "Encrypting “{title}”…",
+    encryptingAttachment: "Encrypting “{filename}” (attachment of “{title}”)…",
+    decryptingNote: "Decrypting “{title}”…",
+    decryptingAttachment: "Decrypting “{filename}” (attachment of “{title}”)…",
+    conversionCanClose:
+      "You can now close settings — this finishes in the background.",
     encryptionFailed: "Something went wrong. Tap to see the log.",
     encryptionStatusAria: "Encryption progress",
     encryptionLogTitle: "Encryption log",

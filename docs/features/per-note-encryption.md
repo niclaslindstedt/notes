@@ -20,7 +20,11 @@ blob. This makes encryption both more private and far lighter to sync.
 - **A green lock you can watch fill in.** Turning encryption on starts a paced
   background migration that seals one note at a time (so it never floods the
   cloud API). Each note shows a green lock in the overview and the side menu the
-  moment it — and all of its attachments — are fully encrypted at rest.
+  moment it — and all of its attachments — are fully encrypted at rest. You don't
+  have to wait for it: the settings dialog tells you it's safe to close, and the
+  conversion keeps running in the background. If you're curious you can leave it
+  open and watch the status flash exactly which note (and which of its
+  attachments) it's working on right now.
 - **Atomic, lossless conversion.** Every conversion writes the new encrypted
   copy and verifies it can be read back *before* the old copy is removed. An
   interruption — a crash, a closed tab, a dropped connection — at worst leaves
@@ -32,5 +36,6 @@ The passphrase is held only for the session. After a reload the app is locked
 until you re-enter it; the offline cache keeps a sealed copy so you can unlock
 and read your notes even with no connection.
 
-Turning encryption off reverses the whole process, decrypting every note and
-attachment back to plain files — just as carefully, with no data loss.
+Turning encryption off reverses the whole process with a matching background
+queue, decrypting every note and attachment back to plain files one at a time —
+just as carefully, just as closeable, with no data loss.

@@ -15,7 +15,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { unlock as unlockAchievement } from "../achievements/index.ts";
 import { createLogger } from "../dev/logger.ts";
 import type { Note } from "../domain/note.ts";
-import type { StorageAdapter, StoredSnapshot } from "./adapter.ts";
+import type {
+  NoteConversionStep,
+  StorageAdapter,
+  StoredSnapshot,
+} from "./adapter.ts";
 import { bytesToDataUrl } from "./attachment-store.ts";
 import { parse, serialize } from "./serialize.ts";
 import {
@@ -125,7 +129,15 @@ export interface UseStorageBackend {
   /** The active adapter's per-note at-rest encryption status, if it tracks it. */
   getEncryptionStatus?: () => Map<string, "encrypted" | "pending">;
   /** Convert one note to encrypted at rest (idempotent), if supported. */
-  migrateNote?: (note: Note) => Promise<boolean>;
+  migrateNote?: (
+    note: Note,
+    onStep?: (step: NoteConversionStep) => void,
+  ) => Promise<boolean>;
+  /** Convert one note back to plaintext at rest (idempotent), if supported. */
+  demigrateNote?: (
+    note: Note,
+    onStep?: (step: NoteConversionStep) => void,
+  ) => Promise<boolean>;
   /** Upgrade a legacy whole-document encrypted blob to per-file form (one-time). */
   splitLegacyBlob?: () => Promise<boolean>;
   /**
@@ -158,6 +170,13 @@ export interface UseStorageBackend {
   encryption: EncryptionMode;
   /** True when encryption is on but no passphrase is held yet (needs unlock). */
   locked: boolean;
+  /**
+   * On a file/cloud backend, true while the background de-encryption queue is
+   * draining (mode is still `encrypted` and the passphrase still held until the
+   * last note is back to plaintext). Drives the reverse conversion and keeps the
+   * settings UI showing "turning off" rather than a finished state.
+   */
+  encryptionDisabling: boolean;
   selectBrowser: () => void;
   /** Pick a folder, seed it from the current document, and switch to it. */
   connectFolder: () => Promise<void>;
@@ -178,10 +197,19 @@ export interface UseStorageBackend {
     onProgress?: EncryptionProgress,
   ) => Promise<void>;
   /**
-   * Turn encryption off, decrypting stored bytes back to plaintext.
-   * `onProgress` (optional) fires once per phase so the UI can show progress.
+   * Turn encryption off. On the browser backend this decrypts the whole
+   * document in one pass (`onProgress` fires per phase). On a file/cloud backend
+   * it only *starts* the reverse: it raises `encryptionDisabling` and the
+   * background queue decrypts note-by-note, calling `finishDisableEncryption`
+   * when the last one lands — so the modal can be closed while it runs.
    */
   disableEncryption: (onProgress?: EncryptionProgress) => Promise<void>;
+  /**
+   * Finalise a file/cloud de-encryption: drop the passphrase and switch the
+   * persisted mode to plaintext. Called by the background queue once every note
+   * is decrypted; never called directly by the UI.
+   */
+  finishDisableEncryption: () => void;
   /** Supply the passphrase for an already-encrypted store; throws if wrong. */
   unlock: (password: string) => Promise<void>;
   /** Namespaces known on this device (default always first). */
@@ -269,6 +297,10 @@ export function useStorageBackend(): UseStorageBackend {
   );
   const [encryption, setEncryptionState] =
     useState<EncryptionMode>(getEncryption);
+  // File/cloud only: true while the background de-encryption queue drains. The
+  // mode stays `encrypted` (and the passphrase held) until the last note is
+  // plaintext, then `finishDisableEncryption` flips it.
+  const [disabling, setDisabling] = useState(false);
   // Session-only passphrase. Never persisted — lost on reload by design.
   const [password, setPassword] = useState<string | null>(null);
   // A stable ref the per-file directory adapters read at call time, so the
@@ -601,6 +633,27 @@ export function useStorageBackend(): UseStorageBackend {
     [adapter],
   );
 
+  // The adapter's at-rest encryption surface, bound once per adapter so the
+  // identity is stable across re-renders. The background conversion effect keys
+  // off these, so a fresh `.bind()` every render would otherwise restart it on
+  // every status tick.
+  const getEncryptionStatus = useMemo(
+    () => adapter.getEncryptionStatus?.bind(adapter),
+    [adapter],
+  );
+  const migrateNote = useMemo(
+    () => adapter.migrateNote?.bind(adapter),
+    [adapter],
+  );
+  const demigrateNote = useMemo(
+    () => adapter.demigrateNote?.bind(adapter),
+    [adapter],
+  );
+  const splitLegacyBlob = useMemo(
+    () => adapter.splitLegacyBlob?.bind(adapter),
+    [adapter],
+  );
+
   const selectBrowser = useCallback(() => {
     persistBackend("browser");
     setBackendState("browser");
@@ -761,29 +814,36 @@ export function useStorageBackend(): UseStorageBackend {
     async (next: string, onProgress?: EncryptionProgress) => {
       if (!next) throw new Error("Passphrase is required");
       log.info("enable encryption: start");
-      // Read the current plaintext document and pull its attachment bytes in
-      // (passphrase not yet active, so this reads the plaintext files), then
-      // turn crypto on and re-save: the adapter writes each note + attachment as
-      // its own encrypted blob and, after verifying them, removes the superseded
-      // plaintext — atomic, no data loss.
-      onProgress?.("reading");
-      const snap = await inner.load();
-      const hydrated = snap ? await hydrateForSwitch(snap.text) : null;
-      onProgress?.("derivingKey");
-      passwordRef.current = next;
-      if (snap && hydrated !== null) {
-        onProgress?.("encrypting");
-        onProgress?.("saving");
-        await inner.save(hydrated, snap.revision);
+      // The browser backend has no per-note representation: its whole document
+      // is one envelope, so the switch is a single re-save through the
+      // `withEncryption` wrapper here and now.
+      if (backend === "browser") {
+        onProgress?.("reading");
+        const snap = await inner.load();
+        const hydrated = snap ? await hydrateForSwitch(snap.text) : null;
+        onProgress?.("derivingKey");
+        passwordRef.current = next;
+        if (snap && hydrated !== null) {
+          onProgress?.("encrypting");
+          onProgress?.("saving");
+          await inner.save(hydrated, snap.revision);
+        }
+        onProgress?.("finalizing");
+      } else {
+        // File/cloud: flip the mode immediately and let the background queue
+        // seal each note one at a time (the encrypted load merges any
+        // not-yet-sealed plaintext remnant, so the document stays whole). No
+        // bulk re-save here — that would burst the cloud API and block the UI.
+        onProgress?.("derivingKey");
+        passwordRef.current = next;
       }
-      onProgress?.("finalizing");
       persistEncryption("encrypted");
       setEncryptionState("encrypted");
       applyPassword(next);
-      log.info("enable encryption: done");
+      log.info("enable encryption: mode on");
       unlockAchievement("paranoidMode");
     },
-    [inner, applyPassword, hydrateForSwitch],
+    [backend, inner, applyPassword, hydrateForSwitch],
   );
 
   const disableEncryption = useCallback(
@@ -792,27 +852,40 @@ export function useStorageBackend(): UseStorageBackend {
         throw new Error("Unlock before turning encryption off");
       }
       log.info("disable encryption: start");
-      // Read + decrypt the encrypted document and pull its attachment bytes in
-      // (passphrase still active), then turn crypto off and re-save as plaintext
-      // markdown — which makes the adapter clear the superseded encrypted files
-      // only after the plaintext is written.
-      onProgress?.("reading");
-      onProgress?.("decrypting");
-      const snap = await inner.load();
-      const hydrated = snap ? await hydrateForSwitch(snap.text) : null;
-      passwordRef.current = null;
-      if (snap && hydrated !== null) {
-        onProgress?.("saving");
-        await inner.save(hydrated, snap.revision);
+      if (backend === "browser") {
+        // Whole-document backend: read + decrypt and re-save as plaintext in one
+        // pass, clearing the encrypted bytes only after the plaintext is written.
+        onProgress?.("reading");
+        onProgress?.("decrypting");
+        const snap = await inner.load();
+        const hydrated = snap ? await hydrateForSwitch(snap.text) : null;
+        passwordRef.current = null;
+        if (snap && hydrated !== null) {
+          onProgress?.("saving");
+          await inner.save(hydrated, snap.revision);
+        }
+        onProgress?.("finalizing");
+        persistEncryption("plaintext");
+        setEncryptionState("plaintext");
+        applyPassword(null);
+        log.info("disable encryption: done");
+        return;
       }
-      onProgress?.("finalizing");
-      persistEncryption("plaintext");
-      setEncryptionState("plaintext");
-      applyPassword(null);
-      log.info("disable encryption: done");
+      // File/cloud: keep the mode `encrypted` and the passphrase held, and raise
+      // the flag so the background queue decrypts note-by-note. It calls
+      // `finishDisableEncryption` once the last note is plaintext.
+      setDisabling(true);
     },
-    [inner, applyPassword, hydrateForSwitch],
+    [backend, inner, applyPassword, hydrateForSwitch],
   );
+
+  const finishDisableEncryption = useCallback(() => {
+    log.info("disable encryption: queue drained — finalising");
+    persistEncryption("plaintext");
+    setEncryptionState("plaintext");
+    applyPassword(null);
+    setDisabling(false);
+  }, [applyPassword]);
 
   const unlock = useCallback(
     async (candidate: string) => {
@@ -925,9 +998,10 @@ export function useStorageBackend(): UseStorageBackend {
   return {
     adapter,
     fetchAttachment,
-    getEncryptionStatus: adapter.getEncryptionStatus?.bind(adapter),
-    migrateNote: adapter.migrateNote?.bind(adapter),
-    splitLegacyBlob: adapter.splitLegacyBlob?.bind(adapter),
+    getEncryptionStatus,
+    migrateNote,
+    demigrateNote,
+    splitLegacyBlob,
     settingsStore,
     backend,
     dropboxConfigured: isDropboxConfigured(),
@@ -939,6 +1013,7 @@ export function useStorageBackend(): UseStorageBackend {
     folderReconnectNeeded,
     encryption,
     locked,
+    encryptionDisabling: disabling,
     selectBrowser,
     connectFolder,
     reconnectFolder,
@@ -949,6 +1024,7 @@ export function useStorageBackend(): UseStorageBackend {
     disconnectGdrive,
     enableEncryption,
     disableEncryption,
+    finishDisableEncryption,
     unlock,
     namespaces,
     activeNamespace,

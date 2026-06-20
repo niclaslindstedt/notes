@@ -169,6 +169,12 @@ const settings: SettingsCatalog = {
     encryptionStepDecrypting: "Dekrypterar dina anteckningar…",
     encryptionStepSaving: "Sparar dina anteckningar…",
     encryptionStepFinalizing: "Slutför…",
+    encryptingNote: "Krypterar ”{title}”…",
+    encryptingAttachment: "Krypterar ”{filename}” (bilaga till ”{title}”)…",
+    decryptingNote: "Dekrypterar ”{title}”…",
+    decryptingAttachment: "Dekrypterar ”{filename}” (bilaga till ”{title}”)…",
+    conversionCanClose:
+      "Du kan stänga inställningarna nu – det här slutförs i bakgrunden.",
     encryptionFailed: "Något gick fel. Tryck för att se loggen.",
     encryptionStatusAria: "Krypteringsförlopp",
     encryptionLogTitle: "Krypteringslogg",

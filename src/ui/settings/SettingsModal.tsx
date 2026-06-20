@@ -11,6 +11,7 @@ import {
 import { useDevMode } from "../../dev/useDevMode.ts";
 import { useT, type MessageKey, type TFunction } from "../../i18n/index.ts";
 import type { UseStorageBackend } from "../../storage/useStorageBackend.ts";
+import type { EncryptionConversionState } from "./EncryptionLogModal.tsx";
 import {
   commitAppearance,
   DEFAULT_APPEARANCE,
@@ -93,9 +94,10 @@ type Props = {
   open: boolean;
   onClose: () => void;
   storage: UseStorageBackend;
+  conversion: EncryptionConversionState;
 };
 
-export function SettingsModal({ open, onClose, storage }: Props) {
+export function SettingsModal({ open, onClose, storage, conversion }: Props) {
   const t = useT();
   const persisted = useAppearance();
   const { devMode, captureLogs } = useDevMode();
@@ -195,7 +197,9 @@ export function SettingsModal({ open, onClose, storage }: Props) {
             {activeTab === "editor" && (
               <EditorSection appearance={draft} onUpdate={update} />
             )}
-            {activeTab === "storage" && <StorageSection storage={storage} />}
+            {activeTab === "storage" && (
+              <StorageSection storage={storage} conversion={conversion} />
+            )}
             {activeTab === "developer" && <DeveloperSection />}
             {activeTab === "logs" && <LogsSection />}
           </div>
