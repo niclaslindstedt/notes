@@ -1,8 +1,8 @@
 import type { Widen } from "./_widen.ts";
 
 // Strings for the left navigation drawer — the floating toggle button, the
-// section headers (Namespaces / Notes / Edit), the note switcher (each note
-// by title, plus "new note" and the per-row delete), the namespace manage
+// section headers (Namespaces / Notes), the note switcher (each note by
+// title, plus "new note" and the per-row delete), the namespace manage
 // action, and the undo / redo edit actions.
 
 const nav = {
@@ -17,7 +17,6 @@ const nav = {
   showAll: "Show all",
   notesEmpty: "No notes yet.",
   deleteNote: "Delete note",
-  edit: "Edit",
   undo: "Undo",
   redo: "Redo",
   // The archive entry at the foot of the notes list and the page it opens.

@@ -49,8 +49,8 @@ import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
 //
 // Note rows support swipe-to-remove: a left swipe latches open a trash
 // button (see `useSwipeReveal`), and tapping it deletes straight away. The
-// deletion is recorded on the undo timeline (the Edit section's Undo brings
-// it back), so no confirming second tap is needed.
+// deletion is recorded on the undo timeline (the Undo button at the foot of
+// the drawer brings it back), so no confirming second tap is needed.
 
 // notes is open source; the "source" link points at its repository.
 const SOURCE_URL = "https://github.com/niclaslindstedt/notes";
@@ -294,26 +294,28 @@ export function SideMenu({
           close();
         }}
       />
-      <SectionHeader label={t("nav.edit")} border />
-      {/* Undo / redo keep the drawer open so a burst of reverts can be
-          applied without reopening it each time. */}
-      <NavItem
-        icon={<UndoIcon className="h-5 w-5" />}
-        label={t("nav.undo")}
-        active={false}
-        disabled={!canUndo}
-        onClick={onUndo}
-      />
-      <NavItem
-        icon={<RedoIcon className="h-5 w-5" />}
-        label={t("nav.redo")}
-        active={false}
-        disabled={!canRedo}
-        onClick={onRedo}
-      />
+      {/* Undo / redo: a pair of side-by-side buttons pinned to the foot of
+          the list (mt-auto), so they sit just above the footer's divider and
+          fall under the thumb. Two columns share one row to save vertical
+          space; each keeps the drawer open so a burst of reverts can be
+          applied without reopening it. */}
+      <div className="mt-auto flex gap-2 px-3 pt-3 pb-1">
+        <EditButton
+          icon={<UndoIcon className="h-5 w-5" />}
+          label={t("nav.undo")}
+          disabled={!canUndo}
+          onClick={onUndo}
+        />
+        <EditButton
+          icon={<RedoIcon className="h-5 w-5" />}
+          label={t("nav.redo")}
+          disabled={!canRedo}
+          onClick={onRedo}
+        />
+      </div>
       {/* The old top-right burger menu, pinned to the foot of the drawer
           with its order inverted so it reads bottom-up. */}
-      <div className="mt-auto flex flex-col border-t border-line [padding-top:calc(1.25rem_-_var(--density-row-py))]">
+      <div className="flex flex-col border-t border-line [padding-top:calc(1.25rem_-_var(--density-row-py))]">
         {donateUrl && (
           <MenuLink
             icon={<HeartIcon className="h-5 w-5 text-danger" />}
@@ -522,11 +524,44 @@ function NavItem({
   );
 }
 
+// Undo / redo render as a side-by-side pair rather than full-width rows so
+// the two fit on one line at the foot of the drawer. Each is a self-contained
+// bordered button (icon + label, centred) that dims and goes inert at the
+// ends of the timeline, where there is nothing to revert or re-apply.
+function EditButton({
+  icon,
+  label,
+  disabled = false,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex flex-1 items-center justify-center gap-2 rounded-md border border-line py-2.5 text-sm ${
+        disabled
+          ? "cursor-not-allowed text-muted opacity-40"
+          : "cursor-pointer text-fg hover:bg-surface-2 hover:text-fg-bright"
+      }`}
+    >
+      <span className={disabled ? "" : "text-muted"}>{icon}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
 // Wraps a drawer row with the same two-outcome swipe as the overview card:
 // a LEFT swipe latches it open to reveal a trailing trash button, and a RIGHT
 // swipe archives the note (see `useSwipeReveal`). Tapping the trash deletes
 // straight away — no confirming second tap, because the deletion is itself
-// undoable from the Edit section. Archiving fires straight from the gesture
+// undoable from the Undo button. Archiving fires straight from the gesture
 // too: it's undoable as well, and the note merely moves to the Archive view,
 // so it needs no confirm. The sliding foreground carries its own surface
 // background so it covers both actions while closed.
