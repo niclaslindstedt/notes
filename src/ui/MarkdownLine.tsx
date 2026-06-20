@@ -47,6 +47,7 @@ function renderInline(
             text={node.text}
             href={node.href}
             offset={node.offset}
+            bare={node.bare === true}
             // A bare URL may be trimmed for display; an explicit link's label
             // is the user's own text and is always shown verbatim.
             display={node.bare ? shortenUrl(node.text, shortenLinkChars) : null}
@@ -116,11 +117,15 @@ function LinkNode({
   text,
   href,
   offset,
+  bare,
   display,
 }: {
   text: string;
   href: string;
   offset: number;
+  // Whether this is a bare autolinked URL (its rendered text is the source) as
+  // opposed to an explicit `[label](url)` whose rendered text is the label.
+  bare: boolean;
   // The text to render in place of `text` — a shortened bare URL, or null to
   // show the source verbatim. The href and `data-src` keep the full URL.
   display: string | null;
@@ -137,9 +142,16 @@ function LinkNode({
   return (
     <a
       data-src={offset}
+      // A bare URL's display may be shortened, so its source length differs from
+      // the rendered text — `data-len` lets a selection map the end of the link
+      // back to the end of the full URL in the source (see `markdown-selection`).
+      data-len={bare ? text.length : undefined}
       href={href}
       target="_blank"
       rel="noreferrer noopener"
+      // Links are draggable by default, which would start a link drag-and-drop
+      // instead of a text selection when the user drags across the note.
+      draggable={false}
       onMouseDown={(e) => e.stopPropagation()}
       className="text-link underline underline-offset-2"
     >
