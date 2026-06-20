@@ -115,8 +115,9 @@ Honour these when naming a new file, key, or string.
 | **Edge swipe to open** / **swipe in from the edge**        | `useEdgeSwipeOpen` (`src/ui/hooks/useEdgeSwipeOpen.ts`). [→](overview.md#edge-swipe-to-open)                  |
 | **Disable swipe-back** / **swipe-back navigation** / **edge-swipe back/forward** | `useSuppressSwipeNavigation` (`src/ui/hooks/useSuppressSwipeNavigation.ts`). [→](overview.md#suppress-swipe-navigation) |
 | **Swipe the drawer closed** / **drag to close**            | `useDrawerSwipeClose` (`src/ui/hooks/useDrawerSwipeClose.ts`). [→](overview.md#drawer-swipe-to-close)         |
-| **Swipe to archive** / **swipe to delete** (note card)     | `useRowSwipe` (`src/ui/hooks/useRowSwipe.ts`). [→](overview.md#row-swipe)                                     |
-| **Swipe to remove** (sidebar row)                          | `useSwipeReveal` (`src/ui/hooks/useSwipeReveal.ts`). [→](overview.md#swipe-reveal-sidebar)                    |
+| **Swipe to archive** / **swipe to delete** (note card)     | `useRowSwipe` (`src/ui/hooks/useRowSwipe.ts`); desktop uses the right-click menu instead. [→](overview.md#row-swipe) |
+| **Swipe to remove** (sidebar row)                          | `useSwipeReveal` (`src/ui/hooks/useSwipeReveal.ts`); desktop uses the right-click menu instead. [→](overview.md#swipe-reveal-sidebar) |
+| **Right-click menu** / **context menu** / **row actions** (desktop) | `RowActionMenu` (`src/ui/RowActionMenu.tsx`); built on `FloatingPanel`. [→](overview.md#right-click-menu) |
 | **Pull to refresh** / **pull down to sync**                | `usePullToRefresh` (`src/ui/hooks/usePullToRefresh.ts`); `PullToRefreshIndicator` (`src/ui/PullToRefreshIndicator.tsx`). [→](overview.md#pull-to-refresh) |
 | **Pinned sidebar** / **docked on tablet** / **media query** | `pinned` in `nav-context.ts`; `useMediaQuery` (`src/ui/hooks/useMediaQuery.ts`). [→](overview.md#pinned-sidebar) |
 | **Viewport height** / **soft-keyboard height**             | `useViewportHeight` (`src/ui/hooks/useViewportHeight.ts`); `appViewportRect` (`src/ui/appViewportRect.ts`). [→](overview.md#viewport-height) |

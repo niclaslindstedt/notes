@@ -49,6 +49,7 @@ import {
   TrashIcon,
 } from "../ui/icons.tsx";
 import { CopyNoteButton } from "../ui/CopyNoteButton.tsx";
+import { RowActionMenu } from "../ui/RowActionMenu.tsx";
 import { RenderedLine } from "../ui/MarkdownLine.tsx";
 import { AttachmentsEndBlock } from "../ui/attachments/AttachmentsEndBlock.tsx";
 import { AttachmentsProvider } from "../ui/attachments/AttachmentsProvider.tsx";
@@ -590,8 +591,30 @@ function SwipeableNoteCard({
   primaryIcon: ReactNode;
 }) {
   const t = useT();
+  const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
   const primary = useCallback(() => onPrimary(), [onPrimary]);
   const swipe = useRowSwipe(primary);
+
+  // On a computer, swipe gestures give way to a right-click menu of the same
+  // actions (see `RowActionMenu`); the card itself opens on a plain click.
+  if (isDesktop) {
+    return (
+      <RowActionMenu
+        ariaLabel={t("app.noteActions")}
+        actions={[
+          { label: primaryLabel, icon: primaryIcon, onSelect: onPrimary },
+          {
+            label: t("app.delete"),
+            icon: <TrashIcon className="h-4 w-4" />,
+            onSelect: onDelete,
+            danger: true,
+          },
+        ]}
+      >
+        <NoteCard note={note} onOpen={onOpen} />
+      </RowActionMenu>
+    );
+  }
 
   return (
     <div className="relative overflow-hidden rounded-[var(--radius)]">

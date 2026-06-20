@@ -8,7 +8,9 @@ import { APP_VIEWPORT_RECT } from "./appViewportRect.ts";
 import { useNav } from "./nav-context.ts";
 import { useDraggableMenuButton } from "./hooks/useDraggableMenuButton.ts";
 import { useDrawerSwipeClose } from "./hooks/useDrawerSwipeClose.ts";
+import { useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSwipeReveal } from "./hooks/useSwipeReveal.ts";
+import { RowActionMenu } from "./RowActionMenu.tsx";
 import {
   ArchiveIcon,
   CheckIcon,
@@ -582,11 +584,38 @@ function SwipeToRemove({
   onArchive: () => void;
   children: ReactNode;
 }) {
+  const t = useT();
+  const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
   const swipe = useSwipeReveal(REMOVE_ACTION_W, onArchive);
 
   function act() {
     swipe.close();
     void onRemove();
+  }
+
+  // On a computer the swipe gestures give way to a right-click menu of the
+  // same actions (see `RowActionMenu`); a plain click still selects the note.
+  if (isDesktop) {
+    return (
+      <RowActionMenu
+        ariaLabel={t("app.noteActions")}
+        actions={[
+          {
+            label: archiveLabel,
+            icon: <ArchiveIcon className="h-5 w-5" />,
+            onSelect: onArchive,
+          },
+          {
+            label: actionLabel,
+            icon: <TrashIcon className="h-5 w-5" />,
+            onSelect: () => void onRemove(),
+            danger: true,
+          },
+        ]}
+      >
+        {children}
+      </RowActionMenu>
+    );
   }
 
   return (

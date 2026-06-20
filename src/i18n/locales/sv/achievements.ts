@@ -133,7 +133,7 @@ const achievements: AchievementsCatalog = {
       name: "Arkivarie",
       condition: "Arkivera en anteckning.",
       learnMore:
-        "Svep en anteckning åt höger i översikten för att arkivera den — den lämnar listan utan att tas bort. Hitta arkiverade anteckningar under Arkiv i sidomenyn, där du kan återställa eller ta bort dem permanent.",
+        "Svep en anteckning åt höger i översikten för att arkivera den — eller högerklicka på den på en dator — så lämnar den listan utan att tas bort. Hitta arkiverade anteckningar under Arkiv i sidomenyn, där du kan återställa eller ta bort dem permanent.",
     },
     compartments: {
       name: "Fack",
@@ -152,6 +152,12 @@ const achievements: AchievementsCatalog = {
       condition: "Dra och släpp en Markdown-fil i appen.",
       learnMore:
         "På datorn kan du släppa en eller flera Markdown-filer var som helst på fönstret så blir varje fil en anteckning — filnamnet blir titeln och innehållet fyller anteckningen.",
+    },
+    rightClick: {
+      name: "Kontextväxling",
+      condition: "Öppna en antecknings högerklicksmeny.",
+      learnMore:
+        "På en dator kan du högerklicka på en anteckning — i översikten eller sidomenyn — för en snabb meny med dess åtgärder: arkivera (eller återställ från Arkiv-vyn) och ta bort. Det är datormotsvarigheten till svepgesterna du använder på en pekskärm.",
     },
     copycat: {
       name: "Kopiekatt",

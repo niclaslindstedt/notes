@@ -139,7 +139,7 @@ const achievements = {
       name: "Archivist",
       condition: "Archive a note.",
       learnMore:
-        "Swipe a note right in the overview to archive it — it leaves the list without being deleted. Find archived notes under Archive in the side menu, where you can restore or remove them for good.",
+        "Swipe a note right in the overview to archive it — or right-click it on a computer — and it leaves the list without being deleted. Find archived notes under Archive in the side menu, where you can restore or remove them for good.",
     },
     compartments: {
       name: "Compartments",
@@ -158,6 +158,12 @@ const achievements = {
       condition: "Drag and drop a Markdown file into the app.",
       learnMore:
         "On desktop, drop one or more Markdown files anywhere on the window and each becomes a note — the file's name turns into the title and its contents fill the body.",
+    },
+    rightClick: {
+      name: "Context switch",
+      condition: "Open a note's right-click menu.",
+      learnMore:
+        "On a computer, right-click a note — in the overview or the side menu — for a quick menu of its actions: archive (or restore from the Archive view), and delete. It's the desktop counterpart to the swipe gestures you'd use on a touchscreen.",
     },
     copycat: {
       name: "Copycat",

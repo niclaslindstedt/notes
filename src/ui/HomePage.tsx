@@ -86,7 +86,8 @@ export function HomePage() {
               Swipe a note right — in the overview or the side menu — to{" "}
               <em>archive</em> it: it leaves the list without being deleted, and
               you can restore it from the Archive view. Swipe left to uncover a
-              quick Delete.
+              quick Delete. On a computer, right-click a note instead for a menu
+              of the same actions.
             </li>
             <li>
               Undo and redo your changes — bring back a deleted or archived note
