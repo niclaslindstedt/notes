@@ -320,3 +320,60 @@ describe("directory adapter — atomic representation switch", () => {
     expect([...files.keys()].some((p) => p.endsWith(".md"))).toBe(false);
   });
 });
+
+describe("directory adapter — paced per-note migration", () => {
+  it("merges plaintext remnants on load and reports per-note status", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const ref = { current: null as string | null };
+    // Two plaintext notes.
+    await encAdapter(store, att, ref).save(
+      serialize({ notes: [noteWithImage(1).note, noteWithImage(2).note] }),
+    );
+
+    // Turn encryption on (mode flips; nothing converted yet).
+    ref.current = "pw";
+    const a = encAdapter(store, att, ref);
+    const loaded = parse((await a.load())!.text);
+    // Both notes are present (merged remnants) and both report pending.
+    expect(loaded.notes).toHaveLength(2);
+    const status = a.getEncryptionStatus!();
+    expect([...status.values()].every((s) => s === "pending")).toBe(true);
+  });
+
+  it("migrateNote converts one note atomically and flips its status", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const ref = { current: null as string | null };
+    await encAdapter(store, att, ref).save(
+      serialize({ notes: [noteWithImage(1).note] }),
+    );
+
+    ref.current = "pw";
+    const a = encAdapter(store, att, ref);
+    const loaded = parse((await a.load())!.text);
+    const note = loaded.notes[0]!;
+    expect(a.getEncryptionStatus!().get(note.id)).toBe("pending");
+
+    const did = await a.migrateNote!(note);
+    expect(did).toBe(true);
+    expect(a.getEncryptionStatus!().get(note.id)).toBe("encrypted");
+
+    // On disk: the plaintext is gone, an encrypted note file + opaque blob
+    // remain, and the bytes still decrypt to the original.
+    expect([...store.files.keys()].some((p) => p.endsWith(".md"))).toBe(false);
+    expect(
+      [...store.files.keys()].filter((p) => p.endsWith(".enc")),
+    ).toHaveLength(1);
+    expect([...att.files.keys()][0]).not.toContain("/");
+
+    const after = encAdapter(store, att, ref);
+    const reloaded = parse((await after.load())!.text).notes[0]!;
+    expect(after.getEncryptionStatus!().get(reloaded.id)).toBe("encrypted");
+    const got = await after.fetchAttachment!(reloaded, "abcd1234-pic.png");
+    expect([...got!.bytes]).toEqual([72, 101, 108, 108, 111]);
+
+    // Migrating again is an idempotent no-op.
+    expect(await after.migrateNote!(reloaded)).toBe(false);
+  });
+});

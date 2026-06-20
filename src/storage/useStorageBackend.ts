@@ -122,6 +122,10 @@ export interface UseStorageBackend {
    * when the attachment isn't found.
    */
   fetchAttachment: (note: Note, filename: string) => Promise<string | null>;
+  /** The active adapter's per-note at-rest encryption status, if it tracks it. */
+  getEncryptionStatus?: () => Map<string, "encrypted" | "pending">;
+  /** Convert one note to encrypted at rest (idempotent), if supported. */
+  migrateNote?: (note: Note) => Promise<boolean>;
   /**
    * The active backend's root settings store — `settings.json` at the
    * app-folder root, stored as plaintext JSON even when the notes are
@@ -919,6 +923,8 @@ export function useStorageBackend(): UseStorageBackend {
   return {
     adapter,
     fetchAttachment,
+    getEncryptionStatus: adapter.getEncryptionStatus?.bind(adapter),
+    migrateNote: adapter.migrateNote?.bind(adapter),
     settingsStore,
     backend,
     dropboxConfigured: isDropboxConfigured(),

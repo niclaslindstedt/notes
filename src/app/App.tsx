@@ -44,6 +44,7 @@ import { useViewportHeight } from "../ui/hooks/useViewportHeight.ts";
 import {
   ArchiveIcon,
   ArrowLeftIcon,
+  LockIcon,
   NotesMarkIcon,
   RestoreIcon,
   TrashIcon,
@@ -70,6 +71,7 @@ import { AchievementsUnlockModalHost } from "./modals/AchievementsUnlockModalHos
 import { ChangelogModalHost } from "./modals/ChangelogModalHost.tsx";
 import { NamespacesModalHost } from "./modals/NamespacesModalHost.tsx";
 import { SettingsModalHost } from "./modals/SettingsModalHost.tsx";
+import { useEncryptionMigration } from "./use-encryption-migration.ts";
 import { useNavState } from "./use-nav.ts";
 import { useNotes } from "./use-notes.ts";
 import { useSettingsSync } from "./use-settings-sync.ts";
@@ -143,6 +145,20 @@ export function App() {
   // the read-only one.
   const [readingId, setReadingId] = useState<string | null>(null);
   const nav = useNavState();
+
+  // Background encryption migration + per-note status for the green lock. When
+  // encryption is on (file/cloud backend, unlocked), this seals each note's
+  // files in the background — paced so it doesn't burst the cloud API — and
+  // reports which notes are fully encrypted so the lock fills in note-by-note.
+  const encStatus = useEncryptionMigration({
+    enabled:
+      storage.encryption === "encrypted" &&
+      !storage.locked &&
+      storage.backend !== "browser",
+    notes: sync.doc.notes,
+    getStatus: storage.getEncryptionStatus,
+    migrateNote: storage.migrateNote,
+  });
 
   // When the floating button is hidden (only possible in the standalone
   // mobile PWA), an inward swipe from the drawer's resting edge opens it.
@@ -396,6 +412,7 @@ export function App() {
               namespaces={storage.namespaces}
               activeNamespace={storage.activeNamespace}
               onSwitchNamespace={switchNamespace}
+              encStatus={encStatus}
             />
             <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
               {editing ? (
@@ -437,6 +454,7 @@ export function App() {
                   onArchive={archiveNote}
                   onDelete={removeNote}
                   syncSlot={syncSlot}
+                  encStatus={encStatus}
                 />
               )}
             </main>
@@ -467,6 +485,7 @@ function NoteList({
   onArchive,
   onDelete,
   syncSlot,
+  encStatus,
 }: {
   notes: Note[];
   onOpen: (id: string) => void;
@@ -474,6 +493,7 @@ function NoteList({
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
   syncSlot: ReactNode;
+  encStatus?: Map<string, "encrypted" | "pending">;
 }) {
   const t = useT();
   // With no notes yet, pressing Enter (a physical keyboard, so desktop) starts
@@ -514,6 +534,7 @@ function NoteList({
                   onDelete={() => onDelete(note.id)}
                   primaryLabel={t("app.archive")}
                   primaryIcon={<ArchiveIcon className="h-4 w-4" />}
+                  encrypted={encStatus?.get(note.id) === "encrypted"}
                 />
               </li>
             ))}
@@ -533,7 +554,17 @@ function NoteList({
   );
 }
 
-function NoteCard({ note, onOpen }: { note: Note; onOpen: () => void }) {
+function NoteCard({
+  note,
+  onOpen,
+  encrypted = false,
+}: {
+  note: Note;
+  onOpen: () => void;
+  /** Show the green lock — the note + all its attachments are encrypted at rest. */
+  encrypted?: boolean;
+}) {
+  const t = useT();
   const preview = notePreview(note);
   return (
     <button
@@ -541,7 +572,15 @@ function NoteCard({ note, onOpen }: { note: Note; onOpen: () => void }) {
       onClick={onOpen}
       className="w-full rounded-[var(--radius)] border border-line bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-2"
     >
-      <p className="truncate font-medium text-fg-bright">{noteTitle(note)}</p>
+      <p className="flex items-center gap-1.5 font-medium text-fg-bright">
+        <span className="truncate">{noteTitle(note)}</span>
+        {encrypted && (
+          <>
+            <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
+            <span className="sr-only">{t("app.encryptedNote")}</span>
+          </>
+        )}
+      </p>
       {preview && (
         <p className="mt-0.5 truncate text-sm text-muted">{preview}</p>
       )}
@@ -563,6 +602,7 @@ function SwipeableNoteCard({
   onDelete,
   primaryLabel,
   primaryIcon,
+  encrypted = false,
 }: {
   note: Note;
   onOpen: () => void;
@@ -573,6 +613,8 @@ function SwipeableNoteCard({
   primaryLabel: string;
   /** Backdrop icon revealed by the swipe-right gesture. */
   primaryIcon: ReactNode;
+  /** Show the green lock — the note is encrypted at rest. */
+  encrypted?: boolean;
 }) {
   const t = useT();
   const primary = useCallback(() => onPrimary(), [onPrimary]);
@@ -617,7 +659,7 @@ function SwipeableNoteCard({
           swipe.animating ? "transition-transform duration-200" : ""
         }`}
       >
-        <NoteCard note={note} onOpen={onOpen} />
+        <NoteCard note={note} onOpen={onOpen} encrypted={encrypted} />
       </div>
     </div>
   );

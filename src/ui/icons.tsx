@@ -695,6 +695,26 @@ export function ArchiveIcon({ className }: IconProps) {
   );
 }
 
+/** A closed padlock — a note fully encrypted at rest. */
+export function LockIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <rect x="4" y="11" width="16" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
 /** A counter-clockwise arrow over a circle — restore an archived note. */
 export function RestoreIcon({ className }: IconProps) {
   return (

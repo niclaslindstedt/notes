@@ -284,6 +284,13 @@ export function createDirectoryAdapter(
   let attachmentsTouched = false;
   const uncertain = new Set<string>();
 
+  // Per-note at-rest encryption status from the last encrypted load: a note is
+  // "encrypted" once its `.enc` file exists and none of its attachments linger
+  // as a plaintext file; "pending" while a plaintext remnant remains (an
+  // in-progress migration). Drives the green lock in the UI.
+  type NoteEncStatus = "encrypted" | "pending";
+  let encStatus = new Map<string, NoteEncStatus>();
+
   // Session keys, derived once per passphrase. The key-params file is read (or
   // created) the first time encryption is active, so every device shares salts.
   let keyCache: { password: string; keys: SessionKeys } | null = null;
@@ -395,9 +402,13 @@ export function createDirectoryAdapter(
   ): Promise<string | null> {
     const revisions = currentRevisions(entries);
     const encPaths = entries.map((e) => e.path).filter(isEncNotePath);
-    if (encPaths.length === 0) {
-      // A legacy whole-document envelope: decrypt it with the passphrase so the
-      // document survives. The next save rewrites it as per-file `.enc`.
+    const mdPaths = entries.map((e) => e.path).filter(isMarkdownPath);
+    const status = new Map<string, NoteEncStatus>();
+
+    // No per-file notes yet: a legacy whole-document envelope is decrypted with
+    // the passphrase so the document survives; the next save rewrites it
+    // per-file. Otherwise nothing is stored.
+    if (encPaths.length === 0 && mdPaths.length === 0) {
       if (entries.some((e) => e.path === BLOB_FILE_NAME)) {
         const blob = await store.read(BLOB_FILE_NAME);
         const password = crypto?.passwordRef.current;
@@ -407,9 +418,13 @@ export function createDirectoryAdapter(
         }
         return blob;
       }
+      encStatus = status;
       return null;
     }
+
     const notes: Note[] = [];
+    const seen = new Set<string>();
+    // Encrypted notes (already migrated).
     for (const path of encPaths) {
       const text = await store.read(path);
       if (text === null) continue;
@@ -417,13 +432,79 @@ export function createDirectoryAdapter(
       const json = new TextDecoder().decode(opened.bytes);
       track(path, json, revisions.get(path));
       const note = encJsonToNote(json);
-      if (note) notes.push(note);
+      if (note) {
+        notes.push(note);
+        seen.add(note.id);
+        status.set(note.id, "encrypted");
+      }
     }
-    // Attachments are NOT read here — a note loads with its attachments'
-    // metadata only and the bytes are fetched on demand (see `fetchAttachment`)
-    // when the note is opened, so the list loads without every note's images.
-    if (notes.some((n) => n.attachments?.length)) attachmentsTouched = true;
+    // Plaintext remnants from an in-progress migration: merge any note not yet
+    // present from the encrypted set, so the document stays complete (and the
+    // migration is resumable) mid-flight.
+    if (mdPaths.length > 0) {
+      const files = await Promise.all(
+        mdPaths.map(async (path) => ({
+          path,
+          text: (await store.read(path)) ?? "",
+        })),
+      );
+      for (const f of files) track(f.path, f.text, revisions.get(f.path));
+      for (const note of filesToSnapshot(files).notes) {
+        if (!seen.has(note.id)) {
+          notes.push(note);
+          status.set(note.id, "pending");
+        }
+      }
+    }
+
+    // Attachments are read on demand, not here — but their metadata + per-note
+    // status is filled in from the file listing.
+    await attachEncryptedMetadata(notes, status);
+    encStatus = status;
     return serialize({ notes });
+  }
+
+  // Fill in attachment metadata (filename + mime) for the loaded notes and
+  // downgrade any note still holding a plaintext attachment file to "pending".
+  // Encrypted notes already carry their attachment metadata (from the note
+  // file); plaintext remnants get theirs from the attachment listing.
+  async function attachEncryptedMetadata(
+    notes: Note[],
+    status: Map<string, NoteEncStatus>,
+  ): Promise<void> {
+    if (!attachments) return;
+    let entries: { path: string }[];
+    try {
+      entries = await attachments.list();
+    } catch (err) {
+      log.warn(`${options.id} load: listing enc attachments failed`, err);
+      return;
+    }
+    if (entries.length === 0) return;
+    attachmentsTouched = true;
+    // Plaintext attachment files still on disk, grouped by note stem.
+    const plaintextByStem = new Map<string, string[]>();
+    for (const entry of entries) {
+      if (!isPlaintextAttachmentPath(entry.path)) continue;
+      const stem = stemOfAttachmentPath(entry.path);
+      const list = plaintextByStem.get(stem) ?? [];
+      list.push(entry.path);
+      plaintextByStem.set(stem, list);
+    }
+    for (const note of notes) {
+      const stem = noteFileStem(note);
+      const plaintext = plaintextByStem.get(stem);
+      if (plaintext && plaintext.length > 0) {
+        // A plaintext attachment file lingers → the note isn't fully encrypted.
+        status.set(note.id, "pending");
+        if (!note.attachments) {
+          note.attachments = plaintext.map((p) => {
+            const filename = p.slice(stem.length + 1);
+            return { filename, mime: mimeForFilename(filename) };
+          });
+        }
+      }
+    }
   }
 
   async function load(
@@ -875,6 +956,73 @@ export function createDirectoryAdapter(
     return { mime: mimeForFilename(filename), bytes };
   }
 
+  // Per-note at-rest encryption status from the last load. Empty in plaintext
+  // mode (no locks shown).
+  function getEncryptionStatus(): Map<string, NoteEncStatus> {
+    return new Map(encStatus);
+  }
+
+  // Convert ONE note from plaintext to its encrypted per-file form, atomically:
+  // seal each attachment's bytes into its opaque blob, write + verify the
+  // encrypted note file, then remove the superseded plaintext `.md` and
+  // attachment files. Idempotent — a note already migrated is a no-op. This is
+  // the unit the paced migration queue drives, so a large conversion never
+  // bursts the cloud API. Returns true when this call did work.
+  async function migrateNote(note: Note): Promise<boolean> {
+    const keys = await ensureKeys();
+    if (!keys) return false;
+    const stem = noteFileStem(note);
+    const mdPath = `${stem}.md`;
+    // Already migrated (no plaintext note file left)?
+    if ((await store.read(mdPath)) === null) {
+      encStatus.set(note.id, "encrypted");
+      return false;
+    }
+
+    // 1. Seal each attachment's bytes from its plaintext file into a blob.
+    if (attachments) {
+      for (const a of note.attachments ?? []) {
+        const blobPath = await attBlobPath(keys, note.id, a.filename);
+        if ((await attachments.read(blobPath)) !== null) continue;
+        const bytes = await attachments.read(attachmentPath(stem, a.filename));
+        if (!bytes) continue;
+        const blob = await sealBytes(keys.contentKey, bytes, {
+          mime: a.mime,
+          filename: a.filename,
+        });
+        await attachments.write(blobPath, blob, "application/octet-stream");
+      }
+    }
+
+    // 2. Write + verify the encrypted note file.
+    const encPath = await encNotePath(keys, note.id);
+    const source = noteToEncJson(note);
+    const rev = await store.write(
+      encPath,
+      await sealString(keys.contentKey, source),
+    );
+    track(encPath, source, rev);
+    const readBack = await store.read(encPath);
+    if (readBack === null) throw new Error("migrate: enc note missing");
+    const opened = await openString(keys.contentKey, readBack);
+    if (new TextDecoder().decode(opened.bytes) !== source) {
+      throw new Error("migrate: verify mismatch");
+    }
+
+    // 3. Remove the superseded plaintext only after the ciphertext is proven.
+    await store.remove(mdPath);
+    tracked.delete(mdPath);
+    if (attachments) {
+      for (const a of note.attachments ?? []) {
+        await attachments
+          .remove(attachmentPath(stem, a.filename))
+          .catch(() => {});
+      }
+    }
+    encStatus.set(note.id, "encrypted");
+    return true;
+  }
+
   const capabilities = new Set<AdapterCapability>();
   if (attachments) capabilities.add("attachments");
 
@@ -886,5 +1034,7 @@ export function createDirectoryAdapter(
     load,
     save,
     fetchAttachment,
+    getEncryptionStatus,
+    migrateNote,
   };
 }

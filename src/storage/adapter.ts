@@ -97,6 +97,17 @@ export type StorageAdapter = {
     filename: string,
   ): Promise<{ mime: string; bytes: Uint8Array } | null>;
 
+  // Per-note at-rest encryption status from the last load — "encrypted" once a
+  // note and all its attachments are sealed, "pending" while an in-progress
+  // migration still has a plaintext remnant. Drives the green lock. Empty/absent
+  // when encryption is off.
+  getEncryptionStatus?(): Map<string, "encrypted" | "pending">;
+
+  // Convert one note from plaintext to its encrypted per-file form, atomically
+  // and idempotently. The paced migration queue calls this per note so a large
+  // conversion doesn't burst the cloud API. Returns true when work was done.
+  migrateNote?(note: Note): Promise<boolean>;
+
   // Milliseconds to wait after the last edit before pushing a save. Defaults
   // to 0 (save immediately) — right for localStorage. Cloud adapters set
   // this around a second to coalesce keystrokes into one request.

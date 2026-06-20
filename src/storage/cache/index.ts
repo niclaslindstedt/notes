@@ -255,5 +255,13 @@ export function withLocalCache(
     fetchAttachment: inner.fetchAttachment
       ? (note, filename) => inner.fetchAttachment!(note, filename)
       : undefined,
+
+    getEncryptionStatus: inner.getEncryptionStatus
+      ? () => inner.getEncryptionStatus!()
+      : undefined,
+
+    migrateNote: inner.migrateNote
+      ? (note) => inner.migrateNote!(note)
+      : undefined,
   };
 }

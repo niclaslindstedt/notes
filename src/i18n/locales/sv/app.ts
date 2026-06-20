@@ -19,6 +19,7 @@ const app: AppCatalog = {
     label: "Kopiera anteckning",
     copied: "Kopierat",
   },
+  encryptedNote: "Krypterad i vila",
 };
 
 export default app;
