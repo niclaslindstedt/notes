@@ -129,6 +129,18 @@ the body explicitly; it reads the parsed blocks from `classifyLines`
 (`src/domain/markdown.ts`) and honours the `EditorSettings` (word-wrap,
 spell-check, autocorrect, margin width).
 
+**Opening a note shows it fully formatted.** The active line is nullable
+(`active: number | null`), and an existing note opens with *no* line active
+(the app passes `focusOnMount={false}`), so every line — last one included —
+renders as Markdown and there is no raw textarea until the user actually places
+the caret. This is what keeps a note's final line (or its only line) from
+opening as plain source, and on mobile it keeps the soft keyboard down until a
+deliberate tap. A line goes active only on a click (`activateAt` /
+`activateEnd`) or when the title field hands focus down through the editor's
+imperative `focus()` handle (`MarkdownEditorHandle`, consumed by `focusBody` in
+`App`) on Enter / Arrow-Down. A brand-new empty note shows the "Start writing"
+placeholder on the blank rendered line instead of a textarea.
+
 Clicking the empty space below the note (`activateEnd`) always lands the caret
 on a blank line at the very bottom, **appending one when the document doesn't
 already end in a newline**. Without that trailing blank line the click would

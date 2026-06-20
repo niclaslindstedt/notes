@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { createRef } from "react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { MarkdownEditor } from "../../src/ui/MarkdownEditor.tsx";
+import {
+  MarkdownEditor,
+  type MarkdownEditorHandle,
+} from "../../src/ui/MarkdownEditor.tsx";
 
 function renderEditor(body: string) {
   const onChange = vi.fn();
@@ -234,5 +238,72 @@ describe("MarkdownEditor", () => {
     expect(screen.getByText("from another device")).not.toBeNull();
     // Adopting a remote change must not be reported back as a local edit.
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  // Opening an existing note (the app always passes focusOnMount={false}) must
+  // not drop a raw textarea on the last line — every line, last one included,
+  // renders as formatted Markdown until the user actually clicks to edit.
+  describe("opening without focus (focusOnMount=false)", () => {
+    function renderClosed(body: string) {
+      const onChange = vi.fn();
+      const utils = render(
+        <MarkdownEditor
+          body={body}
+          onChange={onChange}
+          focusOnMount={false}
+          {...editorProps}
+        />,
+      );
+      return { onChange, ...utils };
+    }
+
+    it("renders the whole note formatted with no active textarea on open", () => {
+      renderClosed("**bold**\nplain");
+      // No line is active, so there is no textarea at all.
+      expect(screen.queryByRole("textbox")).toBeNull();
+      // Both lines — including the last — render as formatted Markdown.
+      expect(screen.getByText("bold").closest("strong")).not.toBeNull();
+      expect(screen.getByText("plain")).not.toBeNull();
+    });
+
+    it("renders a single-line note formatted on open", () => {
+      // The "or first if only one line" case from the report: a lone content
+      // line must not open as a raw textarea — it stays a formatted heading.
+      renderClosed("# Heading");
+      expect(screen.queryByRole("textbox")).toBeNull();
+      // The heading text renders, and not inside the raw-source textarea.
+      const heading = screen.getByText("Heading");
+      expect(heading).not.toBeNull();
+      expect(heading.closest("textarea")).toBeNull();
+    });
+
+    it("enters edit mode on the clicked line, leaving the rest formatted", () => {
+      renderClosed("**bold**\nplain");
+      fireEvent.mouseDown(screen.getByText("plain"));
+      // The clicked line is now the raw textarea; the other stays formatted.
+      expect(activeTextarea().value).toBe("plain");
+      expect(screen.getByText("bold").closest("strong")).not.toBeNull();
+    });
+
+    it("opens edit mode at the end via the imperative focus handle", () => {
+      const ref = createRef<MarkdownEditorHandle>();
+      const onChange = vi.fn();
+      render(
+        <MarkdownEditor
+          ref={ref}
+          body={"line one\nline two"}
+          onChange={onChange}
+          focusOnMount={false}
+          {...editorProps}
+        />,
+      );
+      expect(screen.queryByRole("textbox")).toBeNull();
+      // The title hands focus down: like clicking the empty space below, the
+      // editor lands the caret on a fresh blank line at the end of the note.
+      act(() => ref.current!.focus());
+      expect(activeTextarea().value).toBe(SENTINEL);
+      // Placing the caret is not an edit — the trailing newline stays local.
+      expect(onChange).not.toHaveBeenCalled();
+    });
   });
 });
