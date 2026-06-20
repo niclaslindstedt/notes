@@ -20,8 +20,11 @@ type UpdateAppearance = <K extends keyof Appearance>(
 ) => void;
 
 // The Editor settings tab: how the note-writing surface lays out (margins,
-// word wrap) and whether it renders Markdown live as you type. Each control
-// applies immediately through the appearance store, like the other tabs.
+// word wrap) and whether it renders Markdown live as you type. Split into
+// focused bordered sections (mirroring the General tab) so the controls group
+// by what they affect — new notes, the writing column, Markdown rendering,
+// typing aids, and copying. Each control applies immediately through the
+// appearance store, like the other tabs.
 export function EditorSection({
   appearance,
   onUpdate,
@@ -52,68 +55,87 @@ export function EditorSection({
   };
 
   return (
-    <Section title={t("settings.editor.title")}>
-      <Field label={t("settings.editor.defaultTitle")}>
-        <SegmentedRow<DefaultTitleScheme>
-          ariaLabel={t("settings.editor.defaultTitle")}
-          value={editor.defaultTitle}
-          options={DEFAULT_TITLE_SCHEMES.map((s) => ({
-            value: s,
-            label: titleSchemeLabel[s],
-          }))}
-          onChange={(v) => update("defaultTitle", v)}
+    <>
+      <Section title={t("settings.editor.newNotesTitle")}>
+        <Field label={t("settings.editor.defaultTitle")}>
+          <SegmentedRow<DefaultTitleScheme>
+            ariaLabel={t("settings.editor.defaultTitle")}
+            value={editor.defaultTitle}
+            options={DEFAULT_TITLE_SCHEMES.map((s) => ({
+              value: s,
+              label: titleSchemeLabel[s],
+            }))}
+            onChange={(v) => update("defaultTitle", v)}
+          />
+          <p className="text-xs text-muted">
+            {t("settings.editor.defaultTitleHint")}
+          </p>
+        </Field>
+      </Section>
+
+      <Section title={t("settings.editor.layoutTitle")}>
+        <Field label={t("settings.editor.margins")}>
+          <SegmentedRow<EditorMargin>
+            ariaLabel={t("settings.editor.margins")}
+            value={editor.margin}
+            options={EDITOR_MARGINS.map((m) => ({
+              value: m.id,
+              label: m.label,
+            }))}
+            onChange={(v) => update("margin", v)}
+          />
+          <p className="text-xs text-muted">
+            {t("settings.editor.marginsHint")}
+          </p>
+        </Field>
+        <ToggleRow
+          label={t("settings.editor.wordWrap")}
+          hint={t("settings.editor.wordWrapHint")}
+          checked={editor.wordWrap}
+          onChange={(v) => update("wordWrap", v)}
         />
-        <p className="text-xs text-muted">
-          {t("settings.editor.defaultTitleHint")}
-        </p>
-      </Field>
-      <Field label={t("settings.editor.margins")}>
-        <SegmentedRow<EditorMargin>
-          ariaLabel={t("settings.editor.margins")}
-          value={editor.margin}
-          options={EDITOR_MARGINS.map((m) => ({ value: m.id, label: m.label }))}
-          onChange={(v) => update("margin", v)}
+      </Section>
+
+      <Section title={t("settings.editor.markdownTitle")}>
+        <ToggleRow
+          label={t("settings.editor.renderMarkdown")}
+          hint={t("settings.editor.renderMarkdownHint")}
+          checked={editor.renderMarkdown}
+          onChange={(v) => update("renderMarkdown", v)}
         />
-        <p className="text-xs text-muted">{t("settings.editor.marginsHint")}</p>
-      </Field>
-      <ToggleRow
-        label={t("settings.editor.wordWrap")}
-        hint={t("settings.editor.wordWrapHint")}
-        checked={editor.wordWrap}
-        onChange={(v) => update("wordWrap", v)}
-      />
-      <ToggleRow
-        label={t("settings.editor.renderMarkdown")}
-        hint={t("settings.editor.renderMarkdownHint")}
-        checked={editor.renderMarkdown}
-        onChange={(v) => update("renderMarkdown", v)}
-      />
-      <ToggleRow
-        label={t("settings.editor.disableSpellcheck")}
-        hint={t("settings.editor.disableSpellcheckHint")}
-        checked={editor.disableSpellcheck}
-        onChange={(v) => update("disableSpellcheck", v)}
-      />
-      <ToggleRow
-        label={t("settings.editor.disableAutocorrect")}
-        hint={t("settings.editor.disableAutocorrectHint")}
-        checked={editor.disableAutocorrect}
-        onChange={(v) => update("disableAutocorrect", v)}
-      />
-      <Field label={t("settings.editor.copyScope")}>
-        <SelectPicker<CopyScope>
-          value={editor.copyScope}
-          options={COPY_SCOPES.map((s) => ({
-            value: s,
-            label: copyScopeLabel[s],
-          }))}
-          onChange={(v) => update("copyScope", v)}
-          ariaLabel={t("settings.editor.copyScope")}
+      </Section>
+
+      <Section title={t("settings.editor.typingTitle")}>
+        <ToggleRow
+          label={t("settings.editor.disableSpellcheck")}
+          hint={t("settings.editor.disableSpellcheckHint")}
+          checked={editor.disableSpellcheck}
+          onChange={(v) => update("disableSpellcheck", v)}
         />
-        <p className="text-xs text-muted">
-          {t("settings.editor.copyScopeHint")}
-        </p>
-      </Field>
-    </Section>
+        <ToggleRow
+          label={t("settings.editor.disableAutocorrect")}
+          hint={t("settings.editor.disableAutocorrectHint")}
+          checked={editor.disableAutocorrect}
+          onChange={(v) => update("disableAutocorrect", v)}
+        />
+      </Section>
+
+      <Section title={t("settings.editor.copyTitle")}>
+        <Field label={t("settings.editor.copyScope")}>
+          <SelectPicker<CopyScope>
+            value={editor.copyScope}
+            options={COPY_SCOPES.map((s) => ({
+              value: s,
+              label: copyScopeLabel[s],
+            }))}
+            onChange={(v) => update("copyScope", v)}
+            ariaLabel={t("settings.editor.copyScope")}
+          />
+          <p className="text-xs text-muted">
+            {t("settings.editor.copyScopeHint")}
+          </p>
+        </Field>
+      </Section>
+    </>
   );
 }

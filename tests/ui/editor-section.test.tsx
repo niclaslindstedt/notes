@@ -16,6 +16,21 @@ describe("EditorSection", () => {
     expect(screen.getByLabelText("Render Markdown")).toBeTruthy();
   });
 
+  it("groups the controls into focused bordered sections", () => {
+    render(
+      <EditorSection appearance={DEFAULT_APPEARANCE} onUpdate={vi.fn()} />,
+    );
+    for (const name of [
+      "New notes",
+      "Writing column",
+      "Markdown",
+      "Typing aids",
+      "Copying",
+    ]) {
+      expect(screen.getByRole("group", { name })).toBeTruthy();
+    }
+  });
+
   it("commits a margin change through onUpdate, preserving the rest", () => {
     const onUpdate = vi.fn();
     render(

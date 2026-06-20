@@ -47,6 +47,11 @@ const settings: SettingsCatalog = {
 
   editor: {
     title: "Redigerare",
+    newNotesTitle: "Nya anteckningar",
+    layoutTitle: "Skrivkolumn",
+    markdownTitle: "Markdown",
+    typingTitle: "Skrivhjälp",
+    copyTitle: "Kopiering",
     defaultTitle: "Standardtitel",
     defaultTitleHint:
       "Vad en ny anteckning ska heta innan du ger den en egen titel.",
