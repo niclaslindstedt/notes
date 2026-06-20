@@ -132,6 +132,14 @@ describe("note domain", () => {
     expect(isBlank(renamed)).toBe(false);
   });
 
+  it("leaves updatedAt untouched when the body is unchanged", () => {
+    const note = editNote(createNote(100), "hi", 200);
+    const reEdited = editNote(note, "hi", 999);
+    expect(reEdited.updatedAt).toBe(200);
+    // An unchanged body is a no-op, so the same note instance comes back.
+    expect(reEdited).toBe(note);
+  });
+
   it("archives and restores without bumping updatedAt or mutating the input", () => {
     const note = editNote(createNote(100), "hi", 200);
     const archived = setArchived(note, true);

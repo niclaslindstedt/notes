@@ -155,6 +155,10 @@ export function useNotes(
   const update = useCallback(
     (id: string, body: string): void => {
       const existing = docRef.current.notes.find((n) => n.id === id);
+      // An unchanged body is a no-op — don't churn the document, schedule a
+      // save, or record an undo step (which would also bump `updatedAt` and
+      // jump the note to the top of the list).
+      if (existing && existing.body === body) return;
       const title = existing ? noteTitle(existing) : "note";
       commit(
         (prev) => prev.map((n) => (n.id === id ? editNote(n, body) : n)),

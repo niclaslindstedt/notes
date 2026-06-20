@@ -190,15 +190,18 @@ describe("MarkdownEditor", () => {
   // Clicking the empty space below the note must always land the caret on a
   // blank line at the very bottom, creating one when the note doesn't already
   // end in a newline — otherwise the click would roll edit mode onto the last
-  // content line (e.g. an image), turning it back into raw source.
-  it("appends a trailing blank line when clicking below a note that lacks one", () => {
+  // content line (e.g. an image), turning it back into raw source. The blank
+  // line is held locally and not reported as an edit: placing the caret is not
+  // a change, so it must not bump the note's modified date.
+  it("lands the caret on a fresh blank line below a note that lacks one without reporting an edit", () => {
     const { onChange, container } = renderEditor("![img](attachments/a.png)");
     // The outer scroll container is the empty note space below the content.
     const scroll = container.firstElementChild as HTMLElement;
     fireEvent.mouseDown(scroll, { target: scroll });
-    expect(onChange).toHaveBeenLastCalledWith("![img](attachments/a.png)\n");
-    // The caret now sits on the fresh empty last line.
+    // The caret now sits on the fresh empty last line, but the unchanged
+    // document was never pushed back through onChange.
     expect(activeTextarea().value).toBe(SENTINEL);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("does not add another blank line when the note already ends in one", () => {

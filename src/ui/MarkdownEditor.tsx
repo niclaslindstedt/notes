@@ -427,8 +427,15 @@ export function MarkdownEditor({
     e.preventDefault();
     const last = lines.length - 1;
     if (lines[last] !== "") {
+      // Append the blank line locally so the caret has somewhere to land, but
+      // *don't* push it through `onChange` — placing the caret is not an edit,
+      // and persisting this newline would bump `updatedAt` and jump the note to
+      // the top of the list just for entering edit mode. The empty line becomes
+      // part of the document only once the user actually types onto it.
       const next = [...lines, ""];
-      commit(next, next.length - 1, 0);
+      setValue(next.join("\n"));
+      setActive(next.length - 1);
+      pendingCaret.current = 0;
       return;
     }
     // The document already ends in a blank line; just land the caret on it.

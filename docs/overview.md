@@ -131,7 +131,11 @@ on a blank line at the very bottom, **appending one when the document doesn't
 already end in a newline**. Without that trailing blank line the click would
 have nowhere to go but the last content line, rolling edit mode onto it and
 turning a rendered image (or any formatted line) back into raw source — so a
-note that ends in an image gains a fresh line to keep typing on instead.
+note that ends in an image gains a fresh line to keep typing on instead. That
+appended blank line is held locally and is **not** pushed through `onChange`:
+placing the caret is not an edit, so it never bumps `updatedAt` or jumps the
+note to the top of the list — the line joins the document only once the user
+types onto it.
 
 ### Rendered line
 
@@ -332,9 +336,13 @@ into is a [blank note](#blank-note) and discards itself on close.
 
 ### Edit a note
 
-`editNote` (`src/domain/note.ts`) replaces the body and bumps `updatedAt`;
-`useNotes().update` routes it through the sync engine and records onto the undo
-timeline with a per-note `mergeKey` so a typing burst collapses into one step.
+`editNote` (`src/domain/note.ts`) replaces the body and bumps `updatedAt` —
+but only when the body actually changes: an identical body returns the note
+untouched so re-opening a note (and the editor echoing its current source back)
+never bumps the date or jumps the note to the top of the list. `useNotes().update`
+guards the same way before routing the change through the sync engine and
+recording onto the undo timeline with a per-note `mergeKey` so a typing burst
+collapses into one step.
 
 ### Retitle
 
