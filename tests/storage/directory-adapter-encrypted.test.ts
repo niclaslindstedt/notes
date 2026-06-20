@@ -6,6 +6,7 @@ import {
 } from "../../src/domain/attachment.ts";
 import { createNote, type Note } from "../../src/domain/note.ts";
 import {
+  bytesToDataUrl,
   type AttachmentEntry,
   type AttachmentStore,
 } from "../../src/storage/attachment-store.ts";
@@ -99,6 +100,23 @@ function encAdapter(
   );
 }
 
+// Pull every attachment's bytes into the snapshot via on-demand fetch — what
+// the toggle does before switching representations so the bytes move across.
+async function hydrate(
+  adapter: ReturnType<typeof encAdapter>,
+  text: string,
+): Promise<string> {
+  const snap = parse(text);
+  for (const note of snap.notes) {
+    for (const a of note.attachments ?? []) {
+      if (a.data) continue;
+      const got = await adapter.fetchAttachment!(note, a.filename);
+      if (got) a.data = bytesToDataUrl(got.mime, got.bytes);
+    }
+  }
+  return serialize(snap);
+}
+
 describe("directory adapter — encrypted per-file", () => {
   it("writes one encrypted file per note + one opaque blob per attachment", async () => {
     const store = memoryStore();
@@ -143,7 +161,7 @@ describe("directory adapter — encrypted per-file", () => {
     }
   });
 
-  it("round-trips the note + attachment through encryption", async () => {
+  it("round-trips the note (metadata-only load) and fetches bytes on demand", async () => {
     const store = memoryStore();
     const att = memoryAttachments();
     const { note } = noteWithImage(1);
@@ -151,15 +169,23 @@ describe("directory adapter — encrypted per-file", () => {
       serialize({ notes: [note] }),
     );
 
-    // A cold adapter with the same passphrase reconstructs everything.
-    const loaded = await encAdapter(store, att, { current: "pw" }).load();
+    // A cold adapter with the same passphrase reconstructs the note + the
+    // attachment metadata, but not the attachment bytes.
+    const b = encAdapter(store, att, { current: "pw" });
+    const loaded = await b.load();
     const restored = parse(loaded?.text).notes;
     expect(restored).toHaveLength(1);
     expect(restored[0]!.title).toBe("My Secret Title");
     expect(restored[0]!.body).toContain(SECRET_BODY);
     expect(restored[0]!.attachments).toEqual([
-      { filename: "abcd1234-pic.png", mime: "image/png", data: DATA_URL },
+      { filename: "abcd1234-pic.png", mime: "image/png" },
     ]);
+
+    // Opening the note fetches + decrypts the bytes on demand.
+    const got = await b.fetchAttachment!(restored[0]!, "abcd1234-pic.png");
+    expect(got).not.toBeNull();
+    expect(got!.mime).toBe("image/png");
+    expect([...got!.bytes]).toEqual([72, 101, 108, 108, 111]); // "Hello"
   });
 
   it("rejects the wrong passphrase on load", async () => {
@@ -211,9 +237,9 @@ describe("directory adapter — atomic representation switch", () => {
     expect([...store.files.keys()].some((p) => p.endsWith(".md"))).toBe(true);
     expect([...att.files.keys()][0]).toContain("/"); // plaintext attachment
 
-    // Read the plaintext first (mirrors enableEncryption), then turn crypto on
-    // and re-save through the same adapter.
-    const plain = (await a.load())!.text;
+    // Read the plaintext + pull attachment bytes in (mirrors enableEncryption),
+    // then turn crypto on and re-save through the same adapter.
+    const plain = await hydrate(a, (await a.load())!.text);
     ref.current = "pw";
     await a.save(plain);
 
@@ -234,9 +260,9 @@ describe("directory adapter — atomic representation switch", () => {
     const { note } = noteWithImage(1);
     await a.save(serialize({ notes: [note] }));
 
-    const reloaded = parse((await a.load())!.text);
+    const plain = await hydrate(a, (await a.load())!.text);
     ref.current = null;
-    await a.save(serialize(reloaded));
+    await a.save(plain);
 
     const paths = [...store.files.keys()];
     expect(paths.some((p) => p.endsWith(".enc"))).toBe(false);
@@ -257,8 +283,11 @@ describe("directory adapter — atomic representation switch", () => {
     await encAdapter(real, att, ref).save(
       serialize({ notes: [noteWithImage(1).note] }),
     );
-    // Read the plaintext while crypto is still off.
-    const plain = (await encAdapter(real, att, ref).load())!.text;
+    // Read the plaintext + pull attachment bytes in while crypto is still off.
+    const plain = await hydrate(
+      encAdapter(real, att, ref),
+      (await encAdapter(real, att, ref).load())!.text,
+    );
 
     let failRemove = true;
     const flaky: FileStore = {

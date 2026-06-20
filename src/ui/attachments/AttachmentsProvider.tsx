@@ -6,6 +6,7 @@ import {
   INLINE_PLACEMENT,
   isImageAttachment,
 } from "../../domain/attachment.ts";
+import type { Note } from "../../domain/note.ts";
 import { AttachmentsContext, resolveAttachment } from "./context.ts";
 import { ImageViewer } from "./ImageViewer.tsx";
 
@@ -20,6 +21,8 @@ import { ImageViewer } from "./ImageViewer.tsx";
 
 type Props = {
   attachments: readonly Attachment[] | undefined;
+  /** The note these attachments belong to, for fetching bytes on demand. */
+  note?: Note | null;
   /** Where images / files render — inline (default) or at the note's foot. */
   placement?: AttachmentPlacement;
   children: ReactNode;
@@ -27,6 +30,7 @@ type Props = {
 
 export function AttachmentsProvider({
   attachments,
+  note = null,
   placement = INLINE_PLACEMENT,
   children,
 }: Props) {
@@ -43,8 +47,9 @@ export function AttachmentsProvider({
       },
       attachments: list,
       placement,
+      note,
     }),
-    [list, images, placement],
+    [list, images, placement, note],
   );
   const viewing = viewingIndex !== null ? images[viewingIndex] : undefined;
   return (
@@ -56,6 +61,7 @@ export function AttachmentsProvider({
           index={viewingIndex}
           onIndexChange={setViewingIndex}
           onClose={() => setViewingIndex(null)}
+          note={note}
         />
       )}
     </AttachmentsContext.Provider>

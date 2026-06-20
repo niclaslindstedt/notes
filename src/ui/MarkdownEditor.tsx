@@ -18,6 +18,7 @@ import {
   INLINE_PLACEMENT,
 } from "../domain/attachment.ts";
 import { classifyLines } from "../domain/markdown.ts";
+import type { Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { AttachmentsEndBlock } from "./attachments/AttachmentsEndBlock.tsx";
 import { AttachmentsProvider } from "./attachments/AttachmentsProvider.tsx";
@@ -57,6 +58,8 @@ type Props = {
   maxWidth: string;
   /** Place the caret in the body on mount (false when the title takes focus). */
   focusOnMount?: boolean;
+  /** The note being edited, for fetching attachment bytes on demand. */
+  note?: Note | null;
   /** The note's attachments, for resolving `[…](attachments/…)` references. */
   attachments?: Attachment[];
   /** Whether the active backend can store attachments (the file backends). */
@@ -75,6 +78,7 @@ export function MarkdownEditor({
   disableAutocorrect,
   maxWidth,
   focusOnMount = true,
+  note = null,
   attachments,
   canAttach = false,
   onAttach,
@@ -454,7 +458,11 @@ export function MarkdownEditor({
     : "whitespace-pre";
 
   return (
-    <AttachmentsProvider attachments={attachments} placement={placement}>
+    <AttachmentsProvider
+      attachments={attachments}
+      note={note}
+      placement={placement}
+    >
       {/* This is one editing widget, not a set of independent controls: the
         textarea is the focusable, keyboard-driven surface, and the line
         <div>s are non-interactive visual proxies for source the textarea

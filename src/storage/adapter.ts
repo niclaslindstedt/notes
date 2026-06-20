@@ -7,6 +7,8 @@
 // backend is active. That keeps each adapter small and stops a backend from
 // bypassing the parse pipeline.
 
+import type { Note } from "../domain/note.ts";
+
 /** A document's bytes plus the metadata a backend needs to stay coherent. */
 export type StoredSnapshot = {
   // The serialized document JSON, exactly as produced by `serialize` in
@@ -91,7 +93,7 @@ export type StorageAdapter = {
   // only when it is opened. Returns null when the attachment isn't found or the
   // backend has no attachment store. File backends implement this.
   fetchAttachment?(
-    noteId: string,
+    note: Note,
     filename: string,
   ): Promise<{ mime: string; bytes: Uint8Array } | null>;
 

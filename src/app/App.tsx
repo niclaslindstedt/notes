@@ -52,6 +52,7 @@ import { CopyNoteButton } from "../ui/CopyNoteButton.tsx";
 import { RenderedLine } from "../ui/MarkdownLine.tsx";
 import { AttachmentsEndBlock } from "../ui/attachments/AttachmentsEndBlock.tsx";
 import { AttachmentsProvider } from "../ui/attachments/AttachmentsProvider.tsx";
+import { AttachmentFetchContext } from "../ui/attachments/fetch-context.ts";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
   applyFaviconHref,
@@ -364,9 +365,10 @@ export function App() {
   const syncSlot = <SyncIndicator sync={sync} storage={storage} />;
 
   return (
-    <NavContext.Provider value={nav}>
-      <ModalBusProvider>
-        {/* Pin the whole shell to the *visual* viewport (the band actually on
+    <AttachmentFetchContext.Provider value={storage.fetchAttachment}>
+      <NavContext.Provider value={nav}>
+        <ModalBusProvider>
+          {/* Pin the whole shell to the *visual* viewport (the band actually on
             screen) rather than the layout viewport (`h-dvh`). On iOS the soft
             keyboard shrinks the visual viewport and scrolls the layout viewport
             up to keep the caret in view — with an `h-dvh` shell that drag
@@ -374,86 +376,87 @@ export function App() {
             appears to scroll away with the note. Sizing the shell to
             `--app-height`/`--app-top` (the vars `useViewportHeight` mirrors)
             keeps it filling the visible band, so the header stays frozen. */}
-        <div className="fixed flex overflow-hidden" style={APP_VIEWPORT_RECT}>
-          <SideMenu
-            notes={notes}
-            activeNoteId={editingId}
-            onSelectNote={(id) => switchTo(id)}
-            onShowAll={showAll}
-            showAllActive={view === "notes" && !editing && !reading}
-            onAddNote={openNew}
-            onRemoveNote={removeNote}
-            onArchiveNote={archiveNote}
-            archivedCount={archived.length}
-            onOpenArchive={openArchive}
-            archiveActive={view === "archive" && !editing}
-            onUndo={undo}
-            onRedo={redo}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            namespaces={storage.namespaces}
-            activeNamespace={storage.activeNamespace}
-            onSwitchNamespace={switchNamespace}
-          />
-          <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-            {editing ? (
-              <Editor
-                key={editing.id}
-                note={editing}
-                editor={editor}
-                onChange={(body) => update(editing.id, body)}
-                onTitleChange={(title) => retitle(editing.id, title)}
-                onTitleSettle={sync.releaseSaves}
-                syncSlot={syncSlot}
-                canAttach={storage.adapter.capabilities.has("attachments")}
-                onAttach={(attachment) => attach(editing.id, attachment)}
-              />
-            ) : reading ? (
-              <ReadOnlyNote
-                key={reading.id}
-                note={reading}
-                editor={editor}
-                onBack={() => setReadingId(null)}
-                onRestore={() => restoreAndEdit(reading.id)}
-                onDelete={() => removeNote(reading.id)}
-                syncSlot={syncSlot}
-              />
-            ) : view === "archive" ? (
-              <ArchiveList
-                notes={archived}
-                onOpen={openRead}
-                onRestore={restoreNote}
-                onDelete={removeNote}
-                onBack={() => setView("notes")}
-                syncSlot={syncSlot}
-              />
-            ) : (
-              <NoteList
-                notes={notes}
-                onOpen={(id) => switchTo(id)}
-                onNew={openNew}
-                onArchive={archiveNote}
-                onDelete={removeNote}
-                syncSlot={syncSlot}
-              />
-            )}
-          </main>
-        </div>
+          <div className="fixed flex overflow-hidden" style={APP_VIEWPORT_RECT}>
+            <SideMenu
+              notes={notes}
+              activeNoteId={editingId}
+              onSelectNote={(id) => switchTo(id)}
+              onShowAll={showAll}
+              showAllActive={view === "notes" && !editing && !reading}
+              onAddNote={openNew}
+              onRemoveNote={removeNote}
+              onArchiveNote={archiveNote}
+              archivedCount={archived.length}
+              onOpenArchive={openArchive}
+              archiveActive={view === "archive" && !editing}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              namespaces={storage.namespaces}
+              activeNamespace={storage.activeNamespace}
+              onSwitchNamespace={switchNamespace}
+            />
+            <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+              {editing ? (
+                <Editor
+                  key={editing.id}
+                  note={editing}
+                  editor={editor}
+                  onChange={(body) => update(editing.id, body)}
+                  onTitleChange={(title) => retitle(editing.id, title)}
+                  onTitleSettle={sync.releaseSaves}
+                  syncSlot={syncSlot}
+                  canAttach={storage.adapter.capabilities.has("attachments")}
+                  onAttach={(attachment) => attach(editing.id, attachment)}
+                />
+              ) : reading ? (
+                <ReadOnlyNote
+                  key={reading.id}
+                  note={reading}
+                  editor={editor}
+                  onBack={() => setReadingId(null)}
+                  onRestore={() => restoreAndEdit(reading.id)}
+                  onDelete={() => removeNote(reading.id)}
+                  syncSlot={syncSlot}
+                />
+              ) : view === "archive" ? (
+                <ArchiveList
+                  notes={archived}
+                  onOpen={openRead}
+                  onRestore={restoreNote}
+                  onDelete={removeNote}
+                  onBack={() => setView("notes")}
+                  syncSlot={syncSlot}
+                />
+              ) : (
+                <NoteList
+                  notes={notes}
+                  onOpen={(id) => switchTo(id)}
+                  onNew={openNew}
+                  onArchive={archiveNote}
+                  onDelete={removeNote}
+                  syncSlot={syncSlot}
+                />
+              )}
+            </main>
+          </div>
 
-        <SettingsModalHost storage={storage} />
-        <NamespacesModalHost storage={storage} />
-        <ChangelogModalHost />
-        <AchievementsModalHost />
-        <AchievementsUnlockModalHost />
-        <ConflictModal sync={sync} />
-        <PullToRefreshIndicator
-          state={ptr.state}
-          pullDistance={ptr.pullDistance}
-        />
-        <DropOverlay visible={drop.dragging} />
-        <UpdateToast />
-      </ModalBusProvider>
-    </NavContext.Provider>
+          <SettingsModalHost storage={storage} />
+          <NamespacesModalHost storage={storage} />
+          <ChangelogModalHost />
+          <AchievementsModalHost />
+          <AchievementsUnlockModalHost />
+          <ConflictModal sync={sync} />
+          <PullToRefreshIndicator
+            state={ptr.state}
+            pullDistance={ptr.pullDistance}
+          />
+          <DropOverlay visible={drop.dragging} />
+          <UpdateToast />
+        </ModalBusProvider>
+      </NavContext.Provider>
+    </AttachmentFetchContext.Provider>
   );
 }
 
@@ -751,6 +754,7 @@ function ReadOnlyNote({
           {blocks ? (
             <AttachmentsProvider
               attachments={note.attachments}
+              note={note}
               placement={placement}
             >
               {blocks.map((block, i) =>
@@ -886,6 +890,7 @@ function Editor({
             disableAutocorrect={editor.disableAutocorrect}
             maxWidth={maxWidth}
             focusOnMount={false}
+            note={note}
             attachments={note.attachments}
             canAttach={canAttach}
             onAttach={onAttach}

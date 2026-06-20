@@ -251,5 +251,9 @@ export function withLocalCache(
     },
 
     watch: inner.watch ? (cb) => inner.watch!(cb) : undefined,
+
+    fetchAttachment: inner.fetchAttachment
+      ? (note, filename) => inner.fetchAttachment!(note, filename)
+      : undefined,
   };
 }

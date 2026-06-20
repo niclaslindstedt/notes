@@ -90,10 +90,13 @@ function parseAttachments(value: unknown): Attachment[] {
     if (
       typeof a.filename === "string" &&
       typeof a.mime === "string" &&
-      typeof a.data === "string" &&
       a.filename.length > 0
     ) {
-      out.push({ filename: a.filename, mime: a.mime, data: a.data });
+      // `data` is optional: a note loaded from a file/cloud backend carries
+      // only its attachments' metadata until the bytes are fetched on demand.
+      const att: Attachment = { filename: a.filename, mime: a.mime };
+      if (typeof a.data === "string" && a.data.length > 0) att.data = a.data;
+      out.push(att);
     }
   }
   return out;

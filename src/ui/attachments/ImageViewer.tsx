@@ -7,8 +7,10 @@ import {
 } from "react";
 
 import { type Attachment } from "../../domain/attachment.ts";
+import type { Note } from "../../domain/note.ts";
 import { useT } from "../../i18n/index.ts";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "../icons.tsx";
+import { useAttachmentData } from "./fetch-context.ts";
 
 // Full-size viewer for a note's attached images: a dim, full-screen overlay
 // showing the original at its natural size (capped to the viewport). Opened by
@@ -26,7 +28,37 @@ type Props = {
   index: number;
   onIndexChange: (index: number) => void;
   onClose: () => void;
+  /** The note the images belong to, for fetching full-size bytes on demand. */
+  note?: Note | null;
 };
+
+// One full-size image in the gallery track, resolving its bytes on demand (the
+// note loaded without them). Shows a spinner placeholder until they arrive.
+function ViewerImage({
+  attachment,
+  note,
+  active,
+}: {
+  attachment: Attachment;
+  note: Note | null;
+  active: boolean;
+}) {
+  const data = useAttachmentData(note, attachment);
+  if (!data) {
+    return (
+      <span className="pointer-events-auto h-16 w-16 animate-pulse rounded-full bg-white/20" />
+    );
+  }
+  return (
+    <img
+      src={data}
+      alt={active ? attachment.filename : ""}
+      aria-hidden={active ? undefined : true}
+      draggable={false}
+      className="pointer-events-auto max-h-full max-w-full rounded-[var(--radius)] object-contain shadow-2xl"
+    />
+  );
+}
 
 // Vertical travel that dismisses the viewer; horizontal travel that flips to
 // the next/previous image. Movement before we commit to an axis.
@@ -39,6 +71,7 @@ export function ImageViewer({
   index,
   onIndexChange,
   onClose,
+  note = null,
 }: Props) {
   const t = useT();
   const count = attachments.length;
@@ -185,13 +218,7 @@ export function ImageViewer({
             key={a.filename}
             className="flex h-full w-full flex-shrink-0 items-center justify-center p-4"
           >
-            <img
-              src={a.data}
-              alt={i === index ? a.filename : ""}
-              aria-hidden={i === index ? undefined : true}
-              draggable={false}
-              className="pointer-events-auto max-h-full max-w-full rounded-[var(--radius)] object-contain shadow-2xl"
-            />
+            <ViewerImage attachment={a} note={note} active={i === index} />
           </div>
         ))}
       </div>

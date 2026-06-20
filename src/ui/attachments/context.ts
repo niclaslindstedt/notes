@@ -13,6 +13,7 @@ import {
   type AttachmentPlacement,
   attachmentFilenameFromHref,
 } from "../../domain/attachment.ts";
+import type { Note } from "../../domain/note.ts";
 
 export type AttachmentsContextValue = {
   /** The note attachment a body reference points at, or null. */
@@ -23,6 +24,8 @@ export type AttachmentsContextValue = {
   attachments: readonly Attachment[];
   /** Whether images / files render inline or collected at the note's foot. */
   placement: AttachmentPlacement;
+  /** The note these attachments belong to, for fetching bytes on demand. */
+  note: Note | null;
 };
 
 export const AttachmentsContext = createContext<AttachmentsContextValue | null>(

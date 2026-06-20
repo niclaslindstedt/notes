@@ -14,7 +14,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // Aliased: this module already has a passphrase `unlock` of its own.
 import { unlock as unlockAchievement } from "../achievements/index.ts";
 import { createLogger } from "../dev/logger.ts";
+import type { Note } from "../domain/note.ts";
 import type { StorageAdapter, StoredSnapshot } from "./adapter.ts";
+import { bytesToDataUrl } from "./attachment-store.ts";
+import { parse, serialize } from "./serialize.ts";
 import {
   type BackendId,
   type EncryptionMode,
@@ -113,6 +116,12 @@ export type EncryptionProgress = (step: EncryptionProgressStep) => void;
 export interface UseStorageBackend {
   /** The adapter to hand to the sync engine. A no-op placeholder while locked. */
   adapter: StorageAdapter;
+  /**
+   * Fetch one attachment's bytes as a `data:` URL on demand (the note list
+   * loads without them). Returns null on a backend with no attachment store, or
+   * when the attachment isn't found.
+   */
+  fetchAttachment: (note: Note, filename: string) => Promise<string | null>;
   /**
    * The active backend's root settings store — `settings.json` at the
    * app-folder root, stored as plaintext JSON even when the notes are
@@ -575,6 +584,17 @@ export function useStorageBackend(): UseStorageBackend {
     return inner;
   }, [inner, encryption, locked, backend, selection.kind]);
 
+  // On-demand attachment fetch, surfaced as a `data:` URL for the UI. Bound to
+  // the active adapter; a no-op (null) on backends without an attachment store.
+  const fetchAttachment = useCallback(
+    async (note: Note, filename: string): Promise<string | null> => {
+      const got = await adapter.fetchAttachment?.(note, filename);
+      if (!got) return null;
+      return bytesToDataUrl(got.mime, got.bytes);
+    },
+    [adapter],
+  );
+
   const selectBrowser = useCallback(() => {
     persistBackend("browser");
     setBackendState("browser");
@@ -709,23 +729,46 @@ export function useStorageBackend(): UseStorageBackend {
     setBackendState("browser");
   }, []);
 
+  // Pull every attachment's bytes into the snapshot before a representation
+  // switch. A note loads metadata-only (bytes fetched on demand), but a switch
+  // has to *move* the bytes from the old representation to the new one — so they
+  // must be in hand while the old representation is still readable (keys still
+  // in their pre-flip state). Without this, the switch would clear the old
+  // attachment files with nothing written in their place. The migration queue
+  // does this incrementally per attachment; the toggle does it in one pass.
+  const hydrateForSwitch = useCallback(
+    async (text: string): Promise<string> => {
+      const snap = parse(text);
+      for (const note of snap.notes) {
+        for (const a of note.attachments ?? []) {
+          if (a.data) continue;
+          const got = await inner.fetchAttachment?.(note, a.filename);
+          if (got) a.data = bytesToDataUrl(got.mime, got.bytes);
+        }
+      }
+      return serialize(snap);
+    },
+    [inner],
+  );
+
   const enableEncryption = useCallback(
     async (next: string, onProgress?: EncryptionProgress) => {
       if (!next) throw new Error("Passphrase is required");
       log.info("enable encryption: start");
-      // Read the current plaintext document first (passphrase not yet active so
-      // the directory adapter reads the plaintext markdown), then turn crypto on
-      // and re-save: the adapter writes each note + attachment as its own
-      // encrypted blob and, after verifying them, removes the superseded
+      // Read the current plaintext document and pull its attachment bytes in
+      // (passphrase not yet active, so this reads the plaintext files), then
+      // turn crypto on and re-save: the adapter writes each note + attachment as
+      // its own encrypted blob and, after verifying them, removes the superseded
       // plaintext — atomic, no data loss.
       onProgress?.("reading");
       const snap = await inner.load();
+      const hydrated = snap ? await hydrateForSwitch(snap.text) : null;
       onProgress?.("derivingKey");
       passwordRef.current = next;
-      if (snap) {
+      if (snap && hydrated !== null) {
         onProgress?.("encrypting");
         onProgress?.("saving");
-        await inner.save(snap.text, snap.revision);
+        await inner.save(hydrated, snap.revision);
       }
       onProgress?.("finalizing");
       persistEncryption("encrypted");
@@ -734,7 +777,7 @@ export function useStorageBackend(): UseStorageBackend {
       log.info("enable encryption: done");
       unlockAchievement("paranoidMode");
     },
-    [inner, applyPassword],
+    [inner, applyPassword, hydrateForSwitch],
   );
 
   const disableEncryption = useCallback(
@@ -743,17 +786,18 @@ export function useStorageBackend(): UseStorageBackend {
         throw new Error("Unlock before turning encryption off");
       }
       log.info("disable encryption: start");
-      // Read the encrypted document (passphrase still active so the adapter
-      // decrypts each note + attachment), then turn crypto off and re-save as
-      // plaintext markdown — which makes the adapter clear the superseded
-      // encrypted files only after the plaintext is written.
+      // Read + decrypt the encrypted document and pull its attachment bytes in
+      // (passphrase still active), then turn crypto off and re-save as plaintext
+      // markdown — which makes the adapter clear the superseded encrypted files
+      // only after the plaintext is written.
       onProgress?.("reading");
       onProgress?.("decrypting");
       const snap = await inner.load();
+      const hydrated = snap ? await hydrateForSwitch(snap.text) : null;
       passwordRef.current = null;
-      if (snap) {
+      if (snap && hydrated !== null) {
         onProgress?.("saving");
-        await inner.save(snap.text, snap.revision);
+        await inner.save(hydrated, snap.revision);
       }
       onProgress?.("finalizing");
       persistEncryption("plaintext");
@@ -761,7 +805,7 @@ export function useStorageBackend(): UseStorageBackend {
       applyPassword(null);
       log.info("disable encryption: done");
     },
-    [inner, applyPassword],
+    [inner, applyPassword, hydrateForSwitch],
   );
 
   const unlock = useCallback(
@@ -874,6 +918,7 @@ export function useStorageBackend(): UseStorageBackend {
 
   return {
     adapter,
+    fetchAttachment,
     settingsStore,
     backend,
     dropboxConfigured: isDropboxConfigured(),

@@ -53,11 +53,7 @@ import type {
   StoredSnapshot,
 } from "./adapter.ts";
 import { ConflictError } from "./adapter.ts";
-import {
-  type AttachmentStore,
-  bytesToDataUrl,
-  dataUrlToBytes,
-} from "./attachment-store.ts";
+import { type AttachmentStore, dataUrlToBytes } from "./attachment-store.ts";
 import {
   type SessionKeys,
   decryptEnvelope,
@@ -258,9 +254,8 @@ function encJsonToNote(json: string): Note | null {
       if (a && typeof a === "object") {
         const m = a as Record<string, unknown>;
         if (typeof m.filename === "string" && typeof m.mime === "string") {
-          // `data` is filled in by hydration (or fetched on demand); the
-          // metadata-only attachment carries no bytes yet.
-          meta.push({ filename: m.filename, mime: m.mime, data: "" });
+          // Metadata only — the bytes live in a separate blob, fetched on demand.
+          meta.push({ filename: m.filename, mime: m.mime });
         }
       }
     }
@@ -424,30 +419,10 @@ export function createDirectoryAdapter(
       const note = encJsonToNote(json);
       if (note) notes.push(note);
     }
-    // Eager hydration: pull each attachment's bytes from its opaque blob. On a
-    // later phase this becomes on-demand; for now a loaded note carries its
-    // images so the editor renders them without a fetch.
-    if (attachments) {
-      for (const note of notes) {
-        if (!note.attachments) continue;
-        const hydrated: Attachment[] = [];
-        for (const a of note.attachments) {
-          const ref = await attBlobPath(keys, note.id, a.filename);
-          const blob = await attachments.read(ref);
-          if (!blob) continue;
-          attachmentsTouched = true;
-          const opened = await openBytes(keys.contentKey, blob);
-          const mime = (opened.header.mime as string) ?? a.mime;
-          hydrated.push({
-            filename: a.filename,
-            mime,
-            data: bytesToDataUrl(mime, opened.bytes),
-          });
-        }
-        if (hydrated.length > 0) note.attachments = hydrated;
-        else delete note.attachments;
-      }
-    }
+    // Attachments are NOT read here — a note loads with its attachments'
+    // metadata only and the bytes are fetched on demand (see `fetchAttachment`)
+    // when the note is opened, so the list loads without every note's images.
+    if (notes.some((n) => n.attachments?.length)) attachmentsTouched = true;
     return serialize({ notes });
   }
 
@@ -476,17 +451,18 @@ export function createDirectoryAdapter(
     );
     const hydrated =
       attachments && !isEncryptedEnvelope(text)
-        ? await hydrateAttachments(text, previous)
+        ? await hydrateAttachments(text)
         : text;
     return { text: hydrated, revision };
   }
 
   // -- Plaintext attachment hydration / reconcile (unchanged) ----------------
 
-  async function hydrateAttachments(
-    text: string,
-    previous: StoredSnapshot | undefined,
-  ): Promise<string> {
+  // Attach each note's attachment *metadata* (filename + mime) from the file
+  // listing, without reading any bytes — those are fetched on demand when a note
+  // is opened (`fetchAttachment`), so the list loads without every note's
+  // images.
+  async function hydrateAttachments(text: string): Promise<string> {
     let entries: { path: string }[];
     try {
       entries = await attachments!.list();
@@ -507,52 +483,17 @@ export function createDirectoryAdapter(
       byStem.set(stem, list);
     }
 
-    const cached = previousAttachmentData(previous);
-
-    let fetched = 0;
     for (const note of snapshot.notes) {
       const stem = noteFileStem(note);
       const paths = byStem.get(stem);
       if (!paths || paths.length === 0) continue;
-      const out: Attachment[] = [];
-      for (const path of paths) {
+      const out: Attachment[] = paths.map((path) => {
         const filename = path.slice(stem.length + 1);
-        const reused = cached.get(filename);
-        if (reused) {
-          out.push(reused);
-          continue;
-        }
-        const bytes = await attachments!.read(path);
-        if (!bytes) continue;
-        const mime = mimeForFilename(filename);
-        out.push({ filename, mime, data: bytesToDataUrl(mime, bytes) });
-        fetched += 1;
-      }
+        return { filename, mime: mimeForFilename(filename) };
+      });
       if (out.length > 0) note.attachments = out;
     }
-    if (fetched > 0) {
-      log.info(`${options.id} load: fetched ${fetched} attachment file(s)`);
-    }
     return serialize(snapshot);
-  }
-
-  function previousAttachmentData(
-    previous: StoredSnapshot | undefined,
-  ): Map<string, Attachment> {
-    const map = new Map<string, Attachment>();
-    if (!previous || isEncryptedEnvelope(previous.text)) return map;
-    let snapshot: Snapshot;
-    try {
-      snapshot = parse(previous.text);
-    } catch {
-      return map;
-    }
-    for (const note of snapshot.notes) {
-      for (const a of note.attachments ?? []) {
-        if (a.data && !map.has(a.filename)) map.set(a.filename, a);
-      }
-    }
-    return map;
   }
 
   function desiredAttachments(snapshot: Snapshot): Map<string, Attachment> {
@@ -910,26 +851,28 @@ export function createDirectoryAdapter(
     return { text, revision };
   }
 
-  // Fetch and decrypt one attachment's bytes on demand (used by the UI when a
-  // note is opened). Returns null when the blob is missing or encryption is off.
+  // Fetch one attachment's bytes on demand (used by the UI when a note is
+  // opened). Decrypts the opaque blob in encrypted mode; reads the note-stem
+  // file in plaintext mode. Returns null when the file is missing.
   async function fetchAttachment(
-    noteId: string,
+    note: Note,
     filename: string,
   ): Promise<{ mime: string; bytes: Uint8Array } | null> {
     if (!attachments) return null;
     const keys = await ensureKeys();
     if (keys) {
-      const ref = await attBlobPath(keys, noteId, filename);
+      const ref = await attBlobPath(keys, note.id, filename);
       const blob = await attachments.read(ref);
       if (!blob) return null;
       const opened = await openBytes(keys.contentKey, blob);
       const mime = (opened.header.mime as string) ?? mimeForFilename(filename);
       return { mime, bytes: opened.bytes };
     }
-    // Plaintext: the file lives under its note-stem folder. The caller passes
-    // the note's current stem via `noteId` only for encrypted refs, so plaintext
-    // fetch needs the stem — resolved by the on-demand layer in a later phase.
-    return null;
+    const bytes = await attachments.read(
+      attachmentPath(noteFileStem(note), filename),
+    );
+    if (!bytes) return null;
+    return { mime: mimeForFilename(filename), bytes };
   }
 
   const capabilities = new Set<AdapterCapability>();
