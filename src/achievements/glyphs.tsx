@@ -302,6 +302,17 @@ export function PanelBottomGlyph({ className }: IconProps) {
   );
 }
 
+// Two stacked panels — the note-list layout glyph (switch the overview between
+// the compact rows and the taller, multi-line cards).
+export function CardsGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="3" y="4" width="18" height="7" rx="1.5" />
+      <rect x="3" y="13" width="18" height="7" rx="1.5" />
+    </Svg>
+  );
+}
+
 // A conical lab flask — the "Fake data" / holodeck glyph (a generated sample
 // dataset to experiment with).
 export function FlaskGlyph({ className }: IconProps) {

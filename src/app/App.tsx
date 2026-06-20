@@ -20,6 +20,7 @@ import {
   isBlank,
   noteTitle,
   notePreview,
+  notePreviewBlock,
   type Note,
   type SaveFormatting,
 } from "../domain/note.ts";
@@ -28,7 +29,11 @@ import { isStandaloneMobile } from "../pwa/standalone.ts";
 import { createDevSeedAdapter } from "../storage/dev-seed/index.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
-import { unlockAchievements, useApplyAppearance } from "../theme/useTheme.ts";
+import {
+  unlockAchievements,
+  useAppearance,
+  useApplyAppearance,
+} from "../theme/useTheme.ts";
 import { AppTitle } from "../ui/AppTitle.tsx";
 import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
@@ -602,12 +607,22 @@ function NoteCard({
   uploading?: boolean;
 }) {
   const t = useT();
-  const preview = notePreview(note);
+  // The overview's two looks (Settings → Appearance → Note list): `cards` is
+  // the roomier, multi-line treatment; `rows` is the compact one-line list.
+  const cards = useAppearance().listLayout === "cards";
+  const preview = cards ? notePreviewBlock(note) : notePreview(note);
+  // Only fade the tail when there's plausibly more text below the clamp — a
+  // short note shouldn't have its one line dimmed. A cheap content heuristic
+  // (line count or length) stands in for measuring the clamped overflow.
+  const fade =
+    cards && (preview.length > 180 || preview.split("\n").length > 5);
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="w-full rounded-[var(--radius)] border border-line bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-2"
+      className={`w-full rounded-[var(--radius)] border border-line bg-surface text-left transition-colors hover:bg-surface-2 ${
+        cards ? "px-4 py-3.5" : "px-4 py-3"
+      }`}
     >
       <p className="flex items-center gap-1.5 font-medium text-fg-bright">
         <span className="truncate">{noteTitle(note)}</span>
@@ -629,9 +644,26 @@ function NoteCard({
           )
         )}
       </p>
-      {preview && (
-        <p className="mt-0.5 truncate text-sm text-muted">{preview}</p>
-      )}
+      {preview &&
+        (cards ? (
+          <p
+            className="mt-1.5 max-h-[8.5rem] overflow-hidden text-sm leading-relaxed whitespace-pre-line text-muted"
+            style={
+              fade
+                ? {
+                    maskImage:
+                      "linear-gradient(to bottom, #000 65%, transparent)",
+                    WebkitMaskImage:
+                      "linear-gradient(to bottom, #000 65%, transparent)",
+                  }
+                : undefined
+            }
+          >
+            {preview}
+          </p>
+        ) : (
+          <p className="mt-0.5 truncate text-sm text-muted">{preview}</p>
+        ))}
     </button>
   );
 }
