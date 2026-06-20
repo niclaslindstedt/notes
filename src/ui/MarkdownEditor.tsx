@@ -30,6 +30,10 @@ import {
 } from "./attachments/fromFile.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
+import {
+  extractSourceRange,
+  sourcePointFromDom,
+} from "./markdown-selection.ts";
 
 // Zero-width space — invisible, but a real character the keyboard can delete.
 const SENTINEL = "​";
@@ -52,6 +56,11 @@ const SENTINEL = "​";
 // structural keys (Enter / Backspace / Delete at a boundary) splice lines
 // explicitly. Clicks on a rendered line map back to a caret column via the
 // `data-src` source offsets the renderer stamps on every leaf.
+//
+// A drag across lines is a selection, not a caret move: the textarea (a
+// selection island) is dissolved so every line is plain selectable text, the
+// selection is driven with the Selection API, and a copy puts the verbatim
+// *source* (Markdown, full URLs) on the clipboard via `markdown-selection.ts`.
 
 type Props = {
   body: string;
@@ -142,6 +151,7 @@ export function MarkdownEditor({
     );
   }, [body]);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   // Caret column to install the next time the textarea (re)focuses — set
   // whenever we move the active line programmatically. Null on mount when the
   // body shouldn't grab focus (a new note focuses its title field instead);
@@ -355,7 +365,8 @@ export function MarkdownEditor({
     const listener = (e: InputEvent) => handleBeforeInput.current(e);
     ta.addEventListener("beforeinput", listener);
     return () => ta.removeEventListener("beforeinput", listener);
-    // Re-bind whenever the textarea mounts/unmounts (edit mode toggling on/off).
+    // Re-bind whenever the textarea mounts/unmounts (edit mode toggling on/off,
+    // including a selection drag dissolving it — see below).
   }, [isEditing]);
 
   function onTextChange(ta: HTMLTextAreaElement) {
@@ -515,6 +526,123 @@ export function MarkdownEditor({
     [],
   );
 
+  // --- Cross-line text selection -------------------------------------------
+  //
+  // The active line is a textarea, an isolated selection island, and every
+  // other line is its own element — so a native drag can only ever select
+  // within one line. To let the user sweep a selection across the whole note
+  // (desktop), a drag is tracked from a capture-phase mousedown (so it fires
+  // even on a link, which stops the bubble-phase handler) and, once it crosses
+  // a small threshold, edit mode is dropped (`active = null`, all lines render
+  // as formatted divs) and the selection is driven directly with the Selection
+  // API from the press point to the pointer. A plain click (no drag) still
+  // rolls the caret onto the clicked line via the existing handlers.
+  const dragRef = useRef<{ x: number; y: number; dragging: boolean } | null>(
+    null,
+  );
+
+  function driveSelection(ax: number, ay: number, fx: number, fy: number) {
+    const a = caretFromPoint(ax, ay);
+    const b = caretFromPoint(fx, fy);
+    if (!a || !b) return;
+    const sel = window.getSelection();
+    if (!sel) return;
+    try {
+      sel.setBaseAndExtent(a.node, a.offset, b.node, b.offset);
+    } catch {
+      // The anchor node can be transiently invalid in the frame the textarea is
+      // dissolved; the next mousemove re-runs against the settled DOM.
+    }
+  }
+
+  const onSelMove = useRef<(e: MouseEvent) => void>(() => {});
+  const onSelUp = useRef<(e: MouseEvent) => void>(() => {});
+  onSelMove.current = (e: MouseEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    if (!d.dragging) {
+      if (Math.abs(e.clientX - d.x) < 4 && Math.abs(e.clientY - d.y) < 4)
+        return;
+      d.dragging = true;
+      // Drop edit mode so every line is plain selectable text (no textarea).
+      setActive(null);
+    }
+    e.preventDefault();
+    driveSelection(d.x, d.y, e.clientX, e.clientY);
+  };
+  onSelUp.current = () => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    document.removeEventListener("mousemove", selMoveListener);
+    document.removeEventListener("mouseup", selUpListener);
+    if (d?.dragging) {
+      // Swallow the click the browser fires after the drag so a sweep that began
+      // on a link doesn't also navigate to it once the button is released.
+      const swallow = (ev: MouseEvent) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+      };
+      document.addEventListener("click", swallow, {
+        capture: true,
+        once: true,
+      });
+    }
+  };
+  const selMoveListener = useRef((e: MouseEvent) =>
+    onSelMove.current(e),
+  ).current;
+  const selUpListener = useRef((e: MouseEvent) => onSelUp.current(e)).current;
+
+  // Begin tracking a potential selection drag. Runs in the capture phase so it
+  // sees presses on links too (their bubble-phase handler stops propagation to
+  // keep a click navigating). Caret placement stays on the bubble handlers, so
+  // a press that turns out to be a plain click behaves exactly as before.
+  function startDragTracking(e: ReactMouseEvent) {
+    if (e.button !== 0) return;
+    dragRef.current = { x: e.clientX, y: e.clientY, dragging: false };
+    document.addEventListener("mousemove", selMoveListener);
+    document.addEventListener("mouseup", selUpListener);
+  }
+
+  // Put the verbatim source of a live-preview selection on the clipboard rather
+  // than the rendered text — so Markdown and full (un-shortened) URLs survive a
+  // copy. A selection inside the active textarea isn't part of the document
+  // selection, so it falls through to the browser's own (already-raw) copy.
+  const onCopy = useRef<(e: ClipboardEvent) => void>(() => {});
+  onCopy.current = (e: ClipboardEvent) => {
+    const root = rootRef.current;
+    if (!root) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    const { anchorNode, focusNode } = sel;
+    if (!anchorNode || !focusNode) return;
+    if (!root.contains(anchorNode) || !root.contains(focusNode)) return;
+    const start = sourcePointFromDom(
+      root,
+      blocks,
+      anchorNode,
+      sel.anchorOffset,
+    );
+    const end = sourcePointFromDom(root, blocks, focusNode, sel.focusOffset);
+    if (!start || !end) return;
+    e.preventDefault();
+    e.clipboardData?.setData(
+      "text/plain",
+      extractSourceRange(lines, blocks, start, end),
+    );
+  };
+
+  useEffect(() => {
+    const copyListener = (e: ClipboardEvent) => onCopy.current(e);
+    document.addEventListener("copy", copyListener);
+    return () => {
+      document.removeEventListener("copy", copyListener);
+      // Drop any drag listeners left over from an unmount mid-gesture.
+      document.removeEventListener("mousemove", selMoveListener);
+      document.removeEventListener("mouseup", selUpListener);
+    };
+  }, [selMoveListener, selUpListener]);
+
   const widthStyle =
     maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" };
   const wrapClass = wordWrap
@@ -534,7 +662,11 @@ export function MarkdownEditor({
         with the arrow keys), so the static-interaction a11y rule doesn't apply. */}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div
+        ref={rootRef}
         className={`min-h-0 flex-1 ${wordWrap ? "overflow-y-auto" : "overflow-auto"}`}
+        // Capture phase so a press on a link (which stops the bubble handler to
+        // stay clickable) still arms a cross-line selection drag.
+        onMouseDownCapture={startDragTracking}
         onMouseDown={(e) => {
           // A click in the empty area below the text drops the caret at the end
           // of the note rather than doing nothing.
@@ -594,6 +726,7 @@ export function MarkdownEditor({
               // eslint-disable-next-line jsx-a11y/no-static-element-interactions
               <div
                 key={index}
+                data-line-index={index}
                 onMouseDown={(e) => activateAt(e, index)}
                 className={`cursor-text text-fg ${wrapClass}`}
               >

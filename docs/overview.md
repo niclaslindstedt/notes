@@ -171,20 +171,53 @@ placing the caret is not an edit, so it never bumps `updatedAt` or jumps the
 note to the top of the list — the line joins the document only once the user
 types onto it.
 
+**Selecting across lines.** A press-and-drag is treated as a text selection
+rather than a caret move. Because the active line is a `<textarea>` (its own
+selection island) and every other line is a separate element, a plain native
+drag could only ever select within one line; so once a drag crosses a few
+pixels the editor dissolves the textarea (`active = -1`, every line renders as a
+formatted div) and drives the selection with the Selection API from the press
+point to the pointer. The drag is armed from a **capture-phase** `mousedown` so
+it fires even when the press lands on a link (whose own `mousedown` stops the
+bubble phase to stay clickable); the click the browser fires after such a drag
+is swallowed so a sweep that began on a link doesn't also navigate. A copy of a
+live-preview selection is intercepted (`markdown-selection.ts`) and the verbatim
+**source** is placed on the clipboard — so Markdown syntax and full,
+un-shortened URLs survive the copy rather than the rendered text. A selection
+inside the active textarea is untouched (it's already raw source). See
+[Selection mapping](#selection-mapping).
+
+### Selection mapping
+
+`src/ui/markdown-selection.ts` — translates a live-preview DOM selection back
+onto the raw note. `sourcePointFromDom` resolves one selection endpoint (a DOM
+node + offset) to a source `(line, column)` using the `data-line-index` the
+editor stamps on every rendered line and the `data-src` offset each inline leaf
+carries; a leaf whose rendered text is shorter than its source (a [shortened
+bare URL](#shorten-links)) also carries `data-len` so the *end* of the leaf maps
+to the end of the full source token. `extractSourceRange` then returns the
+verbatim source the selection covers, clamping interior lines to their content
+so list/heading/quote markers (drawn as non-selectable glyphs) never leak in.
+Both are pure/DOM-only helpers the editor uses in its `copy` handler.
+
 ### Rendered line
 
 `RenderedLine` (`src/ui/MarkdownLine.tsx`) — renders one parsed `LineBlock` as
 formatted React (headings, quotes, lists, inline code/links/bold/em/strike).
 Every leaf carries a `data-src` offset so a click maps back to a caret position
-in the raw source. `markdownLineClass` (`src/ui/markdown-line-class.ts`) maps a
-block kind to its CSS classes.
+in the raw source (and a [selection](#selection-mapping) back to a source
+column); a shortened bare URL also carries `data-len` (its full source length).
+`markdownLineClass` (`src/ui/markdown-line-class.ts`) maps a block kind to its
+CSS classes.
 
 A rendered **link** (and an inline image) is the exception to click-to-caret:
 it stops the line-level `mousedown` from rolling the editing textarea onto its
 line, so a click (or tap, even while another line is being edited) opens the
 link instead of entering edit mode on it. To edit a link's text or URL, click
 just past it and backspace into it — the raw `[text](url)` source then shows in
-the active line's textarea like any other text.
+the active line's textarea like any other text. Links are rendered
+`draggable={false}` so dragging across one starts a text selection instead of a
+native link drag.
 
 ### Markdown parser
 
