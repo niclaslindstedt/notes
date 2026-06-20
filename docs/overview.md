@@ -502,7 +502,8 @@ otherwise.
 glyph](#sync-status). Explains the current state (saving / error / throttled /
 offline / in-sync), shows the failure reason verbatim, links out to the
 backend's web UI, and offers Reconnect, Save now / Try again, and Reload-from-
-backend.
+backend. Its content is short and opens no soft keyboard, so it renders as a
+compact `centered` card rather than the full-screen mobile sheet.
 
 ### Conflict modal
 

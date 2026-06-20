@@ -253,7 +253,7 @@ export function SyncDetailsModal({
     : RefreshIcon;
 
   return (
-    <Modal open={open} onClose={onClose} labelledBy={titleId}>
+    <Modal open={open} onClose={onClose} labelledBy={titleId} centered>
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-line bg-surface-3 px-4 py-3">
         <h2
           id={titleId}
