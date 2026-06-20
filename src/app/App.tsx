@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -788,8 +789,8 @@ function Editor({
           document title, the way checklist heads each list with its name and
           icon. There is no Back button: the side menu's "Show all" returns to
           the overview. */}
-      <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <NotesMarkIcon className="h-6 w-6 shrink-0 text-accent" />
+      <header className="sticky top-0 z-10 flex items-start gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <NotesMarkIcon className="mt-0.5 h-6 w-6 shrink-0 text-accent" />
         <TitleField
           value={note.title}
           onChange={onTitleChange}
@@ -835,11 +836,14 @@ function Editor({
   );
 }
 
-// The note's title: a single-line input that heads the editor page, sitting
-// inline in the header beside the app glyph so it reads like the document's
-// own title (the way checklist heads a list with its name). It is *not* part
-// of the body, so backspacing at the start of the body never reaches it.
-// Enter / Arrow-Down hand focus down to the body.
+// The note's title: an auto-growing textarea that heads the editor page,
+// sitting inline in the header beside the app glyph so it reads like the
+// document's own title (the way checklist heads a list with its name). A long
+// title wraps onto further lines and the field grows to fit rather than
+// scrolling out of view; the header top-aligns so the glyph and the copy/sync
+// buttons stay pinned to the first line. It is *not* part of the body, so
+// backspacing at the start of the body never reaches it. Enter / Arrow-Down
+// hand focus down to the body (and so the field never holds a literal newline).
 function TitleField({
   value,
   onChange,
@@ -858,8 +862,22 @@ function TitleField({
   disableAutocorrect: boolean;
 }) {
   const t = useT();
-  const ref = useRef<HTMLInputElement>(null);
+  const ref = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState(value);
+
+  // The title is a textarea, not an input, so a long title wraps onto further
+  // lines instead of scrolling out of view. It carries no manual resize grip;
+  // we grow it to fit its content after every change — collapse to one row,
+  // then stretch to the wrapped height — so it reads as a borderless heading
+  // that simply gets taller. Enter is still intercepted to hand focus to the
+  // body (see onKeyDown), so the field never actually holds a newline.
+  const resize = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+  useLayoutEffect(resize, [draft, resize]);
 
   // Title edits are buffered locally and only pushed upward — which schedules a
   // save and, on the file/cloud backends, *renames* the note's file (the
@@ -918,9 +936,9 @@ function TitleField({
   useEffect(() => settle, [settle]);
 
   return (
-    <input
+    <textarea
       ref={ref}
-      type="text"
+      rows={1}
       value={draft}
       spellCheck={!disableSpellcheck}
       autoCorrect={disableAutocorrect ? "off" : "on"}
@@ -945,7 +963,7 @@ function TitleField({
           onEnter();
         }
       }}
-      className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 font-[inherit] text-lg font-bold text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60"
+      className="min-w-0 flex-1 resize-none appearance-none overflow-hidden border-0 bg-transparent p-0 font-[inherit] text-lg font-bold leading-tight text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60"
     />
   );
 }
