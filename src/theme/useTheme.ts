@@ -214,6 +214,14 @@ function coerce(raw: unknown): Appearance {
           : DEFAULT_EDITOR_SETTINGS.renderMarkdown,
       disableSpellcheck: editor.disableSpellcheck === true,
       disableAutocorrect: editor.disableAutocorrect === true,
+      trimTrailingSpaces:
+        typeof editor.trimTrailingSpaces === "boolean"
+          ? editor.trimTrailingSpaces
+          : DEFAULT_EDITOR_SETTINGS.trimTrailingSpaces,
+      trailingNewline:
+        typeof editor.trailingNewline === "boolean"
+          ? editor.trailingNewline
+          : DEFAULT_EDITOR_SETTINGS.trailingNewline,
       defaultTitle: isDefaultTitleScheme(editor.defaultTitle)
         ? editor.defaultTitle
         : DEFAULT_EDITOR_SETTINGS.defaultTitle,

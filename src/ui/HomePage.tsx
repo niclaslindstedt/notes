@@ -78,7 +78,9 @@ export function HomePage() {
               Write, edit, and organise plain-text notes — each with its own
               editable title (heading the page beside the app glyph) and a
               Markdown body that formats as you type. New notes can be named
-              automatically by date and time or with a running number.
+              automatically by date and time or with a running number, and each
+              note is tidied as it's saved — trailing spaces trimmed and a
+              closing newline added, both optional in Settings.
             </li>
             <li>
               Swipe a note right — in the overview or the side menu — to{" "}

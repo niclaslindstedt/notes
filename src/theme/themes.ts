@@ -201,6 +201,12 @@ export type EditorSettings = {
   // Stop the browser/OS auto-correcting and auto-capitalising what you type
   // (mostly a mobile-keyboard behaviour) so your text goes through verbatim.
   disableAutocorrect: boolean;
+  // Strip trailing spaces / tabs from every line each time a note is saved.
+  // See `SaveFormatting` in the domain — applied to the stored bytes only.
+  trimTrailingSpaces: boolean;
+  // Ensure a saved note ends with a single trailing newline. See
+  // `SaveFormatting` in the domain.
+  trailingNewline: boolean;
   // How a freshly created note is named before the user types a title of
   // their own. See `DefaultTitleScheme` in the domain.
   defaultTitle: DefaultTitleScheme;
@@ -216,6 +222,8 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   renderMarkdown: true,
   disableSpellcheck: false,
   disableAutocorrect: false,
+  trimTrailingSpaces: true,
+  trailingNewline: true,
   defaultTitle: "dateTime",
   copyScope: "body",
 };

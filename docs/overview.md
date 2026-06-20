@@ -183,8 +183,30 @@ are edited in the Editor tab of the settings modal, `EditorSection`
 (`src/ui/settings/EditorSection.tsx`), which groups them into focused bordered
 sections (mirroring the General tab) — **New notes** (the default-title scheme),
 **Writing column** (margins, word wrap), **Markdown** (live render), **Typing
-aids** (spell-check / auto-correct), and **Copying** (the copy scope) — see
+aids** (spell-check / auto-correct), **Formatting on save** (see
+[Format on save](#format-on-save)), and **Copying** (the copy scope) — see
 [Storage settings](#storage-settings) and its sibling sections.
+
+### Format on save
+
+`SaveFormatting` (`src/domain/note.ts`) is the pair of toggles that tidy a
+note's body each time it is persisted: `trimTrailingSpaces` clears trailing
+spaces / tabs from every line, and `trailingNewline` ensures the body ends with
+a single newline (without doubling one already there). Both default on. The
+pure `formatBody` / `formatSnapshotForSave` apply them, and the persistence
+engine calls `formatSnapshotForSave` in `performSave`
+(`src/app/use-notes-sync.ts`) on the snapshot it serializes — **only the stored
+bytes are tidied; the on-screen document and undo timeline keep exactly what
+was typed**. This is deliberate: the [live-preview editor](#markdown-editor)
+treats a body that differs from what it echoed back as another writer's edit
+and would clobber the keystroke, so trimming in memory would fight the caret.
+The tidied form lands in memory the next time the note is read back from the
+backend. The two flags are [Editor settings](#editor-settings) on the synced
+[appearance store](#appearance-store), edited under **Formatting on save** in
+the Editor tab, and changing either unlocks the **Tidy up** achievement. (The
+markdown file backends already end every `.md` file with a newline via the
+[markdown codec](#markdown-codec) independent of these flags; the toggles
+govern the note body's own canonical form.)
 
 ### Image attachments
 

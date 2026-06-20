@@ -54,6 +54,7 @@ const settings: SettingsCatalog = {
     layoutTitle: "Skrivkolumn",
     markdownTitle: "Markdown",
     typingTitle: "Skrivhjälp",
+    formattingTitle: "Formatering vid sparande",
     copyTitle: "Kopiering",
     defaultTitle: "Standardtitel",
     defaultTitleHint:
@@ -74,6 +75,12 @@ const settings: SettingsCatalog = {
     disableAutocorrect: "Inaktivera autokorrigering",
     disableAutocorrectHint:
       "Sluta låta enheten autokorrigera och automatiskt göra versaler medan du skriver (påverkar mest mobiltangentbord).",
+    trimTrailingSpaces: "Ta bort släpande blanksteg",
+    trimTrailingSpacesHint:
+      "Ta bort blanksteg som lämnats kvar i slutet av varje rad när en anteckning sparas.",
+    trailingNewline: "Avsluta med radbrytning",
+    trailingNewlineHint:
+      "Se till att en sparad anteckning avslutas med en enda avslutande radbrytning.",
     copyScope: "Kopiera",
     copyScopeHint:
       "Vad redigerarens kopieringsknapp lägger på urklipp. Brödtext är bara det du skrev; de andra lägger till titeln, eller hela .md-filen med dess YAML-frontmatter.",

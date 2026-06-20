@@ -15,7 +15,12 @@ import {
 } from "react";
 
 import { unlock } from "../achievements/index.ts";
-import { type Snapshot } from "../domain/note.ts";
+import {
+  DEFAULT_SAVE_FORMATTING,
+  formatSnapshotForSave,
+  type SaveFormatting,
+  type Snapshot,
+} from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 import {
   AuthError,
@@ -144,6 +149,11 @@ export interface NotesSync {
 
 export function useNotesSync(deps: {
   active: StorageAdapter;
+  // How to tidy each note's body before it's written to the backend
+  // (format-on-save). Read through a ref at save time so a settings change
+  // takes effect on the next save without re-arming the engine. Defaults to
+  // the standard "trim + trailing newline" when the caller omits it.
+  formatting?: SaveFormatting;
   // Called whenever the document is replaced wholesale from outside the edit
   // path (initial / swap load, reload, conflict-adopt) so the undo timeline
   // re-seeds against the new baseline instead of describing edits to a
@@ -153,6 +163,13 @@ export function useNotesSync(deps: {
   resetHistory?: MutableRefObject<(seed: Snapshot) => void>;
 }): NotesSync {
   const { active, resetHistory } = deps;
+
+  // Latest format-on-save settings, read from the save callbacks without
+  // re-subscribing them to every render.
+  const formattingRef = useRef<SaveFormatting>(
+    deps.formatting ?? DEFAULT_SAVE_FORMATTING,
+  );
+  formattingRef.current = deps.formatting ?? DEFAULT_SAVE_FORMATTING;
 
   // Adapter and concurrency token survive re-renders.
   const adapterRef = useRef(active);
@@ -251,8 +268,14 @@ export function useNotesSync(deps: {
       const generation = saveGeneration.current;
       inFlight.current = true;
       setStatus("saving");
+      // Tidy the body of each note in the bytes we persist (format-on-save).
+      // Only the stored snapshot is normalised; `next` (and so the on-screen
+      // document and undo timeline) stays exactly as typed.
+      const bytes = serialize(
+        formatSnapshotForSave(next, formattingRef.current),
+      );
       void adapterRef.current
-        .save(serialize(next), baseRevision)
+        .save(bytes, baseRevision)
         .then((stored) => {
           inFlight.current = false;
           if (saveGeneration.current !== generation) return;
