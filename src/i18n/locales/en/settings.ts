@@ -52,6 +52,11 @@ const settings = {
 
   editor: {
     title: "Editor",
+    newNotesTitle: "New notes",
+    layoutTitle: "Writing column",
+    markdownTitle: "Markdown",
+    typingTitle: "Typing aids",
+    copyTitle: "Copying",
     defaultTitle: "Default note title",
     defaultTitleHint:
       "What to name a new note before you give it a title of your own.",

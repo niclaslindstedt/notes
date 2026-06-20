@@ -169,8 +169,11 @@ title settles.
 [Copy button](#copy-button)). They live in the
 [appearance store](#appearance-store) (so they sync with the folder/cloud) and
 are edited in the Editor tab of the settings modal, `EditorSection`
-(`src/ui/settings/EditorSection.tsx`) — see [Storage settings](#storage-settings)
-and its sibling sections.
+(`src/ui/settings/EditorSection.tsx`), which groups them into focused bordered
+sections (mirroring the General tab) — **New notes** (the default-title scheme),
+**Writing column** (margins, word wrap), **Markdown** (live render), **Typing
+aids** (spell-check / auto-correct), and **Copying** (the copy scope) — see
+[Storage settings](#storage-settings) and its sibling sections.
 
 ### Image attachments
 
