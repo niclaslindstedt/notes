@@ -1,13 +1,17 @@
-// Turn a pasted / dropped image into a note `Attachment`: read the blob as a
-// `data:` URL, mint a unique filename from its type and name, and pre-warm its
-// thumbnail so the inline preview paints immediately. DOM-bound (FileReader,
-// DataTransfer, ClipboardEvent), so it lives in `ui/`.
+// Turn a pasted / dropped file into a note `Attachment`: read the blob as a
+// `data:` URL and mint a unique filename. An image also pre-warms its
+// thumbnail so the inline preview paints immediately; any other file becomes a
+// downloadable attachment with no preview. DOM-bound (FileReader, DataTransfer,
+// ClipboardEvent), so it lives in `ui/`.
 
 import {
   type Attachment,
   attachmentFilename,
+  fileAttachmentFilename,
   isAttachableImageMime,
+  mimeForFilename,
 } from "../../domain/attachment.ts";
+import { isImportableFilename } from "../../domain/import.ts";
 import { warmThumbnail } from "./thumbnail.ts";
 
 function readAsDataUrl(file: Blob): Promise<string> {
@@ -19,31 +23,50 @@ function readAsDataUrl(file: Blob): Promise<string> {
   });
 }
 
-/** Build an `Attachment` from an image file, or null when it isn't an image. */
+/**
+ * Build an `Attachment` from any file. Images keep a MIME-derived extension
+ * and pre-warm a thumbnail; other files keep their own extension (their MIME
+ * may be unknown) and carry no preview.
+ */
 export async function fileToAttachment(file: File): Promise<Attachment | null> {
-  if (!isAttachableImageMime(file.type)) return null;
   const data = await readAsDataUrl(file);
-  const filename = attachmentFilename(file.type, file.name);
-  warmThumbnail(filename, data);
-  return { filename, mime: file.type, data };
+  if (isAttachableImageMime(file.type)) {
+    const filename = attachmentFilename(file.type, file.name);
+    warmThumbnail(filename, data);
+    return { filename, mime: file.type, data };
+  }
+  const filename = fileAttachmentFilename(file.name);
+  const mime = file.type || mimeForFilename(file.name);
+  return { filename, mime, data };
 }
 
-/** The image files among a drop / paste's items (filtered by MIME type). */
-export function imageFilesFrom(data: DataTransfer | null | undefined): File[] {
+/** Every file in a drop / paste payload (deduping `items` against `files`). */
+function filesFrom(data: DataTransfer | null | undefined): File[] {
   if (!data) return [];
   const out: File[] = [];
-  // `items` carries clipboard images that aren't in `files` on some browsers;
+  // `items` carries clipboard files that aren't in `files` on some browsers;
   // de-dupe by falling back to `files` only when `items` is empty.
   if (data.items && data.items.length > 0) {
     for (const item of Array.from(data.items)) {
       if (item.kind !== "file") continue;
       const file = item.getAsFile();
-      if (file && isAttachableImageMime(file.type)) out.push(file);
+      if (file) out.push(file);
     }
     if (out.length > 0) return out;
   }
-  for (const file of Array.from(data.files ?? [])) {
-    if (isAttachableImageMime(file.type)) out.push(file);
-  }
-  return out;
+  return Array.from(data.files ?? []);
+}
+
+/**
+ * The files in a drop / paste the editor should attach: images, plus any file
+ * that isn't an importable markdown/text note. Importable text files are left
+ * out so dropping a `.md` onto the editor still falls through to the
+ * note-import path rather than attaching the note as a file.
+ */
+export function attachableFilesFrom(
+  data: DataTransfer | null | undefined,
+): File[] {
+  return filesFrom(data).filter(
+    (f) => isAttachableImageMime(f.type) || !isImportableFilename(f.name),
+  );
 }

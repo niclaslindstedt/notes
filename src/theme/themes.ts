@@ -207,6 +207,12 @@ export type EditorSettings = {
   // Ensure a saved note ends with a single trailing newline. See
   // `SaveFormatting` in the domain.
   trailingNewline: boolean;
+  // Collect pasted/dropped image attachments in a block at the foot of the
+  // note instead of rendering them inline where their reference sits. The
+  // reference stays in the body; only where the thumbnail *renders* changes.
+  imagesAtEnd: boolean;
+  // Same as `imagesAtEnd`, for non-image file attachments (the file chips).
+  filesAtEnd: boolean;
   // How a freshly created note is named before the user types a title of
   // their own. See `DefaultTitleScheme` in the domain.
   defaultTitle: DefaultTitleScheme;
@@ -224,6 +230,8 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   disableAutocorrect: false,
   trimTrailingSpaces: true,
   trailingNewline: true,
+  imagesAtEnd: false,
+  filesAtEnd: false,
   defaultTitle: "dateTime",
   copyScope: "body",
 };

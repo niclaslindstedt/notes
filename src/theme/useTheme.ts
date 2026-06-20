@@ -222,6 +222,8 @@ function coerce(raw: unknown): Appearance {
         typeof editor.trailingNewline === "boolean"
           ? editor.trailingNewline
           : DEFAULT_EDITOR_SETTINGS.trailingNewline,
+      imagesAtEnd: editor.imagesAtEnd === true,
+      filesAtEnd: editor.filesAtEnd === true,
       defaultTitle: isDefaultTitleScheme(editor.defaultTitle)
         ? editor.defaultTitle
         : DEFAULT_EDITOR_SETTINGS.defaultTitle,

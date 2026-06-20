@@ -82,6 +82,24 @@ function noteWithImage(): { note: Note; attachment: Attachment } {
   return { note, attachment };
 }
 
+// A non-image file attachment, referenced in the body as a plain link.
+const PDF_DATA_URL = "data:application/pdf;base64,SGVsbG8=";
+
+function noteWithFile(): { note: Note; attachment: Attachment } {
+  const attachment: Attachment = {
+    filename: "abcd1234-report.pdf",
+    mime: "application/pdf",
+    data: PDF_DATA_URL,
+  };
+  const note: Note = {
+    ...createNote(200),
+    title: "Filed",
+    body: `intro\n${attachmentMarkdown(attachment)}`,
+    attachments: [attachment],
+  };
+  return { note, attachment };
+}
+
 describe("data: URL <-> bytes", () => {
   it("round-trips a base64 data URL", () => {
     const decoded = dataUrlToBytes(DATA_URL);
@@ -181,6 +199,41 @@ describe("directory adapter attachments", () => {
     const envelope = JSON.stringify({ encrypted: "notes.encrypted.v1" });
     await a.save(envelope);
     expect(attachments.files.size).toBe(0);
+  });
+
+  it("externalises and re-hydrates a non-image file attachment", async () => {
+    const store = memoryStore();
+    const attachments = memoryAttachments();
+    const a = createDirectoryAdapter(
+      store,
+      { id: "folder", label: "T" },
+      attachments,
+    );
+    const { note } = noteWithFile();
+    await a.save(serialize({ notes: [note] }));
+
+    const stem = noteFileStem(note);
+    const path = `${stem}/abcd1234-report.pdf`;
+    expect(attachments.files.has(path)).toBe(true);
+    // The body keeps a plain link (not an image reference) to the file.
+    const md = await store.read(`${stem}.md`);
+    expect(md).toContain(`[abcd1234-report.pdf](../attachments/${stem}/`);
+    expect(md).not.toContain("![abcd1234-report.pdf]");
+
+    // A cold adapter reconstructs the file attachment with its recovered mime.
+    const b = createDirectoryAdapter(
+      store,
+      { id: "folder", label: "T" },
+      attachments,
+    );
+    const loaded = await b.load();
+    expect(parse(loaded?.text).notes[0]!.attachments).toEqual([
+      {
+        filename: "abcd1234-report.pdf",
+        mime: "application/pdf",
+        data: PDF_DATA_URL,
+      },
+    ]);
   });
 
   it("advertises the attachments capability only when a store is wired", () => {

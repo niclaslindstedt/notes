@@ -1,10 +1,12 @@
 import { type ReactNode } from "react";
 
+import { attachmentFilenameFromHref } from "../domain/attachment.ts";
 import {
   parseInline,
   type InlineNode,
   type LineBlock,
 } from "../domain/markdown.ts";
+import { FileAttachment } from "./attachments/FileAttachment.tsx";
 import { InlineImage } from "./attachments/InlineImage.tsx";
 import { useAttachmentsContext } from "./attachments/context.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
@@ -36,22 +38,12 @@ function renderInline(nodes: InlineNode[]): ReactNode[] {
         );
       case "link":
         return (
-          <a
+          <LinkNode
             key={i}
-            data-src={node.offset}
+            text={node.text}
             href={node.href}
-            target="_blank"
-            rel="noreferrer noopener"
-            // Stop the editor's line-level mousedown from rolling the caret here
-            // (which would replace this anchor with the raw-source textarea
-            // before the click lands), so a click opens the link instead of
-            // entering edit mode. To edit the link, click just past it and
-            // backspace into it. Mirrors `InlineImage`.
-            onMouseDown={(e) => e.stopPropagation()}
-            className="text-link underline underline-offset-2"
-          >
-            {node.text}
-          </a>
+            offset={node.offset}
+          />
         );
       case "image":
         return (
@@ -83,7 +75,9 @@ function renderInline(nodes: InlineNode[]): ReactNode[] {
 // An image reference. When it resolves to one of the note's attachments (via
 // the surrounding `AttachmentsProvider`), render the clickable thumbnail;
 // otherwise fall back to the raw markdown text so a stray `![…](…)` stays
-// visible and editable rather than vanishing.
+// visible and editable rather than vanishing. When the placement puts images
+// at the end of the note, the inline node renders nothing — the thumbnail is
+// shown in the collected end-of-note block instead (`AttachmentsEndBlock`).
 function ImageNode({
   alt,
   href,
@@ -98,8 +92,48 @@ function ImageNode({
   if (!ctx || !attachment) {
     return <span data-src={offset}>{`![${alt}](${href})`}</span>;
   }
+  if (ctx.placement.imagesAtEnd) return null;
   return (
     <InlineImage attachment={attachment} srcOffset={offset} onOpen={ctx.open} />
+  );
+}
+
+// A link node. A link whose href points into the `attachments/` tree is a file
+// attachment: render the downloadable file chip when it resolves (or the raw
+// `[…](…)` markdown when it doesn't, so an unresolved reference stays editable
+// rather than rendering as a broken relative link), and nothing when the
+// placement collects files at the note's end. Any other link is an ordinary
+// hyperlink. Stops the editor's line-level mousedown so a click follows the
+// link / downloads the file instead of rolling the caret onto its line.
+function LinkNode({
+  text,
+  href,
+  offset,
+}: {
+  text: string;
+  href: string;
+  offset: number;
+}) {
+  const ctx = useAttachmentsContext();
+  if (attachmentFilenameFromHref(href) !== null) {
+    const attachment = ctx?.resolve(href) ?? null;
+    if (ctx && attachment) {
+      if (ctx.placement.filesAtEnd) return null;
+      return <FileAttachment attachment={attachment} srcOffset={offset} />;
+    }
+    return <span data-src={offset}>{`[${text}](${href})`}</span>;
+  }
+  return (
+    <a
+      data-src={offset}
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      onMouseDown={(e) => e.stopPropagation()}
+      className="text-link underline underline-offset-2"
+    >
+      {text}
+    </a>
   );
 }
 

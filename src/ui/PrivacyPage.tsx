@@ -67,8 +67,8 @@ export function PrivacyPage() {
               The text of your notes and when each was created and edited.
             </li>
             <li>
-              Any images you attach to a note. On a local folder or cloud
-              backend these are written as ordinary image files in an{" "}
+              Any images and files you attach to a note. On a local folder or
+              cloud backend these are written as ordinary files in an{" "}
               <code className="text-fg-bright">attachments</code> folder beside
               your notes; they are read from your device when you paste or drop
               them and are never sent anywhere other than the sync backend you

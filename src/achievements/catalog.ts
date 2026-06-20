@@ -5,6 +5,7 @@
 // under `achievements.catalog.<id>.*`; the renderer composes the lookup by id.
 // `learnMore: true` flags entries that carry an expanded body.
 
+import { isImageAttachment } from "../domain/attachment.ts";
 import type { Snapshot } from "../domain/note.ts";
 import {
   AccessibilityGlyph,
@@ -27,6 +28,8 @@ import {
   MergeGlyph,
   MoveGlyph,
   PaletteGlyph,
+  PanelBottomGlyph,
+  PaperclipGlyph,
   PlusGlyph,
   RefreshGlyph,
   ScaleTextGlyph,
@@ -63,7 +66,16 @@ const hasArchivedNote = (snap: Snapshot) => snap.notes.some((n) => n.archived);
 // A note that carries an image attachment — the first time someone pastes or
 // drops a picture into a note (only possible on a folder / cloud backend).
 const hasAttachment = (snap: Snapshot) =>
-  snap.notes.some((n) => (n.attachments?.length ?? 0) > 0);
+  snap.notes.some((n) =>
+    (n.attachments ?? []).some((a) => isImageAttachment(a)),
+  );
+
+// A note that carries a non-image file attachment — the first time someone
+// pastes or drops a file (a PDF, an archive, …) into a note.
+const hasFileAttachment = (snap: Snapshot) =>
+  snap.notes.some((n) =>
+    (n.attachments ?? []).some((a) => !isImageAttachment(a)),
+  );
 
 export const ACHIEVEMENTS: readonly Achievement[] = [
   // ──────────────────────────────────────────────────────────────
@@ -227,6 +239,24 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     },
   },
   {
+    id: "appendix",
+    tier: "intermediate",
+    glyph: PanelBottomGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [
+        s.appearance.editor.imagesAtEnd,
+        s.appearance.editor.filesAtEnd,
+      ],
+      predicate: (prev, next) =>
+        (!prev.appearance.editor.imagesAtEnd &&
+          next.appearance.editor.imagesAtEnd) ||
+        (!prev.appearance.editor.filesAtEnd &&
+          next.appearance.editor.filesAtEnd),
+    },
+  },
+  {
     id: "tidyUp",
     tier: "intermediate",
     glyph: BroomGlyph,
@@ -326,6 +356,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       slices: (s) => [s.snapshot.notes],
       predicate: (prev, next) =>
         !hasAttachment(prev.snapshot) && hasAttachment(next.snapshot),
+    },
+  },
+  {
+    id: "paperTrail",
+    tier: "pro",
+    glyph: PaperclipGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasFileAttachment(prev.snapshot) && hasFileAttachment(next.snapshot),
     },
   },
   {

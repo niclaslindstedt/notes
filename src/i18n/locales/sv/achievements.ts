@@ -123,6 +123,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Inställningar → Redigerare städar varje anteckning när den sparas — tar bort släpande blanksteg från varje rad och avslutar anteckningen med en enda radbrytning. Stäng av endera för att behålla dina anteckningar precis som du skrev dem.",
     },
+    appendix: {
+      name: "Appendix",
+      condition: "Visa bilagor i slutet av anteckningen.",
+      learnMore:
+        "Inställningar → Redigerare kan samla en anteckningas bilder och filer i ett block längst ned i anteckningen istället för att visa dem inline där du klistrade in dem — praktiskt när bilagorna är referenser snarare än en del av flödet. Bilder och filer växlas oberoende av varandra.",
+    },
     archivist: {
       name: "Arkivarie",
       condition: "Arkivera en anteckning.",
@@ -184,6 +190,12 @@ const achievements: AchievementsCatalog = {
       condition: "Klistra in eller släpp en bild i en anteckning.",
       learnMore:
         "Med en lokal mapp eller molnbackend kan du klistra in (Ctrl/Cmd+V) eller dra en bild rakt in i redigeraren. Den sparas som en riktig bildfil i en attachments-mapp bredvid dina anteckningar och visas inline som en miniatyr du kan klicka på för att öppna i full storlek.",
+    },
+    paperTrail: {
+      name: "Pappersspår",
+      condition: "Bifoga en fil till en anteckning.",
+      learnMore:
+        "Med en lokal mapp eller molnbackend kan du klistra in eller dra vilken fil som helst — en PDF, ett arkiv, ett kalkylark — rakt in i redigeraren. Den sparas som en riktig fil i en attachments-mapp bredvid dina anteckningar och visas som en bricka med sin typikon som du kan klicka på för att ladda ner.",
     },
     liveSync: {
       name: "Telepati",

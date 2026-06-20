@@ -105,6 +105,21 @@ export function EditorSection({
         />
       </Section>
 
+      <Section title={t("settings.editor.attachmentsTitle")}>
+        <ToggleRow
+          label={t("settings.editor.imagesAtEnd")}
+          hint={t("settings.editor.imagesAtEndHint")}
+          checked={editor.imagesAtEnd}
+          onChange={(v) => update("imagesAtEnd", v)}
+        />
+        <ToggleRow
+          label={t("settings.editor.filesAtEnd")}
+          hint={t("settings.editor.filesAtEndHint")}
+          checked={editor.filesAtEnd}
+          onChange={(v) => update("filesAtEnd", v)}
+        />
+      </Section>
+
       <Section title={t("settings.editor.typingTitle")}>
         <ToggleRow
           label={t("settings.editor.disableSpellcheck")}

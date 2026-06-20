@@ -100,12 +100,15 @@ export function HomePage() {
               never uploaded anywhere.
             </li>
             <li>
-              Attach images to a note — paste (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+
-              <kbd>V</kbd>) or drag an image into the editor and it appears as a
-              clickable thumbnail. Images are saved as ordinary image files in
-              an <em>attachments</em> folder beside your notes, so this is
+              Attach images and files to a note — paste (<kbd>Ctrl</kbd>/
+              <kbd>⌘</kbd>+<kbd>V</kbd>) or drag a file into the editor. An
+              image appears as a clickable thumbnail; any other file (a PDF, an
+              archive, a spreadsheet…) appears as a chip you can click to
+              download. They are saved as ordinary files in an{" "}
+              <em>attachments</em> folder beside your notes, so this is
               available when you sync to a local folder, Dropbox, or Google
-              Drive (see below).
+              Drive (see below). You can choose in Settings to collect images
+              and files in a block at the end of the note instead of inline.
             </li>
             <li>
               <em>Copy</em> a note to your clipboard with the button beside the

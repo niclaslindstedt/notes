@@ -10,7 +10,10 @@ import {
 
 import { unlock, useAchievementWatcher } from "../achievements/index.ts";
 import { useDevSeed } from "../dev/useDevSeed.ts";
-import { type Attachment } from "../domain/attachment.ts";
+import {
+  type Attachment,
+  hiddenAttachmentLines,
+} from "../domain/attachment.ts";
 import { classifyLines } from "../domain/markdown.ts";
 import {
   defaultNoteTitle,
@@ -47,6 +50,7 @@ import {
 } from "../ui/icons.tsx";
 import { CopyNoteButton } from "../ui/CopyNoteButton.tsx";
 import { RenderedLine } from "../ui/MarkdownLine.tsx";
+import { AttachmentsEndBlock } from "../ui/attachments/AttachmentsEndBlock.tsx";
 import { AttachmentsProvider } from "../ui/attachments/AttachmentsProvider.tsx";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
@@ -712,6 +716,14 @@ function ReadOnlyNote({
   // Respect the Markdown-rendering preference: formatted lines when on, the
   // raw source otherwise — matching how the same note reads in the editor.
   const blocks = editor.renderMarkdown ? classifyLines(note.body) : null;
+  const placement = {
+    imagesAtEnd: editor.imagesAtEnd,
+    filesAtEnd: editor.filesAtEnd,
+  };
+  // Lines whose attachment renders in the collected end block instead.
+  const hidden = blocks
+    ? hiddenAttachmentLines(note.body, placement)
+    : new Set<number>();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -737,15 +749,21 @@ function ReadOnlyNote({
             <h1 className="mb-3 text-2xl font-bold text-fg-bright">{title}</h1>
           )}
           {blocks ? (
-            <AttachmentsProvider attachments={note.attachments}>
-              {blocks.map((block, i) => (
-                <div
-                  key={i}
-                  className="text-fg break-words whitespace-pre-wrap"
-                >
-                  <RenderedLine block={block} />
-                </div>
-              ))}
+            <AttachmentsProvider
+              attachments={note.attachments}
+              placement={placement}
+            >
+              {blocks.map((block, i) =>
+                hidden.has(i) ? null : (
+                  <div
+                    key={i}
+                    className="text-fg break-words whitespace-pre-wrap"
+                  >
+                    <RenderedLine block={block} />
+                  </div>
+                ),
+              )}
+              <AttachmentsEndBlock />
             </AttachmentsProvider>
           ) : (
             <pre className="text-fg font-[inherit] break-words whitespace-pre-wrap">
@@ -871,6 +889,10 @@ function Editor({
             attachments={note.attachments}
             canAttach={canAttach}
             onAttach={onAttach}
+            placement={{
+              imagesAtEnd: editor.imagesAtEnd,
+              filesAtEnd: editor.filesAtEnd,
+            }}
           />
         ) : (
           <PlainEditor
