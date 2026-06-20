@@ -1024,6 +1024,7 @@ function Editor({
               imagesAtEnd: editor.imagesAtEnd,
               filesAtEnd: editor.filesAtEnd,
             }}
+            shortenLinkChars={editor.shortenLinkChars}
           />
         ) : (
           <PlainEditor

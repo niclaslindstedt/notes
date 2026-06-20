@@ -213,6 +213,12 @@ export type EditorSettings = {
   imagesAtEnd: boolean;
   // Same as `imagesAtEnd`, for non-image file attachments (the file chips).
   filesAtEnd: boolean;
+  // Shorten long bare URLs in the live preview to `domain` + this many
+  // characters + `[...]` + the same many trailing characters, so a pasted
+  // tracking link doesn't sprawl across the note. 0 shows the URL in full.
+  // Only the displayed text is trimmed — the source and the click target keep
+  // the whole URL. See `shortenUrl` in the domain.
+  shortenLinkChars: number;
   // How a freshly created note is named before the user types a title of
   // their own. See `DefaultTitleScheme` in the domain.
   defaultTitle: DefaultTitleScheme;
@@ -232,9 +238,15 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   trailingNewline: true,
   imagesAtEnd: false,
   filesAtEnd: false,
+  shortenLinkChars: 0,
   defaultTitle: "dateTime",
   copyScope: "body",
 };
+
+// The per-side character counts offered for link shortening. 0 is "Off" (show
+// the whole URL); the rest keep that many characters either side of the elided
+// middle. Drives the Editor settings control and bounds what the parser accepts.
+export const LINK_SHORTEN_LENGTHS: readonly number[] = [0, 8, 12, 16, 24];
 
 export type RadiusPreset = "none" | "sm" | "md" | "lg";
 export type DensityPreset = "compact" | "comfortable" | "spacious";

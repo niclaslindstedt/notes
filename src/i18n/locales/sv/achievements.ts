@@ -129,6 +129,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Inställningar → Redigerare kan samla en anteckningas bilder och filer i ett block längst ned i anteckningen istället för att visa dem inline där du klistrade in dem — praktiskt när bilagorna är referenser snarare än en del av flödet. Bilder och filer växlas oberoende av varandra.",
     },
+    shortAndSweet: {
+      name: "Kort och gott",
+      condition: "Slå på länkförkortning.",
+      learnMore:
+        "Inställningar → Redigerare kortar ned långa inklistrade URL:er i förhandsvisningen till domänen plus några tecken på var sida om en [...]-markör, så att en spårningslänk inte längre breder ut sig över anteckningen. Hela länken sparas och öppnas fortfarande när du klickar — bara visningen förkortas.",
+    },
     archivist: {
       name: "Arkivarie",
       condition: "Arkivera en anteckning.",

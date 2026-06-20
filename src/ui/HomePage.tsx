@@ -80,7 +80,9 @@ export function HomePage() {
               Markdown body that formats as you type. New notes can be named
               automatically by date and time or with a running number, and each
               note is tidied as it's saved — trailing spaces trimmed and a
-              closing newline added, both optional in Settings.
+              closing newline added, both optional in Settings. Long pasted
+              links can be shortened in the preview so they don't sprawl across
+              the note — the full link is still saved and still opens.
             </li>
             <li>
               Swipe a note right — in the overview or the side menu — to{" "}

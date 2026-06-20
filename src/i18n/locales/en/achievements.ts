@@ -135,6 +135,12 @@ const achievements = {
       learnMore:
         "Settings → Editor can collect a note's images and files into a block at the foot of the note instead of showing them inline where you pasted them — handy when the attachments are references, not part of the flow. Images and files toggle independently.",
     },
+    shortAndSweet: {
+      name: "Short and sweet",
+      condition: "Turn on link shortening.",
+      learnMore:
+        "Settings → Editor trims long pasted URLs in the preview down to the domain plus a few characters either side of an [...] marker, so a tracking link no longer sprawls across the note. The whole link is still saved and still opens when clicked — only the display is shortened.",
+    },
     archivist: {
       name: "Archivist",
       condition: "Archive a note.",

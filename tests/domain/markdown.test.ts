@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyLines,
   parseInline,
+  shortenUrl,
   type InlineNode,
 } from "../../src/domain/markdown.ts";
 
@@ -100,6 +101,8 @@ describe("parseInline", () => {
       text: "http://google.se",
       href: "http://google.se",
       offset: 0,
+      // Flagged bare so the renderer may shorten it.
+      bare: true,
     });
     expect(parseInline("https://x.y")[0]).toMatchObject({
       type: "link",
@@ -145,6 +148,8 @@ describe("parseInline", () => {
       text: "label",
       href: "http://x.y",
     });
+    // An explicit link is never flagged bare, so its label is never shortened.
+    expect((node as { bare?: true }).bare).toBeUndefined();
   });
 
   it("parses an image into alt and href, distinct from a link", () => {
@@ -188,5 +193,40 @@ describe("parseInline", () => {
     const nodes = parseInline("**oops");
     expect(flatten(nodes)).toBe("**oops");
     expect(nodes.every((n) => n.type === "text")).toBe(true);
+  });
+});
+
+describe("shortenUrl", () => {
+  it("returns the URL unchanged when shortening is off (0 chars)", () => {
+    const url = "https://www.example.com/a/very/long/path?q=1234567890";
+    expect(shortenUrl(url, 0)).toBe(url);
+  });
+
+  it("keeps the domain plus N chars, an ellipsis, and the last N chars", () => {
+    const url =
+      "https://www.webhallen.com/se/product/397375-ON-CGK-100?utm_source=google&gclid=CjwKCAjw9NjRBhAT_p2J8XjINYQAvD_BwE";
+    const out = shortenUrl(url, 11);
+    expect(out).toBe("https://www.webhallen.com/se/product[...]INYQAvD_BwE");
+    expect(out).toContain("[...]");
+    expect(out.length).toBeLessThan(url.length);
+  });
+
+  it("derives the domain from a bare www. URL (no scheme)", () => {
+    const url = "www.example.com/path/to/something/longer";
+    const out = shortenUrl(url, 6);
+    expect(out.startsWith("www.example.com")).toBe(true);
+    expect(out).toContain("[...]");
+  });
+
+  it("leaves a short URL untouched rather than padding it", () => {
+    // Head + ellipsis + tail would meet or overlap, so there's nothing to gain.
+    const url = "https://x.io/abc";
+    expect(shortenUrl(url, 8)).toBe(url);
+  });
+
+  it("never produces a result longer than the original", () => {
+    const url = "https://host.example/" + "a".repeat(40);
+    const out = shortenUrl(url, 4);
+    expect(out.length).toBeLessThanOrEqual(url.length);
   });
 });

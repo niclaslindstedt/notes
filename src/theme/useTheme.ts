@@ -39,6 +39,7 @@ import {
   FONT_FAMILIES,
   FONT_SCALE_PRESETS,
   isEditorMargin,
+  LINK_SHORTEN_LENGTHS,
   type CustomTheme,
   type DensityPreset,
   type EditorSettings,
@@ -225,6 +226,11 @@ function coerce(raw: unknown): Appearance {
           : DEFAULT_EDITOR_SETTINGS.trailingNewline,
       imagesAtEnd: editor.imagesAtEnd === true,
       filesAtEnd: editor.filesAtEnd === true,
+      shortenLinkChars: LINK_SHORTEN_LENGTHS.includes(
+        editor.shortenLinkChars as number,
+      )
+        ? (editor.shortenLinkChars as number)
+        : DEFAULT_EDITOR_SETTINGS.shortenLinkChars,
       defaultTitle: isDefaultTitleScheme(editor.defaultTitle)
         ? editor.defaultTitle
         : DEFAULT_EDITOR_SETTINGS.defaultTitle,

@@ -68,6 +68,8 @@ type Props = {
   onAttach?: (attachment: Attachment) => void;
   /** Render images / files inline (default) or collected at the note's foot. */
   placement?: AttachmentPlacement;
+  /** Trim bare URLs in the preview to this many characters either side (0 = off). */
+  shortenLinkChars?: number;
 };
 
 export function MarkdownEditor({
@@ -83,6 +85,7 @@ export function MarkdownEditor({
   canAttach = false,
   onAttach,
   placement = INLINE_PLACEMENT,
+  shortenLinkChars = 0,
 }: Props) {
   const t = useT();
   // Local source of truth, seeded from the note. App keys the editor by note
@@ -540,7 +543,10 @@ export function MarkdownEditor({
                 onMouseDown={(e) => activateAt(e, index)}
                 className={`cursor-text text-fg ${wrapClass}`}
               >
-                <RenderedLine block={blocks[index]!} />
+                <RenderedLine
+                  block={blocks[index]!}
+                  shortenLinkChars={shortenLinkChars}
+                />
               </div>
             );
           })}
