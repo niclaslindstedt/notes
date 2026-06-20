@@ -150,6 +150,14 @@ export function HomePage() {
               with a note open. It waits for a pause in your typing first, so it
               never overwrites what you&apos;re writing.
             </li>
+            <li>
+              Optionally encrypt everything at rest with a passphrase only you
+              hold. Each note and each attachment is compressed and encrypted in
+              your browser into its own file under an opaque name, so titles,
+              filenames, and your images are unreadable in the folder or cloud.
+              A green lock fills in note-by-note as the app seals them, and an
+              opened note downloads only its own attachments.
+            </li>
           </ul>
         </Section>
 

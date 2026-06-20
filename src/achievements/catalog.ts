@@ -33,6 +33,7 @@ import {
   PlusGlyph,
   RefreshGlyph,
   ScaleTextGlyph,
+  ShieldGlyph,
   SmartphoneGlyph,
   TypeGlyph,
   UndoGlyph,
@@ -386,6 +387,15 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     tier: "expert",
     glyph: LockGlyph,
     learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "fortKnox",
+    tier: "expert",
+    glyph: ShieldGlyph,
+    learnMore: true,
+    // Fired when the background migration finishes sealing every note + all its
+    // attachments at rest (the green lock on every note).
     trigger: { kind: "manual" },
   },
   {

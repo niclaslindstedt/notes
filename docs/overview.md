@@ -63,9 +63,12 @@ prompts the first note.
 
 `NoteCard` / `SwipeableNoteCard` in `src/app/App.tsx` — one note in the
 overview. Shows the note's title (`noteTitle`) and a one-line preview
-(`notePreview`). `SwipeableNoteCard` wraps it in `useRowSwipe`: a right-swipe
-archives the note, a left-swipe latches a trash button that needs a second tap
-to delete (both undoable).
+(`notePreview`), plus a green **lock** (`LockIcon`, theme `--accent`) when the
+note and all its attachments are encrypted at rest (the per-note status from the
+[encryption migration](#encryption-migration); the side-menu note rows show the
+same). `SwipeableNoteCard` wraps it in `useRowSwipe`: a right-swipe archives the
+note, a left-swipe latches a trash button that needs a second tap to delete
+(both undoable).
 
 ### Archive view
 
@@ -260,18 +263,25 @@ attachment sheds its bytes from the document on every backend — and on the fil
 backends the next save reconciles the now-orphaned file off disk
 ([directory adapter](#directory-adapter)).
 
+In memory an attachment's `data` (`data:` URL) is **optional**: on the
+file/cloud backends a note loads with its attachments' metadata (`filename` +
+`mime`) but **no bytes**, which are fetched **on demand** the first time the note
+is opened and an image/file renders (`fetchAttachment` on the adapter →
+`AttachmentFetchContext` + `useAttachmentData`, `src/ui/attachments/
+fetch-context.ts`; a thumbnail/viewer shows a placeholder until the bytes
+arrive). So the note list loads without downloading every note's images.
+
 Attachments are **only offered on a folder / cloud backend** — the editor gates
 paste / drop on the adapter's `"attachments"` capability, which the
 [directory adapter](#directory-adapter) advertises when an `AttachmentStore`
-(`src/storage/attachment-store.ts`) is wired. On save the directory adapter
-externalises each referenced file to a real file at
-`attachments/<note-name>/<filename>` (a sibling of the `notes/` folder, via each
-backend's binary `AttachmentStore`); on load it reads the files back into the
-`data:` URLs (recovering the MIME from the extension via `mimeForFilename`),
-reusing the offline cache's copies so unchanged files aren't re-downloaded.
-Under encryption the files stay inside the single encrypted blob rather than as
-separate files. The local "This device" backend has no `AttachmentStore`, so it
-never accepts an attachment.
+(`src/storage/attachment-store.ts`) is wired. **Plaintext**: on save the
+directory adapter externalises each referenced file to
+`attachments/<note-name>/<filename>` (recovering the MIME from the extension via
+`mimeForFilename` on fetch). **Encrypted**: each attachment is its own
+gzip-compressed, AES-GCM blob at a flat opaque keyed-HMAC name (the binary
+container carries the real MIME/filename *inside* the ciphertext), so nothing
+leaks — never folded into the note. The local "This device" backend has no
+`AttachmentStore`, so it never accepts an attachment.
 
 ### Attachments at the end
 
@@ -848,11 +858,18 @@ backends. It reads every `*.md` into a snapshot, writes only changed notes
 (hash-compared), removes only files it authored, and scopes conflicts per-file
 so another device's edit to a different note never blocks a save. It remembers
 the revisions it produced to tell listing lag from a real remote edit, and
-tolerates lost acks. Encrypted stores fall back to a single `notes.json` blob.
-A format conversion (toggling encryption) is the one case it removes files it
-didn't author: writing the blob clears every `*.md` (and the externalised image
-files), and writing markdown clears the blob — so a toggle can't strand the old
-representation, which the next load would otherwise read back.
+tolerates lost acks. When a session passphrase is held it switches to the
+**encrypted per-file representation** — one `<ref>.enc` per note, one opaque
+blob per attachment, change-detected by hashing the *plaintext* source so a
+fresh-IV re-encryption isn't a spurious change — and exposes `fetchAttachment`,
+`getEncryptionStatus`, `migrateNote`, and `splitLegacyBlob` for the
+[encryption migration](#encryption-migration). A representation conversion is
+the one case it removes files it didn't author, done atomically (write-new →
+verify-by-readback → delete-old over distinct deterministic paths): enabling
+supersedes every `*.md` (+ plaintext attachment files) and a legacy `notes.json`;
+disabling supersedes the `*.enc` (+ opaque blobs). So a toggle can't strand the
+old representation, and a crash mid-switch leaves both copies for an idempotent
+resume rather than losing data.
 
 ### Markdown codec
 
@@ -884,20 +901,49 @@ origin+pathname so every deploy slot round-trips to itself.
 
 ### Encryption
 
-`withEncryption` (`src/storage/encrypting/index.ts`) wraps any backend so the
-bytes it stores are AES-GCM ciphertext, decrypted on load. The key is derived
-from the passphrase by `src/storage/crypto.ts` (PBKDF2-SHA256, 600k iterations;
-`encryptText` / `decryptEnvelope`; the envelope is itself JSON so it shares the
-storage slot with plaintext). The passphrase is held in a `PasswordRef` per
-session — after reload the store is locked until the [unlock gate](#unlock-gate)
-takes it. Toggling the mode rewrites the document at rest: enabling re-wraps the
-existing notes into ciphertext and disabling decrypts them back, and the
-[directory adapter](#directory-adapter) clears the superseded representation so
-no plaintext copy lingers behind a `notes.json` (or vice versa). Both
-`enableEncryption` / `disableEncryption` (and `encryptText` / `decryptEnvelope`
-underneath) take an optional `onProgress` callback that fires once per phase
-(`reading → derivingKey → encrypting`/`decrypting → saving → finalizing`); the
-[storage settings](#storage-settings) tab feeds it into its status bar.
+At-rest encryption keys off the passphrase via `src/storage/crypto.ts`
+(PBKDF2-SHA256, 600k iterations). The key derivation is split from the cipher so
+the session key is derived **once** (`deriveSessionKeys` → a content `CryptoKey`
++ an HMAC `fileKey`) and reused for every file, rather than re-deriving per note
+— the non-secret salts live in a `.keyparams.json` beside the notes. There are
+two on-disk shapes: a self-contained JSON `Envelope` (`encryptText` /
+`decryptEnvelope`, carrying its own salt) used for the single-document browser
+backend and the offline cache seal, and a compact binary container
+(`src/storage/crypto-binary.ts`, `sealBytes`/`sealString`) used for the per-file
+form. Everything is **gzip-compressed before encryption** (`src/storage/
+compress.ts`).
+
+On the file/cloud backends encryption is **per-file**, performed inside the
+[directory adapter](#directory-adapter) (not the `withEncryption` wrapper, which
+now only wraps the browser backend): each note is its own encrypted `<ref>.enc`
+file and each attachment its own encrypted blob, both at opaque keyed-HMAC names
+so titles, filenames, and grouping don't leak. The passphrase rides a
+`passwordRef` so a runtime unlock/enable/disable doesn't rebuild the adapter;
+after reload the store is locked until the [unlock gate](#unlock-gate) takes the
+passphrase (verified against the per-file notes, or the sealed offline cache).
+Toggling the mode converts every note + attachment across representations
+atomically — write the new copy, verify it reads back, then delete the old —
+over distinct deterministic paths, so an interruption can't lose data. See
+[encryption migration](#encryption-migration) for the paced, resumable
+conversion and the green lock. `enableEncryption` / `disableEncryption` take an
+optional `onProgress` callback (`reading → derivingKey →
+encrypting`/`decrypting → saving → finalizing`) the
+[storage settings](#storage-settings) status bar feeds on.
+
+### Encryption migration
+
+`src/storage/encryption-migration.ts` (`runEncryptionMigration`) + the
+`use-encryption-migration` hook (`src/app/use-encryption-migration.ts`) — the
+paced background conversion that runs after encryption is turned on. The mode
+flips immediately (the encrypted load merges any not-yet-migrated plaintext
+remnants so the document stays complete and the migration is resumable across a
+reload), then the queue seals one note at a time via the directory adapter's
+`migrateNote` — small pacing gap + `RateLimitError` backoff so a big folder
+never bursts the cloud API. Existing users on a legacy whole-document
+`notes.json` are upgraded first by `splitLegacyBlob`. Each note reports an
+`encrypted` / `pending` status (`getEncryptionStatus`); when every note is
+sealed it fires the **Fort Knox** achievement. The status drives the green
+[lock](#note-card) shown per note in the overview and side menu.
 
 ### Offline cache
 

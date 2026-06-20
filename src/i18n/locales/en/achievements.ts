@@ -217,6 +217,12 @@ const achievements = {
       learnMore:
         "Settings → Storage encrypts your notes with a passphrase only you hold. They're sealed on disk and in the cloud until you unlock them.",
     },
+    fortKnox: {
+      name: "Fort Knox",
+      condition: "Encrypt every note and all its attachments at rest.",
+      learnMore:
+        "Each note becomes its own encrypted file and each attachment its own encrypted blob, compressed and opaquely named. A green lock fills in note-by-note as the background migration seals them — when every note is locked, you're here.",
+    },
     themeWizard: {
       name: "Theme wizard",
       condition: "Build your own custom theme.",

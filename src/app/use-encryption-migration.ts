@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { unlock } from "../achievements/index.ts";
 import type { Note } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 import { runEncryptionMigration } from "../storage/encryption-migration.ts";
@@ -68,6 +69,14 @@ export function useEncryptionMigration({
           onProgress: (id) =>
             setStatus((prev) => new Map(prev).set(id, "encrypted")),
         });
+        // Every note (and its attachments) now sealed at rest → the milestone.
+        if (
+          !cancelled &&
+          notes.length > 0 &&
+          notes.every((n) => getStatus?.()?.get(n.id) === "encrypted")
+        ) {
+          unlock("fortKnox");
+        }
       } catch (err) {
         log.warn("encryption migration aborted", err);
       } finally {

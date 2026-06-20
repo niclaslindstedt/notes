@@ -211,6 +211,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Inställningar → Lagring krypterar dina anteckningar med en lösenfras bara du har. De förseglas på disken och i molnet tills du låser upp dem.",
     },
+    fortKnox: {
+      name: "Fort Knox",
+      condition: "Kryptera varje anteckning och alla dess bilagor i vila.",
+      learnMore:
+        "Varje anteckning blir sin egen krypterade fil och varje bilaga sin egen krypterade blob, komprimerad och med ogenomskinligt namn. Ett grönt lås fylls i anteckning för anteckning medan bakgrundsmigreringen förseglar dem — när varje anteckning är låst är du här.",
+    },
     themeWizard: {
       name: "Tematrollkarl",
       condition: "Bygg ditt eget anpassade tema.",

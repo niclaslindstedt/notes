@@ -183,7 +183,10 @@ Honour these when naming a new file, key, or string.
 
 | Term                                                       | Refers to                                                                                                   |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Encryption at rest** / **password-protect** / **lock**   | `withEncryption`, `PasswordRef` (`src/storage/encrypting/index.ts`); `encryptText`, `decryptEnvelope` (`src/storage/crypto.ts`). [→](overview.md#encryption) |
+| **Encryption at rest** / **password-protect** / **lock**   | Per-file: `createDirectoryAdapter` `crypto` arg + `deriveSessionKeys`/`deriveRef` (`src/storage/crypto.ts`), `sealBytes`/`sealString` (`src/storage/crypto-binary.ts`); whole-document: `withEncryption` (`src/storage/encrypting/index.ts`), `encryptText`/`decryptEnvelope`. [→](overview.md#encryption) |
+| **Compression** / **gzip before encrypt**                  | `gzip`/`gunzip`/`gzipText`/`gunzipText` (`src/storage/compress.ts`). [→](overview.md#encryption) |
+| **Encryption migration** / **green lock** / **watch it encrypt** / **Fort Knox** | `runEncryptionMigration` (`src/storage/encryption-migration.ts`), `useEncryptionMigration` (`src/app/use-encryption-migration.ts`); `migrateNote`/`getEncryptionStatus`/`splitLegacyBlob` (`src/storage/directory-adapter.ts`); `LockIcon` (`src/ui/icons.tsx`). [→](overview.md#encryption-migration) |
+| **On-demand attachment** / **lazy fetch / load image when opened** | `fetchAttachment` (`src/storage/directory-adapter.ts`); `AttachmentFetchContext`, `useAttachmentData` (`src/ui/attachments/fetch-context.ts`). [→](overview.md#attachments) |
 | **Offline cache** / **local mirror** / **work offline**    | `withLocalCache`, `isOfflineError`, `OfflineUnavailableError` (`src/storage/cache/index.ts`). [→](overview.md#offline-cache) |
 
 ## Namespaces
