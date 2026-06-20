@@ -169,6 +169,24 @@ describe("MarkdownEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith("a\nx");
   });
 
+  // A rendered link opens on click rather than rolling the editing textarea
+  // onto its line: tapping it (even while another line is being edited) must
+  // leave that line formatted so the anchor's own click fires and navigates.
+  // To edit the link you click just past it and backspace into it.
+  it("opens a link on click instead of entering edit mode on its line", () => {
+    renderEditor("[google](https://example.com)\nplain");
+    const link = screen.getByText("google");
+    expect(link.closest("a")?.getAttribute("href")).toBe("https://example.com");
+
+    fireEvent.mouseDown(link);
+
+    // The link's line stayed formatted (the anchor is still in the DOM) and the
+    // active textarea is still the original last line — edit mode never rolled
+    // onto the link's line.
+    expect(screen.getByText("google").closest("a")).not.toBeNull();
+    expect(activeTextarea().value).toBe("plain");
+  });
+
   // A live cloud pull replaces the open note's `body` prop while the editor is
   // mounted; the editor must adopt the new text in place (the "write here, see
   // it there" path) rather than keeping its mount-time copy.

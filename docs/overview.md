@@ -134,6 +134,13 @@ Every leaf carries a `data-src` offset so a click maps back to a caret position
 in the raw source. `markdownLineClass` (`src/ui/markdown-line-class.ts`) maps a
 block kind to its CSS classes.
 
+A rendered **link** (and an inline image) is the exception to click-to-caret:
+it stops the line-level `mousedown` from rolling the editing textarea onto its
+line, so a click (or tap, even while another line is being edited) opens the
+link instead of entering edit mode on it. To edit a link's text or URL, click
+just past it and backspace into it — the raw `[text](url)` source then shows in
+the active line's textarea like any other text.
+
 ### Markdown parser
 
 `src/domain/markdown.ts` — a dependency-free, pragmatic Markdown subset.
