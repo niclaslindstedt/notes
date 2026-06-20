@@ -17,7 +17,6 @@ const nav = {
   showAll: "Show all",
   notesEmpty: "No notes yet.",
   deleteNote: "Delete note",
-  confirmDelete: "Confirm delete",
   edit: "Edit",
   undo: "Undo",
   redo: "Redo",
