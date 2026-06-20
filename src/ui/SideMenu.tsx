@@ -1,7 +1,14 @@
-import { useEffect, useId, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type ReactNode,
+} from "react";
 
 import { BUILD_LABEL } from "../build-env.ts";
-import { noteTitle, type Note } from "../domain/note.ts";
+import { noteTitle, type Folder, type Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import type { Namespace } from "../storage/namespaces.ts";
 import { APP_VIEWPORT_RECT } from "./appViewportRect.ts";
@@ -14,13 +21,19 @@ import { RowActionMenu } from "./RowActionMenu.tsx";
 import {
   ArchiveIcon,
   CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
   CodeIcon,
   CogIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  FolderPlusIcon,
   HeartIcon,
   ListIcon,
   LockIcon,
   MenuIcon,
   NoteIcon,
+  PencilIcon,
   PlusIcon,
   RedoIcon,
   ShieldIcon,
@@ -43,7 +56,11 @@ import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
 // identical section list (`sections` below); only the framing differs.
 //
 // The drawer lists every note by its title (the switcher — tap to open it
-// in the editor) with a "+" on the Notes heading that starts a fresh one.
+// in the editor). Notes can be grouped into folders: the Notes heading's
+// action creates one inline (a folder glyph, not a "+"), each folder row
+// expands to reveal its notes plus a per-folder "New note", and a "New note"
+// row of its own sits just above "Show all". A note can be dragged onto a
+// folder (or onto the ungrouped zone to leave one) to file it.
 // Pinned to the bottom is what was the top-right burger menu — settings and
 // the project links (privacy, source with the app version as a subtitle,
 // and an optional donate), in inverted order so the whole of it sits flush
@@ -65,6 +82,12 @@ const SOURCE_URL = "https://github.com/niclaslindstedt/notes";
 // it on a phone.
 const MAX_RECENT_NOTES = 6;
 
+// The dataTransfer MIME used when dragging a note onto a folder, and the
+// sentinel `dropTarget` value for the "ungrouped" drop zone (drop a note here
+// to move it out of every folder).
+const NOTE_DND_TYPE = "application/x-notes-note-id";
+const ROOT_DROP = "__root__";
+
 type Props = {
   /** Notes to list, in display order (most-recently-edited first). */
   notes: Note[];
@@ -76,8 +99,8 @@ type Props = {
   onShowAll: () => void;
   /** Whether the overview (rather than a note or the archive) is showing. */
   showAllActive: boolean;
-  /** Start a fresh note and open it. */
-  onAddNote: () => void;
+  /** Start a fresh note and open it. A `folderId` files it into that folder. */
+  onAddNote: (folderId?: string) => void;
   /** Delete a note permanently. */
   onRemoveNote: (id: string) => void;
   /** Archive a note (a right swipe files it into the Archive view). */
@@ -96,6 +119,16 @@ type Props = {
   canUndo: boolean;
   /** Whether there is an undone edit to re-apply. */
   canRedo: boolean;
+  /** Folders defined in the active namespace, in stable creation order. */
+  folders: Folder[];
+  /** Move a note into `folderId`, or out of any folder when `null`. */
+  onMoveNote: (id: string, folderId: string | null) => void;
+  /** Create a folder; returns its id so the new folder can auto-expand. */
+  onCreateFolder: (name: string) => string;
+  /** Rename a folder. */
+  onRenameFolder: (id: string, name: string) => void;
+  /** Delete a folder (its notes fall back to the top level). */
+  onRemoveFolder: (id: string) => void;
   /** Namespaces known on this device, default first. */
   namespaces: Namespace[];
   /** The active namespace's slug. */
@@ -124,6 +157,11 @@ export function SideMenu({
   onRedo,
   canUndo,
   canRedo,
+  folders,
+  onMoveNote,
+  onCreateFolder,
+  onRenameFolder,
+  onRemoveFolder,
   namespaces,
   encStatus,
   uploadingIds,
@@ -133,6 +171,53 @@ export function SideMenu({
   const t = useT();
   const dispatch = useModalDispatch();
   const drawerId = useId();
+  const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
+
+  // Folder UI state: which folders are expanded, whether the inline "new
+  // folder" input is showing, and which folder (if any) is being renamed in
+  // place. All view-local — the persisted registry lives in the notes store.
+  const [expandedFolders, setExpandedFolders] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+
+  // Drag-to-file state. `draggingNote` gates the drop targets (so a stray
+  // dragover from outside doesn't light them up) and `dropTarget` drives the
+  // hover highlight — a folder id, or `ROOT_DROP` for "out of any folder".
+  const [draggingNote, setDraggingNote] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  function toggleFolder(id: string) {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function startNoteDrag(e: ReactDragEvent, id: string) {
+    e.dataTransfer.setData(NOTE_DND_TYPE, id);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggingNote(id);
+  }
+  function endNoteDrag() {
+    setDraggingNote(null);
+    setDropTarget(null);
+  }
+  function allowDropOn(e: ReactDragEvent, key: string) {
+    if (!draggingNote) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dropTarget !== key) setDropTarget(key);
+  }
+  function dropOn(e: ReactDragEvent, folderId: string | null) {
+    e.preventDefault();
+    const id = e.dataTransfer.getData(NOTE_DND_TYPE) || draggingNote;
+    endNoteDrag();
+    if (id) onMoveNote(id, folderId);
+  }
   const {
     open,
     toggle,
@@ -189,6 +274,64 @@ export function SideMenu({
 
   const onRight = position.side === "right";
 
+  // Notes split into their folder buckets plus the ungrouped remainder. A note
+  // whose `folderId` points at a folder the registry no longer has is treated
+  // as ungrouped, so a stale link never hides the note.
+  const folderIds = new Set(folders.map((f) => f.id));
+  const ungrouped = notes.filter(
+    (n) => !n.folderId || !folderIds.has(n.folderId),
+  );
+
+  // One note row: the swipe/right-click wrapper around a NavItem, made
+  // draggable (desktop only) so it can be dropped onto a folder to file it.
+  function renderNoteRow(note: Note, indent = false) {
+    const row = (
+      <NavItem
+        icon={
+          note.id === activeNoteId ? (
+            <CheckIcon className="h-5 w-5" />
+          ) : (
+            <NoteIcon className="h-5 w-5" />
+          )
+        }
+        label={noteTitle(note)}
+        active={note.id === activeNoteId}
+        indent={indent}
+        trailing={
+          // The upload spinner wins over the lock: a note being written isn't
+          // settled at rest yet (see the overview card).
+          uploadingIds?.has(note.id) ? (
+            <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" />
+          ) : encStatus?.get(note.id) === "encrypted" ? (
+            <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
+          ) : undefined
+        }
+        onClick={() => {
+          onSelectNote(note.id);
+          close();
+        }}
+      />
+    );
+    return (
+      <div
+        key={note.id}
+        draggable={isDesktop}
+        onDragStart={isDesktop ? (e) => startNoteDrag(e, note.id) : undefined}
+        onDragEnd={isDesktop ? endNoteDrag : undefined}
+        className={isDesktop && draggingNote === note.id ? "opacity-40" : ""}
+      >
+        <SwipeToRemove
+          actionLabel={t("nav.deleteNote")}
+          archiveLabel={t("nav.archive")}
+          onRemove={() => onRemoveNote(note.id)}
+          onArchive={() => onArchiveNote(note.id)}
+        >
+          {row}
+        </SwipeToRemove>
+      </div>
+    );
+  }
+
   // The drawer's body — identical whether it slides in over a backdrop
   // (narrow viewports) or sits docked as a permanent sidebar (pinned). Only
   // the framing `<nav>` differs between the two, so the rows live here once.
@@ -234,60 +377,119 @@ export function SideMenu({
           />
         );
       })}
+      {/* The Notes heading's trailing action is a folder-add (a "+" overlaid
+          on a folder), not a plain "+": adding a note now has its own row
+          below. Pressing it drops an inline, unnamed folder input into the
+          list; defocusing it empty discards it (see FolderEditRow). */}
       <SectionHeader
         label={t("nav.notes")}
         border
-        onAdd={() => {
+        onAdd={() => setCreatingFolder(true)}
+        addLabel={t("nav.newFolder")}
+        addIcon={<FolderPlusIcon className="h-4 w-4" />}
+      />
+      {creatingFolder && (
+        <FolderEditRow
+          placeholder={t("nav.folderName")}
+          onCommit={(name) => {
+            const id = onCreateFolder(name);
+            setCreatingFolder(false);
+            setExpandedFolders((prev) => new Set(prev).add(id));
+          }}
+          onCancel={() => setCreatingFolder(false)}
+        />
+      )}
+      {/* Folders, each expandable to reveal its notes plus a per-folder "New
+          note" row, and a drop target for filing a dragged note. */}
+      {folders.map((folder) => {
+        const folderNotes = notes.filter((n) => n.folderId === folder.id);
+        const expanded = expandedFolders.has(folder.id);
+        if (renamingFolderId === folder.id) {
+          return (
+            <FolderEditRow
+              key={folder.id}
+              initial={folder.name}
+              placeholder={t("nav.folderName")}
+              onCommit={(name) => {
+                onRenameFolder(folder.id, name);
+                setRenamingFolderId(null);
+              }}
+              onCancel={() => setRenamingFolderId(null)}
+            />
+          );
+        }
+        return (
+          <div key={folder.id}>
+            <FolderRow
+              name={folder.name}
+              count={folderNotes.length}
+              expanded={expanded}
+              isDropTarget={dropTarget === folder.id}
+              renameLabel={t("nav.renameFolder")}
+              deleteLabel={t("nav.deleteFolder")}
+              onToggle={() => toggleFolder(folder.id)}
+              onRename={() => setRenamingFolderId(folder.id)}
+              onDelete={() => onRemoveFolder(folder.id)}
+              onDragOver={(e) => allowDropOn(e, folder.id)}
+              onDragLeave={() => setDropTarget(null)}
+              onDrop={(e) => dropOn(e, folder.id)}
+            />
+            {expanded && (
+              <div>
+                {folderNotes.map((note) => renderNoteRow(note, true))}
+                {folderNotes.length === 0 && (
+                  <p className="py-[var(--density-row-py)] pr-5 pl-11 text-sm text-muted">
+                    {t("nav.folderEmpty")}
+                  </p>
+                )}
+                <NavItem
+                  icon={<PlusIcon className="h-5 w-5" />}
+                  label={t("nav.newNote")}
+                  active={false}
+                  indent
+                  onClick={() => {
+                    onAddNote(folder.id);
+                    close();
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {/* Ungrouped recent notes. Also the drop zone for moving a note OUT of a
+          folder — drop one here and it returns to the top level. */}
+      <div
+        onDragOver={(e) => allowDropOn(e, ROOT_DROP)}
+        onDragLeave={() => setDropTarget(null)}
+        onDrop={(e) => dropOn(e, null)}
+        className={
+          dropTarget === ROOT_DROP ? "rounded-sm bg-accent/10" : undefined
+        }
+      >
+        {ungrouped.length === 0 ? (
+          folders.length === 0 ? (
+            <p className="px-5 py-[var(--density-row-py)] text-sm text-muted">
+              {t("nav.notesEmpty")}
+            </p>
+          ) : null
+        ) : (
+          ungrouped
+            .slice(0, MAX_RECENT_NOTES)
+            .map((note) => renderNoteRow(note))
+        )}
+      </div>
+      {/* "New note" — the add control that used to live as a "+" on the Notes
+          heading, now its own row just above "Show all". */}
+      <NavItem
+        icon={<PlusIcon className="h-5 w-5" />}
+        label={t("nav.newNote")}
+        active={false}
+        onClick={() => {
           onAddNote();
           close();
         }}
-        addLabel={t("nav.newNote")}
       />
-      {notes.length === 0 ? (
-        <p className="px-5 py-[var(--density-row-py)] text-sm text-muted">
-          {t("nav.notesEmpty")}
-        </p>
-      ) : (
-        notes.slice(0, MAX_RECENT_NOTES).map((note) => {
-          const row = (
-            <NavItem
-              icon={
-                note.id === activeNoteId ? (
-                  <CheckIcon className="h-5 w-5" />
-                ) : (
-                  <NoteIcon className="h-5 w-5" />
-                )
-              }
-              label={noteTitle(note)}
-              active={note.id === activeNoteId}
-              trailing={
-                // The upload spinner wins over the lock: a note being written
-                // isn't settled at rest yet (see the overview card).
-                uploadingIds?.has(note.id) ? (
-                  <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" />
-                ) : encStatus?.get(note.id) === "encrypted" ? (
-                  <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
-                ) : undefined
-              }
-              onClick={() => {
-                onSelectNote(note.id);
-                close();
-              }}
-            />
-          );
-          return (
-            <SwipeToRemove
-              key={note.id}
-              actionLabel={t("nav.deleteNote")}
-              archiveLabel={t("nav.archive")}
-              onRemove={() => onRemoveNote(note.id)}
-              onArchive={() => onArchiveNote(note.id)}
-            >
-              {row}
-            </SwipeToRemove>
-          );
-        })
-      )}
       {/* "Show all" opens the full overview — and, with the Back button gone
           from the editor, it's how you return there. Active (accent) whenever
           the overview rather than a note or the archive is showing. */}
@@ -498,11 +700,168 @@ function SectionHeader({
   );
 }
 
+// A folder header row: tap the label to expand/collapse, with rename and
+// delete affordances pinned to the trailing edge. The whole row is a drop
+// target — dragging a note onto it files the note into the folder (the
+// highlight follows `isDropTarget`). Deleting a folder is undoable and only
+// ungroups its notes, so — like a note delete — it needs no confirm beat.
+function FolderRow({
+  name,
+  count,
+  expanded,
+  isDropTarget,
+  renameLabel,
+  deleteLabel,
+  onToggle,
+  onRename,
+  onDelete,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+}: {
+  name: string;
+  count: number;
+  expanded: boolean;
+  isDropTarget: boolean;
+  renameLabel: string;
+  deleteLabel: string;
+  onToggle: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+  onDragOver: (e: ReactDragEvent) => void;
+  onDragLeave: (e: ReactDragEvent) => void;
+  onDrop: (e: ReactDragEvent) => void;
+}) {
+  return (
+    <div
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={`group flex items-center text-sm ${
+        isDropTarget
+          ? "bg-accent/15 ring-1 ring-accent/40 ring-inset"
+          : "hover:bg-surface-2"
+      }`}
+    >
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={onToggle}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-[var(--density-row-py)] pl-3 text-left text-fg hover:text-fg-bright"
+      >
+        <span className="text-muted">
+          {expanded ? (
+            <ChevronDownIcon className="h-4 w-4" />
+          ) : (
+            <ChevronRightIcon className="h-4 w-4" />
+          )}
+        </span>
+        <span className={expanded ? "text-accent" : "text-muted"}>
+          {expanded ? (
+            <FolderOpenIcon className="h-5 w-5" />
+          ) : (
+            <FolderIcon className="h-5 w-5" />
+          )}
+        </span>
+        <span className="flex-1 truncate">{name}</span>
+        {count > 0 && (
+          <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-xs text-muted tabular-nums">
+            {count}
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={onRename}
+        aria-label={renameLabel}
+        title={renameLabel}
+        className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-muted opacity-60 hover:bg-surface-3 hover:text-fg-bright hover:opacity-100"
+      >
+        <PencilIcon className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={deleteLabel}
+        title={deleteLabel}
+        className="mr-2 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-muted opacity-60 hover:bg-surface-3 hover:text-danger hover:opacity-100"
+      >
+        <TrashIcon className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+// The inline folder name editor, used both for creating a folder (empty) and
+// renaming one (seeded with its name). Committing on Enter or blur with a
+// non-empty trimmed name; an empty name (or Escape) cancels — which is what
+// makes a freshly-added, never-named folder simply vanish on defocus. The
+// `committed` latch stops the blur that follows an Enter from firing twice.
+function FolderEditRow({
+  initial = "",
+  placeholder,
+  onCommit,
+  onCancel,
+}: {
+  initial?: string;
+  placeholder: string;
+  onCommit: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [committed, setCommitted] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  // Focus (and select) on mount without the a11y-flagged `autoFocus` prop —
+  // the row only appears on an explicit "new folder" / "rename" action, so it
+  // takes focus, the way the editor's title field does for a fresh note.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+  }, []);
+  function finish() {
+    if (committed) return;
+    setCommitted(true);
+    const name = value.trim();
+    if (name) onCommit(name);
+    else onCancel();
+  }
+  return (
+    <div className="flex items-center gap-2 py-[var(--density-row-py)] pr-2 pl-3">
+      <span className="text-muted">
+        <FolderIcon className="h-5 w-5" />
+      </span>
+      <input
+        ref={ref}
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={finish}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            finish();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setCommitted(true);
+            onCancel();
+          }
+        }}
+        className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-fg-bright outline-none placeholder:text-muted/60"
+      />
+    </div>
+  );
+}
+
 function NavItem({
   icon,
   label,
   active,
   disabled = false,
+  indent = false,
   badge,
   trailing,
   onClick,
@@ -513,6 +872,9 @@ function NavItem({
   // Renders the row inert and dimmed — used by undo / redo at the timeline
   // ends, where there is nothing to revert or re-apply.
   disabled?: boolean;
+  // Indents the row one level — used for notes (and the "New note" row) nested
+  // under an expanded folder so the hierarchy reads at a glance.
+  indent?: boolean;
   // Optional trailing count pill (e.g. the number of archived notes). The
   // caller hides it at zero by passing `undefined`.
   badge?: number;
@@ -527,7 +889,9 @@ function NavItem({
       aria-current={active ? "page" : undefined}
       disabled={disabled}
       onClick={onClick}
-      className={`flex w-full items-center gap-3 px-5 py-[var(--density-row-py)] text-left text-sm ${
+      className={`flex w-full items-center gap-3 py-[var(--density-row-py)] text-left text-sm ${
+        indent ? "pr-5 pl-11" : "px-5"
+      } ${
         disabled
           ? "cursor-not-allowed text-muted opacity-40"
           : active

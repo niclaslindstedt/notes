@@ -41,3 +41,38 @@ describe("storage serialize", () => {
     expect(parse(future).notes).toEqual([]);
   });
 });
+
+describe("storage serialize — folders", () => {
+  it("round-trips folders and note.folderId through serialize → parse", () => {
+    const note = { ...createNote(1), folderId: "f1" };
+    const folder = { id: "f1", name: "Login feature", createdAt: 5 };
+    const snapshot = { notes: [note], folders: [folder] };
+    const restored = parse(serialize(snapshot));
+    expect(restored.notes[0]?.folderId).toBe("f1");
+    expect(restored.folders).toEqual([folder]);
+  });
+
+  it("omits the folders key when there are none", () => {
+    const restored = parse(serialize({ notes: [createNote(1)] }));
+    expect(restored.folders).toBeUndefined();
+  });
+
+  it("drops a malformed folder and a non-string folderId defensively", () => {
+    const text = JSON.stringify({
+      version: LATEST_VERSION,
+      notes: [{ ...createNote(1), folderId: 42 }],
+      folders: [
+        { id: "ok", name: "Keep", createdAt: 1 },
+        { id: "", name: "no id", createdAt: 1 },
+        { name: "missing id", createdAt: 1 },
+        null,
+        { id: "ok", name: "dup", createdAt: 2 },
+      ],
+    });
+    const restored = parse(text);
+    expect(restored.notes[0]?.folderId).toBeUndefined();
+    expect(restored.folders).toEqual([
+      { id: "ok", name: "Keep", createdAt: 1 },
+    ]);
+  });
+});

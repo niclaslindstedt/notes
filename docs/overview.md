@@ -1184,6 +1184,82 @@ side menu.
 `src/ui/namespace-favicon.ts` — paints the active namespace's glyph and colour
 into the browser tab favicon so each namespace is distinguishable at a glance.
 
+## Folders
+
+Folders group notes **inside** a single namespace — a namespace's "Login
+feature", "Vacation 2025". They are a layer below namespaces: switching
+namespace swaps the whole document, while folders just organise the notes
+within one. A `Folder` (`src/domain/note.ts`) is `{ id, name, createdAt }`; a
+note points at one by `Note.folderId` (absent = ungrouped), and the registry of
+folders rides on the `Snapshot` as `folders?: Folder[]` — kept on the snapshot
+rather than derived from the notes, so an **empty** folder persists. The pure
+helpers are `createFolder`, `setNoteFolder` (moving a note, which deliberately
+does **not** bump `updatedAt` — filing isn't editing), `notesInFolder`, and
+`sortFoldersByCreated` (folders sort by creation order so the list stays stable
+as notes move). A note whose `folderId` points at a folder the registry no
+longer has is treated as ungrouped everywhere, so a stale link never hides a
+note.
+
+The notes store (`src/app/use-notes.ts`) exposes the sorted `folders` and the
+verbs `createFolder` (fires the **Filing system** achievement), `renameFolder`,
+`removeFolder` (which only ungroups its notes — they survive, undoably), and
+`moveNote`; `create` takes an optional `folderId` so a note can be born inside a
+folder. Every mutation runs through `commitSnapshot`, which preserves the folder
+registry across edits (the plain `commit` is now a thin wrapper that swaps only
+the notes list).
+
+### Folders in the side menu
+
+`SideMenu` (`src/ui/SideMenu.tsx`) renders the folders between the Notes heading
+and the ungrouped notes. The Notes heading's trailing action is a **folder-add**
+glyph (`FolderPlusIcon`), not the old "+": pressing it drops an inline,
+unnamed `FolderEditRow` into the list — commit a name (Enter / blur) to persist
+it, or defocus it empty to discard it (the row simply vanishes, so a misfire
+costs nothing). Each `FolderRow` expands to reveal its notes (indented) plus a
+per-folder "New note" row that creates a note already filed inside it; the row
+also carries inline rename (reusing `FolderEditRow`) and delete affordances.
+The add control that used to sit as a "+" on the Notes heading is now its own
+**"New note"** row just above "Show all". A note row can be **dragged onto a
+folder** to file it, or onto the ungrouped zone to take it out of one
+(`NOTE_DND_TYPE` carries the note id; the highlight follows `dropTarget`).
+Native HTML5 drag is pointer-only, so it's gated to non-touch devices — touch
+users file notes with the [folder picker](#folder-picker) instead.
+
+### Folders in the overview
+
+`NoteList` (`src/app/App.tsx`) mirrors the same grouping: with at least one
+folder it renders a collapsible section per folder (each a drop target, with a
+"New note" shortcut) followed by the ungrouped notes under a "No folder" label
+(itself the drop zone for moving a note out). Cards are draggable on a pointer
+device exactly like the side-menu rows. With no folders it falls back to the
+flat list unchanged.
+
+### Folder picker
+
+`FolderPicker` (`src/app/App.tsx`) is a compact `SelectPicker` in the editor
+header (shown only when folders exist) listing "No folder" plus every folder —
+the cross-platform way to file the open note, since it works on touch where
+drag-and-drop doesn't. Choosing an entry calls `moveNote` for the open note.
+
+### Folders sidecar
+
+On the local "This device" backend folders ride the JSON snapshot for free
+(serialize/parse round-trip `folders` and `folderId`). On the file/cloud
+backends the note's folder **id** rides its markdown frontmatter (`folder:`, via
+the [markdown codec](#markdown-codec)) — or the encrypted note JSON — so the
+grouping survives, while the folder **names and any empty folders** live in a
+plaintext `folders.json` sidecar beside the note files (`FOLDERS_FILE_NAME`).
+The [directory adapter](#directory-adapter) owns it: `readFolders` /
+`injectFolders` fold the registry into the loaded snapshot (and load a namespace
+whose only content is empty folders as a real, non-null document), and
+`persistFolders` writes it back when it changed (writing `[]` to clear a
+registry whose folders were all removed). Like `namespaces.json` it stays
+plaintext even under encryption — names aren't secret and must be readable
+before the unlock gate — and it is metadata, never read as a note nor removed on
+a representation switch. It sits outside the aggregate revision, so a
+folder-only change on another device isn't picked up by a live pull until a note
+also moves.
+
 ## Theme and appearance
 
 ### Appearance store

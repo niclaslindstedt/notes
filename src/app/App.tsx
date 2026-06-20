@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type DragEvent as ReactDragEvent,
   type ReactNode,
 } from "react";
 
@@ -21,6 +22,7 @@ import {
   noteTitle,
   notePreview,
   notePreviewBlock,
+  type Folder,
   type Note,
   type SaveFormatting,
 } from "../domain/note.ts";
@@ -52,13 +54,19 @@ import { useViewportHeight } from "../ui/hooks/useViewportHeight.ts";
 import {
   ArchiveIcon,
   ArrowLeftIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  FolderIcon,
+  FolderOpenIcon,
   LockIcon,
   NotesMarkIcon,
+  PlusIcon,
   RestoreIcon,
   SpinnerIcon,
   TrashIcon,
 } from "../ui/icons.tsx";
 import { CopyNoteButton } from "../ui/CopyNoteButton.tsx";
+import { SelectPicker } from "../ui/form/SelectPicker.tsx";
 import { RowActionMenu } from "../ui/RowActionMenu.tsx";
 import { RenderedLine } from "../ui/MarkdownLine.tsx";
 import { AttachmentsEndBlock } from "../ui/attachments/AttachmentsEndBlock.tsx";
@@ -134,6 +142,7 @@ export function App() {
     notes,
     allNotes,
     archived,
+    folders,
     create,
     importFiles,
     update,
@@ -142,6 +151,10 @@ export function App() {
     remove,
     archive,
     restore,
+    moveNote,
+    createFolder,
+    renameFolder,
+    removeFolder,
     undo,
     redo,
     canUndo,
@@ -307,7 +320,10 @@ export function App() {
     if (id !== null) void sync.refresh();
   }
 
-  function openNew() {
+  // Open a fresh note. A `folderId` files it straight into that folder (the
+  // per-folder "New note" rows in the side menu / overview pass one); omitted,
+  // it lands ungrouped.
+  function openNew(folderId?: string) {
     if (editing && discardable(editing)) remove(editing.id);
     setReadingId(null);
     setView("notes");
@@ -319,7 +335,7 @@ export function App() {
     // it loses focus. The local browser backend has no per-note filename, so it
     // keeps saving immediately.
     if (storage.backend !== "browser") sync.holdSaves();
-    const id = create(title);
+    const id = create(title, folderId);
     pristineNew.current = { id, title };
     setEditingId(id);
   }
@@ -430,6 +446,11 @@ export function App() {
               onRedo={redo}
               canUndo={canUndo}
               canRedo={canRedo}
+              folders={folders}
+              onMoveNote={moveNote}
+              onCreateFolder={createFolder}
+              onRenameFolder={renameFolder}
+              onRemoveFolder={removeFolder}
               namespaces={storage.namespaces}
               activeNamespace={storage.activeNamespace}
               onSwitchNamespace={switchNamespace}
@@ -442,6 +463,8 @@ export function App() {
                   key={editing.id}
                   note={editing}
                   editor={editor}
+                  folders={folders}
+                  onMoveFolder={(folderId) => moveNote(editing.id, folderId)}
                   onChange={(body) => update(editing.id, body)}
                   onTitleChange={(title) => retitle(editing.id, title)}
                   onTitleSettle={sync.releaseSaves}
@@ -472,10 +495,12 @@ export function App() {
               ) : (
                 <NoteList
                   notes={notes}
+                  folders={folders}
                   onOpen={(id) => switchTo(id)}
                   onNew={openNew}
                   onArchive={archiveNote}
                   onDelete={removeNote}
+                  onMoveNote={moveNote}
                   syncSlot={syncSlot}
                   encStatus={encStatus}
                   uploadingIds={uploadingIds}
@@ -502,30 +527,114 @@ export function App() {
   );
 }
 
+// The dataTransfer MIME used when dragging a note card onto a folder, and the
+// sentinel `dropTarget` value for the overview's ungrouped drop zone (drop a
+// note here to take it out of every folder).
+const NOTE_DND_TYPE = "application/x-notes-note-id";
+const OVERVIEW_ROOT_DROP = "__root__";
+
+// A compact folder picker for the editor header — the cross-platform way to
+// file the open note (drag-to-folder works on a pointer device; this works
+// anywhere, including touch). Built on the shared `SelectPicker`; the trigger
+// shows the folder glyph plus the current folder's name (or "No folder").
+function FolderPicker({
+  folders,
+  value,
+  onChange,
+}: {
+  folders: Folder[];
+  value: string;
+  onChange: (folderId: string) => void;
+}) {
+  const t = useT();
+  const options = [
+    { value: "", label: t("nav.noFolder") },
+    ...folders.map((f) => ({ value: f.id, label: f.name })),
+  ];
+  return (
+    <SelectPicker
+      value={value}
+      options={options}
+      onChange={onChange}
+      ariaLabel={t("nav.moveToFolder")}
+      renderValue={(o) => (
+        <span className="flex items-center gap-1.5">
+          <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
+          <span className="truncate">{o?.label ?? t("nav.noFolder")}</span>
+        </span>
+      )}
+      triggerClassName="flex max-w-[9rem] cursor-pointer items-center gap-1 rounded-[var(--radius)] border border-line bg-transparent px-2 py-1 text-left text-sm text-fg hover:border-accent focus-visible:border-accent focus-visible:outline-none"
+      panelClassName="max-h-64 overflow-y-auto"
+    />
+  );
+}
+
 function NoteList({
   notes,
+  folders,
   onOpen,
   onNew,
   onArchive,
   onDelete,
+  onMoveNote,
   syncSlot,
   encStatus,
   uploadingIds,
 }: {
   notes: Note[];
+  folders: Folder[];
   onOpen: (id: string) => void;
-  onNew: () => void;
+  onNew: (folderId?: string) => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
+  /** Move a note into `folderId`, or out of any folder when `null`. */
+  onMoveNote: (id: string, folderId: string | null) => void;
   syncSlot: ReactNode;
   encStatus?: Map<string, "encrypted" | "pending">;
   /** Ids of notes whose file is being uploaded to the backend right now. */
   uploadingIds?: ReadonlySet<string>;
 }) {
   const t = useT();
+  const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
+  // Collapsed folders (default expanded) and the drag-to-file state — mirrors
+  // the side menu, so a note can be dropped onto a folder here too.
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const [draggingNote, setDraggingNote] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  function toggleFolder(id: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function startDrag(e: ReactDragEvent, id: string) {
+    e.dataTransfer.setData(NOTE_DND_TYPE, id);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggingNote(id);
+  }
+  function endDrag() {
+    setDraggingNote(null);
+    setDropTarget(null);
+  }
+  function allowDropOn(e: ReactDragEvent, key: string) {
+    if (!draggingNote) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dropTarget !== key) setDropTarget(key);
+  }
+  function dropOn(e: ReactDragEvent, folderId: string | null) {
+    e.preventDefault();
+    const id = e.dataTransfer.getData(NOTE_DND_TYPE) || draggingNote;
+    endDrag();
+    if (id) onMoveNote(id, folderId);
+  }
+
   // With no notes yet, pressing Enter (a physical keyboard, so desktop) starts
   // the first note — the empty state's primary action without a tap.
-  const empty = notes.length === 0;
+  const empty = notes.length === 0 && folders.length === 0;
   useEffect(() => {
     if (!empty) return;
     const onKey = (e: KeyboardEvent) => {
@@ -540,6 +649,34 @@ function NoteList({
     return () => document.removeEventListener("keydown", onKey);
   }, [empty, onNew]);
 
+  const folderIds = new Set(folders.map((f) => f.id));
+  const ungrouped = notes.filter(
+    (n) => !n.folderId || !folderIds.has(n.folderId),
+  );
+
+  function renderCard(note: Note) {
+    return (
+      <li
+        key={note.id}
+        draggable={isDesktop}
+        onDragStart={isDesktop ? (e) => startDrag(e, note.id) : undefined}
+        onDragEnd={isDesktop ? endDrag : undefined}
+        className={isDesktop && draggingNote === note.id ? "opacity-40" : ""}
+      >
+        <SwipeableNoteCard
+          note={note}
+          onOpen={() => onOpen(note.id)}
+          onPrimary={() => onArchive(note.id)}
+          onDelete={() => onDelete(note.id)}
+          primaryLabel={t("app.archive")}
+          primaryIcon={<ArchiveIcon className="h-4 w-4" />}
+          encrypted={encStatus?.get(note.id) === "encrypted"}
+          uploading={uploadingIds?.has(note.id) ?? false}
+        />
+      </li>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
@@ -548,25 +685,102 @@ function NoteList({
       </header>
 
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 pt-3 pb-24 md:pb-3">
-        {notes.length === 0 ? (
+        {empty ? (
           <p className="mt-16 text-center text-muted">{t("app.empty")}</p>
+        ) : folders.length === 0 ? (
+          <ul className="flex flex-col gap-2">{notes.map(renderCard)}</ul>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {notes.map((note) => (
-              <li key={note.id}>
-                <SwipeableNoteCard
-                  note={note}
-                  onOpen={() => onOpen(note.id)}
-                  onPrimary={() => onArchive(note.id)}
-                  onDelete={() => onDelete(note.id)}
-                  primaryLabel={t("app.archive")}
-                  primaryIcon={<ArchiveIcon className="h-4 w-4" />}
-                  encrypted={encStatus?.get(note.id) === "encrypted"}
-                  uploading={uploadingIds?.has(note.id) ?? false}
-                />
-              </li>
-            ))}
-          </ul>
+          <div className="flex flex-col gap-3">
+            {/* One section per folder — a header that collapses it and doubles
+                as a drop target, with the folder's cards and a "New note"
+                shortcut nested under it. */}
+            {folders.map((folder) => {
+              const folderNotes = notes.filter((n) => n.folderId === folder.id);
+              const expanded = !collapsed.has(folder.id);
+              return (
+                <section
+                  key={folder.id}
+                  onDragOver={(e) => allowDropOn(e, folder.id)}
+                  onDragLeave={() => setDropTarget(null)}
+                  onDrop={(e) => dropOn(e, folder.id)}
+                  className={`rounded-[var(--radius)] ${
+                    dropTarget === folder.id
+                      ? "bg-accent/10 ring-1 ring-accent/40"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleFolder(folder.id)}
+                      aria-expanded={expanded}
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-[var(--radius)] px-1 py-1.5 text-left text-sm font-semibold text-fg-bright hover:bg-surface-2"
+                    >
+                      <span className="text-muted">
+                        {expanded ? (
+                          <ChevronDownIcon className="h-4 w-4" />
+                        ) : (
+                          <ChevronRightIcon className="h-4 w-4" />
+                        )}
+                      </span>
+                      <span className="text-accent">
+                        {expanded ? (
+                          <FolderOpenIcon className="h-5 w-5" />
+                        ) : (
+                          <FolderIcon className="h-5 w-5" />
+                        )}
+                      </span>
+                      <span className="flex-1 truncate">{folder.name}</span>
+                      <span className="shrink-0 text-xs text-muted tabular-nums">
+                        {folderNotes.length}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onNew(folder.id)}
+                      aria-label={t("nav.newNote")}
+                      title={t("nav.newNote")}
+                      className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg-bright"
+                    >
+                      <PlusIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {expanded &&
+                    (folderNotes.length === 0 ? (
+                      <p className="px-2 pb-1 pl-8 text-sm text-muted">
+                        {t("nav.folderEmpty")}
+                      </p>
+                    ) : (
+                      <ul className="flex flex-col gap-2 pt-1 pl-6">
+                        {folderNotes.map(renderCard)}
+                      </ul>
+                    ))}
+                </section>
+              );
+            })}
+
+            {/* Ungrouped notes — also the drop zone that takes a note OUT of a
+                folder. The label only shows once at least one folder exists. */}
+            <section
+              onDragOver={(e) => allowDropOn(e, OVERVIEW_ROOT_DROP)}
+              onDragLeave={() => setDropTarget(null)}
+              onDrop={(e) => dropOn(e, null)}
+              className={`rounded-[var(--radius)] ${
+                dropTarget === OVERVIEW_ROOT_DROP
+                  ? "bg-accent/10 ring-1 ring-accent/40"
+                  : ""
+              }`}
+            >
+              <p className="px-1 py-1.5 text-xs font-semibold tracking-wide text-muted uppercase">
+                {t("nav.noFolder")}
+              </p>
+              {ungrouped.length > 0 && (
+                <ul className="flex flex-col gap-2">
+                  {ungrouped.map(renderCard)}
+                </ul>
+              )}
+            </section>
+          </div>
         )}
       </div>
 
@@ -579,7 +793,7 @@ function NoteList({
           puck reads as awkward beside a pinned chrome. */}
       <button
         type="button"
-        onClick={onNew}
+        onClick={() => onNew()}
         aria-label={t("app.newNote")}
         className="
           fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-1/2 z-20
@@ -959,6 +1173,8 @@ function ReadOnlyNote({
 function Editor({
   note,
   editor,
+  folders,
+  onMoveFolder,
   onChange,
   onTitleChange,
   onTitleSettle,
@@ -969,6 +1185,10 @@ function Editor({
 }: {
   note: Note;
   editor: EditorSettings;
+  /** Folders the note can be filed into, for the header folder picker. */
+  folders: Folder[];
+  /** File the open note into `folderId`, or out of any folder when `null`. */
+  onMoveFolder: (folderId: string | null) => void;
   onChange: (body: string) => void;
   onTitleChange: (title: string) => void;
   onTitleSettle: () => void;
@@ -1051,6 +1271,13 @@ function Editor({
           disableAutocorrect={editor.disableAutocorrect}
         />
         <div className="flex shrink-0 items-center gap-2">
+          {folders.length > 0 && (
+            <FolderPicker
+              folders={folders}
+              value={note.folderId ?? ""}
+              onChange={(id) => onMoveFolder(id || null)}
+            />
+          )}
           <CopyNoteButton note={note} copyScope={editor.copyScope} />
           {syncSlot}
         </div>

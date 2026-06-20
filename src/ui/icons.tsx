@@ -346,6 +346,64 @@ export function CopyIcon({ className }: IconProps) {
   );
 }
 
+/** A closed folder — a collapsed folder row in the navigation list. */
+export function FolderIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="M4 5h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
+    </svg>
+  );
+}
+
+/** An open folder — an expanded folder row in the navigation list. */
+export function FolderOpenIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H21a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1h5l2 2h6a1 1 0 0 1 1 1v2" />
+    </svg>
+  );
+}
+
+/** A folder with a plus — the "new folder" action on the Notes heading. */
+export function FolderPlusIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="M4 5h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
+      <path d="M12 11v6M9 14h6" />
+    </svg>
+  );
+}
+
 /** A page with text lines — the glyph for a note in the navigation list. */
 export function NoteIcon({ className }: IconProps) {
   return (

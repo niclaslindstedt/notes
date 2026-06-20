@@ -159,6 +159,12 @@ const achievements = {
       learnMore:
         "Namespaces are separate, self-contained sets of notes — work and home, say. Switch between them from the side menu; each can sync to its own folder.",
     },
+    organizer: {
+      name: "Filing system",
+      condition: "Create a folder to group notes.",
+      learnMore:
+        "Folders group notes inside a namespace — a “Login feature”, a “Vacation 2025”. Tap the folder button on the Notes heading in the side menu to make one, then drag notes onto it (or use a note's “Move to folder”) to file them away. A folder can expand to make a new note straight inside it.",
+    },
     polyglot: {
       name: "Polyglot",
       condition: "Switch the app's language.",
