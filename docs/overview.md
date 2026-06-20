@@ -414,6 +414,20 @@ starting ≤30px from the drawer's resting edge and travelling inward >48px open
 the drawer. Gated by the menu-activation choice, disabled while a modal is open,
 and axis-locked so vertical scrolls don't trigger it.
 
+### Suppress swipe navigation
+
+`useSuppressSwipeNavigation` (`src/ui/hooks/useSuppressSwipeNavigation.ts`) —
+mounted once in `App`, it cancels the browser's native edge-swipe history
+navigation (swipe in from the left edge to go *back*, the right to go
+*forward*) so it stops hijacking the side menu's own horizontal swipes, which
+live on the same edges. A document-level, non-passive `touchmove` guard:
+once a single-touch drag that *starts* within 30px of a screen border proves
+horizontal it calls `preventDefault`, killing the native navigation while
+leaving the app's pointer-driven swipe gestures (a separate event stream)
+untouched. `overscroll-behavior: none` on `html` (`src/styles/theme.css`)
+covers Chrome's overscroll navigation; this covers iOS Safari's edge-back
+gesture, which that property doesn't reach.
+
 ### Drawer swipe to close
 
 `useDrawerSwipeClose` (`src/ui/hooks/useDrawerSwipeClose.ts`) — the reverse
