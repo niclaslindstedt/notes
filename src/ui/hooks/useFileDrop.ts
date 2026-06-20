@@ -80,6 +80,15 @@ export function useFileDrop({ enabled = true, onFiles }: Options): {
       if (depth.current === 0) setDragging(false);
     };
 
+    // Lower the overlay on any file drop, in the capture phase so it runs
+    // before a child can claim the event. An attachment dropped onto the
+    // editor calls `stopPropagation()` to keep the global import below from
+    // also firing; that also stops this document listener's bubble phase, so
+    // resetting here in capture is the only place guaranteed to see every
+    // drop and bring the overlay down — claimed or not. A drop emits no
+    // `dragleave`, so the depth counter never unwinds on its own.
+    const onDropCapture = () => reset();
+
     const onDrop = (e: DragEvent) => {
       if (!carriesFiles(e)) return;
       e.preventDefault();
@@ -100,12 +109,14 @@ export function useFileDrop({ enabled = true, onFiles }: Options): {
     document.addEventListener("dragenter", onDragEnter);
     document.addEventListener("dragover", onDragOver);
     document.addEventListener("dragleave", onDragLeave);
+    document.addEventListener("drop", onDropCapture, true);
     document.addEventListener("drop", onDrop);
 
     return () => {
       document.removeEventListener("dragenter", onDragEnter);
       document.removeEventListener("dragover", onDragOver);
       document.removeEventListener("dragleave", onDragLeave);
+      document.removeEventListener("drop", onDropCapture, true);
       document.removeEventListener("drop", onDrop);
     };
   }, [enabled, reset]);
