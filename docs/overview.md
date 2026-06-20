@@ -146,10 +146,15 @@ keystroke, which is why it lives in `domain/`.
 
 ### Title field
 
-`TitleField` in `src/app/App.tsx` — the note's title input above the editor.
-Edits route through `useNotes().retitle` → `retitleNote` (`src/domain/note.ts`).
-On file/cloud backends the [save hold](#save-hold) keeps the file from being
-created under the throwaway default title until the real title settles.
+`TitleField` in `src/app/App.tsx` — the note's title field above the editor. It
+is an auto-growing textarea, so a long title wraps onto further lines and the
+field grows to fit instead of scrolling out of view; the header top-aligns so
+the app glyph and the copy/sync buttons stay pinned to the first line. Enter and
+Arrow-Down hand focus down to the body, so the field never holds a literal
+newline. Edits route through `useNotes().retitle` → `retitleNote`
+(`src/domain/note.ts`). On file/cloud backends the [save hold](#save-hold) keeps
+the file from being created under the throwaway default title until the real
+title settles.
 
 ### Editor settings
 
