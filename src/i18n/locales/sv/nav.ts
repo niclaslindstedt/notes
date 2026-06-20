@@ -12,7 +12,6 @@ const nav: NavCatalog = {
   showAll: "Visa alla",
   notesEmpty: "Inga anteckningar än.",
   deleteNote: "Ta bort anteckning",
-  confirmDelete: "Bekräfta borttagning",
   edit: "Redigera",
   undo: "Ångra",
   redo: "Gör om",

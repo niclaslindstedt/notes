@@ -422,8 +422,9 @@ needs a second confirming tap to delete. The foreground tracks the finger with
 ### Swipe reveal (sidebar)
 
 `useSwipeReveal` (`src/ui/hooks/useSwipeReveal.ts`) — the side-menu row gesture:
-a left swipe latches the row open to uncover a single trash button; no action
-fires until that button is tapped, and tapping an open row closes it.
+a left swipe latches the row open to uncover a single trash button; tapping it
+deletes the note straight away (no confirming second tap — deletion is undoable
+from the Edit section), and tapping an open row closes it.
 
 ### Pull to refresh
 

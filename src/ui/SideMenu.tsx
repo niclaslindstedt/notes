@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, type ReactNode } from "react";
 
 import { BUILD_LABEL } from "../build-env.ts";
 import { noteTitle, type Note } from "../domain/note.ts";
@@ -48,9 +48,9 @@ import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
 // and its verbs are passed as props from App, which owns the notes store.
 //
 // Note rows support swipe-to-remove: a left swipe latches open a trash
-// button (see `useSwipeReveal`). A deletion is recorded on the undo timeline
-// (the Edit section's Undo brings it back), but it still asks for a second
-// confirming tap so a stray swipe doesn't silently drop a note.
+// button (see `useSwipeReveal`), and tapping it deletes straight away. The
+// deletion is recorded on the undo timeline (the Edit section's Undo brings
+// it back), so no confirming second tap is needed.
 
 // notes is open source; the "source" link points at its repository.
 const SOURCE_URL = "https://github.com/niclaslindstedt/notes";
@@ -260,7 +260,6 @@ export function SideMenu({
             <SwipeToRemove
               key={note.id}
               actionLabel={t("nav.deleteNote")}
-              confirmLabel={t("nav.confirmDelete")}
               archiveLabel={t("nav.archive")}
               onRemove={() => onRemoveNote(note.id)}
               onArchive={() => onArchiveNote(note.id)}
@@ -525,27 +524,23 @@ function NavItem({
 
 // Wraps a drawer row with the same two-outcome swipe as the overview card:
 // a LEFT swipe latches it open to reveal a trailing trash button, and a RIGHT
-// swipe archives the note (see `useSwipeReveal`). The first tap on the trash
-// arms a confirming state (the button reads `confirmLabel`) and only the
-// second tap commits — a guard against a stray swipe, even though the
-// deletion is itself undoable from the Edit section. Archiving fires straight
-// from the gesture: it's undoable too, and the note merely moves to the
-// Archive view, so it needs no confirm. The sliding foreground carries its
-// own surface background so it covers both actions while closed.
+// swipe archives the note (see `useSwipeReveal`). Tapping the trash deletes
+// straight away — no confirming second tap, because the deletion is itself
+// undoable from the Edit section. Archiving fires straight from the gesture
+// too: it's undoable as well, and the note merely moves to the Archive view,
+// so it needs no confirm. The sliding foreground carries its own surface
+// background so it covers both actions while closed.
 const REMOVE_ACTION_W = 96;
 
 function SwipeToRemove({
   actionLabel,
-  confirmLabel,
   archiveLabel,
   onRemove,
   onArchive,
   children,
 }: {
-  /** Accessible label for the trash button in its resting state. */
+  /** Accessible label for the trash button. */
   actionLabel: string;
-  /** Label the trash button reads while awaiting a confirming second tap. */
-  confirmLabel: string;
   /** Label shown on the archive backdrop a right swipe uncovers. */
   archiveLabel: string;
   onRemove: () => void | Promise<void>;
@@ -553,20 +548,8 @@ function SwipeToRemove({
   children: ReactNode;
 }) {
   const swipe = useSwipeReveal(REMOVE_ACTION_W, onArchive);
-  const [confirming, setConfirming] = useState(false);
-
-  // Closing the row (a tap on an open row, or a swipe back) disarms the
-  // confirm step so it never lingers half-armed for the next open.
-  useEffect(() => {
-    if (!swipe.open) setConfirming(false);
-  }, [swipe.open]);
 
   function act() {
-    if (!confirming) {
-      setConfirming(true);
-      return;
-    }
-    setConfirming(false);
     swipe.close();
     void onRemove();
   }
@@ -596,11 +579,11 @@ function SwipeToRemove({
         <button
           type="button"
           onClick={act}
-          aria-label={confirming ? confirmLabel : actionLabel}
+          aria-label={actionLabel}
           style={{ width: REMOVE_ACTION_W }}
           className="flex h-full items-center justify-center bg-danger text-xs font-semibold tracking-wide text-white uppercase"
         >
-          {confirming ? confirmLabel : <TrashIcon className="h-5 w-5" />}
+          <TrashIcon className="h-5 w-5" />
         </button>
       </div>
       <div
