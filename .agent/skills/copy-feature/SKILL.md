@@ -223,17 +223,27 @@ reuse them rather than re-porting:
   in `styles/palettes.css`, one block per `data-theme`. notes carries 11
   colour slots (no checklist `meta`/`path`/`flag`/`pipe`/`success`/`positive`/
   `negative`) and a single `--radius` (not the sm/md/lg triple); it drops
-  checklist's `borderWidth` control. Appearance applies **live** — notes has
-  no draft/Save step. Add a preset by adding one `PRESET_PALETTES` entry +
-  one `palettes.css` block + registering its id.
+  checklist's `borderWidth` control. Like checklist, appearance edits are a
+  **draft committed on Save**: the store carries an ephemeral preview override
+  (`setAppearancePreview`) the projection paints while the settings dialog is
+  open, and `commitAppearance` persists it (keeping the achievement map). Quick
+  toggles outside the dialog still persist immediately via `updateAppearance` /
+  `setTheme`. The colour slots match checklist's palettes exactly (same hexes on
+  every shared slot), so keep them in lockstep. Add a preset by adding one
+  `PRESET_PALETTES` entry + one `palettes.css` block + registering its id.
 - **Settings primitives** — `src/ui/form/Checkbox.tsx` and
   `src/ui/settings/shared.tsx` (`Section` / `Field` / `ToggleRow` /
   `SegmentedRow`). The `SettingsModal` is **tabbed** like checklist's — a
   left icon-rail on desktop, a burger dropdown in the header on mobile — and
   lands on a General tab, with `GeneralSection` / `AppearanceSection` /
   `StorageSection` each rendered per tab (flat `*Section.tsx` files, not
-  checklist's `tabs/` subfolder). There's **no draft / Save footer**: every
-  control applies live through its own store. The mobile section dropdown is
+  checklist's `tabs/` subfolder). Like checklist it has a **footer** — Reset to
+  defaults on the left, Cancel + Save on the right (`SettingsFooter`, using the
+  `Button` primitive) — and the appearance settings it owns (theme, font, the
+  Editor controls, the achievements switch) edit a local **draft** that previews
+  live via `setAppearancePreview` and only persists on Save (`commitAppearance`);
+  the device-local controls (language, menu-activation, dev mode) and storage
+  connections still apply immediately. The mobile section dropdown is
   an inline `absolute` panel with a `fixed inset-0` catch-all to dismiss —
   checklist's `FloatingPanel` was **not** needed because the panel sits just
   below the header, within the card. `SelectPicker` / `FloatingPanel` remain
@@ -256,8 +266,9 @@ reuse them rather than re-porting:
   (+ its bus host) and the switcher section in `SideMenu`. notes has no
   toast/i18n/`ConfirmDialog`/`ClearableInput`, so the modal inlines its
   English strings, uses a plain `<input>`, and arms delete with a two-tap
-  "Confirm" button rather than a `ConfirmDialog`. Appearance applies live (no
-  draft/Save), matching the theme engine.
+  "Confirm" button rather than a `ConfirmDialog`. The namespace modal's
+  appearance edits apply live (no draft/Save) — that's the namespace registry,
+  separate from the settings dialog's drafted appearance store.
 - **Cloud sync status** — `src/ui/SyncStatus.tsx` (the morphing cloud glyph
   button) and `src/ui/SyncDetailsModal.tsx` (the info dialog), the two
   presentational pieces of checklist's header sync affordance, plus the cloud

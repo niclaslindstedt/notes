@@ -152,6 +152,7 @@ Honour these when naming a new file, key, or string.
 | **Logs tab** / **captured logs**                           | `LogsSection` (`src/ui/settings/LogsSection.tsx`); `logger` (`src/dev/logger.ts`). [→](overview.md#logs)      |
 | **Language picker** / **switch language**                  | `LanguagePicker` (`src/ui/settings/LanguagePicker.tsx`). [→](overview.md#language-picker)                     |
 | **Settings layout helpers** (Section / Field / ToggleRow)  | `src/ui/settings/shared.tsx`. [→](overview.md#settings-layout-helpers)                                        |
+| **Settings footer** / **the save row** / **Reset to defaults / Cancel / Save** / **draft / live preview** | `SettingsFooter` in `SettingsModal` (`src/ui/settings/SettingsModal.tsx`); `setAppearancePreview`, `commitAppearance` (`src/theme/useTheme.ts`). [→](overview.md#settings-modal) |
 | **Custom dropdown** / **select picker** / **floating panel** | `SelectPicker` (`src/ui/form/SelectPicker.tsx`); `FloatingPanel` (`src/ui/FloatingPanel.tsx`); `useFloatingPosition` (`src/ui/hooks/useFloatingPosition.ts`). [→](overview.md#custom-dropdown) |
 
 ## Sync and storage status (header)
@@ -200,7 +201,7 @@ Honour these when naming a new file, key, or string.
 
 | Term                                                       | Refers to                                                                                                   |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Appearance store** / **theme/font/editor settings**      | `Appearance`, `useAppearance`, `updateAppearance`, `getAppearance` (`src/theme/useTheme.ts`). [→](overview.md#appearance-store) |
+| **Appearance store** / **theme/font/editor settings**      | `Appearance`, `useAppearance`, `updateAppearance`, `getAppearance`, `setAppearancePreview`, `commitAppearance` (`src/theme/useTheme.ts`). [→](overview.md#appearance-store) |
 | **Theme preset** / **light / dark / Dracula / system**     | `ThemePreset`, `THEMES`, `themeFamily` (`src/theme/themes.ts`). [→](overview.md#theme-preset)                |
 | **Custom theme** / **color editor** / **color slots**      | `CustomTheme`, `CustomThemeColors`, `COLOR_KEYS`, `PRESET_PALETTES` (`src/theme/themes.ts`); `ColorPalette` (`src/ui/ColorPalette.tsx`). [→](overview.md#custom-theme) |
 | **Font family** / **font scale** / **text size**           | `FontFamilyId`, `FONT_FAMILIES`, `FONT_SCALE_PRESETS` (`src/theme/themes.ts`); `loadFontFamily` (`src/theme/fonts.ts`). [→](overview.md#fonts) |

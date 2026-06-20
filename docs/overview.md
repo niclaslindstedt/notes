@@ -590,8 +590,18 @@ are mounted once at the `App` root.
 
 `SettingsModal` (`src/ui/settings/SettingsModal.tsx`) — a tabbed dialog
 (General, Appearance, Editor, Storage; Developer and Logs appear only when dev
-mode / log capture are on). Every control applies live through its store (no
-draft/Save). Tabs reset to General on reopen.
+mode / log capture are on), with a footer pinned below the content: **Reset to
+defaults** on the left, **Cancel** + **Save** on the right (mirroring
+checklist). The appearance settings it owns — theme, font, the Editor controls,
+the achievements switch — are edited against a local **draft** and only persist
+on **Save**: while the dialog is open the draft streams to the theme engine via
+`setAppearancePreview` so the look previews live, **Cancel** (and Escape /
+backdrop / the X) drops the draft so the persisted look snaps back, and **Save**
+flushes it through `commitAppearance` (which preserves the earned achievements
+the dialog can't edit). The device-local controls (language, the
+menu-activation toggle, developer mode) and the storage connections apply
+immediately — they don't live in the persisted appearance document the draft
+snapshots. Tabs reset to General on reopen.
 
 ### Namespaces modal
 
@@ -968,6 +978,16 @@ achievements map + unseen queue. `useAppearance` reads it, `updateAppearance` /
 `setTheme` write it, `useApplyAppearance` projects it onto the DOM. Achievement
 progress lives here so it syncs across devices via [settings
 sync](#settings-sync).
+
+The store also carries an **ephemeral preview override** for the [settings
+modal](#settings-modal)'s draft/Save flow: `setAppearancePreview(draft | null)`
+holds an unsaved draft that the projection (`useApplyAppearance`) paints in
+place of the persisted document, while **every other consumer keeps reading the
+persisted document** — so editor / achievement behaviour doesn't shift mid-edit
+and reverts cleanly on Cancel. `commitAppearance(draft)` persists the draft
+(preserving the live achievement map + unseen queue, which the dialog doesn't
+edit) and clears the preview. Quick toggles outside the dialog still persist
+immediately through `updateAppearance` / `setTheme`.
 
 ### Theme preset
 

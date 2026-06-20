@@ -5,10 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GeneralSection } from "../../src/ui/settings/GeneralSection.tsx";
 import { NavContext, type NavContextValue } from "../../src/ui/nav-context.ts";
 import { useStandaloneMobile } from "../../src/pwa/standalone.ts";
-import {
-  getAppearance,
-  setDisableAchievements,
-} from "../../src/theme/useTheme.ts";
+import { DEFAULT_APPEARANCE } from "../../src/theme/useTheme.ts";
 
 // The menu-activation control is only offered in the installed PWA on a
 // phone / tablet, so the standalone detector is mocked per test.
@@ -20,6 +17,7 @@ const mockStandalone = vi.mocked(useStandaloneMobile);
 
 function renderWithNav(overrides: Partial<NavContextValue> = {}) {
   const setShowMenuButton = vi.fn();
+  const onUpdate = vi.fn();
   const value: NavContextValue = {
     open: false,
     toggle: vi.fn(),
@@ -35,16 +33,15 @@ function renderWithNav(overrides: Partial<NavContextValue> = {}) {
   };
   render(
     <NavContext.Provider value={value}>
-      <GeneralSection />
+      <GeneralSection appearance={DEFAULT_APPEARANCE} onUpdate={onUpdate} />
     </NavContext.Provider>,
   );
-  return { setShowMenuButton };
+  return { setShowMenuButton, onUpdate };
 }
 
 describe("GeneralSection", () => {
   afterEach(() => {
     mockStandalone.mockReturnValue(false);
-    setDisableAchievements(false);
   });
 
   it("offers a flag button per supported language", () => {
@@ -54,12 +51,13 @@ describe("GeneralSection", () => {
   });
 
   it("toggles the achievements system off", () => {
-    renderWithNav();
+    const { onUpdate } = renderWithNav();
     const toggle = screen.getByLabelText("Disable achievements");
     expect(toggle).toBeTruthy();
-    // Off by default (achievements on); ticking it disables the system.
+    // Off by default (achievements on); ticking it edits the draft so Save
+    // would disable the system.
     fireEvent.click(toggle);
-    expect(getAppearance().disableAchievements).toBe(true);
+    expect(onUpdate).toHaveBeenCalledWith("disableAchievements", true);
   });
 
   it("hides the menu-activation control outside a standalone mobile PWA", () => {
