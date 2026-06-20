@@ -43,6 +43,12 @@ import {
   UndoIcon,
 } from "./icons.tsx";
 import { useModalDispatch } from "./modal-bus.ts";
+import { NoteDragItem } from "./note-drag.tsx";
+import {
+  NOTE_DROP_ATTR,
+  NOTE_DROP_ROOT,
+  useNoteDropKey,
+} from "./note-drag-context.ts";
 import { AchievementsMenuItem } from "./achievements/AchievementsMenuItem.tsx";
 import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
 
@@ -82,11 +88,10 @@ const SOURCE_URL = "https://github.com/niclaslindstedt/notes";
 // it on a phone.
 const MAX_RECENT_NOTES = 6;
 
-// The dataTransfer MIME used when dragging a note onto a folder, and the
-// sentinel `dropTarget` value for the "ungrouped" drop zone (drop a note here
-// to move it out of every folder).
+// The dataTransfer MIME used when dragging a note onto a folder with the
+// desktop HTML5 path. The touch path and the ungrouped-zone sentinel
+// (`NOTE_DROP_ROOT`) are shared from `note-drag.tsx`.
 const NOTE_DND_TYPE = "application/x-notes-note-id";
-const ROOT_DROP = "__root__";
 
 type Props = {
   /** Notes to list, in display order (most-recently-edited first). */
@@ -182,11 +187,14 @@ export function SideMenu({
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
 
-  // Drag-to-file state. `draggingNote` gates the drop targets (so a stray
-  // dragover from outside doesn't light them up) and `dropTarget` drives the
-  // hover highlight — a folder id, or `ROOT_DROP` for "out of any folder".
+  // Desktop HTML5 drag-to-file state. `draggingNote` gates the drop targets (so
+  // a stray dragover from outside doesn't light them up) and `dropTarget`
+  // drives the hover highlight — a folder id, or `NOTE_DROP_ROOT` for "out of
+  // any folder". The touch long-press path reports its target via
+  // `activeDropKey`.
   const [draggingNote, setDraggingNote] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const activeDropKey = useNoteDropKey();
 
   function toggleFolder(id: string) {
     setExpandedFolders((prev) => {
@@ -283,7 +291,8 @@ export function SideMenu({
   );
 
   // One note row: the swipe/right-click wrapper around a NavItem, made
-  // draggable (desktop only) so it can be dropped onto a folder to file it.
+  // draggable so it can be dropped onto a folder to file it — HTML5 drag on
+  // desktop, a press-and-hold gesture on touch (see `note-drag.tsx`).
   function renderNoteRow(note: Note, indent = false) {
     const row = (
       <NavItem
@@ -313,12 +322,15 @@ export function SideMenu({
       />
     );
     return (
-      <div
+      <NoteDragItem
         key={note.id}
+        noteId={note.id}
+        title={noteTitle(note)}
+        enabled={!isDesktop}
         draggable={isDesktop}
+        dragging={draggingNote === note.id}
         onDragStart={isDesktop ? (e) => startNoteDrag(e, note.id) : undefined}
         onDragEnd={isDesktop ? endNoteDrag : undefined}
-        className={isDesktop && draggingNote === note.id ? "opacity-40" : ""}
       >
         <SwipeToRemove
           actionLabel={t("nav.deleteNote")}
@@ -328,7 +340,7 @@ export function SideMenu({
         >
           {row}
         </SwipeToRemove>
-      </div>
+      </NoteDragItem>
     );
   }
 
@@ -419,12 +431,14 @@ export function SideMenu({
           );
         }
         return (
-          <div key={folder.id}>
+          <div key={folder.id} {...{ [NOTE_DROP_ATTR]: folder.id }}>
             <FolderRow
               name={folder.name}
               count={folderNotes.length}
               expanded={expanded}
-              isDropTarget={dropTarget === folder.id}
+              isDropTarget={
+                dropTarget === folder.id || activeDropKey === folder.id
+              }
               renameLabel={t("nav.renameFolder")}
               deleteLabel={t("nav.deleteFolder")}
               onToggle={() => toggleFolder(folder.id)}
@@ -460,11 +474,14 @@ export function SideMenu({
       {/* Ungrouped recent notes. Also the drop zone for moving a note OUT of a
           folder — drop one here and it returns to the top level. */}
       <div
-        onDragOver={(e) => allowDropOn(e, ROOT_DROP)}
+        {...{ [NOTE_DROP_ATTR]: NOTE_DROP_ROOT }}
+        onDragOver={(e) => allowDropOn(e, NOTE_DROP_ROOT)}
         onDragLeave={() => setDropTarget(null)}
         onDrop={(e) => dropOn(e, null)}
         className={
-          dropTarget === ROOT_DROP ? "rounded-sm bg-accent/10" : undefined
+          dropTarget === NOTE_DROP_ROOT || activeDropKey === NOTE_DROP_ROOT
+            ? "rounded-sm bg-accent/10"
+            : undefined
         }
       >
         {ungrouped.length === 0 ? (

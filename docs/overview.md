@@ -1220,19 +1220,37 @@ per-folder "New note" row that creates a note already filed inside it; the row
 also carries inline rename (reusing `FolderEditRow`) and delete affordances.
 The add control that used to sit as a "+" on the Notes heading is now its own
 **"New note"** row just above "Show all". A note row can be **dragged onto a
-folder** to file it, or onto the ungrouped zone to take it out of one
-(`NOTE_DND_TYPE` carries the note id; the highlight follows `dropTarget`).
-Native HTML5 drag is pointer-only, so it's gated to non-touch devices — touch
-users file notes with the [folder picker](#folder-picker) instead.
+folder** to file it, or onto the ungrouped zone to take it out of one. On a
+pointer device this is native HTML5 drag (`NOTE_DND_TYPE` carries the note id;
+the highlight follows `dropTarget`); on a touchscreen it's a **press-and-hold**
+gesture (see [note drag](#note-drag-touch--pointer)), with the
+[folder picker](#folder-picker) as a keyboard/quick alternative.
 
 ### Folders in the overview
 
 `NoteList` (`src/app/App.tsx`) mirrors the same grouping: with at least one
 folder it renders a collapsible section per folder (each a drop target, with a
 "New note" shortcut) followed by the ungrouped notes under a "No folder" label
-(itself the drop zone for moving a note out). Cards are draggable on a pointer
-device exactly like the side-menu rows. With no folders it falls back to the
-flat list unchanged.
+(itself the drop zone for moving a note out). Cards drag onto folders exactly
+like the side-menu rows — HTML5 drag on a pointer device, press-and-hold on
+touch. With no folders it falls back to the flat list unchanged.
+
+### Note drag (touch / pointer)
+
+`src/ui/note-drag.tsx` (+ `note-drag-context.ts`) is the shared drag layer both
+surfaces file notes through. Native HTML5 drag only fires for a mouse, so on a
+touchscreen `useTouchNoteDrag` supplies the equivalent: a **long-press** (hold
+~320ms without moving) picks the note up, a floating ghost follows the finger,
+and releasing over a folder files it. It coexists with swipe-to-archive/delete
+by latching on a still hold — any movement past a small slop before the timer
+elapses is left to the existing swipe/scroll. Once engaged it captures the
+pointer (so the inner swipe element stops seeing moves) and blocks page scroll,
+and it hit-tests with `elementFromPoint` against any element carrying the
+`data-note-drop` attribute (a folder id, or `NOTE_DROP_ROOT` for the ungrouped
+zone). `NoteDragProvider` (mounted once around the shell in `App`) holds the
+`onMove` callback and renders the ghost; `NoteDragItem` is the per-row wrapper
+that wires the desktop HTML5 props and the touch handlers together; drop targets
+read the hovered key via `useNoteDropKey` to paint their highlight.
 
 ### Folder picker
 
