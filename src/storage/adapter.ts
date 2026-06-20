@@ -113,6 +113,15 @@ export type StorageAdapter = {
   // true when it performed the split.
   splitLegacyBlob?(): Promise<boolean>;
 
+  // Optional subscription to per-note upload progress: the set of note ids whose
+  // file is currently being written to the backend. The adapter emits the full
+  // current set each time it changes, and once immediately on subscribe.
+  // Drives the per-note sync spinner in the note list and side menu. The
+  // file-per-note backends implement it (the upload is one `store.write` per
+  // changed note); the local browser backend, which writes one synchronous
+  // blob, does not. Returns an unsubscribe function.
+  watchUploads?(listener: (uploading: ReadonlySet<string>) => void): () => void;
+
   // Milliseconds to wait after the last edit before pushing a save. Defaults
   // to 0 (save immediately) — right for localStorage. Cloud adapters set
   // this around a second to coalesce keystrokes into one request.

@@ -267,5 +267,9 @@ export function withLocalCache(
     splitLegacyBlob: inner.splitLegacyBlob
       ? () => inner.splitLegacyBlob!()
       : undefined,
+
+    watchUploads: inner.watchUploads
+      ? (listener) => inner.watchUploads!(listener)
+      : undefined,
   };
 }

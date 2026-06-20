@@ -47,6 +47,7 @@ import {
   LockIcon,
   NotesMarkIcon,
   RestoreIcon,
+  SpinnerIcon,
   TrashIcon,
 } from "../ui/icons.tsx";
 import { CopyNoteButton } from "../ui/CopyNoteButton.tsx";
@@ -76,6 +77,7 @@ import { useEncryptionMigration } from "./use-encryption-migration.ts";
 import { useNavState } from "./use-nav.ts";
 import { useNotes } from "./use-notes.ts";
 import { useSettingsSync } from "./use-settings-sync.ts";
+import { useUploadStatus } from "./use-upload-status.ts";
 
 // Root component. The shell is a flex row — the side menu (a docked sidebar
 // on wide viewports, a drag-out drawer on phones) beside a main area that
@@ -161,6 +163,11 @@ export function App() {
     migrateNote: storage.migrateNote,
     splitLegacyBlob: storage.splitLegacyBlob,
   });
+
+  // Per-note upload progress for the sync spinner: the ids of notes whose file
+  // is being pushed to the backend right now. Empty on the local backend, which
+  // has no per-note upload to watch.
+  const uploadingIds = useUploadStatus(storage.adapter);
 
   // When the floating button is hidden (only possible in the standalone
   // mobile PWA), an inward swipe from the drawer's resting edge opens it.
@@ -415,6 +422,7 @@ export function App() {
               activeNamespace={storage.activeNamespace}
               onSwitchNamespace={switchNamespace}
               encStatus={encStatus}
+              uploadingIds={uploadingIds}
             />
             <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
               {editing ? (
@@ -457,6 +465,7 @@ export function App() {
                   onDelete={removeNote}
                   syncSlot={syncSlot}
                   encStatus={encStatus}
+                  uploadingIds={uploadingIds}
                 />
               )}
             </main>
@@ -488,6 +497,7 @@ function NoteList({
   onDelete,
   syncSlot,
   encStatus,
+  uploadingIds,
 }: {
   notes: Note[];
   onOpen: (id: string) => void;
@@ -496,6 +506,8 @@ function NoteList({
   onDelete: (id: string) => void;
   syncSlot: ReactNode;
   encStatus?: Map<string, "encrypted" | "pending">;
+  /** Ids of notes whose file is being uploaded to the backend right now. */
+  uploadingIds?: ReadonlySet<string>;
 }) {
   const t = useT();
   // With no notes yet, pressing Enter (a physical keyboard, so desktop) starts
@@ -537,6 +549,7 @@ function NoteList({
                   primaryLabel={t("app.archive")}
                   primaryIcon={<ArchiveIcon className="h-4 w-4" />}
                   encrypted={encStatus?.get(note.id) === "encrypted"}
+                  uploading={uploadingIds?.has(note.id) ?? false}
                 />
               </li>
             ))}
@@ -578,11 +591,14 @@ function NoteCard({
   note,
   onOpen,
   encrypted = false,
+  uploading = false,
 }: {
   note: Note;
   onOpen: () => void;
   /** Show the green lock — the note + all its attachments are encrypted at rest. */
   encrypted?: boolean;
+  /** Show the sync spinner — the note's file is being uploaded right now. */
+  uploading?: boolean;
 }) {
   const t = useT();
   const preview = notePreview(note);
@@ -594,11 +610,22 @@ function NoteCard({
     >
       <p className="flex items-center gap-1.5 font-medium text-fg-bright">
         <span className="truncate">{noteTitle(note)}</span>
-        {encrypted && (
+        {/* The transient upload spinner takes precedence over the lock: a note
+            being written isn't settled at rest yet, so showing both would
+            misread. The lock returns once the write (and any encryption) is
+            done. */}
+        {uploading ? (
           <>
-            <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
-            <span className="sr-only">{t("app.encryptedNote")}</span>
+            <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" />
+            <span className="sr-only">{t("app.uploadingNote")}</span>
           </>
+        ) : (
+          encrypted && (
+            <>
+              <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
+              <span className="sr-only">{t("app.encryptedNote")}</span>
+            </>
+          )
         )}
       </p>
       {preview && (
@@ -623,6 +650,7 @@ function SwipeableNoteCard({
   primaryLabel,
   primaryIcon,
   encrypted = false,
+  uploading = false,
 }: {
   note: Note;
   onOpen: () => void;
@@ -635,6 +663,8 @@ function SwipeableNoteCard({
   primaryIcon: ReactNode;
   /** Show the green lock — the note is encrypted at rest. */
   encrypted?: boolean;
+  /** Show the sync spinner — the note's file is being uploaded right now. */
+  uploading?: boolean;
 }) {
   const t = useT();
   const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
@@ -657,7 +687,7 @@ function SwipeableNoteCard({
           },
         ]}
       >
-        <NoteCard note={note} onOpen={onOpen} />
+        <NoteCard note={note} onOpen={onOpen} uploading={uploading} />
       </RowActionMenu>
     );
   }

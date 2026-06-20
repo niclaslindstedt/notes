@@ -284,6 +284,41 @@ export function createDirectoryAdapter(
   let attachmentsTouched = false;
   const uncertain = new Set<string>();
 
+  // Per-note upload progress: the ids of notes whose file is being written to
+  // the backend right now. `save` marks a note's id while its `store.write` is
+  // in flight and clears it when the write settles, so the UI can spin a glyph
+  // next to exactly the notes currently uploading. Listeners get the full set
+  // on every change (and once on subscribe). Empty whenever nothing is in
+  // flight, so a slow cloud write shows the spinner and a fast local one barely
+  // flickers.
+  const uploadingIds = new Set<string>();
+  const uploadListeners = new Set<(ids: ReadonlySet<string>) => void>();
+  function emitUploads(): void {
+    const frozen: ReadonlySet<string> = new Set(uploadingIds);
+    for (const listener of uploadListeners) listener(frozen);
+  }
+  function setUploading(ids: readonly string[], active: boolean): void {
+    let changed = false;
+    for (const id of ids) {
+      if (active && !uploadingIds.has(id)) {
+        uploadingIds.add(id);
+        changed = true;
+      } else if (!active && uploadingIds.delete(id)) {
+        changed = true;
+      }
+    }
+    if (changed) emitUploads();
+  }
+  function watchUploads(
+    listener: (ids: ReadonlySet<string>) => void,
+  ): () => void {
+    uploadListeners.add(listener);
+    listener(new Set(uploadingIds));
+    return () => {
+      uploadListeners.delete(listener);
+    };
+  }
+
   // Per-note at-rest encryption status from the last encrypted load: a note is
   // "encrypted" once its `.enc` file exists and none of its attachments linger
   // as a plaintext file; "pending" while a plaintext remnant remains (an
@@ -802,6 +837,10 @@ export function createDirectoryAdapter(
     const base = parseRevisions(baseRevision);
 
     const desired = new Map<string, DesiredFile>();
+    // Which note each desired note-file path belongs to, so a path queued for
+    // writing can drive the per-note upload spinner. The legacy blob has no
+    // per-note mapping (it's one whole-document file), so it stays out of this.
+    const pathToNoteId = new Map<string, string>();
     let snapshotForAttachments: Snapshot | null = null;
     let supersededKind: "toEncrypted" | "toBlob" | "toMarkdown" | null = null;
 
@@ -811,6 +850,7 @@ export function createDirectoryAdapter(
       snapshotForAttachments = snapshot;
       for (const note of snapshot.notes) {
         const path = await encNotePath(keys, note.id);
+        pathToNoteId.set(path, note.id);
         const source = noteToEncJson(note);
         desired.set(path, {
           source,
@@ -826,6 +866,9 @@ export function createDirectoryAdapter(
     } else {
       const snapshot = parse(text);
       snapshotForAttachments = snapshot;
+      for (const note of snapshot.notes) {
+        pathToNoteId.set(`${noteFileStem(note)}.md`, note.id);
+      }
       for (const file of snapshotToFiles(snapshot)) {
         desired.set(file.path, { stored: file.text, source: file.text });
       }
@@ -868,7 +911,19 @@ export function createDirectoryAdapter(
       });
     }
 
-    const written = await writeFiles(desired, toWrite);
+    // Spin a per-note glyph while each changed note's file is actually being
+    // pushed to the backend. Cleared in `finally` so a failed write (conflict,
+    // offline, throttle) doesn't leave a note stuck "uploading".
+    const uploadingNoteIds = toWrite
+      .map((path) => pathToNoteId.get(path))
+      .filter((id): id is string => id !== undefined);
+    setUploading(uploadingNoteIds, true);
+    let written: Map<string, string | undefined>;
+    try {
+      written = await writeFiles(desired, toWrite);
+    } finally {
+      setUploading(uploadingNoteIds, false);
+    }
 
     // Write the new attachment blobs BEFORE deleting any superseded files, then
     // verify the new note ciphertext decrypts — so an interruption never leaves
@@ -1066,5 +1121,6 @@ export function createDirectoryAdapter(
     getEncryptionStatus,
     migrateNote,
     splitLegacyBlob,
+    watchUploads,
   };
 }

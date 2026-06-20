@@ -348,3 +348,80 @@ describe("directory adapter", () => {
     ).resolves.toBeDefined();
   });
 });
+
+describe("directory adapter upload progress", () => {
+  // A store whose writes block on a single shared gate, so a save can be caught
+  // mid-flight to observe which notes are reported as uploading.
+  function gatedStore(): { store: FileStore; release: () => void } {
+    const base = memoryStore();
+    let releaseGate: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    const store: FileStore = {
+      list: () => base.list(),
+      read: (p) => base.read(p),
+      async write(path, text) {
+        await gate;
+        return base.write(path, text);
+      },
+      remove: (p) => base.remove(p),
+    };
+    return { store, release: () => releaseGate() };
+  }
+
+  it("marks each note uploading while its file is written, then clears", async () => {
+    const { store, release } = gatedStore();
+    const a = adapter(store);
+    const [first, second] = notes();
+    const expected = [first!.id, second!.id].sort();
+
+    const seen: string[][] = [];
+    a.watchUploads!((ids) => seen.push([...ids].sort()));
+    // The immediate on-subscribe emit reports nothing in flight.
+    expect(seen).toEqual([[]]);
+
+    const savePromise = a.save(serialize({ notes: [first!, second!] }));
+    // Let the save reach (and block on) the gated writes.
+    for (let i = 0; i < 50 && seen.length < 2; i += 1) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    expect(seen[seen.length - 1]).toEqual(expected);
+
+    release();
+    await savePromise;
+    // The set is empty again once the writes settle.
+    expect(seen[seen.length - 1]).toEqual([]);
+  });
+
+  it("clears the uploading set even when a write fails", async () => {
+    const base = memoryStore();
+    const store: FileStore = {
+      list: () => base.list(),
+      read: (p) => base.read(p),
+      write: () => Promise.reject(new Error("write failed")),
+      remove: (p) => base.remove(p),
+    };
+    const a = adapter(store);
+    const seen: string[][] = [];
+    a.watchUploads!((ids) => seen.push([...ids].sort()));
+
+    await expect(a.save(serialize({ notes: [createNote(1)] }))).rejects.toThrow(
+      "write failed",
+    );
+    // First the note is marked, then the finally-block clears it.
+    expect(seen[seen.length - 1]).toEqual([]);
+    expect(seen.some((s) => s.length > 0)).toBe(true);
+  });
+
+  it("stops emitting after the listener unsubscribes", async () => {
+    const store = memoryStore();
+    const a = adapter(store);
+    const seen: string[][] = [];
+    const unsubscribe = a.watchUploads!((ids) => seen.push([...ids].sort()));
+    unsubscribe();
+    await a.save(serialize({ notes: [createNote(1)] }));
+    // Only the on-subscribe emit landed before unsubscribing.
+    expect(seen).toEqual([[]]);
+  });
+});
