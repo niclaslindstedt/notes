@@ -20,6 +20,7 @@ import {
   isBlank,
   noteTitle,
   notePreview,
+  notePreviewBlock,
   type Note,
   type SaveFormatting,
 } from "../domain/note.ts";
@@ -28,9 +29,16 @@ import { isStandaloneMobile } from "../pwa/standalone.ts";
 import { createDevSeedAdapter } from "../storage/dev-seed/index.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
-import { unlockAchievements, useApplyAppearance } from "../theme/useTheme.ts";
+import {
+  unlockAchievements,
+  useAppearance,
+  useApplyAppearance,
+} from "../theme/useTheme.ts";
 import { AppTitle } from "../ui/AppTitle.tsx";
-import { MarkdownEditor } from "../ui/MarkdownEditor.tsx";
+import {
+  MarkdownEditor,
+  type MarkdownEditorHandle,
+} from "../ui/MarkdownEditor.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { DropOverlay } from "../ui/DropOverlay.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
@@ -602,12 +610,22 @@ function NoteCard({
   uploading?: boolean;
 }) {
   const t = useT();
-  const preview = notePreview(note);
+  // The overview's two looks (Settings → Appearance → Note list): `cards` is
+  // the roomier, multi-line treatment; `rows` is the compact one-line list.
+  const cards = useAppearance().listLayout === "cards";
+  const preview = cards ? notePreviewBlock(note) : notePreview(note);
+  // Only fade the tail when there's plausibly more text below the clamp — a
+  // short note shouldn't have its one line dimmed. A cheap content heuristic
+  // (line count or length) stands in for measuring the clamped overflow.
+  const fade =
+    cards && (preview.length > 180 || preview.split("\n").length > 5);
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="w-full rounded-[var(--radius)] border border-line bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-2"
+      className={`w-full rounded-[var(--radius)] border border-line bg-surface text-left transition-colors hover:bg-surface-2 ${
+        cards ? "px-4 py-3.5" : "px-4 py-3"
+      }`}
     >
       <p className="flex items-center gap-1.5 font-medium text-fg-bright">
         <span className="truncate">{noteTitle(note)}</span>
@@ -629,9 +647,26 @@ function NoteCard({
           )
         )}
       </p>
-      {preview && (
-        <p className="mt-0.5 truncate text-sm text-muted">{preview}</p>
-      )}
+      {preview &&
+        (cards ? (
+          <p
+            className="mt-1.5 max-h-[8.5rem] overflow-hidden text-sm leading-relaxed whitespace-pre-line text-muted"
+            style={
+              fade
+                ? {
+                    maskImage:
+                      "linear-gradient(to bottom, #000 65%, transparent)",
+                    WebkitMaskImage:
+                      "linear-gradient(to bottom, #000 65%, transparent)",
+                  }
+                : undefined
+            }
+          >
+            {preview}
+          </p>
+        ) : (
+          <p className="mt-0.5 truncate text-sm text-muted">{preview}</p>
+        ))}
     </button>
   );
 }
@@ -948,15 +983,26 @@ function Editor({
   // mount — typing the title doesn't re-route focus mid-session.
   const titleFirst = useRef(isBlank(note)).current;
   const bodyRef = useRef<HTMLDivElement>(null);
+  // Handle on the live-preview editor so the title can hand focus down into the
+  // body even when no line is active yet (the body has no textarea until then).
+  const markdownEditorRef = useRef<MarkdownEditorHandle>(null);
   // The header centres a single-line title against the glyph and the copy/sync
   // buttons, and top-aligns once the title wraps so those stay pinned to the
   // first line (the title field reports the transition as it grows).
   const [titleMultiline, setTitleMultiline] = useState(false);
 
-  // Move focus from the title field into the body's editing surface (its
-  // textarea), used when the user presses Enter or Arrow-Down in the title.
+  // Move focus from the title field into the body's editing surface, used when
+  // the user presses Enter or Arrow-Down in the title. The live-preview editor
+  // opens with no active line (so the note renders fully formatted), so there
+  // may be no textarea to focus yet — ask the editor to open one at the end via
+  // its handle. The plain editor always has a textarea, so fall back to that.
   function focusBody() {
-    bodyRef.current?.querySelector("textarea")?.focus();
+    const ta = bodyRef.current?.querySelector("textarea");
+    if (ta) {
+      ta.focus();
+      return;
+    }
+    markdownEditorRef.current?.focus();
   }
 
   return (
@@ -1009,6 +1055,7 @@ function Editor({
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">
         {editor.renderMarkdown ? (
           <MarkdownEditor
+            ref={markdownEditorRef}
             body={note.body}
             onChange={onChange}
             wordWrap={editor.wordWrap}

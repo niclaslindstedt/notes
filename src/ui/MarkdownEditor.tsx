@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -8,6 +9,7 @@ import {
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type Ref,
 } from "react";
 
 import {
@@ -42,6 +44,12 @@ const SENTINEL = "​";
 // Moving the caret (arrows, click) "rolls" that single editable textarea from
 // line to line, so editing always happens against the literal source while
 // the rest of the note stays formatted.
+//
+// Until the user actually places the caret — by clicking a line, the empty
+// space below it, or being handed focus from the title — *no* line is active
+// and the whole note renders as formatted Markdown (`active` is null). This is
+// the opening state for an existing note: there is no raw textarea to leave the
+// last line unformatted, and on mobile the soft keyboard stays down until a tap.
 //
 // The source string is the single source of truth — we never read formatted
 // DOM back. Each edit mutates the line array and re-derives the string;
@@ -79,6 +87,14 @@ type Props = {
   placement?: AttachmentPlacement;
   /** Trim bare URLs in the preview to this many characters either side (0 = off). */
   shortenLinkChars?: number;
+  /** Imperative handle so the title field can hand focus down into the body. */
+  ref?: Ref<MarkdownEditorHandle>;
+};
+
+/** What the editor exposes to its parent: a way to start editing from outside. */
+export type MarkdownEditorHandle = {
+  /** Place the caret at the end of the note and open the textarea there. */
+  focus: () => void;
 };
 
 export function MarkdownEditor({
@@ -95,6 +111,7 @@ export function MarkdownEditor({
   onAttach,
   placement = INLINE_PLACEMENT,
   shortenLinkChars = 0,
+  ref,
 }: Props) {
   const t = useT();
   // Local source of truth, seeded from the note. App keys the editor by note
@@ -108,10 +125,13 @@ export function MarkdownEditor({
     [value, placement],
   );
 
-  // The line currently being edited as raw text. Starts on the last line so
-  // opening an existing note continues where it left off.
-  const [active, setActive] = useState(() =>
-    Math.max(0, value.split("\n").length - 1),
+  // The line currently being edited as raw text, or `null` when no line is
+  // active and the whole note renders formatted. We only auto-open a line when
+  // the parent asks the body to take focus on mount (`focusOnMount`); otherwise
+  // the note stays fully formatted until the user clicks (or focus is handed
+  // down from the title), so nothing renders as a raw textarea on open.
+  const [active, setActive] = useState<number | null>(() =>
+    focusOnMount ? Math.max(0, value.split("\n").length - 1) : null,
   );
 
   // Adopt an out-of-band change to this note's body — a live cloud pull while
@@ -126,7 +146,9 @@ export function MarkdownEditor({
   useEffect(() => {
     if (body === valueRef.current) return;
     setValue(body);
-    setActive((a) => Math.min(a, body.split("\n").length - 1));
+    setActive((a) =>
+      a === null ? null : Math.min(a, body.split("\n").length - 1),
+    );
   }, [body]);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -138,7 +160,11 @@ export function MarkdownEditor({
     focusOnMount ? value.length : null,
   );
 
-  const clampedActive = Math.min(active, lines.length - 1);
+  const clampedActive =
+    active === null ? null : Math.min(active, lines.length - 1);
+  // Whether a line is open as a raw textarea (edit mode), versus the note
+  // rendering fully formatted with no caret placed yet.
+  const isEditing = clampedActive !== null;
 
   // An empty active line below the first one carries an invisible zero-width
   // sentinel inside its textarea. A soft keyboard only fires the `beforeinput`
@@ -148,8 +174,9 @@ export function MarkdownEditor({
   // above. The sentinel gives that Backspace something to bite on, which we
   // intercept and turn into a merge. It never reaches the source string — the
   // textarea shows it but `value`/`onChange` only ever see the real line.
-  const activeLine = lines[clampedActive] ?? "";
-  const useSentinel = clampedActive > 0 && activeLine === "";
+  const activeLine = clampedActive === null ? "" : (lines[clampedActive] ?? "");
+  const useSentinel =
+    clampedActive !== null && clampedActive > 0 && activeLine === "";
   const caretOffset = useSentinel ? SENTINEL.length : 0;
 
   // Apply a line-array mutation: re-derive the source, move the active line,
@@ -171,6 +198,7 @@ export function MarkdownEditor({
   // mobile `beforeinput` handler below. Each splices the line array and moves
   // the caret; callers decide *when* to fire them from their own event.
   function splitLine(start: number, end: number) {
+    if (clampedActive === null) return;
     const text = lines[clampedActive] ?? "";
     const i = clampedActive;
     const next = [...lines];
@@ -179,6 +207,7 @@ export function MarkdownEditor({
   }
 
   function mergeWithPrev() {
+    if (clampedActive === null) return;
     const text = lines[clampedActive] ?? "";
     const i = clampedActive;
     const prev = lines[i - 1]!;
@@ -188,6 +217,7 @@ export function MarkdownEditor({
   }
 
   function mergeWithNext() {
+    if (clampedActive === null) return;
     const text = lines[clampedActive] ?? "";
     const i = clampedActive;
     const next = [...lines];
@@ -200,7 +230,9 @@ export function MarkdownEditor({
   // paste into an empty note doesn't leave a stray gap above the attachment.
   function insertAttachments(atts: readonly Attachment[]) {
     if (atts.length === 0) return;
-    const i = clampedActive;
+    // A drop can land while no line is active (the note is fully formatted);
+    // fall back to the last line so the reference appends to the note's foot.
+    const i = clampedActive ?? lines.length - 1;
     const cur = lines[i] ?? "";
     const inserted = [...atts.map(attachmentMarkdown), ""];
     const next = [...lines];
@@ -288,13 +320,14 @@ export function MarkdownEditor({
   // matching `beforeinput`, so the two paths never both fire for one keystroke.
   //
   // Attached natively (not via React's synthetic `onBeforeInput`, whose
-  // `inputType` coverage is unreliable) through a ref so the one-time listener
-  // always sees current state. The textarea keeps a stable identity (`key=
-  // "active"`) as the active line rolls, so binding once is enough.
+  // `inputType` coverage is unreliable) through a ref so the listener always
+  // sees current state. The textarea keeps a stable identity (`key="active"`)
+  // as the active line rolls, so we only re-bind when it actually mounts or
+  // unmounts — i.e. when the note enters or leaves edit mode.
   const handleBeforeInput = useRef<(e: InputEvent) => void>(() => {});
   handleBeforeInput.current = (e: InputEvent) => {
     const ta = taRef.current;
-    if (!ta) return;
+    if (!ta || clampedActive === null) return;
     // Work in source-line columns: subtract the sentinel so column 0 of an
     // empty line is detected whether or not the textarea carries the sentinel.
     const start = ta.selectionStart - caretOffset;
@@ -326,19 +359,18 @@ export function MarkdownEditor({
     }
   };
 
-  // Rebind whenever the active line changes: a selection drag dissolves the
-  // textarea entirely (active === -1) and a later click mounts a fresh one, so
-  // binding only once on mount would leave that new textarea without the mobile
-  // structural-edit handler.
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     const listener = (e: InputEvent) => handleBeforeInput.current(e);
     ta.addEventListener("beforeinput", listener);
     return () => ta.removeEventListener("beforeinput", listener);
-  }, [clampedActive]);
+    // Re-bind whenever the textarea mounts/unmounts (edit mode toggling on/off,
+    // including a selection drag dissolving it — see below).
+  }, [isEditing]);
 
   function onTextChange(ta: HTMLTextAreaElement) {
+    if (clampedActive === null) return;
     const raw = ta.value;
     // The sentinel was deleted, leaving the field empty: that Backspace is the
     // one a soft keyboard would otherwise have swallowed. Merge into the line
@@ -362,6 +394,7 @@ export function MarkdownEditor({
   }
 
   function onKeyDown(e: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (clampedActive === null) return;
     const ta = e.currentTarget;
     // Source-line columns (see the `beforeinput` handler): the sentinel sits in
     // front of the caret on an empty line, so discount it before comparing.
@@ -446,6 +479,12 @@ export function MarkdownEditor({
   // below the content, where the user expects to keep typing.
   function activateEnd(e: ReactMouseEvent) {
     e.preventDefault();
+    placeCaretAtEnd();
+  }
+
+  // Open edit mode at the end of the note (the bottom blank line), the shared
+  // body of `activateEnd` and the imperative `focus()` the title hands down to.
+  function placeCaretAtEnd() {
     const last = lines.length - 1;
     if (lines[last] !== "") {
       // Append the blank line locally so the caret has somewhere to land, but
@@ -475,6 +514,18 @@ export function MarkdownEditor({
     moveTo(last, 0);
   }
 
+  // Expose `focus()` to the parent so the title field can hand the caret down
+  // into the body on Enter / Arrow-Down. Routed through a ref so the handle
+  // always runs the latest closure (over the current line array), matching the
+  // `beforeinput` listener above.
+  const placeCaretAtEndRef = useRef(placeCaretAtEnd);
+  placeCaretAtEndRef.current = placeCaretAtEnd;
+  useImperativeHandle(
+    ref,
+    () => ({ focus: () => placeCaretAtEndRef.current() }),
+    [],
+  );
+
   // --- Cross-line text selection -------------------------------------------
   //
   // The active line is a textarea, an isolated selection island, and every
@@ -482,10 +533,10 @@ export function MarkdownEditor({
   // within one line. To let the user sweep a selection across the whole note
   // (desktop), a drag is tracked from a capture-phase mousedown (so it fires
   // even on a link, which stops the bubble-phase handler) and, once it crosses
-  // a small threshold, the textarea is dissolved (`active = -1`, all lines
-  // render as formatted divs) and the selection is driven directly with the
-  // Selection API from the press point to the pointer. A plain click (no drag)
-  // still rolls the caret onto the clicked line via the existing handlers.
+  // a small threshold, edit mode is dropped (`active = null`, all lines render
+  // as formatted divs) and the selection is driven directly with the Selection
+  // API from the press point to the pointer. A plain click (no drag) still
+  // rolls the caret onto the clicked line via the existing handlers.
   const dragRef = useRef<{ x: number; y: number; dragging: boolean } | null>(
     null,
   );
@@ -513,8 +564,8 @@ export function MarkdownEditor({
       if (Math.abs(e.clientX - d.x) < 4 && Math.abs(e.clientY - d.y) < 4)
         return;
       d.dragging = true;
-      // Dissolve the editing textarea so every line is plain selectable text.
-      setActive(-1);
+      // Drop edit mode so every line is plain selectable text (no textarea).
+      setActive(null);
     }
     e.preventDefault();
     driveSelection(d.x, d.y, e.clientX, e.clientY);
@@ -658,7 +709,7 @@ export function MarkdownEditor({
                   onKeyDown={onKeyDown}
                   onPaste={onPaste}
                   className={`block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-fg outline-none placeholder:text-muted/60 ${wrapClass} ${lineTextClass(
-                    blocks[clampedActive]!,
+                    blocks[index]!,
                   )}`}
                 />
               );
@@ -679,10 +730,17 @@ export function MarkdownEditor({
                 onMouseDown={(e) => activateAt(e, index)}
                 className={`cursor-text text-fg ${wrapClass}`}
               >
-                <RenderedLine
-                  block={blocks[index]!}
-                  shortenLinkChars={shortenLinkChars}
-                />
+                {value === "" ? (
+                  // An entirely empty note has nothing to format, so show the
+                  // same "Start writing" affordance the active textarea would —
+                  // clicking it opens edit mode on this blank line.
+                  <span className="text-muted/60">{t("app.startWriting")}</span>
+                ) : (
+                  <RenderedLine
+                    block={blocks[index]!}
+                    shortenLinkChars={shortenLinkChars}
+                  />
+                )}
               </div>
             );
           })}

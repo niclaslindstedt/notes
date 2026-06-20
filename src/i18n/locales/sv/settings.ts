@@ -105,6 +105,12 @@ const settings: SettingsCatalog = {
     mode: "Läge",
     variant: "Variant",
     systemNote: "Följer enhetens ljusa/mörka inställning.",
+    list: "Anteckningslista",
+    listLayout: "Layout",
+    listLayoutRows: "Rader",
+    listLayoutCards: "Kort",
+    listLayoutHint:
+      "Rader är en kompakt enradslista; kort är högre och visar mer av varje anteckning innan den tonas ut.",
     font: "Typsnitt",
     fontFamily: "Typsnittsfamilj",
     textSize: "Textstorlek",

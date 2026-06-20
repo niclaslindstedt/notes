@@ -62,13 +62,32 @@ prompts the first note.
 ### Note card
 
 `NoteCard` / `SwipeableNoteCard` in `src/app/App.tsx` — one note in the
-overview. Shows the note's title (`noteTitle`) and a one-line preview
-(`notePreview`), plus a green **lock** (`LockIcon`, theme `--accent`) when the
-note and all its attachments are encrypted at rest (the per-note status from the
+overview. Shows the note's title (`noteTitle`), plus a green **lock**
+(`LockIcon`, theme `--accent`) when the note and all its attachments are
+encrypted at rest (the per-note status from the
 [encryption migration](#encryption-migration); the side-menu note rows show the
 same). `SwipeableNoteCard` wraps it in `useRowSwipe`: a right-swipe archives the
 note, a left-swipe latches a trash button that needs a second tap to delete
 (both undoable).
+
+The preview body honours the [note-list layout](#note-list-layout)
+(`Appearance.listLayout`): in **rows** it's a single truncated line
+(`notePreview`); in **cards** it's a multi-line excerpt (`notePreviewBlock`)
+that keeps the note's line breaks, clamps its height, and fades its tail out
+with a CSS mask gradient when there's more text below the clamp (a cheap
+content-length heuristic decides whether to fade, so a short note isn't dimmed).
+
+### Note-list layout
+
+The overview's two looks, chosen in Settings → Appearance → Note list
+(`Appearance.listLayout`, a `ListLayout` of `"rows" | "cards"` in
+`src/theme/themes.ts`; the control is a segmented row in `AppearanceSection`).
+**Cards** is the default — taller, roomier note cards with a multi-line,
+tail-fading excerpt so the overview reads like a wall of cards. **Rows** is the
+compact one-line list. It's a synced appearance preference (it changes nothing
+about the note document), and switching it the first time unlocks the
+**Gallery** achievement. Read by `NoteCard`, which applies to the archive view's
+cards too.
 
 ### Archive view
 
@@ -128,6 +147,18 @@ on rendered text. Structural edits (Enter, boundary Backspace/Delete) splice
 the body explicitly; it reads the parsed blocks from `classifyLines`
 (`src/domain/markdown.ts`) and honours the `EditorSettings` (word-wrap,
 spell-check, autocorrect, margin width).
+
+**Opening a note shows it fully formatted.** The active line is nullable
+(`active: number | null`), and an existing note opens with *no* line active
+(the app passes `focusOnMount={false}`), so every line — last one included —
+renders as Markdown and there is no raw textarea until the user actually places
+the caret. This is what keeps a note's final line (or its only line) from
+opening as plain source, and on mobile it keeps the soft keyboard down until a
+deliberate tap. A line goes active only on a click (`activateAt` /
+`activateEnd`) or when the title field hands focus down through the editor's
+imperative `focus()` handle (`MarkdownEditorHandle`, consumed by `focusBody` in
+`App`) on Enter / Arrow-Down. A brand-new empty note shows the "Start writing"
+placeholder on the blank rendered line instead of a textarea.
 
 Clicking the empty space below the note (`activateEnd`) always lands the caret
 on a blank line at the very bottom, **appending one when the document doesn't
@@ -446,9 +477,12 @@ litter the list. Blank notes are hidden from the visible `notes` set but live in
 ### Preview
 
 `notePreview` (`src/domain/note.ts`) — the one-line body excerpt shown on the
-[note card](#note-card). Image-attachment markdown (`![alt](attachments/…)`,
-and any `![](…)` image reference) is stripped from it — the raw syntax is noise
-in a text excerpt, not content.
+[note card](#note-card) in the **rows** layout. Image-attachment markdown
+(`![alt](attachments/…)`, and any `![](…)` image reference) is stripped from
+it — the raw syntax is noise in a text excerpt, not content. `notePreviewBlock`
+is its **cards**-layout sibling: the same stripping, but it keeps the note's
+line breaks (collapsing runs of blank lines) so the multi-line card excerpt
+reads like the note itself.
 
 ### Sort order
 
@@ -758,7 +792,8 @@ edge swipe; mobile PWA only), and the dev-mode toggle.
 ### Appearance settings
 
 `AppearanceSection` (`src/ui/settings/AppearanceSection.tsx`) — the
-live-repainting theme picker (presets or the custom editor), font family and
+live-repainting theme picker (presets or the custom editor), the
+[note-list layout](#note-list-layout) toggle (rows vs cards), font family and
 text-scale pickers (non-default fonts load on demand), density, and corner
 radius. The custom editor uses `ColorPalette` (`src/ui/ColorPalette.tsx`) to
 edit individual [colour slots](#custom-theme).

@@ -110,6 +110,12 @@ const settings = {
     mode: "Mode",
     variant: "Variant",
     systemNote: "Follows your device's light / dark setting.",
+    list: "Note list",
+    listLayout: "Layout",
+    listLayoutRows: "Rows",
+    listLayoutCards: "Cards",
+    listLayoutHint:
+      "Rows is a compact one-line list; cards are taller, showing more of each note before fading out.",
     font: "Font",
     fontFamily: "Font family",
     textSize: "Text size",

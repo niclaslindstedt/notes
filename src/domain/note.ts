@@ -131,6 +131,22 @@ export function notePreview(note: Note): string {
     .join(" ");
 }
 
+// A multi-line preview of the body, used by the card layout of the overview
+// (see `notePreview` for the single-line row layout). Keeps the note's line
+// breaks so the excerpt reads like the note itself — every non-empty line is
+// trimmed and runs of blank lines are collapsed away — and the card clamps the
+// height and fades the tail out in CSS. Attachment markdown is stripped the
+// same way as the one-line preview.
+export function notePreviewBlock(note: Note): string {
+  return note.body
+    .replace(IMAGE_MARKDOWN_RE, " ")
+    .replace(FILE_ATTACHMENT_MARKDOWN_RE, " ")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter((line) => line.length > 0)
+    .join("\n");
+}
+
 /** True when a note carries no user content and is safe to discard. */
 export function isBlank(note: Note): boolean {
   return (

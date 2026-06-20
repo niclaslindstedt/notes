@@ -13,6 +13,7 @@ import {
   BoxesGlyph,
   BroadcastGlyph,
   BroomGlyph,
+  CardsGlyph,
   CloudGlyph,
   CodeGlyph,
   CopyGlyph,
@@ -182,6 +183,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       slices: (s) => [s.appearance.fontFamily],
       predicate: (prev, next) =>
         prev.appearance.fontFamily !== next.appearance.fontFamily,
+    },
+  },
+  {
+    id: "gallery",
+    tier: "intermediate",
+    glyph: CardsGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.appearance.listLayout],
+      predicate: (prev, next) =>
+        prev.appearance.listLayout !== next.appearance.listLayout,
     },
   },
   {
