@@ -773,11 +773,16 @@ function Editor({
   const t = useT();
   const nav = useNav();
   const maxWidth = editorMarginMaxWidth(editor.margin);
-  // A brand-new note opens with the caret in the title; an existing note keeps
-  // the body focused so editing continues where it left off. Captured once for
+  // A brand-new note opens with the caret in the title so it's ready to be
+  // named; opening an existing note focuses nothing, so the soft keyboard
+  // stays down until the user taps where they want to type. Captured once for
   // mount — typing the title doesn't re-route focus mid-session.
   const titleFirst = useRef(isBlank(note)).current;
   const bodyRef = useRef<HTMLDivElement>(null);
+  // The header centres a single-line title against the glyph and the copy/sync
+  // buttons, and top-aligns once the title wraps so those stay pinned to the
+  // first line (the title field reports the transition as it grows).
+  const [titleMultiline, setTitleMultiline] = useState(false);
 
   // Move focus from the title field into the body's editing surface (its
   // textarea), used when the user presses Enter or Arrow-Down in the title.
@@ -794,8 +799,12 @@ function Editor({
           returns to the overview. The glyph box matches the title's first-line
           height (leading-tight on text-lg) and centres the icon within it, so
           the two stay vertically aligned even when a long title wraps and the
-          header top-aligns the rest. */}
-      <header className="sticky top-0 z-10 flex items-start gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
+          header top-aligns the rest. A single-line title centres the whole row;
+          once it wraps the header top-aligns so the glyph and the copy/sync
+          buttons stay pinned to the first line. */}
+      <header
+        className={`sticky top-0 z-10 flex gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))] ${titleMultiline ? "items-start" : "items-center"}`}
+      >
         <button
           type="button"
           onClick={nav.toggle}
@@ -810,6 +819,7 @@ function Editor({
           onSettle={onTitleSettle}
           onEnter={focusBody}
           focusOnMount={titleFirst}
+          onMultilineChange={setTitleMultiline}
           disableSpellcheck={editor.disableSpellcheck}
           disableAutocorrect={editor.disableAutocorrect}
         />
@@ -828,7 +838,7 @@ function Editor({
             disableSpellcheck={editor.disableSpellcheck}
             disableAutocorrect={editor.disableAutocorrect}
             maxWidth={maxWidth}
-            focusOnMount={!titleFirst}
+            focusOnMount={false}
             attachments={note.attachments}
             canAttach={canAttach}
             onAttach={onAttach}
@@ -841,7 +851,7 @@ function Editor({
             disableSpellcheck={editor.disableSpellcheck}
             disableAutocorrect={editor.disableAutocorrect}
             maxWidth={maxWidth}
-            focusOnMount={!titleFirst}
+            focusOnMount={false}
           />
         )}
       </div>
@@ -853,8 +863,10 @@ function Editor({
 // sitting inline in the header beside the app glyph so it reads like the
 // document's own title (the way checklist heads a list with its name). A long
 // title wraps onto further lines and the field grows to fit rather than
-// scrolling out of view; the header top-aligns so the glyph and the copy/sync
-// buttons stay pinned to the first line. It is *not* part of the body, so
+// scrolling out of view; a single-line title is centred against the glyph and
+// the copy/sync buttons, and once it wraps the header top-aligns so those stay
+// pinned to the first line (the field reports the transition via
+// onMultilineChange). It is *not* part of the body, so
 // backspacing at the start of the body never reaches it. Enter / Arrow-Down
 // hand focus down to the body (and so the field never holds a literal newline).
 function TitleField({
@@ -863,6 +875,7 @@ function TitleField({
   onSettle,
   onEnter,
   focusOnMount,
+  onMultilineChange,
   disableSpellcheck,
   disableAutocorrect,
 }: {
@@ -871,6 +884,7 @@ function TitleField({
   onSettle: () => void;
   onEnter: () => void;
   focusOnMount: boolean;
+  onMultilineChange: (multiline: boolean) => void;
   disableSpellcheck: boolean;
   disableAutocorrect: boolean;
 }) {
@@ -884,11 +898,20 @@ function TitleField({
   // then stretch to the wrapped height — so it reads as a borderless heading
   // that simply gets taller. Enter is still intercepted to hand focus to the
   // body (see onKeyDown), so the field never actually holds a newline.
+  const onMultilineRef = useRef(onMultilineChange);
+  onMultilineRef.current = onMultilineChange;
   const resize = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+    const { scrollHeight } = el;
+    el.style.height = `${scrollHeight}px`;
+    // Tell the header whether the title now spans more than one line so it can
+    // switch from centring the row to top-aligning it. p-0 means scrollHeight is
+    // pure line height, so anything past ~1.5 lines is a genuine wrap.
+    const lineHeight =
+      parseFloat(getComputedStyle(el).lineHeight) || scrollHeight;
+    onMultilineRef.current(scrollHeight > lineHeight * 1.5);
   }, []);
   useLayoutEffect(resize, [draft, resize]);
 
