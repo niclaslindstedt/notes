@@ -578,6 +578,22 @@ runtime switch the [language root](#language-root) listens for.
 `src/ui/settings/shared.tsx` — reusable section primitives (Section, Field,
 ToggleRow, SegmentedRow) every settings tab composes from.
 
+### Custom dropdown
+
+`SelectPicker` (`src/ui/form/SelectPicker.tsx`) — the app's `<select>`
+replacement, used for the [copy button](#copy-button) scope picker in the Editor
+tab (`EditorSection`). The trigger is a bordered field wearing a `ChevronDownIcon`
+caret; the open menu is a `role="listbox"` of `role="option"` buttons with the
+current value ticked and full keyboard nav (Arrow/Home/End to move, Enter/Space
+to commit, Escape to dismiss without committing). It renders the menu through
+`FloatingPanel` (`src/ui/FloatingPanel.tsx`), a portalled popover shell that owns
+the float position (`useFloatingPosition`, `src/ui/hooks/useFloatingPosition.ts`
+— measures the trigger, clamps the panel into the visible viewport, and flips it
+above the trigger when there isn't room below), the Escape/outside-click
+dismissal (`useEscapeKey`, `DismissBackdrop`), and the `document.body` portal
+mount. Portalling keeps the menu out of the settings modal's `overflow-y-auto`
+body, so a picker on a control near the bottom of the modal isn't clipped.
+
 ## Sync and storage status (header)
 
 ### Sync status

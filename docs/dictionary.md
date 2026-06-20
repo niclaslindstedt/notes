@@ -144,6 +144,7 @@ Honour these when naming a new file, key, or string.
 | **Logs tab** / **captured logs**                           | `LogsSection` (`src/ui/settings/LogsSection.tsx`); `logger` (`src/dev/logger.ts`). [→](overview.md#logs)      |
 | **Language picker** / **switch language**                  | `LanguagePicker` (`src/ui/settings/LanguagePicker.tsx`). [→](overview.md#language-picker)                     |
 | **Settings layout helpers** (Section / Field / ToggleRow)  | `src/ui/settings/shared.tsx`. [→](overview.md#settings-layout-helpers)                                        |
+| **Custom dropdown** / **select picker** / **floating panel** | `SelectPicker` (`src/ui/form/SelectPicker.tsx`); `FloatingPanel` (`src/ui/FloatingPanel.tsx`); `useFloatingPosition` (`src/ui/hooks/useFloatingPosition.ts`). [→](overview.md#custom-dropdown) |
 
 ## Sync and storage status (header)
 

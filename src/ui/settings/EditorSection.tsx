@@ -11,6 +11,7 @@ import {
   type EditorSettings,
 } from "../../theme/themes.ts";
 import type { Appearance } from "../../theme/useTheme.ts";
+import { SelectPicker } from "../form/SelectPicker.tsx";
 import { Field, Section, SegmentedRow, ToggleRow } from "./shared.tsx";
 
 type UpdateAppearance = <K extends keyof Appearance>(
@@ -100,18 +101,15 @@ export function EditorSection({
         onChange={(v) => update("disableAutocorrect", v)}
       />
       <Field label={t("settings.editor.copyScope")}>
-        <select
+        <SelectPicker<CopyScope>
           value={editor.copyScope}
-          onChange={(e) => update("copyScope", e.target.value as CopyScope)}
-          aria-label={t("settings.editor.copyScope")}
-          className="cursor-pointer rounded border border-line bg-surface-2 px-2.5 py-1 text-sm text-fg hover:border-accent focus:border-accent focus:outline-none"
-        >
-          {COPY_SCOPES.map((s) => (
-            <option key={s} value={s}>
-              {copyScopeLabel[s]}
-            </option>
-          ))}
-        </select>
+          options={COPY_SCOPES.map((s) => ({
+            value: s,
+            label: copyScopeLabel[s],
+          }))}
+          onChange={(v) => update("copyScope", v)}
+          ariaLabel={t("settings.editor.copyScope")}
+        />
         <p className="text-xs text-muted">
           {t("settings.editor.copyScopeHint")}
         </p>
