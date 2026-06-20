@@ -358,7 +358,8 @@ entry; a `mergeKey` collapses rapid same-key records (a typing session) into one
 step, while creates/deletes always land as their own steps. `reset` rebuilds the
 timeline whenever the document arrives from outside the edit path (load, reload,
 conflict-adopt). `useUndoRedoShortcuts` (`src/ui/hooks/useUndoRedoShortcuts.ts`)
-binds ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z; the side menu also has undo/redo rows.
+binds ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z; the side menu also has a side-by-side
+undo/redo button pair at the foot of the drawer.
 
 ### Settings sync
 
@@ -385,7 +386,8 @@ threaded props.
 `SideMenu` (`src/ui/SideMenu.tsx`) — the navigation surface: a drawer over a
 dimmed backdrop on phones, an always-docked panel on tablets+. It holds the
 namespace switcher, the recent-notes list (with swipe-to-remove rows), the
-archive link, undo/redo rows, and a footer (settings, privacy, changelog,
+archive link, a side-by-side undo/redo button pair pinned to the foot of the
+list, and a footer (settings, privacy, changelog,
 source, donate). It reads state from `NavContext` and dispatches modal-open
 commands on the [modal bus](#modal-bus).
 
