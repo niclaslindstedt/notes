@@ -61,6 +61,12 @@ export function editNote(
   body: string,
   now: number = Date.now(),
 ): Note {
+  // Opening a note and placing the caret can echo the body back unchanged
+  // (e.g. the editor re-emitting the current source). An identical body is not
+  // an edit, so leave the note — and crucially its `updatedAt` — untouched so
+  // it keeps its place in the most-recently-edited ordering instead of jumping
+  // to the top of the list.
+  if (body === note.body) return note;
   const next: Note = { ...note, body, updatedAt: now };
   if (note.attachments && note.attachments.length > 0) {
     const kept = referencedAttachments(body, note.attachments);
