@@ -32,6 +32,7 @@ describe("editor margin helpers", () => {
       trailingNewline: true,
       imagesAtEnd: false,
       filesAtEnd: false,
+      shortenLinkChars: 0,
       defaultTitle: "dateTime",
       copyScope: "body",
     });

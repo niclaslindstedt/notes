@@ -138,7 +138,7 @@ function classifyLine(raw: string): LineBlock {
 export type InlineNode =
   | { type: "text"; text: string; offset: number }
   | { type: "code"; text: string; offset: number }
-  | { type: "link"; text: string; href: string; offset: number }
+  | { type: "link"; text: string; href: string; offset: number; bare?: true }
   | { type: "image"; alt: string; href: string; offset: number }
   | { type: "strong"; children: InlineNode[] }
   | { type: "em"; children: InlineNode[] }
@@ -229,6 +229,10 @@ export function parseInline(text: string, base = 0): InlineNode[] {
           text: auto.text,
           href: auto.href,
           offset: base + i,
+          // Flags a bare URL (no `[…](…)`) so the renderer may shorten its
+          // displayed text — an explicit link's text is the user's own label
+          // and must never be touched.
+          bare: true,
         });
         i = auto.end;
         textStart = i;
@@ -314,6 +318,27 @@ function trimUrlTrailing(url: string): string {
     break;
   }
   return url.slice(0, end);
+}
+
+// The marker an elided URL middle is replaced with.
+const URL_ELLIPSIS = "[...]";
+
+// Shorten a bare URL for *display* (the source is never touched): keep the
+// domain (scheme + host) plus the next `chars` characters, an elision marker,
+// then the final `chars` characters — e.g. `https://site.com/a/b[...]xyz789`.
+// `chars` of 0 disables shortening. Returns the URL unchanged when shortening
+// wouldn't make it shorter — i.e. the kept head and tail would meet or overlap,
+// or the elided middle is no longer than the marker itself — so a short URL is
+// always shown in full and the result is never longer than the original.
+export function shortenUrl(url: string, chars: number): string {
+  if (chars <= 0) return url;
+  const domain = /^(?:https?:\/\/)?[^/?#]*/i.exec(url)?.[0] ?? "";
+  const head = url.slice(0, domain.length + chars);
+  const tail = url.slice(url.length - chars);
+  if (url.length <= head.length + URL_ELLIPSIS.length + tail.length) {
+    return url;
+  }
+  return `${head}${URL_ELLIPSIS}${tail}`;
 }
 
 function matchEmphasis(

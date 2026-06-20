@@ -74,6 +74,10 @@ const settings = {
     renderMarkdown: "Render Markdown",
     renderMarkdownHint:
       "Format Markdown as you type — every line but the one you're on shows formatted, like Obsidian.",
+    shortenLinks: "Shorten links",
+    shortenLinksHint:
+      "Trim long pasted URLs in the preview to the domain, a few characters either side of an [...] marker. The full link is still saved and still opens — only the display is shortened.",
+    shortenLinksOff: "Off",
     attachmentsTitle: "Attachments",
     imagesAtEnd: "Images at the end",
     imagesAtEndHint:

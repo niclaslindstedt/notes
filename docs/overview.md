@@ -165,7 +165,9 @@ em, code, link, image, strikethrough), each leaf carrying a source-column
 **bare URL** (`http://…`, `https://…`, or `www.…`, via `matchAutolink`) become
 a `link` node, so a pasted or typed URL renders and clicks through without the
 `[…](…)` ceremony (`www.` gets an `https://` href; trailing sentence
-punctuation and an unbalanced `)` stay outside the link). The `image` node (`![alt](href)`) is what
+punctuation and an unbalanced `)` stay outside the link). An autolinked node
+carries a `bare: true` flag so the renderer knows it may [shorten it for
+display](#shorten-links) — an explicit link's label is never touched. The `image` node (`![alt](href)`) is what
 the [attachment renderer](#attachments) turns into an inline thumbnail. It is pure (no DOM/IO) and fast enough to run on every
 keystroke, which is why it lives in `domain/`.
 
@@ -190,16 +192,34 @@ title settles.
 
 `EditorSettings` (`src/theme/themes.ts`) — margin (writing-column max width via
 `editorMarginMaxWidth`), `wordWrap`, `renderMarkdown`, `disableSpellcheck`,
-`disableAutocorrect`, the `defaultTitle` scheme, and the `copyScope` (see
+`disableAutocorrect`, `shortenLinkChars` (see [Shorten links](#shorten-links)),
+the `defaultTitle` scheme, and the `copyScope` (see
 [Copy button](#copy-button)). They live in the
 [appearance store](#appearance-store) (so they sync with the folder/cloud) and
 are edited in the Editor tab of the settings modal, `EditorSection`
 (`src/ui/settings/EditorSection.tsx`), which groups them into focused bordered
 sections (mirroring the General tab) — **New notes** (the default-title scheme),
-**Writing column** (margins, word wrap), **Markdown** (live render), **Typing
-aids** (spell-check / auto-correct), **Formatting on save** (see
-[Format on save](#format-on-save)), and **Copying** (the copy scope) — see
-[Storage settings](#storage-settings) and its sibling sections.
+**Writing column** (margins, word wrap), **Markdown** (live render + link
+shortening), **Typing aids** (spell-check / auto-correct), **Formatting on
+save** (see [Format on save](#format-on-save)), and **Copying** (the copy scope)
+— see [Storage settings](#storage-settings) and its sibling sections.
+
+### Shorten links
+
+`shortenUrl` (`src/domain/markdown.ts`) trims a long **bare URL** for *display*
+in the [live-preview editor](#markdown-editor): it keeps the domain (scheme +
+host) plus `shortenLinkChars` characters, a `[...]` marker, then the same many
+trailing characters — e.g. `https://www.webhallen.com/se/product[...]INYQAvD_BwE`.
+The `shortenLinkChars` editor setting (offered as `LINK_SHORTEN_LENGTHS`: 0 /
+8 / 12 / 16 / 24, `0` = off, the default) drives it from the **Markdown** group
+of [Editor settings](#editor-settings). Only `bare` autolink nodes are
+shortened — an explicit `[label](url)` keeps its label — and only the *displayed*
+text changes: the node's `data-src` offset and the `<a href>` keep the whole
+URL, so the source the editor saves and the click target are untouched, and a
+short URL (where head + marker + tail would meet or overlap) is shown in full.
+`LinkNode` (`src/ui/MarkdownLine.tsx`) applies it; the
+[Short and sweet](#unlock-triggers) achievement fires the first time it's
+switched on.
 
 ### Format on save
 

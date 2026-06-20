@@ -69,6 +69,10 @@ const settings: SettingsCatalog = {
     renderMarkdown: "Rendera Markdown",
     renderMarkdownHint:
       "Formatera Markdown medan du skriver — varje rad utom den du står på visas formaterad, som i Obsidian.",
+    shortenLinks: "Förkorta länkar",
+    shortenLinksHint:
+      "Korta ned långa inklistrade URL:er i förhandsvisningen till domänen och några tecken på var sida om en [...]-markör. Hela länken sparas och öppnas fortfarande — bara visningen förkortas.",
+    shortenLinksOff: "Av",
     attachmentsTitle: "Bilagor",
     imagesAtEnd: "Bilder i slutet",
     imagesAtEndHint:

@@ -7,6 +7,7 @@ import {
 import { useT } from "../../i18n/index.ts";
 import {
   EDITOR_MARGINS,
+  LINK_SHORTEN_LENGTHS,
   type EditorMargin,
   type EditorSettings,
 } from "../../theme/themes.ts";
@@ -103,6 +104,20 @@ export function EditorSection({
           checked={editor.renderMarkdown}
           onChange={(v) => update("renderMarkdown", v)}
         />
+        <Field label={t("settings.editor.shortenLinks")}>
+          <SegmentedRow<number>
+            ariaLabel={t("settings.editor.shortenLinks")}
+            value={editor.shortenLinkChars}
+            options={LINK_SHORTEN_LENGTHS.map((n) => ({
+              value: n,
+              label: n === 0 ? t("settings.editor.shortenLinksOff") : String(n),
+            }))}
+            onChange={(v) => update("shortenLinkChars", v)}
+          />
+          <p className="text-xs text-muted">
+            {t("settings.editor.shortenLinksHint")}
+          </p>
+        </Field>
       </Section>
 
       <Section title={t("settings.editor.attachmentsTitle")}>

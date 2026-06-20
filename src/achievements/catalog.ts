@@ -259,6 +259,19 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     },
   },
   {
+    id: "shortAndSweet",
+    tier: "intermediate",
+    glyph: ScaleTextGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.appearance.editor.shortenLinkChars],
+      predicate: (prev, next) =>
+        prev.appearance.editor.shortenLinkChars === 0 &&
+        next.appearance.editor.shortenLinkChars > 0,
+    },
+  },
+  {
     id: "tidyUp",
     tier: "intermediate",
     glyph: BroomGlyph,
