@@ -9,12 +9,15 @@
 // is on but no passphrase is held) until the user re-enters it; the `locked`
 // flag drives the unlock gate in `App`.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // Aliased: this module already has a passphrase `unlock` of its own.
 import { unlock as unlockAchievement } from "../achievements/index.ts";
 import { createLogger } from "../dev/logger.ts";
+import type { Note } from "../domain/note.ts";
 import type { StorageAdapter, StoredSnapshot } from "./adapter.ts";
+import { bytesToDataUrl } from "./attachment-store.ts";
+import { parse, serialize } from "./serialize.ts";
 import {
   type BackendId,
   type EncryptionMode,
@@ -113,6 +116,18 @@ export type EncryptionProgress = (step: EncryptionProgressStep) => void;
 export interface UseStorageBackend {
   /** The adapter to hand to the sync engine. A no-op placeholder while locked. */
   adapter: StorageAdapter;
+  /**
+   * Fetch one attachment's bytes as a `data:` URL on demand (the note list
+   * loads without them). Returns null on a backend with no attachment store, or
+   * when the attachment isn't found.
+   */
+  fetchAttachment: (note: Note, filename: string) => Promise<string | null>;
+  /** The active adapter's per-note at-rest encryption status, if it tracks it. */
+  getEncryptionStatus?: () => Map<string, "encrypted" | "pending">;
+  /** Convert one note to encrypted at rest (idempotent), if supported. */
+  migrateNote?: (note: Note) => Promise<boolean>;
+  /** Upgrade a legacy whole-document encrypted blob to per-file form (one-time). */
+  splitLegacyBlob?: () => Promise<boolean>;
   /**
    * The active backend's root settings store — `settings.json` at the
    * app-folder root, stored as plaintext JSON even when the notes are
@@ -256,6 +271,32 @@ export function useStorageBackend(): UseStorageBackend {
     useState<EncryptionMode>(getEncryption);
   // Session-only passphrase. Never persisted — lost on reload by design.
   const [password, setPassword] = useState<string | null>(null);
+  // A stable ref the per-file directory adapters read at call time, so the
+  // adapter never needs rebuilding when the passphrase changes (unlock / enable
+  // / disable). Kept in lockstep with the `password` state via `applyPassword`.
+  const passwordRef = useRef<string | null>(null);
+  const directoryCrypto = useMemo(() => ({ passwordRef }), []);
+  // Set or clear the session passphrase in one place: the imperative ref (read
+  // by the adapters) and the React state (drives `locked` / re-renders).
+  const applyPassword = useCallback((next: string | null) => {
+    passwordRef.current = next;
+    setPassword(next);
+  }, []);
+
+  // Seal/unseal the offline cache so localStorage holds one whole-document
+  // envelope (ciphertext) even though the per-file directory adapter hands the
+  // cache plaintext. No passphrase held → pass through. `unseal` is what an
+  // offline unlock verifies the candidate passphrase against.
+  const seal = useCallback(async (plaintext: string): Promise<string> => {
+    const pw = passwordRef.current;
+    return pw ? await encryptText(plaintext, pw) : plaintext;
+  }, []);
+  const unseal = useCallback(async (stored: string): Promise<string> => {
+    const pw = passwordRef.current;
+    return pw && isEncryptedEnvelope(stored)
+      ? await decryptEnvelope(stored, pw)
+      : stored;
+  }, []);
   // The picked local folder (File System Access API). `null` until the boot
   // probe resolves, the user picks one, or a revoked grant drops it.
   const [folderHandle, setFolderHandle] =
@@ -395,18 +436,32 @@ export function useStorageBackend(): UseStorageBackend {
       // already on-device, so they need no mirror.
       case "dropbox":
         return withLocalCache(
-          createDropboxAdapter(selection.auth, fetch, activeNamespace),
+          createDropboxAdapter(
+            selection.auth,
+            fetch,
+            activeNamespace,
+            directoryCrypto,
+          ),
           {
             storage: globalThis.localStorage,
             key: localCacheKey("dropbox", activeNamespace),
+            seal,
+            unseal,
           },
         );
       case "gdrive":
         return withLocalCache(
-          createGdriveAdapter(selection.token, fetch, activeNamespace),
+          createGdriveAdapter(
+            selection.token,
+            fetch,
+            activeNamespace,
+            directoryCrypto,
+          ),
           {
             storage: globalThis.localStorage,
             key: localCacheKey("gdrive", activeNamespace),
+            seal,
+            unseal,
           },
         );
       case "folder":
@@ -414,6 +469,7 @@ export function useStorageBackend(): UseStorageBackend {
           directoryHandle: selection.handle,
           namespace: activeNamespace,
           onPermissionLost: markFolderPermissionLost,
+          crypto: directoryCrypto,
         });
       case "browser":
         return new BrowserLocalStorageAdapter(
@@ -421,7 +477,14 @@ export function useStorageBackend(): UseStorageBackend {
           activeNamespace,
         );
     }
-  }, [selection, activeNamespace, markFolderPermissionLost]);
+  }, [
+    selection,
+    activeNamespace,
+    markFolderPermissionLost,
+    directoryCrypto,
+    seal,
+    unseal,
+  ]);
 
   // The active backend's root settings store — the same selection as `inner`
   // but independent of encryption (settings are app-wide plaintext). Null for
@@ -515,28 +578,43 @@ export function useStorageBackend(): UseStorageBackend {
 
   const locked = encryption === "encrypted" && password === null;
 
-  // The adapter handed to the app. Wrapped with encryption when on; replaced
-  // by the locked placeholder until the passphrase is supplied.
+  // The adapter handed to the app. While locked, a no-op placeholder. The
+  // file/cloud backends encrypt per-file *inside* the directory adapter (via
+  // `directoryCrypto`), so only the single-document browser backend still needs
+  // the whole-document `withEncryption` wrapper.
   const adapter = useMemo<StorageAdapter>(() => {
     if (locked) return lockedAdapter(backend);
-    if (encryption === "encrypted") {
-      return withEncryption(inner, { current: password });
+    if (encryption === "encrypted" && selection.kind === "browser") {
+      return withEncryption(inner, passwordRef);
     }
     return inner;
-  }, [inner, encryption, password, locked, backend]);
+  }, [inner, encryption, locked, backend, selection.kind]);
+
+  // On-demand attachment fetch, surfaced as a `data:` URL for the UI. Bound to
+  // the active adapter; a no-op (null) on backends without an attachment store.
+  const fetchAttachment = useCallback(
+    async (note: Note, filename: string): Promise<string | null> => {
+      const got = await adapter.fetchAttachment?.(note, filename);
+      if (!got) return null;
+      return bytesToDataUrl(got.mime, got.bytes);
+    },
+    [adapter],
+  );
 
   const selectBrowser = useCallback(() => {
     persistBackend("browser");
     setBackendState("browser");
   }, []);
 
-  // Wrap a raw adapter in the session's encryption envelope so a folder probe
-  // / seed / mirror reads and writes the same bytes the steady-state app does.
-  // A no-op when encryption is off (or locked).
-  const wrapForActive = useCallback(
+  // Wrap a single-document adapter (the browser store) in the session's
+  // whole-document encryption envelope so a folder seed / mirror round-trips the
+  // same bytes the steady-state app does. The file/cloud adapters encrypt
+  // per-file internally via `directoryCrypto`, so they are *not* wrapped — only
+  // the browser store passes through here. A no-op when encryption is off.
+  const wrapBrowserForActive = useCallback(
     (raw: StorageAdapter): StorageAdapter =>
       encryption === "encrypted" && password !== null
-        ? withEncryption(raw, { current: password })
+        ? withEncryption(raw, passwordRef)
         : raw,
     [encryption, password],
   );
@@ -556,12 +634,11 @@ export function useStorageBackend(): UseStorageBackend {
       log.error("folder picker failed", err);
       return;
     }
-    const folder = wrapForActive(
-      createFolderAdapter({
-        directoryHandle: handle,
-        namespace: activeNamespace,
-      }),
-    );
+    const folder = createFolderAdapter({
+      directoryHandle: handle,
+      namespace: activeNamespace,
+      crypto: directoryCrypto,
+    });
     try {
       const [remote, source] = await Promise.all([
         folder.load().catch(() => null),
@@ -578,7 +655,7 @@ export function useStorageBackend(): UseStorageBackend {
     setFolderHandleLoaded(true);
     setBackendState("folder");
     unlockAchievement("localVault");
-  }, [activeNamespace, adapter, wrapForActive]);
+  }, [activeNamespace, adapter, directoryCrypto]);
 
   // Re-confirm the OS grant on the already-stored handle. `requestPermission`
   // needs a user gesture, which is why this lives in a click handler.
@@ -601,15 +678,14 @@ export function useStorageBackend(): UseStorageBackend {
   const disconnectFolder = useCallback(async () => {
     if (folderHandle) {
       try {
-        const folder = wrapForActive(
-          createFolderAdapter({
-            directoryHandle: folderHandle,
-            namespace: activeNamespace,
-          }),
-        );
+        const folder = createFolderAdapter({
+          directoryHandle: folderHandle,
+          namespace: activeNamespace,
+          crypto: directoryCrypto,
+        });
         const snap = await folder.load();
         if (snap) {
-          const browser = wrapForActive(
+          const browser = wrapBrowserForActive(
             new BrowserLocalStorageAdapter(
               globalThis.localStorage,
               activeNamespace,
@@ -626,7 +702,7 @@ export function useStorageBackend(): UseStorageBackend {
     setFolderHandle(null);
     setFolderReconnectNeeded(false);
     setBackendState("browser");
-  }, [folderHandle, activeNamespace, wrapForActive]);
+  }, [folderHandle, activeNamespace, directoryCrypto, wrapBrowserForActive]);
 
   const connectDropbox = useCallback(() => {
     // Redirects away; completion runs in the boot effect above — anything
@@ -659,86 +735,107 @@ export function useStorageBackend(): UseStorageBackend {
     setBackendState("browser");
   }, []);
 
-  const enableEncryption = useCallback(
-    async (next: string, onProgress?: EncryptionProgress) => {
-      if (!next) throw new Error("Passphrase is required");
-      log.info("enable encryption: start");
-      // Re-wrap whatever the inner backend currently holds so existing
-      // plaintext becomes an envelope. A first run with no data is a no-op
-      // beyond flipping the flag.
-      onProgress?.("reading");
-      const snap = await inner.load();
-      if (snap && !isEncryptedEnvelope(snap.text)) {
-        const payload = await encryptText(snap.text, next, onProgress);
-        onProgress?.("saving");
-        await inner.save(payload, snap.revision);
+  // Pull every attachment's bytes into the snapshot before a representation
+  // switch. A note loads metadata-only (bytes fetched on demand), but a switch
+  // has to *move* the bytes from the old representation to the new one — so they
+  // must be in hand while the old representation is still readable (keys still
+  // in their pre-flip state). Without this, the switch would clear the old
+  // attachment files with nothing written in their place. The migration queue
+  // does this incrementally per attachment; the toggle does it in one pass.
+  const hydrateForSwitch = useCallback(
+    async (text: string): Promise<string> => {
+      const snap = parse(text);
+      for (const note of snap.notes) {
+        for (const a of note.attachments ?? []) {
+          if (a.data) continue;
+          const got = await inner.fetchAttachment?.(note, a.filename);
+          if (got) a.data = bytesToDataUrl(got.mime, got.bytes);
+        }
       }
-      onProgress?.("finalizing");
-      persistEncryption("encrypted");
-      setEncryptionState("encrypted");
-      setPassword(next);
-      log.info("enable encryption: done");
-      unlockAchievement("paranoidMode");
+      return serialize(snap);
     },
     [inner],
   );
 
+  const enableEncryption = useCallback(
+    async (next: string, onProgress?: EncryptionProgress) => {
+      if (!next) throw new Error("Passphrase is required");
+      log.info("enable encryption: start");
+      // Read the current plaintext document and pull its attachment bytes in
+      // (passphrase not yet active, so this reads the plaintext files), then
+      // turn crypto on and re-save: the adapter writes each note + attachment as
+      // its own encrypted blob and, after verifying them, removes the superseded
+      // plaintext — atomic, no data loss.
+      onProgress?.("reading");
+      const snap = await inner.load();
+      const hydrated = snap ? await hydrateForSwitch(snap.text) : null;
+      onProgress?.("derivingKey");
+      passwordRef.current = next;
+      if (snap && hydrated !== null) {
+        onProgress?.("encrypting");
+        onProgress?.("saving");
+        await inner.save(hydrated, snap.revision);
+      }
+      onProgress?.("finalizing");
+      persistEncryption("encrypted");
+      setEncryptionState("encrypted");
+      applyPassword(next);
+      log.info("enable encryption: done");
+      unlockAchievement("paranoidMode");
+    },
+    [inner, applyPassword, hydrateForSwitch],
+  );
+
   const disableEncryption = useCallback(
     async (onProgress?: EncryptionProgress) => {
-      if (password === null) {
+      if (passwordRef.current === null) {
         throw new Error("Unlock before turning encryption off");
       }
       log.info("disable encryption: start");
-      // Rewrite the document at rest as plaintext and drop the encrypted blob.
-      // Decrypt when the load surfaced the envelope; when a stale plaintext copy
-      // shadows the blob (a both-representations state a backend can drift
-      // into), the load returns that markdown instead, so re-save it as-is.
-      // Either way the plaintext write makes the directory adapter clear the
-      // superseded `notes.json`, so disabling can't leave the envelope behind —
-      // gating the re-save on the load happening to surface the envelope is what
-      // let the file linger.
+      // Read + decrypt the encrypted document and pull its attachment bytes in
+      // (passphrase still active), then turn crypto off and re-save as plaintext
+      // markdown — which makes the adapter clear the superseded encrypted files
+      // only after the plaintext is written.
       onProgress?.("reading");
+      onProgress?.("decrypting");
       const snap = await inner.load();
-      if (snap) {
-        const plaintext = isEncryptedEnvelope(snap.text)
-          ? await decryptEnvelope(snap.text, password, onProgress)
-          : snap.text;
+      const hydrated = snap ? await hydrateForSwitch(snap.text) : null;
+      passwordRef.current = null;
+      if (snap && hydrated !== null) {
         onProgress?.("saving");
-        await inner.save(plaintext, snap.revision);
+        await inner.save(hydrated, snap.revision);
       }
       onProgress?.("finalizing");
       persistEncryption("plaintext");
       setEncryptionState("plaintext");
-      setPassword(null);
+      applyPassword(null);
       log.info("disable encryption: done");
     },
-    [inner, password],
+    [inner, applyPassword, hydrateForSwitch],
   );
 
   const unlock = useCallback(
     async (candidate: string) => {
       if (!candidate) throw new Error("Passphrase is required");
-      // Verify by decrypting the stored envelope. For a cloud backend the
-      // load falls back to the on-device cache when offline, so the
-      // passphrase can be checked in airplane mode against the cached
-      // ciphertext. If the backend is unreachable *and* nothing is cached,
-      // map it to a distinct error so the gate says "you're offline" instead
-      // of the misleading "wrong passphrase".
-      let snap: StoredSnapshot | null;
+      // Tentatively activate the candidate so the directory adapter derives keys
+      // and decrypts the per-file notes (or the offline cache falls back and
+      // unseals against it). A wrong passphrase surfaces as an AES-GCM auth
+      // failure ("Wrong password"); an unreachable backend with nothing cached
+      // maps to the distinct "you're offline" error.
+      passwordRef.current = candidate;
       try {
-        snap = await inner.load();
+        await inner.load();
       } catch (err) {
+        passwordRef.current = password;
+        if (err instanceof Error && /wrong password/i.test(err.message)) {
+          throw new Error("Wrong password", { cause: err });
+        }
         log.warn("unlock: backend unreachable and no cached copy", err);
-        throw new OfflineUnavailableError();
+        throw new OfflineUnavailableError(undefined, { cause: err });
       }
-      // Plaintext-at-rest (the re-wrap never ran) can't be verified, so it
-      // unlocks optimistically.
-      if (snap && isEncryptedEnvelope(snap.text)) {
-        await decryptEnvelope(snap.text, candidate); // throws on wrong pass
-      }
-      setPassword(candidate);
+      applyPassword(candidate);
     },
-    [inner],
+    [inner, password, applyPassword],
   );
 
   const switchNamespace = useCallback((slug: string) => {
@@ -827,6 +924,10 @@ export function useStorageBackend(): UseStorageBackend {
 
   return {
     adapter,
+    fetchAttachment,
+    getEncryptionStatus: adapter.getEncryptionStatus?.bind(adapter),
+    migrateNote: adapter.migrateNote?.bind(adapter),
+    splitLegacyBlob: adapter.splitLegacyBlob?.bind(adapter),
     settingsStore,
     backend,
     dropboxConfigured: isDropboxConfigured(),

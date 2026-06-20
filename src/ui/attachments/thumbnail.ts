@@ -98,10 +98,15 @@ export function warmThumbnail(filename: string, dataUrl: string): void {
 }
 
 /**
- * The thumbnail for an attachment, or null until it's generated. Falls back to
- * the full image if generation fails, so a preview always renders something.
+ * The thumbnail for an attachment, or null until it's generated (or until the
+ * source bytes have been fetched — `dataUrl` is null while a note's attachment
+ * is still loading on demand). Falls back to the full image if generation
+ * fails, so a preview always renders something once bytes are available.
  */
-export function useThumbnail(filename: string, dataUrl: string): string | null {
+export function useThumbnail(
+  filename: string,
+  dataUrl: string | null | undefined,
+): string | null {
   const [thumb, setThumb] = useState<string | null>(
     () => cache.get(filename) ?? null,
   );
@@ -110,6 +115,10 @@ export function useThumbnail(filename: string, dataUrl: string): string | null {
     const hit = cache.get(filename);
     if (hit) {
       setThumb(hit);
+      return;
+    }
+    if (!dataUrl) {
+      setThumb(null);
       return;
     }
     getThumbnail(filename, dataUrl)

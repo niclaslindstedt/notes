@@ -18,6 +18,7 @@ import {
   CogIcon,
   HeartIcon,
   ListIcon,
+  LockIcon,
   MenuIcon,
   NoteIcon,
   PlusIcon,
@@ -100,6 +101,8 @@ type Props = {
   activeNamespace: string;
   /** Make a namespace active (and leave the editor). */
   onSwitchNamespace: (slug: string) => void;
+  /** Per-note at-rest encryption status, for the green lock on a note row. */
+  encStatus?: Map<string, "encrypted" | "pending">;
 };
 
 export function SideMenu({
@@ -119,6 +122,7 @@ export function SideMenu({
   canUndo,
   canRedo,
   namespaces,
+  encStatus,
   activeNamespace,
   onSwitchNamespace,
 }: Props) {
@@ -252,6 +256,11 @@ export function SideMenu({
               }
               label={noteTitle(note)}
               active={note.id === activeNoteId}
+              trailing={
+                encStatus?.get(note.id) === "encrypted" ? (
+                  <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
+                ) : undefined
+              }
               onClick={() => {
                 onSelectNote(note.id);
                 close();
@@ -487,6 +496,7 @@ function NavItem({
   active,
   disabled = false,
   badge,
+  trailing,
   onClick,
 }: {
   icon: ReactNode;
@@ -498,6 +508,8 @@ function NavItem({
   // Optional trailing count pill (e.g. the number of archived notes). The
   // caller hides it at zero by passing `undefined`.
   badge?: number;
+  // Optional trailing element (e.g. the green encryption lock on a note row).
+  trailing?: ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -517,6 +529,7 @@ function NavItem({
     >
       <span className={active ? "text-accent" : "text-muted"}>{icon}</span>
       <span className="flex-1 truncate">{label}</span>
+      {trailing}
       {badge !== undefined && (
         <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-xs text-muted tabular-nums">
           {badge}

@@ -139,7 +139,7 @@ describe("directory adapter attachments", () => {
     expect(md).toContain(`../attachments/${stem}/abcd1234-pic.png`);
   });
 
-  it("re-hydrates the image data URL on load", async () => {
+  it("loads image metadata only, then fetches the bytes on demand", async () => {
     const store = memoryStore();
     const attachments = memoryAttachments();
     const a = createDirectoryAdapter(
@@ -150,7 +150,7 @@ describe("directory adapter attachments", () => {
     const { note } = noteWithImage();
     await a.save(serialize({ notes: [note] }));
 
-    // A fresh adapter (cold cache) must reconstruct the attachment from files.
+    // A fresh adapter (cold) loads the attachment's metadata but not its bytes.
     const b = createDirectoryAdapter(
       store,
       { id: "folder", label: "T" },
@@ -159,8 +159,13 @@ describe("directory adapter attachments", () => {
     const loaded = await b.load();
     const restored = parse(loaded?.text).notes[0]!;
     expect(restored.attachments).toEqual([
-      { filename: "abcd1234-pic.png", mime: "image/png", data: DATA_URL },
+      { filename: "abcd1234-pic.png", mime: "image/png" },
     ]);
+
+    // Opening the note fetches the bytes on demand.
+    const got = await b.fetchAttachment!(restored, "abcd1234-pic.png");
+    expect(got).not.toBeNull();
+    expect(bytesToDataUrl(got!.mime, got!.bytes)).toBe(DATA_URL);
   });
 
   it("removes the image file when its reference is deleted from the body", async () => {
@@ -220,20 +225,20 @@ describe("directory adapter attachments", () => {
     expect(md).toContain(`[abcd1234-report.pdf](../attachments/${stem}/`);
     expect(md).not.toContain("![abcd1234-report.pdf]");
 
-    // A cold adapter reconstructs the file attachment with its recovered mime.
+    // A cold adapter loads the file attachment's metadata (recovered mime), and
+    // fetches the bytes on demand.
     const b = createDirectoryAdapter(
       store,
       { id: "folder", label: "T" },
       attachments,
     );
     const loaded = await b.load();
-    expect(parse(loaded?.text).notes[0]!.attachments).toEqual([
-      {
-        filename: "abcd1234-report.pdf",
-        mime: "application/pdf",
-        data: PDF_DATA_URL,
-      },
+    const restored = parse(loaded?.text).notes[0]!;
+    expect(restored.attachments).toEqual([
+      { filename: "abcd1234-report.pdf", mime: "application/pdf" },
     ]);
+    const got = await b.fetchAttachment!(restored, "abcd1234-report.pdf");
+    expect(bytesToDataUrl(got!.mime, got!.bytes)).toBe(PDF_DATA_URL);
   });
 
   it("advertises the attachments capability only when a store is wired", () => {

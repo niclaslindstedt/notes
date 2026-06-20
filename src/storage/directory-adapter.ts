@@ -1,48 +1,51 @@
 // Wraps any `FileStore` into a `StorageAdapter`, storing the document as a
-// folder of individual markdown files (one per note). This is the single
-// place the file-based backends — local folder, Dropbox, Google Drive —
-// share, so the markdown representation, the encrypted single-file fallback,
-// and conflict detection are implemented once rather than per backend.
+// folder of individual files (one per note). This is the single place the
+// file-based backends — local folder, Dropbox, Google Drive — share, so the
+// representation, conflict detection, and incremental sync are implemented once
+// rather than per backend.
 //
-// Bytes in, bytes out: the adapter still speaks the `StorageAdapter` contract
-// (serialized JSON text on `save`, the same back on `load`), so nothing
-// upstream — the encryption wrapper, the sync engine — changes. The markdown
-// lives only on disk.
+// Three on-disk representations, picked by whether a session passphrase is held
+// (`crypto.passwordRef.current`):
 //
-//   - load():  read every `*.md` file → reconstruct the snapshot →
-//              re-serialize to canonical JSON for the pipeline. If there are
-//              no markdown files but a `notes.json` exists (an encrypted
-//              envelope), return that file verbatim.
-//   - save():  plaintext JSON → markdown files. Only the notes whose bytes
-//              changed are written, and only files this adapter itself put
-//              there are removed when their note goes away.
+//   - **Plaintext** (no passphrase): one `<slug>-<id>.md` per note, with each
+//     note's attachments externalised as real files under the attachment
+//     store's `<note-stem>/<filename>` tree. This is the historical format and
+//     its logic below is unchanged.
+//   - **Encrypted** (passphrase held): one opaque `<ref>.enc` file per note
+//     (the note JSON sealed with the session content key) and one opaque
+//     `<ref>` blob per attachment in the attachment store. The opaque names are
+//     a keyed HMAC of the note id (+ filename), so nothing about the title,
+//     filename, extension, or grouping leaks on disk. Each note + each
+//     attachment is its own encrypted blob — never folded together — so a note
+//     can be read without downloading every other note's attachments.
+//   - **Legacy blob** (`notes.json`): the old whole-document AES-GCM envelope.
+//     Read-only — on the next save it is superseded by the per-file form.
+//
+// Bytes in, bytes out: `save` is always handed the plaintext serialized
+// snapshot and `load` always returns it, so the sync engine and the offline
+// cache (which re-seals the plaintext into a single envelope so localStorage
+// stays ciphertext) are unchanged. The crypto lives here because this is the
+// only layer that already owns per-file writes and the representation switch.
+//
+// ## Atomicity — no data loss across a representation switch
+//
+// Plaintext and encrypted files live at *different, deterministic* paths, so a
+// switch (enable / disable encryption) is write-new → verify-by-readback →
+// delete-old: the new representation is written and re-read to confirm it
+// committed and decrypts, and only then is the superseded representation
+// removed. A crash between the two leaves both on disk; the next pass re-derives
+// the same paths and finishes idempotently. No interruption can lose data.
 //
 // ## Per-file sync, not whole-document sync
 //
-// Each note is its own file with its own revision, and this adapter treats
-// them independently — the design that keeps a 500-note folder usable and
-// stops a single device colliding with itself:
+// Each note is its own file with its own revision, treated independently so a
+// 500-note folder stays usable and a device never collides with itself:
 //
-//   1. **Only changed notes are written.** A save hashes each note's bytes
-//      against the last copy this adapter wrote (`tracked`) and skips the
-//      files that didn't move. Typing in one note re-uploads one file, not
-//      the whole folder.
-//   2. **Conflicts are scoped to the notes being written.** A save raises
-//      `ConflictError` only when a file it is about to write or remove moved
-//      on the remote since the caller's baseline — i.e. another device edited
-//      *that* note. A note we aren't touching can move freely (it'll be
-//      reconciled on the next load/refresh); it never blocks the save.
-//   3. **We never clobber notes we didn't author.** Removals target only the
-//      files this adapter has tracked, so a note another device added while
-//      we were offline is left intact rather than deleted out from under it.
-//   4. **Our own lag and lost acks are tolerated per file.** Cloud list
-//      endpoints (Dropbox's `list_folder`, Drive's `files.list`) are
-//      eventually consistent and a write's HTTP response can be lost after
-//      the backend already committed it. Either way the file's revision moves
-//      to a value *this* device caused. The conflict check tolerates a moved
-//      revision that is one we produced for that path (lag), and tolerates a
-//      file whose last write threw mid-flight (`uncertain`, a lost ack) —
-//      both are our own write settling, not another device.
+//   1. **Only changed notes are written** (hash of the *plaintext* note source,
+//      so a re-encryption with a fresh IV doesn't look like a change).
+//   2. **Conflicts are scoped to the notes being written.**
+//   3. **We never clobber notes we didn't author.**
+//   4. **Our own lag and lost acks are tolerated per file.**
 
 import type {
   AdapterCapability,
@@ -50,12 +53,23 @@ import type {
   StoredSnapshot,
 } from "./adapter.ts";
 import { ConflictError } from "./adapter.ts";
+import { type AttachmentStore, dataUrlToBytes } from "./attachment-store.ts";
 import {
-  type AttachmentStore,
-  bytesToDataUrl,
-  dataUrlToBytes,
-} from "./attachment-store.ts";
-import { isEncryptedEnvelope } from "./crypto.ts";
+  type SessionKeys,
+  decryptEnvelope,
+  deriveRef,
+  deriveSessionKeys,
+  isEncryptedEnvelope,
+  newKeyParams,
+  parseKeyParams,
+  serializeKeyParams,
+} from "./crypto.ts";
+import {
+  openBytes,
+  openString,
+  sealBytes,
+  sealString,
+} from "./crypto-binary.ts";
 import type { FileEntry, FileStore } from "./file-store.ts";
 import {
   filesToSnapshot,
@@ -68,38 +82,57 @@ import {
   mimeForFilename,
   referencedAttachments,
 } from "../domain/attachment.ts";
-import type { Snapshot } from "../domain/note.ts";
+import type { Note, Snapshot } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 
 const log = createLogger("sync");
 
-// Shorten an aggregate revision for a log line — it can be long for a
-// multi-file document, and only its head and tail matter when eyeballing
-// whether two revisions differ.
+// Shorten an aggregate revision for a log line.
 function shortRev(rev: string | undefined): string {
   if (rev === undefined) return "∅";
   if (rev.length <= 48) return rev;
   return `${rev.slice(0, 28)}…${rev.slice(-16)}`;
 }
 
-// Single-file location for bytes that can't be expressed as markdown: an
-// AES-GCM envelope (encryption on).
+// Single-file location for the legacy whole-document AES-GCM envelope.
 export const BLOB_FILE_NAME = "notes.json";
+// The non-secret KDF salts for this folder's encryption, so any device with the
+// passphrase derives the same keys and resolves the same opaque names.
+export const KEY_PARAMS_FILE = ".keyparams.json";
+// Suffix of an encrypted per-note file. The stem is the opaque keyed-HMAC ref.
+const ENC_SUFFIX = ".enc";
+
+// The session passphrase, by reference so it can change at runtime (unlock /
+// enable / disable) without rebuilding the adapter.
+export type DirectoryCrypto = {
+  passwordRef: { readonly current: string | null };
+};
 
 function isMarkdownPath(path: string): boolean {
   return path.endsWith(".md");
 }
 
-// Paths this adapter owns inside the folder: a note's `*.md` file, or the
-// encrypted single-file blob. Anything else in the folder is ignored.
-function isOwnedPath(path: string): boolean {
-  return isMarkdownPath(path) || path === BLOB_FILE_NAME;
+function isEncNotePath(path: string): boolean {
+  return path.endsWith(ENC_SUFFIX);
 }
 
-// A cheap, stable content hash (djb2) used only to tell "did this note's bytes
-// change since we last wrote it?" — never persisted, never compared across
-// devices, so a collision at worst skips a redundant rewrite of identical
-// bytes.
+// Paths this adapter owns inside the notes folder: a plaintext `*.md` note, an
+// encrypted `*.enc` note, or the legacy blob. The key-params file is metadata,
+// not a note — owned in the sense that it's left alone, never read as a note
+// nor removed on a representation switch, so it is handled separately.
+function isOwnedPath(path: string): boolean {
+  return isMarkdownPath(path) || isEncNotePath(path) || path === BLOB_FILE_NAME;
+}
+
+// A plaintext attachment file is grouped under a note-stem folder (`<stem>/…`);
+// an encrypted attachment blob is a flat opaque ref (no slash). Telling them
+// apart lets a representation switch clear only the superseded kind.
+function isPlaintextAttachmentPath(path: string): boolean {
+  return path.includes("/");
+}
+
+// A cheap, stable content hash (djb2) used only to tell "did this note's
+// plaintext source change since we last wrote it?" — never persisted.
 function hashText(text: string): number {
   let h = 5381;
   for (let i = 0; i < text.length; i += 1) {
@@ -108,17 +141,10 @@ function hashText(text: string): number {
   return h;
 }
 
-// Build the directory's aggregate revision from the per-file revisions.
-// Order-independent (sorted) so two listings of the same bytes compare equal
-// regardless of the order the backend returned them in. Still the adapter's
-// opaque `revision` token, so the sync engine and cache wrapper are unchanged;
-// it doubles as a per-file revision map the save path parses back apart.
 function aggregateRevision(entries: readonly FileEntry[]): string {
   return revLines(currentRevisions(entries));
 }
 
-// The per-file revisions of a listing as a `path -> rev` map, restricted to
-// the files this adapter owns.
 function currentRevisions(entries: readonly FileEntry[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const entry of entries) {
@@ -127,9 +153,6 @@ function currentRevisions(entries: readonly FileEntry[]): Map<string, string> {
   return map;
 }
 
-// Parse an aggregate revision string back into a `path -> rev` map. The
-// inverse of `revLines`; lets the save path diff the caller's baseline
-// per file without a second listing.
 function parseRevisions(aggregate: string | undefined): Map<string, string> {
   const map = new Map<string, string>();
   if (!aggregate) return map;
@@ -155,44 +178,99 @@ export type DirectoryAdapterOptions = {
   saveDebounceMs?: number;
 };
 
-// The on-disk path of one of a note's attachment files, relative to the
-// attachment store's `attachments/` root: `<note-stem>/<filename>`. The stem
-// matches the note's `<stem>.md` so the load path can pair a note with its
-// images, and so a title change relocates both together.
+// One desired file: the bytes to write (`stored`) and the plaintext source to
+// hash for change detection (`source`). In plaintext mode the two are equal; in
+// encrypted mode `stored` is fresh ciphertext (new IV every time) while
+// `source` is the stable plaintext, so an unchanged note isn't re-uploaded.
+type DesiredFile = { stored: string; source: string };
+
+// The on-disk path of a plaintext attachment file, relative to the attachment
+// store root: `<note-stem>/<filename>`.
 function attachmentPath(stem: string, filename: string): string {
   return `${stem}/${filename}`;
 }
 
-// The note-stem segment of an attachment path, used to group a listing by note.
 function stemOfAttachmentPath(path: string): string {
   const slash = path.indexOf("/");
   return slash === -1 ? "" : path.slice(0, slash);
 }
 
-// The last-known-good state of one file this adapter wrote: the content hash
-// (to skip redundant rewrites) and the revision the backend reported (to
-// recognise our own writes when a later listing shows them).
 type Tracked = {
   hash: number;
   rev: string;
 };
 
+// Minimal per-note JSON stored inside an encrypted note file: the note minus
+// its attachment *bytes* (those live in their own blobs), plus attachment
+// metadata so the load knows what to fetch. The opaque ref is re-derived, never
+// stored.
+type EncAttachmentMeta = { filename: string; mime: string };
+
+function noteToEncJson(note: Note): string {
+  const meta: EncAttachmentMeta[] = (note.attachments ?? []).map((a) => ({
+    filename: a.filename,
+    mime: a.mime,
+  }));
+  const obj: Record<string, unknown> = {
+    id: note.id,
+    title: note.title,
+    body: note.body,
+    createdAt: note.createdAt,
+    updatedAt: note.updatedAt,
+  };
+  if (note.archived) obj.archived = true;
+  if (meta.length > 0) obj.attachments = meta;
+  return JSON.stringify(obj);
+}
+
+function encJsonToNote(json: string): Note | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (!raw || typeof raw !== "object") return null;
+  const n = raw as Record<string, unknown>;
+  if (
+    typeof n.id !== "string" ||
+    typeof n.body !== "string" ||
+    typeof n.createdAt !== "number" ||
+    typeof n.updatedAt !== "number"
+  ) {
+    return null;
+  }
+  const note: Note = {
+    id: n.id,
+    title: typeof n.title === "string" ? n.title : "",
+    body: n.body,
+    createdAt: n.createdAt,
+    updatedAt: n.updatedAt,
+  };
+  if (n.archived === true) note.archived = true;
+  if (Array.isArray(n.attachments)) {
+    const meta: Attachment[] = [];
+    for (const a of n.attachments) {
+      if (a && typeof a === "object") {
+        const m = a as Record<string, unknown>;
+        if (typeof m.filename === "string" && typeof m.mime === "string") {
+          // Metadata only — the bytes live in a separate blob, fetched on demand.
+          meta.push({ filename: m.filename, mime: m.mime });
+        }
+      }
+    }
+    if (meta.length > 0) note.attachments = meta;
+  }
+  return note;
+}
+
 export function createDirectoryAdapter(
   store: FileStore,
   options: DirectoryAdapterOptions,
   attachments?: AttachmentStore,
+  crypto?: DirectoryCrypto,
 ): StorageAdapter {
-  // Per-file state this adapter has itself established, from `load` and from
-  // each successful `save`. `tracked` is the baseline a save diffs against —
-  // which files changed (hash) and what revision they were at (rev) — and the
-  // set of files we're entitled to remove. Keyed by path; an entry is dropped
-  // when its file is removed.
   const tracked = new Map<string, Tracked>();
-
-  // Recent revisions this adapter produced for each path, newest last and
-  // bounded. The conflict check consults it to tell "the backend's listing is
-  // still catching up to a write of ours" (a revision we made) from "another
-  // device moved this note" (a revision we never made) — see file header (4).
   const producedRevs = new Map<string, string[]>();
   const MAX_TRACKED_REVS = 6;
   function rememberRev(path: string, rev: string): void {
@@ -203,32 +281,62 @@ export function createDirectoryAdapter(
     producedRevs.set(path, list);
   }
 
-  // Whether this adapter has ever observed an attachment file (on load, or by
-  // writing one). Lets a save skip the attachment listing entirely for the
-  // common image-free document — see `reconcileAttachments`.
   let attachmentsTouched = false;
-
-  // Paths whose most recent write threw mid-flight (a lost ack: the backend
-  // may have committed the bytes but the response never arrived). Until the
-  // next successful write of that path settles it, a listing that shows the
-  // file at a revision we don't recognise is treated as our own lost write,
-  // not another device — see file header (4).
   const uncertain = new Set<string>();
 
-  function track(path: string, text: string, rev: string | undefined): void {
+  // Per-note at-rest encryption status from the last encrypted load: a note is
+  // "encrypted" once its `.enc` file exists and none of its attachments linger
+  // as a plaintext file; "pending" while a plaintext remnant remains (an
+  // in-progress migration). Drives the green lock in the UI.
+  type NoteEncStatus = "encrypted" | "pending";
+  let encStatus = new Map<string, NoteEncStatus>();
+
+  // Session keys, derived once per passphrase. The key-params file is read (or
+  // created) the first time encryption is active, so every device shares salts.
+  let keyCache: { password: string; keys: SessionKeys } | null = null;
+  async function ensureKeys(): Promise<SessionKeys | null> {
+    const password = crypto?.passwordRef.current ?? null;
+    if (!password) {
+      keyCache = null;
+      return null;
+    }
+    if (keyCache && keyCache.password === password) return keyCache.keys;
+    let params = parseKeyParams(await store.read(KEY_PARAMS_FILE));
+    if (!params) {
+      params = newKeyParams();
+      await store.write(KEY_PARAMS_FILE, serializeKeyParams(params));
+    }
+    const keys = await deriveSessionKeys(password, params);
+    keyCache = { password, keys };
+    return keys;
+  }
+
+  function track(path: string, source: string, rev: string | undefined): void {
     const value = rev ?? "";
-    tracked.set(path, { hash: hashText(text), rev: value });
+    tracked.set(path, { hash: hashText(source), rev: value });
     rememberRev(path, value);
     uncertain.delete(path);
   }
 
   log.info(`${options.id}: directory adapter created`);
 
-  // Read the markdown files (or the encrypted blob) into the serialized
-  // snapshot text, and refresh `tracked` from what's on disk so the next save
-  // diffs against the real current state. `reuse` carries the bytes of files
-  // whose revision the caller already knows are current, so they're taken from
-  // memory instead of re-downloaded — the read half of incremental sync.
+  async function encNotePath(
+    keys: SessionKeys,
+    noteId: string,
+  ): Promise<string> {
+    return `${await deriveRef(keys.fileKey, "note", noteId)}${ENC_SUFFIX}`;
+  }
+
+  async function attBlobPath(
+    keys: SessionKeys,
+    noteId: string,
+    filename: string,
+  ): Promise<string> {
+    return deriveRef(keys.fileKey, "att", `${noteId} ${filename}`);
+  }
+
+  // -- Plaintext load --------------------------------------------------------
+
   async function readSnapshot(
     entries: readonly FileEntry[],
     reuse: ReadonlyMap<string, string> = new Map(),
@@ -247,8 +355,6 @@ export function createDirectoryAdapter(
       }
       return serialize(filesToSnapshot(files));
     }
-    // No markdown yet: fall back to the single-file blob (an encrypted
-    // envelope). Returned verbatim so the pipeline can decrypt it.
     if (entries.some((e) => e.path === BLOB_FILE_NAME)) {
       const blob = await store.read(BLOB_FILE_NAME);
       if (blob !== null) {
@@ -259,10 +365,6 @@ export function createDirectoryAdapter(
     return null;
   }
 
-  // Bytes of the notes a `previous` snapshot already holds at a revision the
-  // current listing still reports — these don't need re-downloading. Skipped
-  // entirely when the previous bytes are an encrypted envelope (single blob,
-  // nothing per-file to reuse) or can't be parsed.
   function reusableFiles(
     previous: StoredSnapshot | undefined,
     entries: readonly FileEntry[],
@@ -292,40 +394,156 @@ export function createDirectoryAdapter(
     return reuse;
   }
 
+  // -- Encrypted load --------------------------------------------------------
+
+  async function readEncryptedSnapshot(
+    keys: SessionKeys,
+    entries: readonly FileEntry[],
+  ): Promise<string | null> {
+    const revisions = currentRevisions(entries);
+    const encPaths = entries.map((e) => e.path).filter(isEncNotePath);
+    const mdPaths = entries.map((e) => e.path).filter(isMarkdownPath);
+    const status = new Map<string, NoteEncStatus>();
+
+    // No per-file notes yet: a legacy whole-document envelope is decrypted with
+    // the passphrase so the document survives; the next save rewrites it
+    // per-file. Otherwise nothing is stored.
+    if (encPaths.length === 0 && mdPaths.length === 0) {
+      if (entries.some((e) => e.path === BLOB_FILE_NAME)) {
+        const blob = await store.read(BLOB_FILE_NAME);
+        const password = crypto?.passwordRef.current;
+        if (blob && password && isEncryptedEnvelope(blob)) {
+          track(BLOB_FILE_NAME, blob, revisions.get(BLOB_FILE_NAME));
+          return decryptEnvelope(blob, password);
+        }
+        return blob;
+      }
+      encStatus = status;
+      return null;
+    }
+
+    const notes: Note[] = [];
+    const seen = new Set<string>();
+    // Encrypted notes (already migrated).
+    for (const path of encPaths) {
+      const text = await store.read(path);
+      if (text === null) continue;
+      const opened = await openString(keys.contentKey, text);
+      const json = new TextDecoder().decode(opened.bytes);
+      track(path, json, revisions.get(path));
+      const note = encJsonToNote(json);
+      if (note) {
+        notes.push(note);
+        seen.add(note.id);
+        status.set(note.id, "encrypted");
+      }
+    }
+    // Plaintext remnants from an in-progress migration: merge any note not yet
+    // present from the encrypted set, so the document stays complete (and the
+    // migration is resumable) mid-flight.
+    if (mdPaths.length > 0) {
+      const files = await Promise.all(
+        mdPaths.map(async (path) => ({
+          path,
+          text: (await store.read(path)) ?? "",
+        })),
+      );
+      for (const f of files) track(f.path, f.text, revisions.get(f.path));
+      for (const note of filesToSnapshot(files).notes) {
+        if (!seen.has(note.id)) {
+          notes.push(note);
+          status.set(note.id, "pending");
+        }
+      }
+    }
+
+    // Attachments are read on demand, not here — but their metadata + per-note
+    // status is filled in from the file listing.
+    await attachEncryptedMetadata(notes, status);
+    encStatus = status;
+    return serialize({ notes });
+  }
+
+  // Fill in attachment metadata (filename + mime) for the loaded notes and
+  // downgrade any note still holding a plaintext attachment file to "pending".
+  // Encrypted notes already carry their attachment metadata (from the note
+  // file); plaintext remnants get theirs from the attachment listing.
+  async function attachEncryptedMetadata(
+    notes: Note[],
+    status: Map<string, NoteEncStatus>,
+  ): Promise<void> {
+    if (!attachments) return;
+    let entries: { path: string }[];
+    try {
+      entries = await attachments.list();
+    } catch (err) {
+      log.warn(`${options.id} load: listing enc attachments failed`, err);
+      return;
+    }
+    if (entries.length === 0) return;
+    attachmentsTouched = true;
+    // Plaintext attachment files still on disk, grouped by note stem.
+    const plaintextByStem = new Map<string, string[]>();
+    for (const entry of entries) {
+      if (!isPlaintextAttachmentPath(entry.path)) continue;
+      const stem = stemOfAttachmentPath(entry.path);
+      const list = plaintextByStem.get(stem) ?? [];
+      list.push(entry.path);
+      plaintextByStem.set(stem, list);
+    }
+    for (const note of notes) {
+      const stem = noteFileStem(note);
+      const plaintext = plaintextByStem.get(stem);
+      if (plaintext && plaintext.length > 0) {
+        // A plaintext attachment file lingers → the note isn't fully encrypted.
+        status.set(note.id, "pending");
+        if (!note.attachments) {
+          note.attachments = plaintext.map((p) => {
+            const filename = p.slice(stem.length + 1);
+            return { filename, mime: mimeForFilename(filename) };
+          });
+        }
+      }
+    }
+  }
+
   async function load(
     previous?: StoredSnapshot,
   ): Promise<StoredSnapshot | null> {
+    const keys = await ensureKeys();
     const entries = await store.list();
-    // A load re-establishes the baseline from scratch.
     tracked.clear();
     uncertain.clear();
+    const revision = aggregateRevision(entries);
+
+    if (keys) {
+      const text = await readEncryptedSnapshot(keys, entries);
+      if (text === null) return null;
+      log.info(`${options.id} load (encrypted): rev=${shortRev(revision)}`);
+      return { text, revision };
+    }
+
     const reuse = reusableFiles(previous, entries);
     const text = await readSnapshot(entries, reuse);
     if (text === null) return null;
-    const revision = aggregateRevision(entries);
     const mdCount = entries.filter((e) => isMarkdownPath(e.path)).length;
     log.info(
       `${options.id} load: rev=${shortRev(revision)} files=${mdCount} reused=${reuse.size} fetched=${mdCount - reuse.size}`,
     );
-    // The markdown carries only the image *references*; pull the image bytes
-    // back from the `attachments/` tree and re-attach them. Skipped for an
-    // encrypted blob (its images ride inside the envelope, not as files).
     const hydrated =
       attachments && !isEncryptedEnvelope(text)
-        ? await hydrateAttachments(text, previous)
+        ? await hydrateAttachments(text)
         : text;
     return { text: hydrated, revision };
   }
 
-  // Read the note images back from the `attachments/` tree into the snapshot's
-  // `data:` URLs. Images whose filename the `previous` snapshot already holds
-  // are reused from memory rather than re-downloaded — attachments are
-  // content-addressed by a unique filename, so a matching name means matching
-  // bytes. Only genuinely new files are fetched.
-  async function hydrateAttachments(
-    text: string,
-    previous: StoredSnapshot | undefined,
-  ): Promise<string> {
+  // -- Plaintext attachment hydration / reconcile (unchanged) ----------------
+
+  // Attach each note's attachment *metadata* (filename + mime) from the file
+  // listing, without reading any bytes — those are fetched on demand when a note
+  // is opened (`fetchAttachment`), so the list loads without every note's
+  // images.
+  async function hydrateAttachments(text: string): Promise<string> {
     let entries: { path: string }[];
     try {
       entries = await attachments!.list();
@@ -337,7 +555,6 @@ export function createDirectoryAdapter(
     attachmentsTouched = true;
 
     const snapshot = parse(text);
-    // Index this note set's attachment files by note stem.
     const byStem = new Map<string, string[]>();
     for (const entry of entries) {
       const stem = stemOfAttachmentPath(entry.path);
@@ -347,61 +564,19 @@ export function createDirectoryAdapter(
       byStem.set(stem, list);
     }
 
-    // Prior `data:` URLs keyed by filename, so an unchanged image is reused.
-    const cached = previousAttachmentData(previous);
-
-    let fetched = 0;
     for (const note of snapshot.notes) {
       const stem = noteFileStem(note);
       const paths = byStem.get(stem);
       if (!paths || paths.length === 0) continue;
-      const out: Attachment[] = [];
-      for (const path of paths) {
+      const out: Attachment[] = paths.map((path) => {
         const filename = path.slice(stem.length + 1);
-        const reused = cached.get(filename);
-        if (reused) {
-          out.push(reused);
-          continue;
-        }
-        const bytes = await attachments!.read(path);
-        if (!bytes) continue;
-        const mime = mimeForFilename(filename);
-        out.push({ filename, mime, data: bytesToDataUrl(mime, bytes) });
-        fetched += 1;
-      }
+        return { filename, mime: mimeForFilename(filename) };
+      });
       if (out.length > 0) note.attachments = out;
-    }
-    if (fetched > 0) {
-      log.info(`${options.id} load: fetched ${fetched} attachment file(s)`);
     }
     return serialize(snapshot);
   }
 
-  // The `data:` URLs a `previous` snapshot already holds, keyed by attachment
-  // filename, so a load can reuse them instead of re-downloading. Tolerates an
-  // encrypted or unparseable previous by returning an empty map.
-  function previousAttachmentData(
-    previous: StoredSnapshot | undefined,
-  ): Map<string, Attachment> {
-    const map = new Map<string, Attachment>();
-    if (!previous || isEncryptedEnvelope(previous.text)) return map;
-    let snapshot: Snapshot;
-    try {
-      snapshot = parse(previous.text);
-    } catch {
-      return map;
-    }
-    for (const note of snapshot.notes) {
-      for (const a of note.attachments ?? []) {
-        if (!map.has(a.filename)) map.set(a.filename, a);
-      }
-    }
-    return map;
-  }
-
-  // The image files a snapshot wants on disk: one per *referenced* attachment,
-  // keyed by its `<stem>/<filename>` path. Unreferenced attachments (the user
-  // deleted the image's line) are dropped so their file is reconciled away.
   function desiredAttachments(snapshot: Snapshot): Map<string, Attachment> {
     const desired = new Map<string, Attachment>();
     for (const note of snapshot.notes) {
@@ -413,16 +588,8 @@ export function createDirectoryAdapter(
     return desired;
   }
 
-  // Add any new image file and remove orphans (a deleted image, or an old-stem
-  // file left behind by a rename). Best-effort write/remove with errors
-  // propagated so the sync engine retries — markdown writes are idempotent, so
-  // a retried save re-runs cleanly.
   async function reconcileAttachments(snapshot: Snapshot): Promise<void> {
     const desired = desiredAttachments(snapshot);
-    // The overwhelmingly common case is a note set with no images at all: skip
-    // the listing round-trip entirely until this adapter has actually seen an
-    // attachment (on load or an earlier save), so an image-free document never
-    // pays for the feature.
     if (desired.size === 0 && !attachmentsTouched) return;
     if (desired.size > 0) attachmentsTouched = true;
     let current: { path: string }[];
@@ -432,7 +599,11 @@ export function createDirectoryAdapter(
       log.warn(`${options.id} save: listing attachments failed`, err);
       current = [];
     }
-    const currentPaths = new Set(current.map((e) => e.path));
+    // Only the plaintext attachment files are this path's concern; a flat
+    // opaque blob belongs to the encrypted representation.
+    const currentPaths = new Set(
+      current.map((e) => e.path).filter(isPlaintextAttachmentPath),
+    );
     if (currentPaths.size > 0) attachmentsTouched = true;
 
     const toWrite: [string, Attachment][] = [];
@@ -448,19 +619,19 @@ export function createDirectoryAdapter(
     await Promise.all(
       toWrite.map(async ([path, attachment]) => {
         const decoded = dataUrlToBytes(attachment.data);
-        if (!decoded) return; // remote/non-data href — nothing to externalise
+        if (!decoded) return;
         await attachments!.write(path, decoded.bytes, decoded.mime);
       }),
     );
     await Promise.all(toRemove.map((path) => attachments!.remove(path)));
   }
 
-  // Remove every externalised attachment file. Run when the document is
-  // converted to an encrypted blob: the images now ride inside the envelope, so
-  // the plaintext copies under `attachments/` are both redundant and a leak.
-  // Best-effort listing — a failure leaves the files for a later pass rather
-  // than failing the (already committed) document write.
-  async function clearAttachments(): Promise<void> {
+  // Remove externalised files of a representation we're leaving behind, filtered
+  // by predicate so the encrypted blobs and the plaintext files don't wipe each
+  // other out.
+  async function clearAttachmentsWhere(
+    keep: (path: string) => boolean,
+  ): Promise<void> {
     let current: { path: string }[];
     try {
       current = await attachments!.list();
@@ -468,28 +639,95 @@ export function createDirectoryAdapter(
       log.warn(`${options.id} save: listing attachments to clear failed`, err);
       return;
     }
-    if (current.length === 0) return;
-    log.info(
-      `${options.id} save: clearing ${current.length} attachment file(s) (encrypting)`,
-    );
-    await Promise.all(current.map((entry) => attachments!.remove(entry.path)));
+    const drop = current.map((e) => e.path).filter((p) => !keep(p));
+    if (drop.length === 0) return;
+    log.info(`${options.id} save: clearing ${drop.length} attachment file(s)`);
+    await Promise.all(drop.map((path) => attachments!.remove(path)));
   }
 
-  // Decide which owned files a save must touch and whether any of them
-  // conflicts with the remote. `desired` is the path -> bytes the new snapshot
-  // wants on disk (one entry for the blob, or one per note).
+  // Legacy: clear every externalised attachment file (used when the document is
+  // converted to the single-blob envelope, the historical encrypted format).
+  async function clearAttachments(): Promise<void> {
+    await clearAttachmentsWhere(() => false);
+  }
+
+  // -- Encrypted attachment reconcile ---------------------------------------
+
+  // The encrypted attachment blobs a snapshot wants on disk, keyed by opaque
+  // ref. Every referenced attachment is desired (so an existing one isn't
+  // removed even when its bytes aren't in memory); only those that still carry
+  // bytes are (re)written.
+  async function encDesiredAttachments(
+    keys: SessionKeys,
+    snapshot: Snapshot,
+  ): Promise<Map<string, Attachment>> {
+    const desired = new Map<string, Attachment>();
+    for (const note of snapshot.notes) {
+      for (const a of referencedAttachments(note.body, note.attachments)) {
+        desired.set(await attBlobPath(keys, note.id, a.filename), a);
+      }
+    }
+    return desired;
+  }
+
+  async function reconcileEncryptedAttachments(
+    keys: SessionKeys,
+    snapshot: Snapshot,
+  ): Promise<void> {
+    const desired = await encDesiredAttachments(keys, snapshot);
+    if (desired.size === 0 && !attachmentsTouched) return;
+    if (desired.size > 0) attachmentsTouched = true;
+    let current: { path: string }[];
+    try {
+      current = await attachments!.list();
+    } catch (err) {
+      log.warn(`${options.id} save: listing enc attachments failed`, err);
+      current = [];
+    }
+    const currentBlobs = new Set(
+      current.map((e) => e.path).filter((p) => !isPlaintextAttachmentPath(p)),
+    );
+    if (currentBlobs.size > 0) attachmentsTouched = true;
+
+    const toWrite: [string, Attachment][] = [];
+    for (const [path, attachment] of desired) {
+      // Already on disk (content-addressed by ref → bytes never change) → skip;
+      // or no bytes in memory to write → skip (it must already exist).
+      if (currentBlobs.has(path) || !attachment.data) continue;
+      toWrite.push([path, attachment]);
+    }
+    const toRemove = [...currentBlobs].filter((p) => !desired.has(p));
+    if (toWrite.length === 0 && toRemove.length === 0) return;
+    log.info(
+      `${options.id} save: enc attachments write=${toWrite.length} remove=${toRemove.length}`,
+    );
+
+    await Promise.all(
+      toWrite.map(async ([path, attachment]) => {
+        const decoded = dataUrlToBytes(attachment.data);
+        if (!decoded) return;
+        const blob = await sealBytes(keys.contentKey, decoded.bytes, {
+          mime: decoded.mime,
+          filename: attachment.filename,
+        });
+        await attachments!.write(path, blob, "application/octet-stream");
+      }),
+    );
+    await Promise.all(toRemove.map((path) => attachments!.remove(path)));
+  }
+
+  // -- Shared save machinery -------------------------------------------------
+
   function plan(
-    desired: Map<string, string>,
+    desired: Map<string, DesiredFile>,
     current: ReadonlyMap<string, string>,
     base: ReadonlyMap<string, string>,
   ): { toWrite: string[]; toRemove: string[]; conflicts: string[] } {
     const toWrite: string[] = [];
-    for (const [path, text] of desired) {
+    for (const [path, d] of desired) {
       const known = tracked.get(path);
-      if (!known || known.hash !== hashText(text)) toWrite.push(path);
+      if (!known || known.hash !== hashText(d.source)) toWrite.push(path);
     }
-    // Only ever remove files we put there: a note another device added while
-    // we weren't looking isn't ours to delete.
     const toRemove = [...tracked.keys()].filter((path) => !desired.has(path));
 
     const conflicts: string[] = [];
@@ -500,43 +738,31 @@ export function createDirectoryAdapter(
     return { toWrite, toRemove, conflicts };
   }
 
-  // Is the remote revision of `path` one this device is responsible for, or
-  // has another device moved it since our baseline?
   function isOurs(
     path: string,
     remoteRev: string | undefined,
     baseRev: string | undefined,
   ): boolean {
-    // A file whose last write threw may have committed without us hearing the
-    // new rev — its remote state is our own lost write, not a remote edit.
     if (uncertain.has(path)) return true;
-    // Nothing on the remote to collide with: removing a file the listing
-    // doesn't show (already gone, or our own create still propagating) and
-    // recreating a note another device deleted are both safe to proceed with.
     if (remoteRev === undefined) return true;
-    // Unchanged since our baseline — the common case.
     if (remoteRev === baseRev) return true;
-    // The remote shows a revision we ourselves produced for this path: a
-    // listing still catching up to one of our writes.
     if (producedRevs.get(path)?.includes(remoteRev)) return true;
     return false;
   }
 
   async function writeFiles(
-    desired: Map<string, string>,
+    desired: Map<string, DesiredFile>,
     toWrite: readonly string[],
   ): Promise<Map<string, string | undefined>> {
     const written = new Map<string, string | undefined>();
     await Promise.all(
       toWrite.map(async (path) => {
-        const text = desired.get(path)!;
+        const d = desired.get(path)!;
         try {
-          const rev = await store.write(path, text);
-          track(path, text, rev);
+          const rev = await store.write(path, d.stored);
+          track(path, d.source, rev);
           written.set(path, rev);
         } catch (err) {
-          // Remember the lost ack so the retry recognises its own write
-          // rather than raising a phantom conflict on it.
           uncertain.add(path);
           throw err;
         }
@@ -545,45 +771,84 @@ export function createDirectoryAdapter(
     return written;
   }
 
+  // Re-read every freshly-written encrypted note file and confirm it decrypts
+  // to the source we meant to store — the fsync-equivalent that makes deleting
+  // the superseded plaintext safe (the ciphertext is proven committed first).
+  async function verifyEncrypted(
+    keys: SessionKeys,
+    desired: Map<string, DesiredFile>,
+    paths: readonly string[],
+  ): Promise<void> {
+    for (const path of paths) {
+      if (!isEncNotePath(path)) continue;
+      const d = desired.get(path);
+      if (!d) continue;
+      const readBack = await store.read(path);
+      if (readBack === null)
+        throw new Error(`verify: ${path} missing after write`);
+      const opened = await openString(keys.contentKey, readBack);
+      const text = new TextDecoder().decode(opened.bytes);
+      if (text !== d.source) throw new Error(`verify: ${path} mismatch`);
+    }
+  }
+
   async function save(
     text: string,
     baseRevision?: string,
   ): Promise<StoredSnapshot> {
+    const keys = await ensureKeys();
     const before = await store.list();
     const current = currentRevisions(before);
     const base = parseRevisions(baseRevision);
 
-    const desired = new Map<string, string>();
-    if (isEncryptedEnvelope(text)) {
-      // Can't express an envelope as markdown — store it whole and drop any
-      // markdown files so the two representations can't disagree.
-      desired.set(BLOB_FILE_NAME, text);
-    } else {
-      for (const file of snapshotToFiles(parse(text))) {
-        desired.set(file.path, file.text);
+    const desired = new Map<string, DesiredFile>();
+    let snapshotForAttachments: Snapshot | null = null;
+    let supersededKind: "toEncrypted" | "toBlob" | "toMarkdown" | null = null;
+
+    if (keys) {
+      // Encrypted per-file representation.
+      const snapshot = parse(text);
+      snapshotForAttachments = snapshot;
+      for (const note of snapshot.notes) {
+        const path = await encNotePath(keys, note.id);
+        const source = noteToEncJson(note);
+        desired.set(path, {
+          source,
+          stored: await sealString(keys.contentKey, source),
+        });
       }
+      supersededKind = "toEncrypted";
+    } else if (isEncryptedEnvelope(text)) {
+      // Legacy single-blob envelope handed straight through (kept for the
+      // browser backend path and back-compat).
+      desired.set(BLOB_FILE_NAME, { stored: text, source: text });
+      supersededKind = "toBlob";
+    } else {
+      const snapshot = parse(text);
+      snapshotForAttachments = snapshot;
+      for (const file of snapshotToFiles(snapshot)) {
+        desired.set(file.path, { stored: file.text, source: file.text });
+      }
+      supersededKind = "toMarkdown";
     }
 
-    // A format conversion (plaintext markdown <-> encrypted blob) rewrites the
-    // whole document into the other representation, superseding the previous
-    // one wholesale: the encrypted blob holds every note, so every markdown
-    // file is stale; decrypted markdown supersedes the blob. Remove the
-    // superseded representation unconditionally — including files this adapter
-    // instance never tracked, because the load before an encryption toggle can
-    // be served from the offline cache and a backend / namespace swap rebuilds
-    // the adapter with an empty `tracked`. Without this, enabling encryption
-    // leaves the plaintext `.md` sitting beside the new `notes.json` (and the
-    // next load reads the markdown back, so encryption silently has no effect
-    // at rest), and disabling it strands the ciphertext beside the markdown.
-    const writingBlob = desired.has(BLOB_FILE_NAME);
+    // Files of the representation we're leaving behind — removed unconditionally
+    // (even untracked ones, since a load before the switch can be served from
+    // the offline cache or a rebuilt adapter). Distinct paths per
+    // representation mean this can't touch the one we're writing.
     const superseded = before
       .map((e) => e.path)
-      .filter(
-        (path) =>
-          isOwnedPath(path) &&
-          !desired.has(path) &&
-          (writingBlob ? isMarkdownPath(path) : path === BLOB_FILE_NAME),
-      );
+      .filter((path) => {
+        if (!isOwnedPath(path) || desired.has(path)) return false;
+        if (supersededKind === "toEncrypted") {
+          return isMarkdownPath(path) || path === BLOB_FILE_NAME;
+        }
+        if (supersededKind === "toBlob") {
+          return isMarkdownPath(path) || isEncNotePath(path);
+        }
+        // toMarkdown
+        return isEncNotePath(path) || path === BLOB_FILE_NAME;
+      });
 
     const { toWrite, toRemove, conflicts } = plan(desired, current, base);
     log.info(
@@ -591,16 +856,12 @@ export function createDirectoryAdapter(
     );
 
     if (baseRevision !== undefined && conflicts.length > 0) {
-      // Always captured (no debug toggle): this single line is what a
-      // phantom-conflict bug report turns on. It names the exact files that
-      // diverged, so a recurrence is self-diagnosing rather than hidden inside
-      // a truncated aggregate revision.
       log.warn(`${options.id} save: remote moved on files we're writing`, {
         conflicts,
-        remote: conflicts.map((p) => `${p}:${shortRev(current.get(p))}`),
-        base: conflicts.map((p) => `${p}:${shortRev(base.get(p))}`),
       });
-      const remoteText = await readSnapshot(before);
+      const remoteText = keys
+        ? await readEncryptedSnapshot(keys, before)
+        : await readSnapshot(before);
       throw new ConflictError({
         text: remoteText ?? serialize(parse(null)),
         revision: aggregateRevision(before),
@@ -608,8 +869,25 @@ export function createDirectoryAdapter(
     }
 
     const written = await writeFiles(desired, toWrite);
-    // The superseded-format files are removed alongside the tracked ones; the
-    // union dedupes the overlap (a tracked file that is also a stale format).
+
+    // Write the new attachment blobs BEFORE deleting any superseded files, then
+    // verify the new note ciphertext decrypts — so an interruption never leaves
+    // a note without a readable representation.
+    if (attachments) {
+      if (keys && snapshotForAttachments) {
+        await reconcileEncryptedAttachments(keys, snapshotForAttachments);
+      } else if (supersededKind === "toBlob") {
+        // legacy: fold images into the blob → clear all externalised files.
+        if (superseded.length > 0) await clearAttachments();
+      } else if (snapshotForAttachments) {
+        await reconcileAttachments(snapshotForAttachments);
+      }
+    }
+
+    if (keys && superseded.length > 0) {
+      await verifyEncrypted(keys, desired, toWrite);
+    }
+
     const removals = [...new Set([...toRemove, ...superseded])];
     await Promise.all(
       removals.map(async (path) => {
@@ -620,28 +898,16 @@ export function createDirectoryAdapter(
       }),
     );
 
-    // Keep the externalised images in step with the representation just
-    // written. Plaintext markdown carries only image *references*, so the bytes
-    // live beside it under `attachments/`; an encrypted blob folds the images
-    // into the envelope. On the plaintext→encrypted conversion (signalled by
-    // markdown files being superseded) the plaintext copies must be cleared —
-    // both because they're now redundant and because leaving them is a
-    // plaintext leak that would defeat enabling encryption. A steady-state
-    // encrypted save supersedes nothing, so it skips the attachment listing
-    // entirely rather than paying for it on every keystroke.
-    if (attachments) {
-      if (isEncryptedEnvelope(text)) {
-        if (superseded.length > 0) await clearAttachments();
-      } else {
-        await reconcileAttachments(parse(text));
+    // Clear the superseded attachment representation only after the new note
+    // files are written + verified.
+    if (attachments && superseded.length > 0) {
+      if (supersededKind === "toEncrypted") {
+        await clearAttachmentsWhere((p) => !isPlaintextAttachmentPath(p));
+      } else if (supersededKind === "toMarkdown") {
+        await clearAttachmentsWhere((p) => isPlaintextAttachmentPath(p));
       }
     }
 
-    // Build the post-save revision from what we know per file: the rev each
-    // write returned, or — for files we didn't rewrite — the rev the listing
-    // already showed. Only re-list when a write couldn't report its rev (a
-    // backend that doesn't echo it), which is the eventually-consistent path
-    // the per-file design otherwise avoids.
     const needsRelist = [...written.values()].some((rev) => rev === undefined);
     let revisions: Map<string, string>;
     if (needsRelist) {
@@ -649,7 +915,6 @@ export function createDirectoryAdapter(
         `${options.id} save: a write returned no revision — re-listing (lag-prone)`,
       );
       revisions = currentRevisions(await store.list());
-      // Re-listing is authoritative for what's actually on disk now.
       for (const [path, rev] of revisions) {
         const known = tracked.get(path);
         if (known) known.rev = rev;
@@ -667,9 +932,126 @@ export function createDirectoryAdapter(
     return { text, revision };
   }
 
-  // Advertise image attachments only when an attachment store is wired, so the
-  // editor enables paste / drop on the file backends and leaves it off for the
-  // local (browser) backend that has nowhere to put a file.
+  // Fetch one attachment's bytes on demand (used by the UI when a note is
+  // opened). Decrypts the opaque blob in encrypted mode; reads the note-stem
+  // file in plaintext mode. Returns null when the file is missing.
+  async function fetchAttachment(
+    note: Note,
+    filename: string,
+  ): Promise<{ mime: string; bytes: Uint8Array } | null> {
+    if (!attachments) return null;
+    const keys = await ensureKeys();
+    if (keys) {
+      const ref = await attBlobPath(keys, note.id, filename);
+      const blob = await attachments.read(ref);
+      if (!blob) return null;
+      const opened = await openBytes(keys.contentKey, blob);
+      const mime = (opened.header.mime as string) ?? mimeForFilename(filename);
+      return { mime, bytes: opened.bytes };
+    }
+    const bytes = await attachments.read(
+      attachmentPath(noteFileStem(note), filename),
+    );
+    if (!bytes) return null;
+    return { mime: mimeForFilename(filename), bytes };
+  }
+
+  // Per-note at-rest encryption status from the last load. Empty in plaintext
+  // mode (no locks shown).
+  function getEncryptionStatus(): Map<string, NoteEncStatus> {
+    return new Map(encStatus);
+  }
+
+  // Convert ONE note from plaintext to its encrypted per-file form, atomically:
+  // seal each attachment's bytes into its opaque blob, write + verify the
+  // encrypted note file, then remove the superseded plaintext `.md` and
+  // attachment files. Idempotent — a note already migrated is a no-op. This is
+  // the unit the paced migration queue drives, so a large conversion never
+  // bursts the cloud API. Returns true when this call did work.
+  async function migrateNote(note: Note): Promise<boolean> {
+    const keys = await ensureKeys();
+    if (!keys) return false;
+    const stem = noteFileStem(note);
+    const mdPath = `${stem}.md`;
+    // Already migrated (no plaintext note file left)?
+    if ((await store.read(mdPath)) === null) {
+      encStatus.set(note.id, "encrypted");
+      return false;
+    }
+
+    // 1. Seal each attachment's bytes from its plaintext file into a blob.
+    if (attachments) {
+      for (const a of note.attachments ?? []) {
+        const blobPath = await attBlobPath(keys, note.id, a.filename);
+        if ((await attachments.read(blobPath)) !== null) continue;
+        const bytes = await attachments.read(attachmentPath(stem, a.filename));
+        if (!bytes) continue;
+        const blob = await sealBytes(keys.contentKey, bytes, {
+          mime: a.mime,
+          filename: a.filename,
+        });
+        await attachments.write(blobPath, blob, "application/octet-stream");
+      }
+    }
+
+    // 2. Write + verify the encrypted note file.
+    const encPath = await encNotePath(keys, note.id);
+    const source = noteToEncJson(note);
+    const rev = await store.write(
+      encPath,
+      await sealString(keys.contentKey, source),
+    );
+    track(encPath, source, rev);
+    const readBack = await store.read(encPath);
+    if (readBack === null) throw new Error("migrate: enc note missing");
+    const opened = await openString(keys.contentKey, readBack);
+    if (new TextDecoder().decode(opened.bytes) !== source) {
+      throw new Error("migrate: verify mismatch");
+    }
+
+    // 3. Remove the superseded plaintext only after the ciphertext is proven.
+    await store.remove(mdPath);
+    tracked.delete(mdPath);
+    if (attachments) {
+      for (const a of note.attachments ?? []) {
+        await attachments
+          .remove(attachmentPath(stem, a.filename))
+          .catch(() => {});
+      }
+    }
+    encStatus.set(note.id, "encrypted");
+    return true;
+  }
+
+  // One-time upgrade for existing users: a legacy whole-document `notes.json`
+  // envelope is decrypted and re-saved as the per-file form, then the blob is
+  // removed (the save's representation-switch supersede handles that atomically:
+  // the per-file notes + attachment blobs are written and verified before the
+  // blob goes). The legacy blob folds attachment bytes inline, so the decrypted
+  // snapshot carries them and they land in their own encrypted blobs. Idempotent
+  // and a no-op once split. Returns true when it did the split.
+  async function splitLegacyBlob(): Promise<boolean> {
+    const keys = await ensureKeys();
+    if (!keys) return false;
+    const password = crypto?.passwordRef.current;
+    if (!password) return false;
+    const entries = await store.list();
+    if (!entries.some((e) => e.path === BLOB_FILE_NAME)) return false;
+    // Already split (per-file notes exist) — nothing to do.
+    if (entries.some((e) => isEncNotePath(e.path))) return false;
+    const blob = await store.read(BLOB_FILE_NAME);
+    if (!blob || !isEncryptedEnvelope(blob)) return false;
+    log.info(`${options.id}: splitting legacy notes.json into per-file form`);
+    const plaintext = await decryptEnvelope(blob, password);
+    // save() in encrypted mode writes per-file + reconciles attachment blobs
+    // from the inline data + supersedes (removes) notes.json after verifying.
+    await save(plaintext);
+    for (const note of parse(plaintext).notes) {
+      encStatus.set(note.id, "encrypted");
+    }
+    return true;
+  }
+
   const capabilities = new Set<AdapterCapability>();
   if (attachments) capabilities.add("attachments");
 
@@ -680,5 +1062,9 @@ export function createDirectoryAdapter(
     capabilities,
     load,
     save,
+    fetchAttachment,
+    getEncryptionStatus,
+    migrateNote,
+    splitLegacyBlob,
   };
 }

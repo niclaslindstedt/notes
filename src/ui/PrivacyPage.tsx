@@ -12,7 +12,7 @@ import { ArrowLeftIcon } from "./icons.tsx";
 // Last meaningful change to the policy text below. Bump this whenever the
 // wording is edited — it renders verbatim at the top of the page and is the
 // only line readers have to look at to see how fresh the policy is.
-const LAST_UPDATED = "2026-06-18";
+const LAST_UPDATED = "2026-06-20";
 
 export function PrivacyPage() {
   // The deploy-slot root (`/`, `/preview/`, …) — the link back to the app.
@@ -68,11 +68,13 @@ export function PrivacyPage() {
             </li>
             <li>
               Any images and files you attach to a note. On a local folder or
-              cloud backend these are written as ordinary files in an{" "}
+              cloud backend these are written in an{" "}
               <code className="text-fg-bright">attachments</code> folder beside
-              your notes; they are read from your device when you paste or drop
-              them and are never sent anywhere other than the sync backend you
-              chose.
+              your notes — as ordinary files, or, when encryption is on, as
+              individually encrypted blobs under opaque names. They are read
+              from your device when you paste or drop them, fetched back only
+              when you open the note that shows them, and are never sent
+              anywhere other than the sync backend you chose.
             </li>
             <li>
               Your <em>namespaces</em> — the named buckets you group notes into,
@@ -168,11 +170,14 @@ export function PrivacyPage() {
         <Section title="Encryption">
           <p>
             You may optionally protect a synced note store with a passphrase.
-            When enabled, your notes are encrypted in your browser with AES-GCM
-            before they are written, so the bytes stored in the folder or cloud
-            — and in the offline mirror — are ciphertext. The passphrase stays
-            on your device and is never sent anywhere; if you lose it, the notes
-            cannot be recovered.
+            When enabled, each note and each attachment is compressed and then
+            encrypted in your browser with AES-GCM before it is written — every
+            note becomes its own encrypted file and every attachment its own
+            encrypted blob, stored under opaque names so the title, filename,
+            and which attachments belong to which note are not visible in the
+            folder or cloud. The bytes stored remotely, and in the offline
+            mirror, are ciphertext. The passphrase stays on your device and is
+            never sent anywhere; if you lose it, the notes cannot be recovered.
           </p>
         </Section>
 

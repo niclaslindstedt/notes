@@ -44,6 +44,7 @@ import { useViewportHeight } from "../ui/hooks/useViewportHeight.ts";
 import {
   ArchiveIcon,
   ArrowLeftIcon,
+  LockIcon,
   NotesMarkIcon,
   RestoreIcon,
   TrashIcon,
@@ -53,6 +54,7 @@ import { RowActionMenu } from "../ui/RowActionMenu.tsx";
 import { RenderedLine } from "../ui/MarkdownLine.tsx";
 import { AttachmentsEndBlock } from "../ui/attachments/AttachmentsEndBlock.tsx";
 import { AttachmentsProvider } from "../ui/attachments/AttachmentsProvider.tsx";
+import { AttachmentFetchContext } from "../ui/attachments/fetch-context.ts";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
   applyFaviconHref,
@@ -70,6 +72,7 @@ import { AchievementsUnlockModalHost } from "./modals/AchievementsUnlockModalHos
 import { ChangelogModalHost } from "./modals/ChangelogModalHost.tsx";
 import { NamespacesModalHost } from "./modals/NamespacesModalHost.tsx";
 import { SettingsModalHost } from "./modals/SettingsModalHost.tsx";
+import { useEncryptionMigration } from "./use-encryption-migration.ts";
 import { useNavState } from "./use-nav.ts";
 import { useNotes } from "./use-notes.ts";
 import { useSettingsSync } from "./use-settings-sync.ts";
@@ -143,6 +146,21 @@ export function App() {
   // the read-only one.
   const [readingId, setReadingId] = useState<string | null>(null);
   const nav = useNavState();
+
+  // Background encryption migration + per-note status for the green lock. When
+  // encryption is on (file/cloud backend, unlocked), this seals each note's
+  // files in the background — paced so it doesn't burst the cloud API — and
+  // reports which notes are fully encrypted so the lock fills in note-by-note.
+  const encStatus = useEncryptionMigration({
+    enabled:
+      storage.encryption === "encrypted" &&
+      !storage.locked &&
+      storage.backend !== "browser",
+    notes: sync.doc.notes,
+    getStatus: storage.getEncryptionStatus,
+    migrateNote: storage.migrateNote,
+    splitLegacyBlob: storage.splitLegacyBlob,
+  });
 
   // When the floating button is hidden (only possible in the standalone
   // mobile PWA), an inward swipe from the drawer's resting edge opens it.
@@ -365,9 +383,10 @@ export function App() {
   const syncSlot = <SyncIndicator sync={sync} storage={storage} />;
 
   return (
-    <NavContext.Provider value={nav}>
-      <ModalBusProvider>
-        {/* Pin the whole shell to the *visual* viewport (the band actually on
+    <AttachmentFetchContext.Provider value={storage.fetchAttachment}>
+      <NavContext.Provider value={nav}>
+        <ModalBusProvider>
+          {/* Pin the whole shell to the *visual* viewport (the band actually on
             screen) rather than the layout viewport (`h-dvh`). On iOS the soft
             keyboard shrinks the visual viewport and scrolls the layout viewport
             up to keep the caret in view — with an `h-dvh` shell that drag
@@ -375,86 +394,89 @@ export function App() {
             appears to scroll away with the note. Sizing the shell to
             `--app-height`/`--app-top` (the vars `useViewportHeight` mirrors)
             keeps it filling the visible band, so the header stays frozen. */}
-        <div className="fixed flex overflow-hidden" style={APP_VIEWPORT_RECT}>
-          <SideMenu
-            notes={notes}
-            activeNoteId={editingId}
-            onSelectNote={(id) => switchTo(id)}
-            onShowAll={showAll}
-            showAllActive={view === "notes" && !editing && !reading}
-            onAddNote={openNew}
-            onRemoveNote={removeNote}
-            onArchiveNote={archiveNote}
-            archivedCount={archived.length}
-            onOpenArchive={openArchive}
-            archiveActive={view === "archive" && !editing}
-            onUndo={undo}
-            onRedo={redo}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            namespaces={storage.namespaces}
-            activeNamespace={storage.activeNamespace}
-            onSwitchNamespace={switchNamespace}
-          />
-          <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-            {editing ? (
-              <Editor
-                key={editing.id}
-                note={editing}
-                editor={editor}
-                onChange={(body) => update(editing.id, body)}
-                onTitleChange={(title) => retitle(editing.id, title)}
-                onTitleSettle={sync.releaseSaves}
-                syncSlot={syncSlot}
-                canAttach={storage.adapter.capabilities.has("attachments")}
-                onAttach={(attachment) => attach(editing.id, attachment)}
-              />
-            ) : reading ? (
-              <ReadOnlyNote
-                key={reading.id}
-                note={reading}
-                editor={editor}
-                onBack={() => setReadingId(null)}
-                onRestore={() => restoreAndEdit(reading.id)}
-                onDelete={() => removeNote(reading.id)}
-                syncSlot={syncSlot}
-              />
-            ) : view === "archive" ? (
-              <ArchiveList
-                notes={archived}
-                onOpen={openRead}
-                onRestore={restoreNote}
-                onDelete={removeNote}
-                onBack={() => setView("notes")}
-                syncSlot={syncSlot}
-              />
-            ) : (
-              <NoteList
-                notes={notes}
-                onOpen={(id) => switchTo(id)}
-                onNew={openNew}
-                onArchive={archiveNote}
-                onDelete={removeNote}
-                syncSlot={syncSlot}
-              />
-            )}
-          </main>
-        </div>
+          <div className="fixed flex overflow-hidden" style={APP_VIEWPORT_RECT}>
+            <SideMenu
+              notes={notes}
+              activeNoteId={editingId}
+              onSelectNote={(id) => switchTo(id)}
+              onShowAll={showAll}
+              showAllActive={view === "notes" && !editing && !reading}
+              onAddNote={openNew}
+              onRemoveNote={removeNote}
+              onArchiveNote={archiveNote}
+              archivedCount={archived.length}
+              onOpenArchive={openArchive}
+              archiveActive={view === "archive" && !editing}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              namespaces={storage.namespaces}
+              activeNamespace={storage.activeNamespace}
+              onSwitchNamespace={switchNamespace}
+              encStatus={encStatus}
+            />
+            <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+              {editing ? (
+                <Editor
+                  key={editing.id}
+                  note={editing}
+                  editor={editor}
+                  onChange={(body) => update(editing.id, body)}
+                  onTitleChange={(title) => retitle(editing.id, title)}
+                  onTitleSettle={sync.releaseSaves}
+                  syncSlot={syncSlot}
+                  canAttach={storage.adapter.capabilities.has("attachments")}
+                  onAttach={(attachment) => attach(editing.id, attachment)}
+                />
+              ) : reading ? (
+                <ReadOnlyNote
+                  key={reading.id}
+                  note={reading}
+                  editor={editor}
+                  onBack={() => setReadingId(null)}
+                  onRestore={() => restoreAndEdit(reading.id)}
+                  onDelete={() => removeNote(reading.id)}
+                  syncSlot={syncSlot}
+                />
+              ) : view === "archive" ? (
+                <ArchiveList
+                  notes={archived}
+                  onOpen={openRead}
+                  onRestore={restoreNote}
+                  onDelete={removeNote}
+                  onBack={() => setView("notes")}
+                  syncSlot={syncSlot}
+                />
+              ) : (
+                <NoteList
+                  notes={notes}
+                  onOpen={(id) => switchTo(id)}
+                  onNew={openNew}
+                  onArchive={archiveNote}
+                  onDelete={removeNote}
+                  syncSlot={syncSlot}
+                  encStatus={encStatus}
+                />
+              )}
+            </main>
+          </div>
 
-        <SettingsModalHost storage={storage} />
-        <NamespacesModalHost storage={storage} />
-        <ChangelogModalHost />
-        <AchievementsModalHost />
-        <AchievementsUnlockModalHost />
-        <ConflictModal sync={sync} />
-        <PullToRefreshIndicator
-          state={ptr.state}
-          pullDistance={ptr.pullDistance}
-        />
-        <DropOverlay visible={drop.dragging} />
-        <UpdateToast />
-      </ModalBusProvider>
-    </NavContext.Provider>
+          <SettingsModalHost storage={storage} />
+          <NamespacesModalHost storage={storage} />
+          <ChangelogModalHost />
+          <AchievementsModalHost />
+          <AchievementsUnlockModalHost />
+          <ConflictModal sync={sync} />
+          <PullToRefreshIndicator
+            state={ptr.state}
+            pullDistance={ptr.pullDistance}
+          />
+          <DropOverlay visible={drop.dragging} />
+          <UpdateToast />
+        </ModalBusProvider>
+      </NavContext.Provider>
+    </AttachmentFetchContext.Provider>
   );
 }
 
@@ -465,6 +487,7 @@ function NoteList({
   onArchive,
   onDelete,
   syncSlot,
+  encStatus,
 }: {
   notes: Note[];
   onOpen: (id: string) => void;
@@ -472,6 +495,7 @@ function NoteList({
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
   syncSlot: ReactNode;
+  encStatus?: Map<string, "encrypted" | "pending">;
 }) {
   const t = useT();
   // With no notes yet, pressing Enter (a physical keyboard, so desktop) starts
@@ -512,6 +536,7 @@ function NoteList({
                   onDelete={() => onDelete(note.id)}
                   primaryLabel={t("app.archive")}
                   primaryIcon={<ArchiveIcon className="h-4 w-4" />}
+                  encrypted={encStatus?.get(note.id) === "encrypted"}
                 />
               </li>
             ))}
@@ -549,7 +574,17 @@ function NoteList({
   );
 }
 
-function NoteCard({ note, onOpen }: { note: Note; onOpen: () => void }) {
+function NoteCard({
+  note,
+  onOpen,
+  encrypted = false,
+}: {
+  note: Note;
+  onOpen: () => void;
+  /** Show the green lock — the note + all its attachments are encrypted at rest. */
+  encrypted?: boolean;
+}) {
+  const t = useT();
   const preview = notePreview(note);
   return (
     <button
@@ -557,7 +592,15 @@ function NoteCard({ note, onOpen }: { note: Note; onOpen: () => void }) {
       onClick={onOpen}
       className="w-full rounded-[var(--radius)] border border-line bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-2"
     >
-      <p className="truncate font-medium text-fg-bright">{noteTitle(note)}</p>
+      <p className="flex items-center gap-1.5 font-medium text-fg-bright">
+        <span className="truncate">{noteTitle(note)}</span>
+        {encrypted && (
+          <>
+            <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
+            <span className="sr-only">{t("app.encryptedNote")}</span>
+          </>
+        )}
+      </p>
       {preview && (
         <p className="mt-0.5 truncate text-sm text-muted">{preview}</p>
       )}
@@ -579,6 +622,7 @@ function SwipeableNoteCard({
   onDelete,
   primaryLabel,
   primaryIcon,
+  encrypted = false,
 }: {
   note: Note;
   onOpen: () => void;
@@ -589,6 +633,8 @@ function SwipeableNoteCard({
   primaryLabel: string;
   /** Backdrop icon revealed by the swipe-right gesture. */
   primaryIcon: ReactNode;
+  /** Show the green lock — the note is encrypted at rest. */
+  encrypted?: boolean;
 }) {
   const t = useT();
   const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
@@ -655,7 +701,7 @@ function SwipeableNoteCard({
           swipe.animating ? "transition-transform duration-200" : ""
         }`}
       >
-        <NoteCard note={note} onOpen={onOpen} />
+        <NoteCard note={note} onOpen={onOpen} encrypted={encrypted} />
       </div>
     </div>
   );
@@ -792,6 +838,7 @@ function ReadOnlyNote({
           {blocks ? (
             <AttachmentsProvider
               attachments={note.attachments}
+              note={note}
               placement={placement}
             >
               {blocks.map((block, i) =>
@@ -927,6 +974,7 @@ function Editor({
             disableAutocorrect={editor.disableAutocorrect}
             maxWidth={maxWidth}
             focusOnMount={false}
+            note={note}
             attachments={note.attachments}
             canAttach={canAttach}
             onAttach={onAttach}

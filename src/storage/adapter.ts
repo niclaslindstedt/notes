@@ -7,6 +7,8 @@
 // backend is active. That keeps each adapter small and stops a backend from
 // bypassing the parse pipeline.
 
+import type { Note } from "../domain/note.ts";
+
 /** A document's bytes plus the metadata a backend needs to stay coherent. */
 export type StoredSnapshot = {
   // The serialized document JSON, exactly as produced by `serialize` in
@@ -85,6 +87,31 @@ export type StorageAdapter = {
   // Optional subscription to out-of-band remote changes; returns an
   // unsubscribe function. Present iff `capabilities` carries `"watch"`.
   watch?(onRemoteChange: (snapshot: StoredSnapshot) => void): () => void;
+
+  // Optional on-demand fetch of one attachment's bytes, so the note list can
+  // load without pulling every note's images and a note's attachments are read
+  // only when it is opened. Returns null when the attachment isn't found or the
+  // backend has no attachment store. File backends implement this.
+  fetchAttachment?(
+    note: Note,
+    filename: string,
+  ): Promise<{ mime: string; bytes: Uint8Array } | null>;
+
+  // Per-note at-rest encryption status from the last load — "encrypted" once a
+  // note and all its attachments are sealed, "pending" while an in-progress
+  // migration still has a plaintext remnant. Drives the green lock. Empty/absent
+  // when encryption is off.
+  getEncryptionStatus?(): Map<string, "encrypted" | "pending">;
+
+  // Convert one note from plaintext to its encrypted per-file form, atomically
+  // and idempotently. The paced migration queue calls this per note so a large
+  // conversion doesn't burst the cloud API. Returns true when work was done.
+  migrateNote?(note: Note): Promise<boolean>;
+
+  // One-time upgrade of a legacy whole-document `notes.json` envelope to the
+  // per-file encrypted form, atomically. Idempotent (no-op once split). Returns
+  // true when it performed the split.
+  splitLegacyBlob?(): Promise<boolean>;
 
   // Milliseconds to wait after the last edit before pushing a save. Defaults
   // to 0 (save immediately) — right for localStorage. Cloud adapters set

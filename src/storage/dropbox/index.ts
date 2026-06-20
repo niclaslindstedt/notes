@@ -15,7 +15,10 @@
 import { createLogger } from "../../dev/logger.ts";
 import { AuthError, RateLimitError, type StorageAdapter } from "../adapter.ts";
 import type { AttachmentEntry, AttachmentStore } from "../attachment-store.ts";
-import { createDirectoryAdapter } from "../directory-adapter.ts";
+import {
+  type DirectoryCrypto,
+  createDirectoryAdapter,
+} from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
 import {
   DEFAULT_NAMESPACE_SLUG,
@@ -155,6 +158,7 @@ export function createDropboxAdapter(
   auth: string | DropboxAuth,
   fetchImpl: FetchImpl = fetch,
   namespace: string = DEFAULT_NAMESPACE_SLUG,
+  crypto?: DirectoryCrypto,
 ): StorageAdapter {
   log.info(`adapter created ns=${namespace}`);
   const authedFetch = createAuthedFetch(auth, fetchImpl);
@@ -174,6 +178,7 @@ export function createDropboxAdapter(
       saveDebounceMs: SAVE_DEBOUNCE_MS,
     },
     attachments,
+    crypto,
   );
 }
 

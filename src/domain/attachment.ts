@@ -20,12 +20,16 @@
 
 // A single file attached to a note. `filename` is unique within the note and
 // is both the on-disk filename and the basename a body reference points at;
-// `data` is the full file as a `data:` URL (the in-memory canonical form the
-// storage layer splits out into a file and re-hydrates on load).
+// `data` is the full file as a `data:` URL — the in-memory canonical form the
+// storage layer splits out into a file. It is **optional**: on the file/cloud
+// backends a note loads with its attachments' metadata (`filename` + `mime`)
+// but **no bytes**, which are fetched on demand only when the note is opened
+// (so the note list loads without downloading every note's images). A freshly
+// pasted attachment, and the browser backend's attachments, always carry `data`.
 export type Attachment = {
   filename: string;
   mime: string;
-  data: string;
+  data?: string;
 };
 
 /** Whether an attachment is an image (rendered inline as a thumbnail) rather

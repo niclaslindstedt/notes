@@ -25,7 +25,10 @@
 import { createLogger } from "../../dev/logger.ts";
 import type { StorageAdapter } from "../adapter.ts";
 import type { AttachmentEntry, AttachmentStore } from "../attachment-store.ts";
-import { createDirectoryAdapter } from "../directory-adapter.ts";
+import {
+  type DirectoryCrypto,
+  createDirectoryAdapter,
+} from "../directory-adapter.ts";
 import type { FileEntry, FileStore } from "../file-store.ts";
 import {
   DEFAULT_NAMESPACE_SLUG,
@@ -64,6 +67,9 @@ export type CreateFolderAdapterOptions = {
   // revoked between sessions, so the App can clear the in-state handle and
   // surface a reconnect banner without awaiting the next operation.
   onPermissionLost?: () => void;
+  // When set with a held passphrase, the directory adapter encrypts each note
+  // and attachment in place; null/absent keeps the plaintext markdown format.
+  crypto?: DirectoryCrypto;
 };
 
 class FolderFileStore implements FileStore {
@@ -332,6 +338,7 @@ export function createFolderAdapter(
       saveDebounceMs: SAVE_DEBOUNCE_MS,
     },
     attachments,
+    options.crypto,
   );
 }
 

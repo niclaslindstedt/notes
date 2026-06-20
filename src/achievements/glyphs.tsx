@@ -70,6 +70,16 @@ export function LockGlyph({ className }: IconProps) {
   );
 }
 
+// A shield with a check — every note sealed at rest (the green-lock milestone).
+export function ShieldGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" />
+      <path d="M9 12l2 2 4-4" />
+    </Svg>
+  );
+}
+
 // ── Tier glyphs ───────────────────────────────────────────────────────────
 
 export function SproutGlyph({ className }: IconProps) {

@@ -32,6 +32,9 @@ const app = {
     label: "Copy note",
     copied: "Copied",
   },
+  // Screen-reader label for the green lock shown on a note whose document and
+  // every attachment are encrypted at rest.
+  encryptedNote: "Encrypted at rest",
 } as const;
 
 export type AppCatalog = Widen<typeof app>;

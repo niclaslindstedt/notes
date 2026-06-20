@@ -56,7 +56,8 @@ export type DataUrl = { mime: string; bytes: Uint8Array<ArrayBuffer> };
  * string isn't a base64 data URL (a remote `http(s)` image reference, say,
  * which has no bytes to externalise).
  */
-export function dataUrlToBytes(dataUrl: string): DataUrl | null {
+export function dataUrlToBytes(dataUrl: string | undefined): DataUrl | null {
+  if (!dataUrl) return null;
   const match = /^data:([^;,]+)(;base64)?,(.*)$/s.exec(dataUrl);
   if (!match || !match[2]) return null;
   const mime = match[1] || "application/octet-stream";
