@@ -216,6 +216,26 @@ export function parseInline(text: string, base = 0): InlineNode[] {
       }
     }
 
+    if (c === "h" || c === "H" || c === "w" || c === "W") {
+      // A bare URL typed without `[…](…)` syntax — `http://…`, `https://…`, or
+      // `www.…` — becomes a link so it renders and clicks through like an
+      // explicit one. Unlike a markdown link the rendered text *is* the source,
+      // so its offset starts at the URL's first character (no `[` to skip).
+      const auto = matchAutolink(text, i);
+      if (auto) {
+        flush(i);
+        nodes.push({
+          type: "link",
+          text: auto.text,
+          href: auto.href,
+          offset: base + i,
+        });
+        i = auto.end;
+        textStart = i;
+        continue;
+      }
+    }
+
     if (c === "*" || c === "_" || c === "~") {
       const emphasis = matchEmphasis(text, i, base);
       if (emphasis) {
@@ -247,6 +267,53 @@ function matchLink(
     href: text.slice(closeBracket + 2, closeParen),
     end: closeParen + 1,
   };
+}
+
+// A bare URL starting at `start`: an `http(s)://` or `www.` run of non-space
+// characters. Returns the displayed text (verbatim source) and the `href` to
+// open (`www.` gets an `https://` prefix so it's a valid absolute URL), or
+// null when `start` doesn't begin a URL.
+const AUTOLINK_RE = /^(?:https?:\/\/|www\.)[^\s<>[\]]+/i;
+
+function matchAutolink(
+  text: string,
+  start: number,
+): { text: string; href: string; end: number } | null {
+  // Only fire at a token boundary so "shttps://x" doesn't link from index 1.
+  const prev = text.charAt(start - 1);
+  if (prev && /[A-Za-z0-9]/.test(prev)) return null;
+  const m = AUTOLINK_RE.exec(text.slice(start));
+  if (!m) return null;
+  const url = trimUrlTrailing(m[0]);
+  // `www.` alone (or shorter) isn't a usable URL — require something after it.
+  if (/^www\.$/i.test(url) || url.length === 0) return null;
+  const href = /^www\./i.test(url) ? `https://${url}` : url;
+  return { text: url, href, end: start + url.length };
+}
+
+// Strip trailing characters that read as sentence punctuation rather than part
+// of the URL (`.,!?;:` and quotes), and an unbalanced closing paren — so
+// "(see http://x.y)" and "visit http://x.y." don't swallow the `)`/`.`.
+function trimUrlTrailing(url: string): string {
+  let end = url.length;
+  while (end > 0) {
+    const ch = url.charAt(end - 1);
+    if (".,!?;:'\"".includes(ch)) {
+      end--;
+      continue;
+    }
+    if (ch === ")") {
+      const slice = url.slice(0, end);
+      const opens = (slice.match(/\(/g) ?? []).length;
+      const closes = (slice.match(/\)/g) ?? []).length;
+      if (closes > opens) {
+        end--;
+        continue;
+      }
+    }
+    break;
+  }
+  return url.slice(0, end);
 }
 
 function matchEmphasis(

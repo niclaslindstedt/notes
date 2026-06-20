@@ -94,6 +94,59 @@ describe("parseInline", () => {
     });
   });
 
+  it("autolinks a bare http(s) URL, displaying it verbatim", () => {
+    expect(parseInline("http://google.se")[0]).toMatchObject({
+      type: "link",
+      text: "http://google.se",
+      href: "http://google.se",
+      offset: 0,
+    });
+    expect(parseInline("https://x.y")[0]).toMatchObject({
+      type: "link",
+      href: "https://x.y",
+    });
+  });
+
+  it("autolinks a bare www. URL with an https:// href", () => {
+    expect(parseInline("www.example.com")[0]).toMatchObject({
+      type: "link",
+      text: "www.example.com",
+      href: "https://www.example.com",
+    });
+  });
+
+  it("keeps surrounding text and trailing punctuation outside the autolink", () => {
+    const nodes = parseInline("see http://google.se now");
+    expect(nodes.map((n) => n.type)).toEqual(["text", "link", "text"]);
+    expect(nodes[1]).toMatchObject({ type: "link", text: "http://google.se" });
+
+    // A sentence-ending period isn't part of the URL.
+    const [, dotLink, tail] = parseInline("visit http://x.y.");
+    expect(dotLink).toMatchObject({ type: "link", href: "http://x.y" });
+    expect(tail).toMatchObject({ type: "text", text: "." });
+
+    // An unbalanced closing paren stays with the wrapping text.
+    const wrapped = parseInline("(http://x.y)");
+    expect(wrapped[1]).toMatchObject({ type: "link", href: "http://x.y" });
+    expect(wrapped[2]).toMatchObject({ type: "text", text: ")" });
+  });
+
+  it("does not autolink a scheme glued to the end of a word", () => {
+    // "ahttp://x" must stay plain text, not link from the inner "http".
+    expect(parseInline("ahttp://x.y").every((n) => n.type === "text")).toBe(
+      true,
+    );
+  });
+
+  it("still prefers an explicit [text](url) link over autolinking", () => {
+    const [node] = parseInline("[label](http://x.y)");
+    expect(node).toMatchObject({
+      type: "link",
+      text: "label",
+      href: "http://x.y",
+    });
+  });
+
   it("parses an image into alt and href, distinct from a link", () => {
     const [node] = parseInline("![my pic](attachments/abcd-pic.png)");
     expect(node).toMatchObject({
