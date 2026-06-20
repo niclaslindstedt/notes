@@ -86,6 +86,15 @@ export type StorageAdapter = {
   // unsubscribe function. Present iff `capabilities` carries `"watch"`.
   watch?(onRemoteChange: (snapshot: StoredSnapshot) => void): () => void;
 
+  // Optional on-demand fetch of one attachment's bytes, so the note list can
+  // load without pulling every note's images and a note's attachments are read
+  // only when it is opened. Returns null when the attachment isn't found or the
+  // backend has no attachment store. File backends implement this.
+  fetchAttachment?(
+    noteId: string,
+    filename: string,
+  ): Promise<{ mime: string; bytes: Uint8Array } | null>;
+
   // Milliseconds to wait after the last edit before pushing a save. Defaults
   // to 0 (save immediately) — right for localStorage. Cloud adapters set
   // this around a second to coalesce keystrokes into one request.

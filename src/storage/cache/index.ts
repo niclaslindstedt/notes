@@ -41,8 +41,11 @@ const log = createLogger("cache");
 // so the UI can say "you're offline" instead of the misleading "wrong
 // passphrase" a generic failure would map to at the unlock gate.
 export class OfflineUnavailableError extends Error {
-  constructor(message = "Backend is unreachable and nothing is cached yet") {
-    super(message);
+  constructor(
+    message = "Backend is unreachable and nothing is cached yet",
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
     this.name = "OfflineUnavailableError";
   }
 }
@@ -52,6 +55,16 @@ export type LocalCacheOptions = {
   storage: Pick<Storage, "getItem" | "setItem" | "removeItem">;
   /** Storage key, namespaced by backend id by the caller. */
   key: string;
+  /**
+   * Optional re-encryption of the mirror. With per-file encryption the inner
+   * adapter returns *plaintext*, so to keep localStorage ciphertext-only the
+   * cache seals what it writes and unseals what it reads back. `seal` wraps the
+   * plaintext into one whole-document envelope; `unseal` reverses it (and is
+   * what an offline unlock verifies the passphrase against). Omitted (or no
+   * passphrase) → the mirror is stored as-is.
+   */
+  seal?: (plaintext: string) => Promise<string>;
+  unseal?: (sealed: string) => Promise<string>;
 };
 
 // A failure means "serve the cache" only when it's a raw network error, never
@@ -95,7 +108,20 @@ export function withLocalCache(
   inner: StorageAdapter,
   options: LocalCacheOptions,
 ): StorageAdapter {
-  const { storage, key } = options;
+  const { storage, key, seal, unseal } = options;
+
+  // Seal plaintext into the mirror format (or pass through when no seal is
+  // wired). Best-effort: if sealing throws we'd rather skip caching than crash a
+  // successful load/save, so callers guard the write.
+  async function sealForCache(plaintext: string): Promise<string> {
+    return seal ? await seal(plaintext) : plaintext;
+  }
+
+  // Reverse the seal; tolerate already-plaintext bytes (a mirror written before
+  // encryption was enabled, or no seal wired).
+  async function unsealFromCache(stored: string): Promise<string> {
+    return unseal ? await unseal(stored) : stored;
+  }
 
   function readCache(): CachedBytes | null {
     try {
@@ -140,12 +166,30 @@ export function withLocalCache(
 
     async load(): Promise<StoredSnapshot | null> {
       try {
-        // Hand the inner backend our cached copy so a file-per-note backend can
-        // fetch only the notes whose revision moved instead of re-reading the
-        // whole folder — the read half of keeping a large note set in sync.
-        const snap = await inner.load(readCache() ?? undefined);
+        // Hand the inner backend our cached copy (unsealed) so a file-per-note
+        // backend can fetch only the notes whose revision moved instead of
+        // re-reading the whole folder — the read half of keeping a large note
+        // set in sync.
+        let previous: StoredSnapshot | undefined;
+        const cached = readCache();
+        if (cached) {
+          try {
+            previous = { ...cached, text: await unsealFromCache(cached.text) };
+          } catch {
+            // A mirror we can't unseal (no key yet) is no use as a reuse hint.
+            previous = undefined;
+          }
+        }
+        const snap = await inner.load(previous);
         if (snap) {
-          writeCache({ text: snap.text, revision: snap.revision });
+          try {
+            writeCache({
+              text: await sealForCache(snap.text),
+              revision: snap.revision,
+            });
+          } catch (err) {
+            log.warn("load: sealing cache failed — skipping mirror", err);
+          }
         } else {
           // The remote genuinely has nothing — drop any stale mirror so an
           // offline read can't resurrect a document that was deleted.
@@ -157,7 +201,11 @@ export function withLocalCache(
           const cached = readCache();
           if (cached) {
             log.info("load: backend offline — serving cached copy");
-            return { ...cached, offline: true };
+            return {
+              ...cached,
+              text: await unsealFromCache(cached.text),
+              offline: true,
+            };
           }
           log.warn("load: backend offline and no cached copy");
         }
@@ -171,16 +219,31 @@ export function withLocalCache(
     async save(text: string, baseRevision?: string): Promise<StoredSnapshot> {
       try {
         const stored = await inner.save(text, baseRevision);
-        writeCache({ text: stored.text, revision: stored.revision });
+        try {
+          writeCache({
+            text: await sealForCache(stored.text),
+            revision: stored.revision,
+          });
+        } catch (err) {
+          log.warn("save: sealing cache failed — skipping mirror", err);
+        }
         return stored;
       } catch (err) {
         if (isOfflineError(err)) {
-          // Persist the attempted bytes locally so the edit survives an
-          // offline reload; keep the last good revision so the eventual
+          // Persist the attempted bytes locally (sealed) so the edit survives
+          // an offline reload; keep the last good revision so the eventual
           // reconnect save bases on the right baseline. Re-throw so the sync
           // engine keeps the edit queued and retries it when the network
           // returns (see the `online` listener in `use-notes-sync`).
-          writeCache({ text, revision: readCache()?.revision });
+          try {
+            writeCache({
+              text: await sealForCache(text),
+              revision: readCache()?.revision,
+            });
+          } catch {
+            // Couldn't seal the offline edit — drop the mirror update rather
+            // than write plaintext.
+          }
           log.info("save: backend offline — cached locally, will retry");
         }
         throw err;

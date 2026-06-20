@@ -109,3 +109,56 @@ describe("withLocalCache", () => {
     expect(storage.getItem(localCacheKey("dropbox"))).toContain("queued");
   });
 });
+
+describe("withLocalCache — sealed mirror (encryption on)", () => {
+  // A realistic seal: wrap plaintext in the whole-document envelope so the
+  // mirror in localStorage is ciphertext, exactly as the app does when
+  // encryption is active and the per-file adapter hands the cache plaintext.
+  function sealed() {
+    let stored: StoredSnapshot | null = null;
+    let offline = false;
+    const inner: StorageAdapter = {
+      id: "dropbox",
+      label: "Sealed",
+      capabilities: new Set(),
+      async load() {
+        if (offline) throw new TypeError("Failed to fetch");
+        return stored;
+      },
+      async save(text) {
+        if (offline) throw new TypeError("Failed to fetch");
+        stored = { text, revision: "r1" };
+        return stored;
+      },
+    };
+    return { inner, setOffline: (v: boolean) => (offline = v) };
+  }
+
+  it("never writes plaintext to localStorage and unseals on offline read", async () => {
+    const { encryptText, decryptEnvelope, isEncryptedEnvelope } =
+      await import("../../src/storage/crypto.ts");
+    const storage = memoryStorage();
+    const { inner, setOffline } = sealed();
+    const cache = withLocalCache(inner, {
+      storage,
+      key: localCacheKey("dropbox"),
+      seal: (t) => encryptText(t, "pw"),
+      unseal: (t) => decryptEnvelope(t, "pw"),
+    });
+
+    const secret = JSON.stringify({ notes: [{ id: "a", body: "TOPSECRET" }] });
+    await cache.save(secret);
+
+    // The mirror holds an envelope, not the plaintext.
+    const raw = storage.getItem(localCacheKey("dropbox"))!;
+    expect(raw).not.toContain("TOPSECRET");
+    const envelope = JSON.parse(raw).text as string;
+    expect(isEncryptedEnvelope(envelope)).toBe(true);
+
+    // Offline read transparently unseals back to plaintext.
+    setOffline(true);
+    const snap = await cache.load();
+    expect(snap?.text).toBe(secret);
+    expect(snap?.offline).toBe(true);
+  });
+});
