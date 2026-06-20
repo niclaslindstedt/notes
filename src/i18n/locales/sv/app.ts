@@ -15,6 +15,7 @@ const app: AppCatalog = {
   archive: "Arkivera",
   archiveNote: "Arkivera anteckning",
   delete: "Ta bort",
+  noteActions: "Anteckningsåtgärder",
   copy: {
     label: "Kopiera anteckning",
     copied: "Kopierat",

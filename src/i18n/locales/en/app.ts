@@ -23,6 +23,9 @@ const app = {
   archive: "Archive",
   archiveNote: "Archive note",
   delete: "Delete",
+  // Accessible label for the desktop right-click menu that replaces the
+  // swipe actions on a note row (overview card and side-menu row).
+  noteActions: "Note actions",
   // The editor's copy-to-clipboard button (left of the sync glyph). What it
   // copies is the copy-scope editor setting; see settings.editor.copy*.
   copy: {

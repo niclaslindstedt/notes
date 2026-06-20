@@ -531,14 +531,34 @@ it, with the backdrop dimming in step with the drag. Rows tagged
 `useRowSwipe` (`src/ui/hooks/useRowSwipe.ts`) — the note-card gesture. A right
 swipe >96px archives the note; a left swipe >48px latches a trash button that
 needs a second confirming tap to delete. The foreground tracks the finger with
-`translateX` and settles via CSS transition on release.
+`translateX` and settles via CSS transition on release. **Touch only:** on a
+hover/fine-pointer device (`useMediaQuery("(hover: hover) and (pointer:
+fine)")`) `SwipeableNoteCard` skips the swipe wiring and renders the card inside
+a [right-click menu](#right-click-menu) instead.
 
 ### Swipe reveal (sidebar)
 
 `useSwipeReveal` (`src/ui/hooks/useSwipeReveal.ts`) — the side-menu row gesture:
 a left swipe latches the row open to uncover a single trash button; tapping it
 deletes the note straight away (no confirming second tap — deletion is undoable
-from the Edit section), and tapping an open row closes it.
+from the Edit section), and tapping an open row closes it. **Touch only:** like
+the overview card, `SwipeToRemove` swaps the swipe for a
+[right-click menu](#right-click-menu) on a hover/fine-pointer device.
+
+### Right-click menu
+
+`RowActionMenu` (`src/ui/RowActionMenu.tsx`) — the desktop counterpart to the
+two swipe gestures above. On a hover/fine-pointer device both the overview
+card (`SwipeableNoteCard`) and the side-menu row (`SwipeToRemove`) wrap their
+content in this component instead of arming a swipe: right-clicking the row
+opens a menu of the same actions — archive/restore and delete — and a plain
+click still opens/selects the note. It is built on the same
+[`FloatingPanel`](#custom-dropdown) the custom dropdown uses (anchored to the
+row, portalled to `document.body` so it escapes the drawer's `translateX`,
+Escape / outside-click to dismiss, arrow-key nav), and fires the `rightClick`
+achievement the first time it opens. Destructive rows (delete) are tinted via
+a `danger` flag. Touch devices keep their native context menu and their swipe
+gestures untouched.
 
 ### Pull to refresh
 

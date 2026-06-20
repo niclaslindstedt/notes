@@ -304,6 +304,17 @@ export function FlaskGlyph({ className }: IconProps) {
   );
 }
 
+// An arrow cursor — the desktop right-click menu glyph (the gesture that, on a
+// computer, replaces the touch swipe on a note row).
+export function MousePointerGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M12.586 12.586 19 19" />
+      <path d="M3.688 3.037a.497.497 0 0 0-.651.651l6.5 15.999a.501.501 0 0 0 .947-.062l1.569-6.083a2 2 0 0 1 1.448-1.479l6.124-1.579a.5.5 0 0 0 .063-.947z" />
+    </Svg>
+  );
+}
+
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;
