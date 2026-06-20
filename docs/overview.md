@@ -147,7 +147,11 @@ the active line's textarea like any other text.
 `classifyLines` splits the body into `LineBlock[]` (one per line, tracking
 fenced-code state); `parseInline` tokenizes a line into `InlineNode`s (strong,
 em, code, link, image, strikethrough), each leaf carrying a source-column
-`offset` for click-to-caret mapping. The `image` node (`![alt](href)`) is what
+`offset` for click-to-caret mapping. Both an explicit `[text](url)` link and a
+**bare URL** (`http://…`, `https://…`, or `www.…`, via `matchAutolink`) become
+a `link` node, so a pasted or typed URL renders and clicks through without the
+`[…](…)` ceremony (`www.` gets an `https://` href; trailing sentence
+punctuation and an unbalanced `)` stay outside the link). The `image` node (`![alt](href)`) is what
 the [attachment renderer](#image-attachments) turns into an inline thumbnail. It is pure (no DOM/IO) and fast enough to run on every
 keystroke, which is why it lives in `domain/`.
 
