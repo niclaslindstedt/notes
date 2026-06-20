@@ -26,6 +26,13 @@ export type Envelope = {
   ciphertext: string;
 };
 
+// Coarse phases an encrypt/decrypt passes through, fired so the settings UI can
+// flash a one-line "this is what's happening" status while the (deliberately
+// slow) 600k-iteration key derivation runs. Optional and side-effect-only —
+// the crypto result is unchanged whether or not a callback is supplied.
+export type CryptoProgressStep = "derivingKey" | "encrypting" | "decrypting";
+export type CryptoProgress = (step: CryptoProgressStep) => void;
+
 // Parse without throwing — returns `undefined` for malformed input so the
 // envelope sniffers below can treat "not JSON" the same as "not an envelope".
 function safeJsonParse(text: string): unknown {
@@ -82,15 +89,18 @@ function randomBytes(length: number): Uint8Array {
 export async function encryptText(
   plaintext: string,
   password: string,
+  onProgress?: CryptoProgress,
 ): Promise<string> {
   if (!password) throw new Error("Password is required");
   const salt = randomBytes(SALT_LENGTH_BYTES);
   const iv = randomBytes(IV_LENGTH_BYTES);
+  onProgress?.("derivingKey");
   const key = await deriveKey(
     password,
     salt as BufferSource,
     DEFAULT_ITERATIONS,
   );
+  onProgress?.("encrypting");
   const ciphertext = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: iv as BufferSource },
     key,
@@ -111,6 +121,7 @@ export async function encryptText(
 export async function decryptEnvelope(
   envelopeText: string,
   password: string,
+  onProgress?: CryptoProgress,
 ): Promise<string> {
   const envelope = parseEnvelope(envelopeText);
   if (!envelope) throw new Error("Not an encrypted envelope");
@@ -118,11 +129,13 @@ export async function decryptEnvelope(
   const salt = fromBase64(envelope.salt);
   const iv = fromBase64(envelope.iv);
   const ciphertext = fromBase64(envelope.ciphertext);
+  onProgress?.("derivingKey");
   const key = await deriveKey(
     password,
     salt as BufferSource,
     envelope.iterations,
   );
+  onProgress?.("decrypting");
   let plaintext: ArrayBuffer;
   try {
     plaintext = await crypto.subtle.decrypt(

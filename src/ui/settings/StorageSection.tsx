@@ -1,11 +1,30 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 
-import { useT } from "../../i18n/index.ts";
+import { useT, type MessageKey } from "../../i18n/index.ts";
 import type { BackendId } from "../../storage/backend-preference.ts";
-import type { UseStorageBackend } from "../../storage/useStorageBackend.ts";
-import { ShieldIcon } from "../icons.tsx";
+import type {
+  EncryptionProgress,
+  EncryptionProgressStep,
+  UseStorageBackend,
+} from "../../storage/useStorageBackend.ts";
+import { ShieldIcon, SpinnerIcon } from "../icons.tsx";
 import { Button } from "../form/Button.tsx";
+import {
+  EncryptionLogModal,
+  type EncryptionLogEntry,
+} from "./EncryptionLogModal.tsx";
 import { Section } from "./shared.tsx";
+
+// Maps each progress phase the storage layer reports to the catalog string the
+// status bar flashes. Module-level so the record is built once, not per render.
+const STEP_MESSAGE_KEY: Record<EncryptionProgressStep, MessageKey> = {
+  reading: "settings.storage.encryptionStepReading",
+  derivingKey: "settings.storage.encryptionStepDerivingKey",
+  encrypting: "settings.storage.encryptionStepEncrypting",
+  decrypting: "settings.storage.encryptionStepDecrypting",
+  saving: "settings.storage.encryptionStepSaving",
+  finalizing: "settings.storage.encryptionStepFinalizing",
+};
 
 // Storage settings: pick the backend that persists the notes (this device /
 // local folder / Dropbox / Google Drive) and toggle at-rest encryption.
@@ -235,53 +254,89 @@ function EncryptionSection({
   onDisable,
 }: {
   encryption: "encrypted" | "plaintext";
-  onEnable: (password: string) => Promise<void>;
-  onDisable: () => Promise<void>;
+  onEnable: (
+    password: string,
+    onProgress?: EncryptionProgress,
+  ) => Promise<void>;
+  onDisable: (onProgress?: EncryptionProgress) => Promise<void>;
 }) {
   const t = useT();
   const on = encryption === "encrypted";
   const [setting, setSetting] = useState(false);
   const [pass, setPass] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  // Synchronous passphrase validation (too short / mismatch) shown inline under
+  // the form. The asynchronous flow's own failures live in the status bar.
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The single line the status bar flashes while the flow runs. Each phase
+  // overwrites it, so the bar reads as a fast-moving ticker rather than a list.
+  const [current, setCurrent] = useState<EncryptionLogEntry | null>(null);
+  // Every phase plus any terminating error, kept so the log modal can replay
+  // the whole operation once the user taps a failed status bar.
+  const [log, setLog] = useState<EncryptionLogEntry[]>([]);
+  const [failed, setFailed] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
 
-  const submitEnable = async (e: FormEvent) => {
-    e.preventDefault();
-    if (busy) return;
-    if (pass.length < 4) {
-      setError(t("settings.storage.passphraseTooShort"));
-      return;
-    }
-    if (pass !== confirm) {
-      setError(t("settings.storage.passphraseMismatch"));
-      return;
-    }
+  // Drive one turn-on / turn-off attempt: reset the status state, feed each
+  // reported phase into the ticker + the running log, and on a thrown failure
+  // park a red, tappable status bar instead. Resolves to whether it succeeded.
+  const runFlow = async (
+    op: (onProgress: EncryptionProgress) => Promise<void>,
+  ): Promise<boolean> => {
     setBusy(true);
-    setError(null);
+    setFailed(false);
+    setCurrent(null);
+    setLog([]);
+    const onProgress: EncryptionProgress = (step) => {
+      const entry: EncryptionLogEntry = {
+        text: t(STEP_MESSAGE_KEY[step]),
+        ts: Date.now(),
+        level: "info",
+      };
+      setCurrent(entry);
+      setLog((prev) => [...prev, entry]);
+    };
     try {
-      await onEnable(pass);
-      setSetting(false);
-      setPass("");
-      setConfirm("");
+      await op(onProgress);
+      // Done — drop the ticker so the heading's "on / off" is all that's left.
+      setCurrent(null);
+      setLog([]);
+      return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const text = err instanceof Error ? err.message : String(err);
+      setLog((prev) => [...prev, { text, ts: Date.now(), level: "error" }]);
+      setCurrent(null);
+      setFailed(true);
+      return false;
     } finally {
       setBusy(false);
     }
   };
 
+  const submitEnable = async (e: FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    if (pass.length < 4) {
+      setValidationError(t("settings.storage.passphraseTooShort"));
+      return;
+    }
+    if (pass !== confirm) {
+      setValidationError(t("settings.storage.passphraseMismatch"));
+      return;
+    }
+    setValidationError(null);
+    const ok = await runFlow((onProgress) => onEnable(pass, onProgress));
+    if (ok) {
+      setSetting(false);
+      setPass("");
+      setConfirm("");
+    }
+  };
+
   const disable = async () => {
     if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await onDisable();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
+    await runFlow((onProgress) => onDisable(onProgress));
   };
 
   const inputClass =
@@ -319,6 +374,7 @@ function EncryptionSection({
             onChange={(e) => setPass(e.target.value)}
             placeholder={t("settings.storage.passphrase")}
             aria-label={t("settings.storage.passphrase")}
+            disabled={busy}
             className={inputClass}
           />
           <input
@@ -327,6 +383,7 @@ function EncryptionSection({
             onChange={(e) => setConfirm(e.target.value)}
             placeholder={t("settings.storage.passphraseConfirm")}
             aria-label={t("settings.storage.passphraseConfirm")}
+            disabled={busy}
             className={inputClass}
           />
           <p className="text-xs text-danger">
@@ -334,14 +391,18 @@ function EncryptionSection({
           </p>
           <div className="flex items-center gap-2">
             <Button type="submit" variant="primary" disabled={busy}>
-              {t("settings.storage.enableEncryption")}
+              <ButtonLabel busy={busy}>
+                {t("settings.storage.enableEncryption")}
+              </ButtonLabel>
             </Button>
             <Button
               type="button"
               variant="secondary"
+              disabled={busy}
               onClick={() => {
                 setSetting(false);
-                setError(null);
+                setValidationError(null);
+                setFailed(false);
                 setPass("");
                 setConfirm("");
               }}
@@ -354,15 +415,64 @@ function EncryptionSection({
 
       {on && (
         <Button variant="danger" onClick={() => void disable()} disabled={busy}>
-          {t("settings.storage.disableEncryption")}
+          <ButtonLabel busy={busy}>
+            {t("settings.storage.disableEncryption")}
+          </ButtonLabel>
         </Button>
       )}
 
-      {error && (
+      {busy && current && (
+        <div
+          role="status"
+          aria-label={t("settings.storage.encryptionStatusAria")}
+          className="flex items-center gap-2 rounded-[var(--radius)] border border-line bg-surface-2 px-2.5 py-1.5"
+        >
+          <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
+          <span className="truncate text-xs text-muted">{current.text}</span>
+        </div>
+      )}
+
+      {!busy && failed && (
+        <button
+          type="button"
+          onClick={() => setLogOpen(true)}
+          className="flex w-full cursor-pointer items-center gap-2 rounded-[var(--radius)] border border-danger/50 bg-danger/10 px-2.5 py-1.5 text-left hover:bg-danger/20"
+        >
+          <span className="truncate text-xs text-danger">
+            {t("settings.storage.encryptionFailed")}
+          </span>
+        </button>
+      )}
+
+      {validationError && (
         <p role="alert" className="text-xs text-danger">
-          {error}
+          {validationError}
         </p>
       )}
+
+      <EncryptionLogModal
+        open={logOpen}
+        entries={log}
+        onClose={() => setLogOpen(false)}
+      />
     </Section>
+  );
+}
+
+// A button label that swaps in a leading spinner while a flow runs, so the
+// turn-on / turn-off button itself shows it's working — not just the status bar.
+function ButtonLabel({
+  busy,
+  children,
+}: {
+  busy: boolean;
+  children: ReactNode;
+}) {
+  if (!busy) return <>{children}</>;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+      {children}
+    </span>
   );
 }

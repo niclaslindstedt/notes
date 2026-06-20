@@ -134,6 +134,18 @@ const settings: SettingsCatalog = {
       "Det finns ingen återställning. Om du glömmer lösenfrasen kan dina anteckningar inte läsas.",
     passphraseTooShort: "Använd en lösenfras på minst 4 tecken.",
     passphraseMismatch: "Lösenfraserna matchar inte.",
+    encryptionBusyEnabling: "Aktiverar kryptering…",
+    encryptionBusyDisabling: "Stänger av kryptering…",
+    encryptionStepReading: "Läser dina anteckningar…",
+    encryptionStepDerivingKey: "Härleder krypteringsnyckel…",
+    encryptionStepEncrypting: "Krypterar dina anteckningar…",
+    encryptionStepDecrypting: "Dekrypterar dina anteckningar…",
+    encryptionStepSaving: "Sparar dina anteckningar…",
+    encryptionStepFinalizing: "Slutför…",
+    encryptionFailed: "Något gick fel. Tryck för att se loggen.",
+    encryptionStatusAria: "Krypteringsförlopp",
+    encryptionLogTitle: "Krypteringslogg",
+    encryptionLogEmpty: "Inget loggades.",
   },
 
   unlock: {

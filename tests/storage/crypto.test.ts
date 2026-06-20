@@ -34,4 +34,14 @@ describe("storage crypto", () => {
     expect(isEncryptedEnvelope('{"notes":[]}')).toBe(false);
     expect(isEncryptedEnvelope("not json")).toBe(false);
   });
+
+  it("reports its progress phases in order when encrypting and decrypting", async () => {
+    const encryptSteps: string[] = [];
+    const envelope = await encryptText("hi", "pw", (s) => encryptSteps.push(s));
+    expect(encryptSteps).toEqual(["derivingKey", "encrypting"]);
+
+    const decryptSteps: string[] = [];
+    await decryptEnvelope(envelope, "pw", (s) => decryptSteps.push(s));
+    expect(decryptSteps).toEqual(["derivingKey", "decrypting"]);
+  });
 });
