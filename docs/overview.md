@@ -742,18 +742,33 @@ default-title scheme, and the [copy](#copy-button) scope. The values are the
 `StorageSection` (`src/ui/settings/StorageSection.tsx`) — the radio picker for
 the backend (This device / Local folder / Dropbox / Google Drive) with connect
 buttons, plus the at-rest-encryption toggle. Driven entirely by the
-[storage backend hook](#storage-backend-hook). Turning encryption on or off is
-the heaviest thing the tab does (key derivation, re-wrapping every note,
-re-saving), so the toggle buttons spin while it runs and a one-line
-**encryption status bar** flashes the phase it's on — `Reading…`,
-`Deriving encryption key…`, `Encrypting…`, `Saving…`, `Finalizing…` — fed by the
-`onProgress` callback the hook reports each phase through. The messages flash by
-too fast to read in full by design; they're there to show *something is
-happening* during the otherwise-silent key-derivation pause. On success the bar
-vanishes and the heading's "Encryption is on / off" is all that's left. On
-failure the bar turns red and becomes a button that opens the
-[encryption log modal](#encryption-log-modal) with the whole phase sequence plus
-the error that stopped it.
+[storage backend hook](#storage-backend-hook). How heavy turning encryption on
+or off is depends on the backend:
+
+- **On a file/cloud backend** the toggle is near-instant: it only flips the mode
+  (and derives the key), then the [encryption migration](#encryption-migration)
+  background queue converts the notes one at a time. So the **encryption status
+  bar** here reflects that queue (`StorageSection` reads the live `conversion`
+  snapshot the [encryption migration](#encryption-migration) hook returns, passed
+  down from `App`): it flashes exactly which note — and which of that note's
+  attachments — is being sealed or unsealed right now (`Encrypting "Groceries"…`,
+  `Decrypting "photo.png" (attachment of "Trip")…`), and below it a line tells
+  the user **they can close settings — the conversion finishes in the
+  background**. The messages flash by too fast to read in full by design; they're
+  there to show *something is happening* and let the curious watch (the green
+  [lock](#note-card) filling in or draining away in the list and side menu is the
+  same signal). Turning encryption *off* runs the exact reverse queue, so it is
+  just as backgroundable.
+- **On the This-device backend** there is no per-note representation (the whole
+  document is one envelope), so the toggle still does the work in one pass: the
+  buttons spin and the bar flashes the coarse phases (`Reading…`,
+  `Deriving encryption key…`, `Encrypting…`, `Saving…`, `Finalizing…`) the
+  `onProgress` callback reports.
+
+On success the bar vanishes and the heading's "Encryption is on / off" is all
+that's left. On failure the bar turns red and becomes a button that opens the
+[encryption log modal](#encryption-log-modal) with the recent steps plus the
+error that stopped it.
 
 ### Encryption log modal
 
@@ -1017,25 +1032,39 @@ Toggling the mode converts every note + attachment across representations
 atomically — write the new copy, verify it reads back, then delete the old —
 over distinct deterministic paths, so an interruption can't lose data. See
 [encryption migration](#encryption-migration) for the paced, resumable
-conversion and the green lock. `enableEncryption` / `disableEncryption` take an
-optional `onProgress` callback (`reading → derivingKey →
-encrypting`/`decrypting → saving → finalizing`) the
+conversion and the green lock. On a file/cloud backend `enableEncryption` only
+flips the mode (no bulk re-save) and `disableEncryption` only raises
+`encryptionDisabling`, handing the actual work to the background queue;
+`finishDisableEncryption` is what the queue calls once the last note is back to
+plaintext, to drop the passphrase and persist the plaintext mode. The
+This-device backend has no per-note form, so there both still convert the whole
+document in one pass and take an optional `onProgress` callback (`reading →
+derivingKey → encrypting`/`decrypting → saving → finalizing`) the
 [storage settings](#storage-settings) status bar feeds on.
 
 ### Encryption migration
 
 `src/storage/encryption-migration.ts` (`runEncryptionMigration`) + the
-`use-encryption-migration` hook (`src/app/use-encryption-migration.ts`) — the
-paced background conversion that runs after encryption is turned on. The mode
-flips immediately (the encrypted load merges any not-yet-migrated plaintext
-remnants so the document stays complete and the migration is resumable across a
-reload), then the queue seals one note at a time via the directory adapter's
-`migrateNote` — small pacing gap + `RateLimitError` backoff so a big folder
-never bursts the cloud API. Existing users on a legacy whole-document
-`notes.json` are upgraded first by `splitLegacyBlob`. Each note reports an
-`encrypted` / `pending` status (`getEncryptionStatus`); when every note is
-sealed it fires the **Fort Knox** achievement. The status drives the green
-[lock](#note-card) shown per note in the overview and side menu.
+`use-encryption-migration` hook (`src/app/use-encryption-migration.ts`,
+`useEncryptionMigration`) — the paced background conversion that runs after
+encryption is turned **on or off** on a file/cloud backend. It is
+**bidirectional**: enabling hands it the directory adapter's `migrateNote`
+(plaintext → encrypted), disabling hands it `demigrateNote` (encrypted →
+plaintext), selected by the `disabling` flag. Either way the mode the app
+reports flips immediately (the encrypted load merges any not-yet-converted
+remnants, so the document stays complete and the run is resumable across a
+reload), then the queue converts one note at a time — small pacing gap +
+`RateLimitError` backoff so a big folder never bursts the cloud API, and the
+settings modal can be **closed while it runs**. Existing users on a legacy
+whole-document `notes.json` are upgraded first by `splitLegacyBlob` (forward
+only). Each converter reports fine-grained steps (each attachment, then the note
+file) so the [storage settings](#storage-settings) can flash what it's on, and
+the hook returns both the per-note `encrypted` / `pending` status map
+(`getEncryptionStatus`, drives the green [lock](#note-card) in the overview and
+side menu) and a live `conversion` snapshot (`EncryptionConversionState` — which
+note/attachment, how far along, any error, a capped log). When every note is
+sealed it fires the **Fort Knox** achievement; when every note is back to
+plaintext it calls `onDisableComplete` to finalise the turn-off.
 
 ### Offline cache
 

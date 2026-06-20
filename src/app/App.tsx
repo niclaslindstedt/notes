@@ -153,16 +153,20 @@ export function App() {
   // encryption is on (file/cloud backend, unlocked), this seals each note's
   // files in the background — paced so it doesn't burst the cloud API — and
   // reports which notes are fully encrypted so the lock fills in note-by-note.
-  const encStatus = useEncryptionMigration({
-    enabled:
-      storage.encryption === "encrypted" &&
-      !storage.locked &&
-      storage.backend !== "browser",
-    notes: sync.doc.notes,
-    getStatus: storage.getEncryptionStatus,
-    migrateNote: storage.migrateNote,
-    splitLegacyBlob: storage.splitLegacyBlob,
-  });
+  const { status: encStatus, conversion: encConversion } =
+    useEncryptionMigration({
+      enabled:
+        storage.encryption === "encrypted" &&
+        !storage.locked &&
+        storage.backend !== "browser",
+      disabling: storage.encryptionDisabling,
+      notes: sync.doc.notes,
+      getStatus: storage.getEncryptionStatus,
+      migrateNote: storage.migrateNote,
+      demigrateNote: storage.demigrateNote,
+      splitLegacyBlob: storage.splitLegacyBlob,
+      onDisableComplete: storage.finishDisableEncryption,
+    });
 
   // Per-note upload progress for the sync spinner: the ids of notes whose file
   // is being pushed to the backend right now. Empty on the local backend, which
@@ -472,7 +476,7 @@ export function App() {
             </main>
           </div>
 
-          <SettingsModalHost storage={storage} />
+          <SettingsModalHost storage={storage} conversion={encConversion} />
           <NamespacesModalHost storage={storage} />
           <ChangelogModalHost />
           <AchievementsModalHost />

@@ -261,7 +261,11 @@ export function withLocalCache(
       : undefined,
 
     migrateNote: inner.migrateNote
-      ? (note) => inner.migrateNote!(note)
+      ? (note, onStep) => inner.migrateNote!(note, onStep)
+      : undefined,
+
+    demigrateNote: inner.demigrateNote
+      ? (note, onStep) => inner.demigrateNote!(note, onStep)
       : undefined,
 
     splitLegacyBlob: inner.splitLegacyBlob

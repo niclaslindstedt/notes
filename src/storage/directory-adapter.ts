@@ -49,6 +49,7 @@
 
 import type {
   AdapterCapability,
+  NoteConversionProgress,
   StorageAdapter,
   StoredSnapshot,
 } from "./adapter.ts";
@@ -74,6 +75,7 @@ import type { FileEntry, FileStore } from "./file-store.ts";
 import {
   filesToSnapshot,
   noteFileStem,
+  noteToMarkdown,
   snapshotToFiles,
 } from "./markdown/codec.ts";
 import { parse, serialize } from "./serialize.ts";
@@ -1022,8 +1024,13 @@ export function createDirectoryAdapter(
   // encrypted note file, then remove the superseded plaintext `.md` and
   // attachment files. Idempotent — a note already migrated is a no-op. This is
   // the unit the paced migration queue drives, so a large conversion never
-  // bursts the cloud API. Returns true when this call did work.
-  async function migrateNote(note: Note): Promise<boolean> {
+  // bursts the cloud API. `onStep` fires before each attachment and before the
+  // note file so the UI can flash what it's sealing. Returns true when this call
+  // did work.
+  async function migrateNote(
+    note: Note,
+    onStep?: NoteConversionProgress,
+  ): Promise<boolean> {
     const keys = await ensureKeys();
     if (!keys) return false;
     const stem = noteFileStem(note);
@@ -1037,6 +1044,7 @@ export function createDirectoryAdapter(
     // 1. Seal each attachment's bytes from its plaintext file into a blob.
     if (attachments) {
       for (const a of note.attachments ?? []) {
+        onStep?.({ phase: "attachment", filename: a.filename });
         const blobPath = await attBlobPath(keys, note.id, a.filename);
         if ((await attachments.read(blobPath)) !== null) continue;
         const bytes = await attachments.read(attachmentPath(stem, a.filename));
@@ -1050,6 +1058,7 @@ export function createDirectoryAdapter(
     }
 
     // 2. Write + verify the encrypted note file.
+    onStep?.({ phase: "note" });
     const encPath = await encNotePath(keys, note.id);
     const source = noteToEncJson(note);
     const rev = await store.write(
@@ -1075,6 +1084,68 @@ export function createDirectoryAdapter(
       }
     }
     encStatus.set(note.id, "encrypted");
+    return true;
+  }
+
+  // The exact reverse of `migrateNote`: convert ONE note from its encrypted
+  // per-file form back to plaintext, atomically — decrypt each attachment blob
+  // into its plaintext `<stem>/<filename>` file, write + verify the plaintext
+  // `.md` note, then remove the superseded `.enc` note and opaque attachment
+  // blobs. Same write-new → verify → delete-old ordering as the forward path, so
+  // an interruption leaves both representations for an idempotent resume rather
+  // than losing data. Idempotent — a note already plaintext is a no-op. This is
+  // the unit the paced de-encryption queue drives. Returns true when it worked.
+  async function demigrateNote(
+    note: Note,
+    onStep?: NoteConversionProgress,
+  ): Promise<boolean> {
+    const keys = await ensureKeys();
+    if (!keys) return false;
+    const encPath = await encNotePath(keys, note.id);
+    // Already demigrated (no encrypted note file left)?
+    if ((await store.read(encPath)) === null) {
+      encStatus.delete(note.id);
+      return false;
+    }
+    const stem = noteFileStem(note);
+
+    // 1. Decrypt each attachment blob back into its plaintext file.
+    if (attachments) {
+      for (const a of note.attachments ?? []) {
+        onStep?.({ phase: "attachment", filename: a.filename });
+        const plainPath = attachmentPath(stem, a.filename);
+        if ((await attachments.read(plainPath)) !== null) continue;
+        const blob = await attachments.read(
+          await attBlobPath(keys, note.id, a.filename),
+        );
+        if (!blob) continue;
+        const opened = await openBytes(keys.contentKey, blob);
+        const mime = (opened.header.mime as string) ?? a.mime;
+        await attachments.write(plainPath, new Uint8Array(opened.bytes), mime);
+      }
+    }
+
+    // 2. Write + verify the plaintext markdown note file.
+    onStep?.({ phase: "note" });
+    const mdPath = `${stem}.md`;
+    const text = noteToMarkdown(note);
+    const rev = await store.write(mdPath, text);
+    track(mdPath, text, rev);
+    const readBack = await store.read(mdPath);
+    if (readBack === null) throw new Error("demigrate: md note missing");
+    if (readBack !== text) throw new Error("demigrate: verify mismatch");
+
+    // 3. Remove the superseded ciphertext only after the plaintext is proven.
+    await store.remove(encPath);
+    tracked.delete(encPath);
+    if (attachments) {
+      for (const a of note.attachments ?? []) {
+        await attachments
+          .remove(await attBlobPath(keys, note.id, a.filename))
+          .catch(() => {});
+      }
+    }
+    encStatus.delete(note.id);
     return true;
   }
 
@@ -1120,6 +1191,7 @@ export function createDirectoryAdapter(
     fetchAttachment,
     getEncryptionStatus,
     migrateNote,
+    demigrateNote,
     splitLegacyBlob,
     watchUploads,
   };

@@ -376,6 +376,72 @@ describe("directory adapter — paced per-note migration", () => {
     // Migrating again is an idempotent no-op.
     expect(await after.migrateNote!(reloaded)).toBe(false);
   });
+
+  it("demigrateNote reverses one note back to plaintext and flips its status", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const ref = { current: "pw" as string | null };
+    const { note } = noteWithImage(1);
+    // Start fully encrypted (one .enc note + one opaque blob).
+    await encAdapter(store, att, ref).save(serialize({ notes: [note] }));
+    expect([...store.files.keys()].some((p) => p.endsWith(".enc"))).toBe(true);
+
+    const a = encAdapter(store, att, ref);
+    const loaded = parse((await a.load())!.text).notes[0]!;
+    expect(a.getEncryptionStatus!().get(loaded.id)).toBe("encrypted");
+
+    const did = await a.demigrateNote!(loaded);
+    expect(did).toBe(true);
+    expect(a.getEncryptionStatus!().get(loaded.id)).toBeUndefined();
+
+    // On disk: the ciphertext is gone, a plaintext .md + grouped attachment
+    // file remain.
+    expect([...store.files.keys()].some((p) => p.endsWith(".enc"))).toBe(false);
+    expect([...store.files.keys()].some((p) => p.endsWith(".md"))).toBe(true);
+    expect([...att.files.keys()][0]).toContain("/");
+
+    // A plaintext adapter (no passphrase) reads it back intact, bytes included.
+    const plain = encAdapter(store, att, { current: null });
+    const reloaded = parse((await plain.load())!.text).notes[0]!;
+    expect(reloaded.title).toBe("My Secret Title");
+    expect(reloaded.body).toContain(SECRET_BODY);
+    const got = await plain.fetchAttachment!(reloaded, "abcd1234-pic.png");
+    expect([...got!.bytes]).toEqual([72, 101, 108, 108, 111]);
+
+    // Demigrating again is an idempotent no-op.
+    expect(await encAdapter(store, att, ref).demigrateNote!(loaded)).toBe(
+      false,
+    );
+  });
+
+  it("round-trips a note through encrypt → decrypt with no data loss", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const ref = { current: null as string | null };
+    const { note } = noteWithImage(1);
+
+    // Plaintext → encrypt the whole document → migrate (already sealed) is a
+    // no-op, so seal via demigrate's inverse: start plaintext, turn on, then off.
+    await encAdapter(store, att, ref).save(serialize({ notes: [note] }));
+    const plain = await hydrate(
+      encAdapter(store, att, ref),
+      (await encAdapter(store, att, ref).load())!.text,
+    );
+    ref.current = "pw";
+    await encAdapter(store, att, ref).save(plain); // now encrypted
+
+    // Decrypt note-by-note via demigrateNote, then drop the passphrase.
+    const enc = encAdapter(store, att, ref);
+    const loaded = parse((await enc.load())!.text).notes[0]!;
+    await enc.demigrateNote!(loaded);
+    ref.current = null;
+
+    const final = encAdapter(store, att, { current: null });
+    const out = parse((await final.load())!.text).notes[0]!;
+    expect(out.body).toContain(SECRET_BODY);
+    const got = await final.fetchAttachment!(out, "abcd1234-pic.png");
+    expect([...got!.bytes]).toEqual([72, 101, 108, 108, 111]);
+  });
 });
 
 describe("directory adapter — legacy notes.json split", () => {
