@@ -42,6 +42,12 @@ function renderInline(nodes: InlineNode[]): ReactNode[] {
             href={node.href}
             target="_blank"
             rel="noreferrer noopener"
+            // Stop the editor's line-level mousedown from rolling the caret here
+            // (which would replace this anchor with the raw-source textarea
+            // before the click lands), so a click opens the link instead of
+            // entering edit mode. To edit the link, click just past it and
+            // backspace into it. Mirrors `InlineImage`.
+            onMouseDown={(e) => e.stopPropagation()}
             className="text-link underline underline-offset-2"
           >
             {node.text}
