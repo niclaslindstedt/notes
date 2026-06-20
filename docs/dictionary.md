@@ -162,7 +162,7 @@ Honour these when naming a new file, key, or string.
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | **Sync glyph** / **cloud icon** / **save status button**   | `SyncStatus` (`src/ui/SyncStatus.tsx`). [→](overview.md#sync-status)                                          |
 | **Sync indicator** (the glyph itself)                      | `SyncIndicator` (`src/ui/SyncIndicator.tsx`). [→](overview.md#sync-indicator)                                 |
-| **Per-note upload spinner** / **sync spinner** / **note being uploaded** | `useUploadStatus` (`src/app/use-upload-status.ts`) over the adapter's `watchUploads`; rendered as a `SpinnerIcon` on the `NoteCard` (`src/app/App.tsx`) and the side-menu note row (`SideMenu.tsx`). [→](overview.md#per-note-upload-spinner) |
+| **Per-note upload spinner** / **sync spinner** / **note being uploaded** / **editor glyph spinner** | `useUploadStatus` (`src/app/use-upload-status.ts`) over the adapter's `watchUploads`; rendered as a `SpinnerIcon` on the `NoteCard`, the side-menu note row (`SideMenu.tsx`), and in place of the editor's brand glyph (`Editor` in `src/app/App.tsx`). [→](overview.md#per-note-upload-spinner) |
 
 ## Storage backends and persistence
 
