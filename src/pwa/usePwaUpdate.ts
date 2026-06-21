@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { Workbox } from "workbox-window";
 
 // Single source of truth for the PWA update lifecycle, consumed by
-// `UpdateToast` ("a new build is ready — reload to apply"). Registration
+// `UpdateToast` (the "Update ready" prompt). Registration
 // and progress tracking live in a module singleton here so multiple
 // surfaces can subscribe; the first subscriber starts it and
 // `useSyncExternalStore` fans the state out. Ported from checklist.
