@@ -116,7 +116,10 @@ so a long version label never wraps). Driven by `usePwaUpdate`
 (`src/pwa/usePwaUpdate.ts`): the new service worker parks in `waiting`, and the
 page only swaps when the user presses the primary **Update** button — which
 carries the whole "apply it" affordance, so the copy no longer spells out
-"reload to apply" — never silently mid-edit. See also [PWA update](#pwa-update).
+"reload to apply" — never silently mid-edit. When the side menu is pinned open
+as a docked sidebar (≥768px) the toast insets past it on the side it docks
+(reading `nav.pinned` / `position.side`) so it centres within the notes content
+area rather than the whole viewport. See also [PWA update](#pwa-update).
 
 ### Icons
 
