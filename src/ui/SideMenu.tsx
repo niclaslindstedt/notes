@@ -490,12 +490,15 @@ export function SideMenu({
       noteSortKey,
     );
     const expanded = expandedFolders.has(folder.id);
+    const containsActiveNote =
+      activeNoteId != null && folderNotes.some((n) => n.id === activeNoteId);
     return (
       <div key={folder.id} {...{ [NOTE_DROP_ATTR]: folder.id }}>
         <FolderRow
           name={folder.name}
           count={folderNotes.length}
           expanded={expanded}
+          containsActiveNote={containsActiveNote}
           isDropTarget={dropTarget === folder.id || activeDropKey === folder.id}
           renameLabel={t("nav.renameFolder")}
           deleteLabel={t("nav.deleteFolder")}
@@ -880,6 +883,7 @@ function FolderRow({
   name,
   count,
   expanded,
+  containsActiveNote,
   isDropTarget,
   renameLabel,
   deleteLabel,
@@ -895,6 +899,8 @@ function FolderRow({
   name: string;
   count: number;
   expanded: boolean;
+  /** The currently open note is filed in this folder — tints the glyph accent. */
+  containsActiveNote: boolean;
   isDropTarget: boolean;
   renameLabel: string;
   deleteLabel: string;
@@ -931,7 +937,7 @@ function FolderRow({
             <ChevronRightIcon className="h-4 w-4" />
           )}
         </span>
-        <span className={expanded ? "text-accent" : "text-muted"}>
+        <span className={containsActiveNote ? "text-accent" : "text-muted"}>
           {expanded ? (
             <FolderOpenIcon className="h-5 w-5" />
           ) : (

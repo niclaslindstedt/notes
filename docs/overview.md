@@ -1401,7 +1401,10 @@ drops an inline, unnamed `FolderEditRow` into the list — commit a name
 vanishes, so a misfire costs nothing). Each `FolderRow` expands to
 reveal its notes (indented), and carries a **"+" pinned to its far right**
 (`onAddNote`) that starts a note already filed inside it — replacing the old
-per-folder "New note" row. The folder row's edit and delete actions stay hidden
+per-folder "New note" row. Its glyph swaps closed→open (`FolderIcon` →
+`FolderOpenIcon`) as it expands, but the **accent (green) tint is reserved for
+when the open note is filed inside that folder** (`containsActiveNote`) — merely
+expanding a folder does not colour it. The folder row's edit and delete actions stay hidden
 until summoned, the way a note's do: a **left swipe** latches open an
 `[edit | delete]` strip (sharing the width of a note's single delete button,
 split in two) on touch, and a **right-click** opens the same two actions on a
