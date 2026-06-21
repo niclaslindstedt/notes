@@ -56,28 +56,51 @@ export function NoteDragProvider({
 }) {
   const [dragging, setDragging] = useState<{ title: string } | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);
-  const ghostRef = useRef<HTMLDivElement>(null);
+  const ghostRef = useRef<HTMLDivElement | null>(null);
+  // Latest fingertip position, kept on a ref so the callback ref can place the
+  // chip the instant it mounts (see `setGhostRef`).
+  const ghostPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   // Live mirrors so the memoised actions read current values without being
   // rebuilt (which would re-fire the touch handlers' closures).
   const noteIdRef = useRef<string | null>(null);
   const dropKeyRef = useRef<string | null>(null);
 
-  const positionGhost = useCallback((x: number, y: number) => {
-    const el = ghostRef.current;
-    // Sit the chip just above the fingertip, horizontally centred on it.
-    if (el)
-      el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -150%)`;
+  // Sit the chip just above the fingertip, horizontally centred on it.
+  const applyGhostTransform = useCallback((el: HTMLDivElement) => {
+    const { x, y } = ghostPos.current;
+    el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -150%)`;
   }, []);
+
+  const positionGhost = useCallback(
+    (x: number, y: number) => {
+      ghostPos.current = { x, y };
+      const el = ghostRef.current;
+      if (el) applyGhostTransform(el);
+    },
+    [applyGhostTransform],
+  );
+
+  // Callback ref: place the chip in the same commit it mounts, before the
+  // browser paints. `begin` records the pickup point first, so the chip is
+  // never shown at its `top-0 left-0` default while waiting for the first move.
+  const setGhostRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      ghostRef.current = el;
+      if (el) applyGhostTransform(el);
+    },
+    [applyGhostTransform],
+  );
 
   const actions = useMemo<DragActions>(
     () => ({
       begin(noteId, title, x, y) {
         noteIdRef.current = noteId;
         dropKeyRef.current = null;
+        // Record the pickup point so the chip's callback ref can place it the
+        // moment it mounts, rather than flashing at the top-left default.
+        positionGhost(x, y);
         setDragging({ title });
         setDropKey(null);
-        // The ghost mounts this render; position it on the next frame.
-        requestAnimationFrame(() => positionGhost(x, y));
       },
       hover(key, x, y) {
         positionGhost(x, y);
@@ -111,7 +134,7 @@ export function NoteDragProvider({
         {children}
         {dragging && (
           <div
-            ref={ghostRef}
+            ref={setGhostRef}
             aria-hidden
             className="pointer-events-none fixed top-0 left-0 z-[100] flex max-w-[70vw] items-center gap-2 rounded-[var(--radius)] border border-accent/40 bg-surface-2 px-3 py-1.5 text-sm text-fg-bright shadow-lg"
           >

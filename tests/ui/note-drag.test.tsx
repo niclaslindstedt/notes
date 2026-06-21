@@ -97,6 +97,23 @@ describe("note long-press drag", () => {
     expect(onDrop).toHaveBeenCalledExactlyOnceWith("n1", NOTE_DROP_ARCHIVE);
   });
 
+  it("positions the drag chip at the pickup point before the finger moves", () => {
+    const onDrop = vi.fn();
+    const { wrapper, container, getByTestId } = setup(onDrop);
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(getByTestId("root"));
+
+    fireEvent.pointerDown(wrapper, touch);
+    // Latch the long-press; the chip mounts here, before any pointermove.
+    act(() => void vi.advanceTimersByTime(400));
+
+    const chip = container.querySelector<HTMLElement>("[aria-hidden]")!;
+    // It must be placed at the fingertip immediately — not left at the
+    // top-0/left-0 default until the first move snaps it into place.
+    expect(chip.style.transform).toBe(
+      "translate(10px, 10px) translate(-50%, -150%)",
+    );
+  });
+
   it("does not pick the note up if the finger moves before the press latches", () => {
     const onDrop = vi.fn();
     const { wrapper, getByTestId } = setup(onDrop);
