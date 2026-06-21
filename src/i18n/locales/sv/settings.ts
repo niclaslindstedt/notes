@@ -111,6 +111,15 @@ const settings: SettingsCatalog = {
     listLayoutCards: "Kort",
     listLayoutHint:
       "Rader är en kompakt enradslista; kort är högre och visar mer av varje anteckning innan den tonas ut.",
+    sidebar: "Sidofält",
+    folderPlacement: "Mappar",
+    folderPlacementTop: "Överst",
+    folderPlacementMixed: "Blandat",
+    folderPlacementHint:
+      "Håll mapparna fästa ovanför anteckningarna, eller sortera in dem bland anteckningarna.",
+    sortBy: "Sortera efter",
+    sortByModified: "Senast ändrad",
+    sortByName: "Namn",
     font: "Typsnitt",
     fontFamily: "Typsnittsfamilj",
     textSize: "Textstorlek",

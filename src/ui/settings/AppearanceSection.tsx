@@ -11,18 +11,22 @@ import {
   DENSITY_PRESETS,
   FAMILY_DEFAULT_THEME,
   FAMILY_LABELS,
+  FOLDER_PLACEMENTS,
   FONT_FAMILIES,
   FONT_SCALE_PRESETS,
   LIGHT_THEMES,
   LIST_LAYOUTS,
+  NOTE_SORT_KEYS,
   PRESET_PALETTES,
   RADIUS_PRESETS,
   themeFamily,
   THEME_LABELS,
   type CustomTheme,
   type CustomThemeColors,
+  type FolderPlacement,
   type FontFamilyId,
   type ListLayout,
+  type NoteSortKey,
   type ThemeFamily,
   type ThemePreset,
 } from "../../theme/themes.ts";
@@ -133,6 +137,40 @@ export function AppearanceSection({
           <p className="w-full text-xs text-muted">
             {t("settings.appearance.listLayoutHint")}
           </p>
+        </Field>
+      </Section>
+
+      <Section title={t("settings.appearance.sidebar")}>
+        <Field label={t("settings.appearance.folderPlacement")}>
+          <SegmentedRow<FolderPlacement>
+            ariaLabel={t("settings.appearance.folderPlacement")}
+            value={appearance.folderPlacement}
+            options={FOLDER_PLACEMENTS.map((id) => ({
+              value: id,
+              label:
+                id === "top"
+                  ? t("settings.appearance.folderPlacementTop")
+                  : t("settings.appearance.folderPlacementMixed"),
+            }))}
+            onChange={(v) => onUpdate("folderPlacement", v)}
+          />
+          <p className="w-full text-xs text-muted">
+            {t("settings.appearance.folderPlacementHint")}
+          </p>
+        </Field>
+        <Field label={t("settings.appearance.sortBy")}>
+          <SegmentedRow<NoteSortKey>
+            ariaLabel={t("settings.appearance.sortBy")}
+            value={appearance.noteSortKey}
+            options={NOTE_SORT_KEYS.map((id) => ({
+              value: id,
+              label:
+                id === "modified"
+                  ? t("settings.appearance.sortByModified")
+                  : t("settings.appearance.sortByName"),
+            }))}
+            onChange={(v) => onUpdate("noteSortKey", v)}
+          />
         </Field>
       </Section>
 

@@ -116,6 +116,15 @@ const settings = {
     listLayoutCards: "Cards",
     listLayoutHint:
       "Rows is a compact one-line list; cards are taller, showing more of each note before fading out.",
+    sidebar: "Sidebar",
+    folderPlacement: "Folders",
+    folderPlacementTop: "On top",
+    folderPlacementMixed: "Mixed in",
+    folderPlacementHint:
+      "Keep folders pinned above your notes, or sort them in among the notes.",
+    sortBy: "Sort by",
+    sortByModified: "Last modified",
+    sortByName: "Name",
     font: "Font",
     fontFamily: "Font family",
     textSize: "Text size",

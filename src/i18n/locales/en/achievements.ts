@@ -105,6 +105,12 @@ const achievements = {
       learnMore:
         "Settings → Appearance lays the overview out two ways: compact one-line rows, or taller cards that show several lines of each note and fade the tail out. Pick whichever you like to scan.",
     },
+    sidebarArranger: {
+      name: "Rearranger",
+      condition: "Change how the side menu orders folders and notes.",
+      learnMore:
+        "Settings → Appearance → Sidebar decides whether folders pin above your notes or mix in among them, and whether the side menu sorts by name or by what you edited last.",
+    },
     marginalia: {
       name: "Marginalia",
       condition: "Adjust the editor's writing-column margins.",
