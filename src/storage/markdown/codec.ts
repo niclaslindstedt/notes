@@ -19,7 +19,7 @@ import {
   ATTACHMENT_REF_PREFIX,
   attachmentFilenameFromHref,
 } from "../../domain/attachment.ts";
-import { type Note, type Snapshot } from "../../domain/note.ts";
+import { type Folder, type Note, type Snapshot } from "../../domain/note.ts";
 
 /** A single markdown document keyed by its path relative to the app root. */
 export type MarkdownFile = {
@@ -58,17 +58,78 @@ function slugify(name: string): string {
     .slice(0, 48);
 }
 
-// -- Serialize --------------------------------------------------------
+// -- Physical folder directories --------------------------------------
+//
+// A note's folder is a **real subdirectory** on the file/cloud backends: a
+// grouped note's `.md` is written into `<folder-dir>/<stem>.md` under the
+// namespace's notes root, so the synced folder is browsable and tool-friendly
+// (open the `Recipes/` folder in any file manager and there are the recipes).
+// The directory name is a slug of the folder's display name, falling back to a
+// stable id-derived stem for a name that slugs to nothing (an all-emoji name),
+// so every folder still maps to a distinct, deterministic directory. The
+// note's `folder:` frontmatter (the folder *id*) stays the authoritative link
+// the load reads back — the directory is a write-side projection for browsing,
+// and the frontmatter is what's sanity-checked against it — so two folders that
+// happen to slug alike never lose a note.
 
-/** Every note in a snapshot, as an individual markdown file. */
-export function snapshotToFiles(snapshot: Snapshot): MarkdownFile[] {
-  return snapshot.notes.map((note) => ({
-    path: `${noteFileStem(note)}.md`,
-    text: noteToMarkdown(note),
-  }));
+/** The directory segment a folder's notes are filed under (no slashes). */
+export function folderDirSegment(folder: Folder): string {
+  return slugify(folder.name) || `folder-${idSuffix(folder.id)}`;
 }
 
-export function noteToMarkdown(note: Note): string {
+/**
+ * The directory a note is filed under, relative to the notes root: the empty
+ * string for an ungrouped note (it lives directly at the root) and the folder's
+ * `folderDirSegment` when it points at a known folder. An unknown / missing
+ * folder id (no registry, or a stale link) falls back to the root.
+ */
+export function folderDirName(
+  folderId: string | undefined,
+  folders: readonly Folder[] | undefined,
+): string {
+  if (!folderId || !folders) return "";
+  const folder = folders.find((f) => f.id === folderId);
+  return folder ? folderDirSegment(folder) : "";
+}
+
+/**
+ * The path a note's `.md` file lives at, relative to the notes root, resolving
+ * its folder against the registry: `<folder-dir>/<stem>.md` when grouped,
+ * `<stem>.md` when ungrouped.
+ */
+export function noteFilePath(note: Note, folders?: readonly Folder[]): string {
+  const dir = folderDirName(note.folderId, folders);
+  const stem = noteFileStem(note);
+  return dir ? `${dir}/${stem}.md` : `${stem}.md`;
+}
+
+// -- Serialize --------------------------------------------------------
+
+/**
+ * Every note in a snapshot, as an individual markdown file. A grouped note is
+ * filed into its folder's real subdirectory (`<folder-dir>/<stem>.md`); an
+ * ungrouped one sits at the notes root. The on-disk attachment references are
+ * pointed up the extra directory level a folder adds so they still resolve in
+ * an external markdown viewer.
+ */
+export function snapshotToFiles(snapshot: Snapshot): MarkdownFile[] {
+  return snapshot.notes.map((note) => {
+    const dir = folderDirName(note.folderId, snapshot.folders);
+    const stem = noteFileStem(note);
+    return {
+      path: dir ? `${dir}/${stem}.md` : `${stem}.md`,
+      text: noteToMarkdown(note, dir ? 1 : 0),
+    };
+  });
+}
+
+/**
+ * Serialize one note to its `.md` file contents. `folderDepth` is how many
+ * folder directories the note is nested under the notes root (0 ungrouped, 1
+ * inside a folder), so the attachment references point up the right number of
+ * levels to reach the sibling `attachments/` tree.
+ */
+export function noteToMarkdown(note: Note, folderDepth = 0): string {
   const front = renderFrontmatter({
     id: note.id,
     // Only written when set, so a title-less note's frontmatter stays minimal.
@@ -85,9 +146,14 @@ export function noteToMarkdown(note: Note): string {
     ...(note.folderId ? { folder: note.folderId } : {}),
   });
   // Point image references at the on-disk sibling layout
-  // (`../attachments/<stem>/<file>`) so the file opens with working images in
-  // any markdown viewer; the in-memory body keeps the rename-proof flat form.
-  const body = refsToDisk(note.body.replace(/\n+$/, ""), noteFileStem(note));
+  // (`../attachments/<stem>/<file>`, with an extra `../` per folder level) so
+  // the file opens with working images in any markdown viewer; the in-memory
+  // body keeps the rename-proof flat form.
+  const body = refsToDisk(
+    note.body.replace(/\n+$/, ""),
+    noteFileStem(note),
+    folderDepth,
+  );
   // One blank line between the frontmatter and the body, and exactly one
   // trailing newline so the file ends cleanly. Trailing blank lines in the
   // body are trimmed (normalised) before the single newline is re-added.
@@ -99,21 +165,26 @@ export function noteToMarkdown(note: Note): string {
 // In memory a note body references an attachment by the flat
 // `attachments/<file>` (no note-name segment, so it survives a rename) — an
 // image as `![file](…)`, any other file as a plain `[file](…)` link. On disk
-// the note lives in `notes/<stem>.md` and the file in the sibling
+// the note lives in `notes/[<folder>/]<stem>.md` and the file in the sibling
 // `attachments/<stem>/<file>`, so the reference is rewritten to the relative
-// `../attachments/<stem>/<file>` on the way out and collapsed back to the
+// `../attachments/<stem>/<file>` on the way out — with one extra `../` for each
+// folder directory the note is nested under — and collapsed back to the
 // basename on the way in. The optional leading `!` matches both forms; a
 // non-attachment href (an ordinary link) is left untouched.
 
 const ATTACHMENT_REF_RE = /(!?\[[^\]]*\]\()([^)]+)(\))/g;
 
-function refsToDisk(body: string, stem: string): string {
+function refsToDisk(body: string, stem: string, folderDepth = 0): string {
+  // One `../` climbs out of the notes root to the namespace root (where the
+  // `attachments/` tree sits beside `notes/`); each folder directory the note
+  // is filed under adds one more.
+  const up = "../".repeat(1 + folderDepth);
   return body.replace(
     ATTACHMENT_REF_RE,
     (whole, open: string, href: string, close: string) => {
       const filename = attachmentFilenameFromHref(href);
       if (!filename) return whole;
-      return `${open}../${ATTACHMENT_REF_PREFIX}${stem}/${filename}${close}`;
+      return `${open}${up}${ATTACHMENT_REF_PREFIX}${stem}/${filename}${close}`;
     },
   );
 }

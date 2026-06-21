@@ -341,6 +341,36 @@ describe("directory adapter — paced per-note migration", () => {
     expect([...status.values()].every((s) => s === "pending")).toBe(true);
   });
 
+  it("migrateNote removes a folder-placed plaintext note (no leak)", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const ref = { current: null as string | null };
+    // A note filed into a folder → plaintext lives at `<folder-dir>/<stem>.md`.
+    const filed: Note = { ...noteWithImage(1).note, folderId: "f1" };
+    await encAdapter(store, att, ref).save(
+      serialize({
+        notes: [filed],
+        folders: [{ id: "f1", name: "Secret Plans", createdAt: 1 }],
+      }),
+    );
+    expect(
+      [...store.files.keys()].some(
+        (p) => p.startsWith("secret-plans/") && p.endsWith(".md"),
+      ),
+    ).toBe(true);
+
+    // Enable encryption and migrate the one note: the folder-placed plaintext
+    // must be found and removed, not left stranded in the clear.
+    ref.current = "pw";
+    const a = encAdapter(store, att, ref);
+    const note = parse((await a.load())!.text).notes[0]!;
+    expect(await a.migrateNote!(note)).toBe(true);
+    expect([...store.files.keys()].some((p) => p.endsWith(".md"))).toBe(false);
+    expect(
+      [...store.files.keys()].filter((p) => p.endsWith(".enc")),
+    ).toHaveLength(1);
+  });
+
   it("migrateNote converts one note atomically and flips its status", async () => {
     const store = memoryStore();
     const att = memoryAttachments();

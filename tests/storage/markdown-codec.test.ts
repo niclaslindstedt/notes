@@ -116,3 +116,69 @@ describe("markdown codec — folder frontmatter", () => {
     expect(parseNote(md)?.folderId).toBeUndefined();
   });
 });
+
+describe("markdown codec — physical folder directories", () => {
+  it("files a grouped note into its folder's real subdirectory", () => {
+    const n: Note = {
+      ...note("abcdef123456", "Pasta", "boil"),
+      folderId: "f1",
+    };
+    const file = snapshotToFiles({
+      notes: [n],
+      folders: [{ id: "f1", name: "Recipes", createdAt: 1 }],
+    })[0]!;
+    expect(file.path).toBe("recipes/pasta-123456.md");
+    // The folder id still rides the frontmatter as the authoritative link.
+    expect(file.text).toContain("folder: f1");
+  });
+
+  it("keeps an ungrouped note at the notes root", () => {
+    const file = snapshotToFiles({
+      notes: [note("abcdef123456", "Loose", "x")],
+      folders: [{ id: "f1", name: "Recipes", createdAt: 1 }],
+    })[0]!;
+    expect(file.path).toBe("loose-123456.md");
+  });
+
+  it("leaves a note flat when its folder is missing from the registry", () => {
+    const n: Note = {
+      ...note("abcdef123456", "Orphan", "x"),
+      folderId: "gone",
+    };
+    const file = snapshotToFiles({ notes: [n], folders: [] })[0]!;
+    expect(file.path).toBe("orphan-123456.md");
+  });
+
+  it("points an attachment reference up the extra folder level on disk", () => {
+    const n: Note = {
+      ...note("aabbcc112233", "Holiday", "![pic](attachments/xy-pic.png)"),
+      folderId: "f1",
+    };
+    const file = snapshotToFiles({
+      notes: [n],
+      folders: [{ id: "f1", name: "Travel", createdAt: 1 }],
+    })[0]!;
+    const stem = noteFileStem(n);
+    // notes/travel/<stem>.md -> ../../attachments/<stem>/ reaches the sibling
+    // attachments tree at the namespace root.
+    expect(file.text).toContain(`![pic](../../attachments/${stem}/xy-pic.png)`);
+    // And it collapses back to the flat in-memory form regardless of depth.
+    expect(parseNote(file.text)?.body).toBe("![pic](attachments/xy-pic.png)");
+  });
+
+  it("derives a stable directory for a folder whose name slugs to nothing", () => {
+    const n: Note = { ...note("abcdef123456", "X", "x"), folderId: "f9" };
+    const file = snapshotToFiles({
+      notes: [n],
+      folders: [{ id: "f9aaaa", name: "🎉", createdAt: 1 }],
+    })[0]!;
+    // Folder id "f9" doesn't match "f9aaaa", so it falls back to the root —
+    // but a matching all-emoji folder gets a deterministic `folder-<id>` dir.
+    expect(file.path).toBe("x-123456.md");
+    const matched = snapshotToFiles({
+      notes: [{ ...n, folderId: "f9aaaa" }],
+      folders: [{ id: "f9aaaa", name: "🎉", createdAt: 1 }],
+    })[0]!;
+    expect(matched.path).toBe("folder-f9aaaa/x-123456.md");
+  });
+});

@@ -83,6 +83,10 @@ class FolderFileStore implements FileStore {
     private readonly root: FileSystemDirectoryHandle,
     base: string = "",
     private readonly onPermissionLost?: () => void,
+    // The notes store descends into subdirectories so a note filed into a
+    // folder (`<folder-dir>/<stem>.md`) is found; the root settings / registry
+    // stores stay shallow (they only ever `read`/`write` a named file).
+    private readonly recursive: boolean = false,
   ) {
     this.baseSegments = base.split("/").filter((s) => s.length > 0);
   }
@@ -131,25 +135,38 @@ class FolderFileStore implements FileStore {
     }
   }
 
-  // List the files directly in the base directory (the namespace's subfolder,
-  // or the picked-directory root for the default namespace). Notes are flat,
-  // so directories — other namespaces' folders when listing at the root — are
-  // skipped rather than descended into.
+  // List the files under the base directory. The notes store descends into the
+  // folder subdirectories (a note filed into a folder lives at
+  // `<folder-dir>/<stem>.md`), yielding `/`-joined relative paths; the shallow
+  // root stores skip subdirectories — which also keeps the default namespace,
+  // rooted at `notes/`, from being confused by any nested directory.
   async list(): Promise<FileEntry[]> {
     const dir = await this.resolveDir(this.baseSegments, false);
     if (!dir) return [];
     const out: FileEntry[] = [];
     try {
-      for await (const handle of dir.values()) {
-        if (handle.kind !== "file") continue;
-        const file = await handle.getFile();
-        out.push({ path: handle.name, rev: String(file.lastModified) });
-      }
+      await this.collect(dir, "", out);
     } catch (err) {
       this.reportPermission(err);
       throw err;
     }
     return out;
+  }
+
+  private async collect(
+    dir: FileSystemDirectoryHandle,
+    prefix: string,
+    out: FileEntry[],
+  ): Promise<void> {
+    for await (const handle of dir.values()) {
+      const path = prefix ? `${prefix}/${handle.name}` : handle.name;
+      if (handle.kind === "file") {
+        const file = await handle.getFile();
+        out.push({ path, rev: String(file.lastModified) });
+      } else if (this.recursive && handle.kind === "directory") {
+        await this.collect(handle, path, out);
+      }
+    }
   }
 
   async read(path: string): Promise<string | null> {
@@ -324,6 +341,7 @@ export function createFolderAdapter(
     options.directoryHandle,
     namespaceNotesFolder(namespace),
     options.onPermissionLost,
+    true,
   );
   const attachments = new FolderAttachmentStore(
     options.directoryHandle,

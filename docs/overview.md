@@ -1011,7 +1011,9 @@ labelled "Local folder" — the File System Access API directory picker. The
 `FileSystemDirectoryHandle` is persisted in IndexedDB (`handle-store.ts`) so it
 survives reloads, and the OS permission is re-confirmed each session
 (`ensurePermission`). Notes are one `.md` per note via the [directory
-adapter](#directory-adapter); each file's `lastModified` is its revision.
+adapter](#directory-adapter), with grouped notes filed into a real
+[folder subdirectory](#folders-sidecar); the store lists **recursively** so
+those nested notes are found, and each file's `lastModified` is its revision.
 
 ### Dropbox backend
 
@@ -1020,8 +1022,9 @@ under the scoped app folder (`free-notes` by default, overridable at build time
 via `VITE_DROPBOX_APP_FOLDER`). It uses the PKCE
 full-page-redirect [OAuth](#oauth) flow and refresh tokens for silent re-auth on
 401 (coalescing concurrent refreshes), honours 429 rate limits with a cooldown,
-and lists non-recursively so the default namespace doesn't pick up other
-namespaces' folders. Built on the [directory adapter](#directory-adapter).
+and lists the namespace's notes folder recursively so notes filed into a
+[folder subdirectory](#folders-sidecar) are found. Built on the
+[directory adapter](#directory-adapter).
 
 ### Google Drive backend
 
@@ -1036,9 +1039,15 @@ on the [directory adapter](#directory-adapter).
 
 `createDirectoryAdapter` (`src/storage/directory-adapter.ts`) over a `FileStore`
 (`src/storage/file-store.ts`) — the shared sync logic for all three file
-backends. It reads every `*.md` into a snapshot, writes only changed notes
-(hash-compared), removes only files it authored, and scopes conflicts per-file
-so another device's edit to a different note never blocks a save. It remembers
+backends. It reads every `*.md` (now **recursively**, so notes filed into a
+folder's subdirectory are found) into a snapshot, writes each note to its
+folder-aware path (`noteFilePath`), writes only changed notes (hash-compared),
+removes only files it authored — so a note that changes folder is moved by
+writing the new path and removing the old — and scopes conflicts per-file so
+another device's edit to a different note never blocks a save. It keeps the
+last-loaded folder registry (`lastFolders`) so the per-note encryption
+migrate / demigrate paths resolve a grouped note's plaintext path the same way a
+save does. It remembers
 the revisions it produced to tell listing lag from a real remote edit, and
 tolerates lost acks. When a session passphrase is held it switches to the
 **encrypted per-file representation** — one `<ref>.enc` per note, one opaque
@@ -1058,9 +1067,13 @@ resume rather than losing data.
 `src/storage/markdown/codec.ts` — the one-`.md`-file-per-note codec the file
 backends share. `snapshotToFiles` / `filesToSnapshot` convert in both
 directions; `noteToMarkdown` writes YAML frontmatter (id, title, created,
-updated, archived) plus the body; `parseNote` reads it back defensively
-(skipping malformed files); `noteFileStem` builds the `<slug>-<id-suffix>.md`
-filename.
+updated, archived, and the `folder:` id) plus the body; `parseNote` reads it
+back defensively (skipping malformed files); `noteFileStem` builds the
+`<slug>-<id-suffix>.md` filename. `noteFilePath` / `folderDirName` /
+`folderDirSegment` add the **physical folder directory** a grouped note is filed
+into — `<folder-dir>/<stem>.md`, the folder-name slug — and `noteToMarkdown`
+takes a `folderDepth` so a note nested in a folder points its on-disk attachment
+references up the extra `../` level to reach the sibling `attachments/` tree.
 
 ### Save retry
 
@@ -1210,7 +1223,10 @@ does **not** bump `updatedAt` — filing isn't editing), `notesInFolder`, and
 `sortFoldersByCreated` (folders sort by creation order so the list stays stable
 as notes move). A note whose `folderId` points at a folder the registry no
 longer has is treated as ungrouped everywhere, so a stale link never hides a
-note.
+note. On the file/cloud backends a folder is a **real directory** the note's
+`.md` is filed into (see [folders sidecar](#folders-sidecar)); on the local
+"This device" backend, where there are no files, folders are purely the
+`folderId` + registry.
 
 The notes store (`src/app/use-notes.ts`) exposes the sorted `folders` and the
 verbs `createFolder` (fires the **Filing system** achievement), `renameFolder`,
@@ -1318,20 +1334,38 @@ drag-and-drop doesn't. Choosing an entry calls `moveNote` for the open note.
 
 On the local "This device" backend folders ride the JSON snapshot for free
 (serialize/parse round-trip `folders` and `folderId`). On the file/cloud
-backends the note's folder **id** rides its markdown frontmatter (`folder:`, via
-the [markdown codec](#markdown-codec)) — or the encrypted note JSON — so the
-grouping survives, while the folder **names and any empty folders** live in a
-plaintext `folders.json` sidecar beside the note files (`FOLDERS_FILE_NAME`).
-The [directory adapter](#directory-adapter) owns it: `readFolders` /
-`injectFolders` fold the registry into the loaded snapshot (and load a namespace
-whose only content is empty folders as a real, non-null document), and
-`persistFolders` writes it back when it changed (writing `[]` to clear a
-registry whose folders were all removed). Like `namespaces.json` it stays
-plaintext even under encryption — names aren't secret and must be readable
-before the unlock gate — and it is metadata, never read as a note nor removed on
-a representation switch. It sits outside the aggregate revision, so a
+backends a grouped note is filed into a **real subdirectory** named after its
+folder — `notes/<folder-dir>/<stem>.md`, where `<folder-dir>` is a slug of the
+folder's display name (`folderDirName` / `folderDirSegment` in the
+[markdown codec](#markdown-codec)) — so the synced folder is browsable and
+tool-friendly (open the `recipes/` directory in any file manager and there are
+the recipes). The note's folder **id** still rides its markdown frontmatter
+(`folder:`) — or the encrypted note JSON — and that frontmatter id, not the
+directory, is the **authoritative link the load reads back**: the physical
+directory is a write-side projection, so two folders that happen to slug alike
+never lose a note, and moving a `.md` file between directories by hand doesn't
+re-file it (the next save snaps it back to match the frontmatter). The folder
+**names and any empty folders** live in a plaintext `folders.json` sidecar at
+the notes root (`FOLDERS_FILE_NAME`); an empty folder simply has no directory on
+disk until a note is filed into it. The [directory adapter](#directory-adapter)
+owns it: `readFolders` / `injectFolders` fold the registry into the loaded
+snapshot (and load a namespace whose only content is empty folders as a real,
+non-null document), and `persistFolders` writes it back when it changed (writing
+`[]` to clear a registry whose folders were all removed). Like `namespaces.json`
+it stays plaintext even under encryption — names aren't secret and must be
+readable before the unlock gate — and it is metadata, never read as a note nor
+removed on a representation switch. It sits outside the aggregate revision, so a
 folder-only change on another device isn't picked up by a live pull until a note
 also moves.
+
+The **encrypted** per-file representation stays flat and opaque on purpose
+(`<ref>.enc` at the notes root, no folder directories), so the at-rest layout
+leaks nothing about which notes are grouped together — physical folders are a
+plaintext-only nicety. Filing a note into a folder, renaming a folder, or
+deleting one therefore relocates the affected `.md` files on the next save (the
+[directory adapter](#directory-adapter) writes the new path and removes the old
+one, the same per-file move it does for any path change); an emptied folder
+directory may linger harmlessly until the backend prunes it.
 
 ## Theme and appearance
 

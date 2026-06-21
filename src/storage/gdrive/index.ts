@@ -117,6 +117,7 @@ export function createGdriveAdapter(
     token,
     fetchImpl,
     namespaceNotesFolder(namespace),
+    true,
   );
   const attachments = createGdriveAttachmentStore(
     token,
@@ -160,6 +161,10 @@ function createGdriveFileStore(
   token: string,
   fetchImpl: FetchImpl,
   baseFolder: string = "",
+  // The notes store descends into the folder subdirectories (a note filed into
+  // a folder lives at `<folder-dir>/<stem>.md`); the shallow root settings /
+  // registry stores never call `list`.
+  recursive: boolean = false,
 ): FileStore {
   // The folder, relative to the `notes/` app folder, this store is rooted at:
   // `notes` / `<slug>/notes` for a namespace's documents, or empty for the
@@ -256,11 +261,16 @@ function createGdriveFileStore(
     return parentId;
   }
 
-  // List the files directly in a directory. Non-recursive: notes are stored
-  // flat (one `.md` per note, no nesting), so folders are skipped rather than
-  // descended into — which keeps the default namespace, rooted at the `notes/`
-  // app folder, from picking up other namespaces' subfolders.
-  async function listDir(dirId: string, out: FileEntry[]): Promise<void> {
+  // List the files under a directory. The notes store descends into the folder
+  // subdirectories (a note filed into a folder lives at `<folder-dir>/<stem>.md`),
+  // building `/`-joined relative paths; the shallow root stores skip folders.
+  // The folder subdirectories live inside the namespace's `notes/` app folder,
+  // so descending stays scoped to this namespace.
+  async function listDir(
+    dirId: string,
+    prefix: string,
+    out: FileEntry[],
+  ): Promise<void> {
     const query = `'${dirId}' in parents and trashed=false`;
     const url =
       `${DRIVE_FILES_API}?q=${encodeURIComponent(query)}&spaces=drive` +
@@ -272,8 +282,13 @@ function createGdriveFileStore(
     }
     const files = ((await res.json()) as DriveListResponse).files ?? [];
     for (const file of files) {
-      if (file.mimeType === FOLDER_MIME_TYPE) continue;
-      out.push({ path: file.name ?? "", rev: file.version });
+      const name = file.name ?? "";
+      const path = prefix ? `${prefix}/${name}` : name;
+      if (file.mimeType === FOLDER_MIME_TYPE) {
+        if (recursive && file.id) await listDir(file.id, path, out);
+        continue;
+      }
+      out.push({ path, rev: file.version });
     }
   }
 
@@ -329,7 +344,7 @@ function createGdriveFileStore(
       const baseId = await resolveDirId("", false);
       if (!baseId) return [];
       const out: FileEntry[] = [];
-      await listDir(baseId, out);
+      await listDir(baseId, "", out);
       return out;
     },
 
