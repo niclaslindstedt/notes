@@ -108,6 +108,39 @@ describe("withLocalCache", () => {
     await expect(cached.save("queued")).rejects.toBeInstanceOf(TypeError);
     expect(storage.getItem(localCacheKey("dropbox"))).toContain("queued");
   });
+
+  it("advertises loadSync and serves the mirror synchronously for first paint", async () => {
+    const storage = memoryStorage();
+    const { adapter } = flakyAdapter();
+    const cached = withLocalCache(adapter, {
+      storage,
+      key: localCacheKey("dropbox"),
+    });
+    // Nothing mirrored yet → no synchronous answer.
+    expect(cached.capabilities.has("loadSync")).toBe(true);
+    expect(cached.loadSync?.()).toBeNull();
+    // After a successful save the mirror can paint the last-known bytes before
+    // the async load resolves.
+    await cached.save("v1");
+    expect(cached.loadSync?.()?.text).toBe("v1");
+  });
+
+  it("loadSync returns null while the mirror holds a sealed envelope", async () => {
+    const { encryptText, decryptEnvelope } =
+      await import("../../src/storage/crypto.ts");
+    const storage = memoryStorage();
+    const { adapter } = flakyAdapter();
+    const cached = withLocalCache(adapter, {
+      storage,
+      key: localCacheKey("dropbox"),
+      seal: (t) => encryptText(t, "pw"),
+      unseal: (t) => decryptEnvelope(t, "pw"),
+    });
+    await cached.save(JSON.stringify({ notes: [{ id: "a", body: "secret" }] }));
+    // The mirror is ciphertext and unsealing is async, so there is no
+    // synchronous answer — the async load handles the decrypt.
+    expect(cached.loadSync?.()).toBeNull();
+  });
 });
 
 describe("withLocalCache — sealed mirror (encryption on)", () => {

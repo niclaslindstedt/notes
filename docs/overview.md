@@ -1147,6 +1147,11 @@ bytes are exactly what the cloud holds (encrypted if encryption is on). On a
 network failure (`isOfflineError`) it falls back to the cache and flags
 `offline: true`; typed errors (conflict/auth/rate-limit) bypass the cache so
 their handlers still fire, and an empty cache raises `OfflineUnavailableError`.
+The wrapper also exposes `loadSync` from the mirror, so a cloud backend paints
+its last-known notes on the first frame instead of flashing an empty list while
+the network round-trip runs (the async `load()` then replaces them with the
+fresh remote copy). It returns null while encryption is on, since unsealing the
+mirrored envelope is async — that path stays on the async load.
 
 ## Namespaces
 
