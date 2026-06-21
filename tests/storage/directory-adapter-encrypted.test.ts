@@ -188,6 +188,34 @@ describe("directory adapter — encrypted per-file", () => {
     expect([...got!.bytes]).toEqual([72, 101, 108, 108, 111]); // "Hello"
   });
 
+  it("reports each note to onDecryptNote as it unseals them", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const notes: Note[] = [
+      { ...createNote(1), title: "Groceries" },
+      { ...createNote(2), title: "Trip" },
+    ];
+    await encAdapter(store, att, { current: "pw" }).save(serialize({ notes }));
+
+    const seen: Array<{ title: string; index: number; total: number }> = [];
+    const crypto: DirectoryCrypto = {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (info) => seen.push(info) },
+    };
+    const b = createDirectoryAdapter(
+      store,
+      { id: "folder", label: "T" },
+      att,
+      crypto,
+    );
+    await b.load();
+
+    expect(seen).toHaveLength(2);
+    expect(seen.map((s) => s.title).sort()).toEqual(["Groceries", "Trip"]);
+    expect(seen.every((s) => s.total === 2)).toBe(true);
+    expect(seen.map((s) => s.index).sort()).toEqual([1, 2]);
+  });
+
   it("rejects the wrong passphrase on load", async () => {
     const store = memoryStore();
     const att = memoryAttachments();

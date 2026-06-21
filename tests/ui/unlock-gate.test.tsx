@@ -47,6 +47,72 @@ describe("unlock gate status feedback", () => {
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
   });
 
+  it("names the phases in unlock-specific terms", async () => {
+    const gate = deferred<void>();
+    const unlock = vi.fn((_pass: string, onProgress?: EncryptionProgress) => {
+      onProgress?.("derivingKey");
+      return gate.promise;
+    });
+    const storage = { unlock } as unknown as UseStorageBackend;
+
+    render(<UnlockGate storage={storage} />);
+    fireEvent.change(screen.getByLabelText("Passphrase"), {
+      target: { value: "hunter2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    const status = await screen.findByRole("status");
+    // Not the generic "Deriving encryption key…" the encryption toggle uses.
+    expect(status.textContent).toContain("Checking your passphrase…");
+
+    gate.resolve();
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+
+  it("names each note as the file backend decrypts it", async () => {
+    const gate = deferred<void>();
+    const unlock = vi.fn((_pass: string, onProgress?: EncryptionProgress) => {
+      onProgress?.("decrypting");
+      onProgress?.("decrypting", { title: "Groceries", index: 2, total: 5 });
+      return gate.promise;
+    });
+    const storage = { unlock } as unknown as UseStorageBackend;
+
+    render(<UnlockGate storage={storage} />);
+    fireEvent.change(screen.getByLabelText("Passphrase"), {
+      target: { value: "hunter2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toContain("Groceries");
+    expect(status.textContent).toContain("(2/5)");
+
+    gate.resolve();
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+
+  it("falls back to a placeholder for an untitled note", async () => {
+    const gate = deferred<void>();
+    const unlock = vi.fn((_pass: string, onProgress?: EncryptionProgress) => {
+      onProgress?.("decrypting", { title: "", index: 1, total: 1 });
+      return gate.promise;
+    });
+    const storage = { unlock } as unknown as UseStorageBackend;
+
+    render(<UnlockGate storage={storage} />);
+    fireEvent.change(screen.getByLabelText("Passphrase"), {
+      target: { value: "hunter2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toContain("Untitled note");
+
+    gate.resolve();
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+
   it("shows no status bar before unlock is pressed", () => {
     const storage = {
       unlock: vi.fn(() => Promise.resolve()),

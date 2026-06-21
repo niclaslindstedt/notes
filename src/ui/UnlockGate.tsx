@@ -8,7 +8,7 @@ import type {
 } from "../storage/useStorageBackend.ts";
 import { BusyLabel } from "./BusyLabel.tsx";
 import { CipherGlyph } from "./CipherGlyph.tsx";
-import { STEP_MESSAGE_KEY } from "./encryption-progress.ts";
+import { UNLOCK_STEP_MESSAGE_KEY } from "./encryption-progress.ts";
 import { ShieldIcon } from "./icons.tsx";
 
 // Full-screen unlock gate shown when encryption is on but no passphrase is
@@ -26,9 +26,10 @@ export function UnlockGate({ storage }: Props) {
   const [pass, setPass] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // The phase line the unlock flow reports while it derives the key and
-  // decrypts the notes, mirroring the storage tab's encryption status bar so
-  // the gate hints at what's happening instead of sitting blank.
+  // The phase line the unlock flow reports while it checks the passphrase and
+  // decrypts the notes, named in unlock-specific terms (see
+  // UNLOCK_STEP_MESSAGE_KEY) so the gate hints at what's happening instead of
+  // sitting blank.
   const [step, setStep] = useState<string | null>(null);
 
   const submit = async (e: FormEvent) => {
@@ -37,8 +38,16 @@ export function UnlockGate({ storage }: Props) {
     setBusy(true);
     setError(null);
     setStep(null);
-    const onProgress: EncryptionProgress = (s) =>
-      setStep(t(STEP_MESSAGE_KEY[s]));
+    const onProgress: EncryptionProgress = (s, detail) =>
+      setStep(
+        detail
+          ? t("settings.unlock.decryptingNote", {
+              title: detail.title || t("settings.unlock.untitledNote"),
+              index: detail.index,
+              total: detail.total,
+            })
+          : t(UNLOCK_STEP_MESSAGE_KEY[s]),
+      );
     try {
       await storage.unlock(pass, onProgress);
       setPass("");
