@@ -636,7 +636,7 @@ function FolderPicker({
 }) {
   const t = useT();
   const options = [
-    { value: "", label: t("nav.noFolder") },
+    { value: "", label: <span className="italic">{t("nav.noFolder")}</span> },
     ...folders.map((f) => ({ value: f.id, label: f.name })),
   ];
   return (
