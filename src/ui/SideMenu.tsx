@@ -451,11 +451,6 @@ export function SideMenu({
             {expanded && (
               <div>
                 {folderNotes.map((note) => renderNoteRow(note, true))}
-                {folderNotes.length === 0 && (
-                  <p className="py-[var(--density-row-py)] pr-5 pl-11 text-sm text-muted">
-                    {t("nav.folderEmpty")}
-                  </p>
-                )}
                 <NavItem
                   icon={<PlusIcon className="h-5 w-5" />}
                   label={t("nav.newNote")}
@@ -601,7 +596,7 @@ export function SideMenu({
     return (
       <nav
         aria-label={t("nav.label")}
-        className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface [padding-bottom:max(env(safe-area-inset-bottom),calc(1.25rem_-_var(--density-row-py)))] [padding-top:env(safe-area-inset-top)] ${
+        className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-bottom:max(env(safe-area-inset-bottom),calc(1.25rem_-_var(--density-row-py)))] [padding-top:env(safe-area-inset-top)] ${
           onRight ? "order-last border-l border-line" : "border-r border-line"
         }`}
       >
@@ -659,7 +654,7 @@ export function SideMenu({
             ref={swipeClose.panelRef}
             aria-label={t("nav.label")}
             style={{ transform: `translateX(${swipeClose.offset}px)` }}
-            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl [touch-action:pan-y] [padding-bottom:max(env(safe-area-inset-bottom),calc(1.25rem_-_var(--density-row-py)))] [padding-top:env(safe-area-inset-top)] ${
+            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl select-none [touch-action:pan-y] [padding-bottom:max(env(safe-area-inset-bottom),calc(1.25rem_-_var(--density-row-py)))] [padding-top:env(safe-area-inset-top)] ${
               swipeClose.animating ? "transition-transform duration-200" : ""
             } ${
               onRight
@@ -722,6 +717,14 @@ function SectionHeader({
 // target — dragging a note onto it files the note into the folder (the
 // highlight follows `isDropTarget`). Deleting a folder is undoable and only
 // ungroups its notes, so — like a note delete — it needs no confirm beat.
+// A folder header row: tap the label to expand/collapse. Its edit and delete
+// actions stay hidden until summoned, the way a note's do — a left swipe
+// latches open an [edit | delete] strip (sharing the width of a note's single
+// delete button, split in two) on touch, and a right-click opens the same two
+// actions on a computer. The whole row is a drop target — dropping a note onto
+// it files the note into the folder (the highlight follows `isDropTarget`).
+// Deleting a folder is undoable and only ungroups its notes, so — like a note
+// delete — it needs no confirm beat.
 function FolderRow({
   name,
   count,
@@ -749,62 +752,130 @@ function FolderRow({
   onDragLeave: (e: ReactDragEvent) => void;
   onDrop: (e: ReactDragEvent) => void;
 }) {
+  const t = useT();
+  const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
+  // No archive analogue for a folder, so a right swipe is inert — only the
+  // left swipe latches the edit/delete strip open.
+  const swipe = useSwipeReveal(REMOVE_ACTION_W);
+
+  const header = (
+    <button
+      type="button"
+      aria-expanded={expanded}
+      onClick={onToggle}
+      className="flex w-full min-w-0 cursor-pointer items-center gap-2 py-[var(--density-row-py)] pr-3 pl-3 text-left text-fg hover:text-fg-bright"
+    >
+      <span className="text-muted">
+        {expanded ? (
+          <ChevronDownIcon className="h-4 w-4" />
+        ) : (
+          <ChevronRightIcon className="h-4 w-4" />
+        )}
+      </span>
+      <span className={expanded ? "text-accent" : "text-muted"}>
+        {expanded ? (
+          <FolderOpenIcon className="h-5 w-5" />
+        ) : (
+          <FolderIcon className="h-5 w-5" />
+        )}
+      </span>
+      <span className="flex-1 truncate">{name}</span>
+      {count > 0 && (
+        <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-xs text-muted tabular-nums">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+
+  if (isDesktop) {
+    return (
+      <div
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        className={`text-sm ${
+          isDropTarget
+            ? "bg-accent/15 ring-1 ring-accent/40 ring-inset"
+            : "hover:bg-surface-2"
+        }`}
+      >
+        <RowActionMenu
+          ariaLabel={t("nav.folderActions")}
+          actions={[
+            {
+              label: renameLabel,
+              icon: <PencilIcon className="h-5 w-5" />,
+              onSelect: onRename,
+            },
+            {
+              label: deleteLabel,
+              icon: <TrashIcon className="h-5 w-5" />,
+              onSelect: onDelete,
+              danger: true,
+            },
+          ]}
+        >
+          {header}
+        </RowActionMenu>
+      </div>
+    );
+  }
+
   return (
     <div
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`group flex items-center text-sm ${
-        isDropTarget
-          ? "bg-accent/15 ring-1 ring-accent/40 ring-inset"
-          : "hover:bg-surface-2"
-      }`}
+      className="relative overflow-hidden text-sm"
     >
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={onToggle}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-[var(--density-row-py)] pl-3 text-left text-fg hover:text-fg-bright"
+      {/* Edit + Delete — the trailing strip a left swipe latches open. Hidden
+          until the row is swiped left. */}
+      <div
+        aria-hidden={swipe.offset >= 0}
+        className={`absolute inset-0 flex items-center justify-end ${
+          swipe.offset < 0 ? "" : "invisible"
+        }`}
       >
-        <span className="text-muted">
-          {expanded ? (
-            <ChevronDownIcon className="h-4 w-4" />
-          ) : (
-            <ChevronRightIcon className="h-4 w-4" />
-          )}
-        </span>
-        <span className={expanded ? "text-accent" : "text-muted"}>
-          {expanded ? (
-            <FolderOpenIcon className="h-5 w-5" />
-          ) : (
-            <FolderIcon className="h-5 w-5" />
-          )}
-        </span>
-        <span className="flex-1 truncate">{name}</span>
-        {count > 0 && (
-          <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-xs text-muted tabular-nums">
-            {count}
-          </span>
-        )}
-      </button>
-      <button
-        type="button"
-        onClick={onRename}
-        aria-label={renameLabel}
-        title={renameLabel}
-        className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-muted opacity-60 hover:bg-surface-3 hover:text-fg-bright hover:opacity-100"
+        <div className="flex h-full" style={{ width: REMOVE_ACTION_W }}>
+          <button
+            type="button"
+            onClick={() => {
+              swipe.close();
+              onRename();
+            }}
+            aria-label={renameLabel}
+            className="flex h-full flex-1 items-center justify-center bg-surface-3 text-fg-bright"
+          >
+            <PencilIcon className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              swipe.close();
+              onDelete();
+            }}
+            aria-label={deleteLabel}
+            className="flex h-full flex-1 items-center justify-center bg-danger text-white"
+          >
+            <TrashIcon className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+      <div
+        {...swipe.handlers}
+        data-drawer-swipe-ignore
+        style={{ transform: `translateX(${swipe.offset}px)` }}
+        className={`relative [touch-action:pan-y] ${
+          swipe.animating ? "transition-transform duration-200" : ""
+        } ${
+          isDropTarget
+            ? "bg-accent/15 ring-1 ring-accent/40 ring-inset"
+            : "bg-surface"
+        }`}
       >
-        <PencilIcon className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        onClick={onDelete}
-        aria-label={deleteLabel}
-        title={deleteLabel}
-        className="mr-2 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-muted opacity-60 hover:bg-surface-3 hover:text-danger hover:opacity-100"
-      >
-        <TrashIcon className="h-4 w-4" />
-      </button>
+        {header}
+      </div>
     </div>
   );
 }

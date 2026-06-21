@@ -692,7 +692,7 @@ function NoteList({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col select-none">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
         <AppTitle />
         <div className="flex items-center gap-2">{syncSlot}</div>
@@ -760,16 +760,11 @@ function NoteList({
                       <PlusIcon className="h-4 w-4" />
                     </button>
                   </div>
-                  {expanded &&
-                    (folderNotes.length === 0 ? (
-                      <p className="px-2 pb-1 pl-8 text-sm text-muted">
-                        {t("nav.folderEmpty")}
-                      </p>
-                    ) : (
-                      <ul className="flex flex-col gap-2 pt-1 pl-6">
-                        {folderNotes.map(renderCard)}
-                      </ul>
-                    ))}
+                  {expanded && folderNotes.length > 0 && (
+                    <ul className="flex flex-col gap-2 pt-1 pl-6">
+                      {folderNotes.map(renderCard)}
+                    </ul>
+                  )}
                 </section>
               );
             })}

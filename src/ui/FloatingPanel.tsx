@@ -73,11 +73,16 @@ export function FloatingPanel({
   // needing to know the rendered panel height.
   const flipUp = position.placement === "above";
 
-  // `kind: "max"` panels pin to their computed width; `kind: "min"`
-  // panels may grow past `position.width` to fit content, bounded by the
-  // room left to the viewport edge.
-  const fixedWidth = placement.width.kind === "max";
-  const maxWidth = fixedWidth ? position.width : position.maxWidth;
+  // `kind: "min"` panels take at least their computed width (the trigger
+  // width) and may grow to fit content, bounded by the room to the viewport
+  // edge. `kind: "max"` panels instead shrink to their content — a short
+  // context menu shouldn't span as wide as the row it anchors to — capped at
+  // the computed width (`maxPx`, clamped to the viewport).
+  const contentSized = placement.width.kind === "max";
+  const minWidth = contentSized ? undefined : position.width;
+  const maxWidth = contentSized
+    ? Math.min(position.width, position.maxWidth)
+    : position.maxWidth;
 
   return createPortal(
     <>
@@ -87,7 +92,7 @@ export function FloatingPanel({
         style={{
           top: position.top,
           left: position.left,
-          minWidth: position.width,
+          minWidth,
           maxWidth,
           maxHeight: position.maxHeight,
           transform: flipUp ? "translateY(-100%)" : undefined,

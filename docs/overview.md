@@ -1216,9 +1216,13 @@ glyph (`FolderPlusIcon`), not the old "+": pressing it drops an inline,
 unnamed `FolderEditRow` into the list — commit a name (Enter / blur) to persist
 it, or defocus it empty to discard it (the row simply vanishes, so a misfire
 costs nothing). Each `FolderRow` expands to reveal its notes (indented) plus a
-per-folder "New note" row that creates a note already filed inside it; the row
-also carries inline rename (reusing `FolderEditRow`) and delete affordances.
-The add control that used to sit as a "+" on the Notes heading is now its own
+per-folder "New note" row that creates a note already filed inside it. The
+row's edit and delete actions stay hidden until summoned, the way a note's do:
+a **left swipe** latches open an `[edit | delete]` strip (sharing the width of
+a note's single delete button, split in two) on touch, and a **right-click**
+opens the same two actions on a computer (`RowActionMenu`); editing swaps the
+row for the inline `FolderEditRow`. The add control that used to sit as a "+"
+on the Notes heading is now its own
 **"New note"** row just above "Show all". A note row can be **dragged onto a
 folder** to file it, or onto the ungrouped zone to take it out of one. On a
 pointer device this is native HTML5 drag (`NOTE_DND_TYPE` carries the note id;
@@ -1250,7 +1254,9 @@ and it hit-tests with `elementFromPoint` against any element carrying the
 zone). `NoteDragProvider` (mounted once around the shell in `App`) holds the
 `onMove` callback and renders the ghost; `NoteDragItem` is the per-row wrapper
 that wires the desktop HTML5 props and the touch handlers together; drop targets
-read the hovered key via `useNoteDropKey` to paint their highlight.
+read the hovered key via `useNoteDropKey` to paint their highlight. The side
+menu and the overview both carry `select-none` so a drag never paints a text
+selection across the rows it crosses.
 
 ### Folder picker
 
