@@ -208,6 +208,17 @@ function aggregateRevision(entries: readonly FileEntry[]): string {
   return revLines(currentRevisions(entries));
 }
 
+// A fingerprint of the *entire* on-disk listing — every path's revision, not
+// just the note files `aggregateRevision` covers. Used as the load memo's key
+// so any change at all (a note, `folders.json`, the key params) busts it, while
+// the snapshot's own `revision` keeps its owned-only meaning for save/conflict.
+function listingFingerprint(entries: readonly FileEntry[]): string {
+  return entries
+    .map((e) => `${e.path}:${e.rev ?? ""}`)
+    .sort()
+    .join("\n");
+}
+
 function currentRevisions(entries: readonly FileEntry[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const entry of entries) {
@@ -482,15 +493,39 @@ export function createDirectoryAdapter(
   // per note, every save) into a map lookup after the first time. Cleared
   // whenever the keys change (password switch / lock) since the fileKey does.
   const refCache = new Map<string, string>();
+  // Per-note decrypted-JSON cache, keyed by the encrypted note's path and the
+  // file revision the plaintext was unsealed from. Lets a load skip the network
+  // read + AES-GCM open for every `.enc` file whose revision hasn't moved, so a
+  // remote edit to one note re-decrypts that note alone instead of the whole
+  // vault (the encrypted-mode counterpart of the plaintext path's `reusableFiles`).
+  // Cleared whenever the keys change.
+  const encNoteCache = new Map<string, { rev: string; json: string }>();
+  // The snapshot the last load produced, keyed by the full listing fingerprint.
+  // When a fresh `store.list()` proves the on-disk state is byte-identical, the
+  // load returns this without re-reading or re-decrypting anything — collapsing
+  // the unlock's two back-to-back loads (gate verifies, then the adapter swap
+  // reloads) into one decrypt, and making an idle live-pull cost a single
+  // listing. Listing is always re-run, so this never serves data staler than the
+  // backend. Cleared whenever the keys change.
+  let lastLoad: { key: string; snapshot: StoredSnapshot } | null = null;
+  // The passphrase `ensureKeys` last observed, so a change (lock / unlock /
+  // switch) can drop every key-derived cache — including the plaintext-safe
+  // `lastLoad` — exactly once on transition, not on every plaintext load.
+  let lastPassword: string | null = null;
   async function ensureKeys(): Promise<SessionKeys | null> {
     const password = crypto?.passwordRef.current ?? null;
+    if (password !== lastPassword) {
+      // Key state changed → everything derived from the old key is stale.
+      refCache.clear();
+      encNoteCache.clear();
+      lastLoad = null;
+      lastPassword = password;
+    }
     if (!password) {
       keyCache = null;
-      refCache.clear();
       return null;
     }
     if (keyCache && keyCache.password === password) return keyCache.keys;
-    refCache.clear();
     let params = parseKeyParams(await store.read(KEY_PARAMS_FILE));
     if (!params) {
       params = newKeyParams();
@@ -641,10 +676,22 @@ export function createDirectoryAdapter(
       encPaths,
       ENC_LOAD_CONCURRENCY,
       async (path) => {
-        const text = await store.read(path);
-        if (text === null) return null;
-        const blob = await openString(keys.contentKey, text);
-        const json = new TextDecoder().decode(blob.bytes);
+        const rev = revisions.get(path) ?? "";
+        // Reuse the plaintext we already unsealed for this exact file revision —
+        // no network read, no AES open. A re-encryption uses a fresh IV and so
+        // bumps the rev, meaning a cache hit can never serve a note's stale
+        // plaintext: a changed note always misses and is re-read.
+        const cached = encNoteCache.get(path);
+        let json: string;
+        if (cached && cached.rev === rev) {
+          json = cached.json;
+        } else {
+          const text = await store.read(path);
+          if (text === null) return null;
+          const blob = await openString(keys.contentKey, text);
+          json = new TextDecoder().decode(blob.bytes);
+          encNoteCache.set(path, { rev, json });
+        }
         const note = encJsonToNote(json);
         if (note) {
           decrypted += 1;
@@ -657,6 +704,12 @@ export function createDirectoryAdapter(
         return { path, json, note };
       },
     );
+    // Forget cached notes whose file is gone so the map can't grow across a long
+    // session of deletes.
+    const encPathSet = new Set(encPaths);
+    for (const path of [...encNoteCache.keys()]) {
+      if (!encPathSet.has(path)) encNoteCache.delete(path);
+    }
     for (const entry of opened) {
       if (!entry) continue;
       track(entry.path, entry.json, revisions.get(entry.path));
@@ -685,9 +738,19 @@ export function createDirectoryAdapter(
       }
     }
 
-    // Attachments are read on demand, not here — but their metadata + per-note
-    // status is filled in from the file listing.
-    await attachEncryptedMetadata(notes, status);
+    // Attachments are read on demand, not here. A fully-migrated vault (no
+    // plaintext note remnants) already carries each encrypted note's attachment
+    // metadata inside its own note JSON, so the only thing a fresh attachment
+    // listing would add is spotting a plaintext attachment stranded by an
+    // interrupted migration — a transient state the next save reconciles. So we
+    // walk the listing only while plaintext note remnants remain; otherwise we
+    // skip it (a network round-trip on a cloud backend) and keep orphan-blob
+    // cleanup armed for the next save off the metadata already in hand.
+    if (mdPaths.length > 0) {
+      await attachEncryptedMetadata(notes, status);
+    } else if (notes.some((n) => n.attachments?.length)) {
+      attachmentsTouched = true;
+    }
     encStatus = status;
     return serialize({ notes });
   }
@@ -740,6 +803,18 @@ export function createDirectoryAdapter(
   ): Promise<StoredSnapshot | null> {
     const keys = await ensureKeys();
     const entries = await store.list();
+    // The listing is always fresh, so the fingerprint reflects the backend's
+    // current state. If it's byte-identical to the last load's, nothing on disk
+    // moved — return the snapshot we already built without re-reading or
+    // re-decrypting a single file. `tracked` and the folder registry already
+    // describe this exact state from that load, so they're left intact.
+    const fingerprint = listingFingerprint(entries);
+    if (lastLoad && lastLoad.key === fingerprint) {
+      log.info(
+        `${options.id} load: unchanged (rev=${shortRev(aggregateRevision(entries))}) — reusing decrypted snapshot`,
+      );
+      return lastLoad.snapshot;
+    }
     tracked.clear();
     uncertain.clear();
     const revision = aggregateRevision(entries);
@@ -756,7 +831,9 @@ export function createDirectoryAdapter(
       const text = await readEncryptedSnapshot(keys, entries);
       if (text === null) return emptyWithFolders();
       log.info(`${options.id} load (encrypted): rev=${shortRev(revision)}`);
-      return { text: injectFolders(text, folders), revision };
+      const result = { text: injectFolders(text, folders), revision };
+      lastLoad = { key: fingerprint, snapshot: result };
+      return result;
     }
 
     const reuse = reusableFiles(previous, entries);
@@ -770,7 +847,9 @@ export function createDirectoryAdapter(
       attachments && !isEncryptedEnvelope(text)
         ? await hydrateAttachments(text)
         : text;
-    return { text: injectFolders(hydrated, folders), revision };
+    const result = { text: injectFolders(hydrated, folders), revision };
+    lastLoad = { key: fingerprint, snapshot: result };
+    return result;
   }
 
   // -- Plaintext attachment hydration / reconcile (unchanged) ----------------
@@ -1001,6 +1080,13 @@ export function createDirectoryAdapter(
         try {
           const rev = await store.write(path, bytes);
           track(path, d.source, rev);
+          // Keep the decrypted-note cache warm for what we just wrote: `d.source`
+          // is the note's plaintext enc-JSON, so a follow-up load (the next
+          // live-pull) reuses it instead of re-reading + re-decrypting a note we
+          // already hold. Only meaningful for encrypted note files.
+          if (rev !== undefined && isEncNotePath(path)) {
+            encNoteCache.set(path, { rev, json: d.source });
+          }
           written.set(path, rev);
         } catch (err) {
           uncertain.add(path);
@@ -1160,6 +1246,7 @@ export function createDirectoryAdapter(
         tracked.delete(path);
         producedRevs.delete(path);
         uncertain.delete(path);
+        encNoteCache.delete(path);
       }),
     );
 
@@ -1291,6 +1378,7 @@ export function createDirectoryAdapter(
       await sealString(keys.contentKey, source),
     );
     track(encPath, source, rev);
+    if (rev !== undefined) encNoteCache.set(encPath, { rev, json: source });
     const readBack = await store.read(encPath);
     if (readBack === null) throw new Error("migrate: enc note missing");
     const opened = await openString(keys.contentKey, readBack);
@@ -1365,6 +1453,7 @@ export function createDirectoryAdapter(
     // 3. Remove the superseded ciphertext only after the plaintext is proven.
     await store.remove(encPath);
     tracked.delete(encPath);
+    encNoteCache.delete(encPath);
     if (attachments) {
       for (const a of note.attachments ?? []) {
         await attachments
