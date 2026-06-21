@@ -196,6 +196,7 @@ const settings = {
     hint: "Enter your passphrase to unlock and read your notes on this device.",
     passphrase: "Passphrase",
     unlock: "Unlock",
+    statusAria: "Unlock progress",
     wrong: "That passphrase didn't work.",
     offline:
       "You're offline and nothing is cached on this device yet. Connect to the internet and try again.",
