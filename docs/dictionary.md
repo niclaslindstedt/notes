@@ -181,7 +181,7 @@ Honour these when naming a new file, key, or string.
 | **Dropbox backend**                                        | `createDropboxAdapter`, `DROPBOX_APP_FOLDER` (`src/storage/dropbox/index.ts`). [→](overview.md#dropbox-backend) |
 | **Google Drive backend**                                   | `createGdriveAdapter`, `GDRIVE_SCOPE` (`src/storage/gdrive/index.ts`). [→](overview.md#google-drive-backend)        |
 | **Directory adapter** / **one-file-per-note sync**         | `createDirectoryAdapter` (`src/storage/directory-adapter.ts`); `FileStore` (`src/storage/file-store.ts`). [→](overview.md#directory-adapter) |
-| **Markdown codec** / **note ↔ file**                       | `snapshotToFiles`, `filesToSnapshot`, `noteToMarkdown`, `parseNote` (`src/storage/markdown/codec.ts`). [→](overview.md#markdown-codec) |
+| **Markdown codec** / **note ↔ file**                       | `snapshotToFiles`, `filesToSnapshot`, `noteToMarkdown`, `parseNote`, `noteFilePath`, `folderDirName`, `folderDirSegment` (`src/storage/markdown/codec.ts`). [→](overview.md#markdown-codec) |
 | **Save retry** / **backoff**                               | `backoffDelayMs`, `isRetryableSaveError`, `MAX_TRANSIENT_SAVE_RETRIES` (`src/storage/save-retry.ts`); `http-utils.ts`. [→](overview.md#save-retry) |
 | **OAuth** / **PKCE** / **connect an account**              | `oauth-pkce.ts` (`startAuth`, `completeAuth`, `refreshAccessToken`); `base64url.ts` (`src/encoding/`). [→](overview.md#oauth) |
 
@@ -218,7 +218,7 @@ Honour these when naming a new file, key, or string.
 | **Long-press to drag** / **pick up a note** / **drag-to-folder on mobile** / **touch drag** | `NoteDragProvider`, `NoteDragItem` (`src/ui/note-drag.tsx`); `useTouchNoteDrag`, `useNoteDropKey`, `NOTE_DROP_ATTR`, `NOTE_DROP_ROOT` (`src/ui/note-drag-context.ts`). [→](overview.md#note-drag-touch--pointer) |
 | **Drag a note to a namespace / to the archive** (sidebar) | drop keys `NOTE_DROP_ARCHIVE`, `noteDropNamespaceKey` (`src/ui/note-drag-context.ts`); `onMoveNoteToNamespace` + the namespace/Archive drop rows in `SideMenu`; `moveNoteToNamespace` (`src/storage/useStorageBackend.ts`). [→](overview.md#note-drag-touch--pointer) |
 | **Folder picker** (editor)                                 | `FolderPicker` (`src/app/App.tsx`), built on `SelectPicker`. [→](overview.md#folder-picker)                  |
-| **Folders sidecar** / **`folders.json`**                   | `FOLDERS_FILE_NAME`, `readFolders` / `injectFolders` / `persistFolders` (`src/storage/directory-adapter.ts`); `parseFolders` / `serializeFolders` (`src/storage/serialize.ts`). [→](overview.md#folders-sidecar) |
+| **Folders sidecar** / **`folders.json`** / **physical folder** / **real folder directory** / **folder on disk** | `FOLDERS_FILE_NAME`, `readFolders` / `injectFolders` / `persistFolders` (`src/storage/directory-adapter.ts`); `noteFilePath` / `folderDirName` (`src/storage/markdown/codec.ts`); `parseFolders` / `serializeFolders` (`src/storage/serialize.ts`). [→](overview.md#folders-sidecar) |
 
 ## Theme and appearance
 

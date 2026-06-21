@@ -170,6 +170,7 @@ export function createDropboxAdapter(
   const store = createDropboxFileStore(
     authedFetch,
     dropboxNotesPath(namespace),
+    true,
   );
   const attachments = createDropboxAttachmentStore(
     authedFetch,
@@ -284,6 +285,10 @@ function createAuthedFetch(
 function createDropboxFileStore(
   authedFetch: AuthedFetch,
   rootPath: string,
+  // The notes store descends into the folder subdirectories (a note filed into
+  // a folder lives at `<folder-dir>/<stem>.md`); the shallow root settings /
+  // registry stores never call `list`.
+  recursive: boolean = false,
 ): FileStore {
   const rootPrefix = `${rootPath}/`.toLowerCase();
 
@@ -318,13 +323,13 @@ function createDropboxFileStore(
 
   return {
     async list(): Promise<FileEntry[]> {
-      // Non-recursive: notes are stored flat (one `.md` per note, no
-      // nesting), so listing only direct children keeps a namespace's file
-      // set scoped — in particular the default namespace, which roots at the
-      // app folder, never picks up other namespaces' subfolders.
+      // The notes store lists recursively so a note filed into a folder
+      // (`<folder-dir>/<stem>.md`) is found; the folder subdirectories live
+      // inside the namespace's `notes/` root, so descending stays scoped to
+      // this namespace and never reaches another's sibling folder.
       let page = await listOnce(LIST_FOLDER_ENDPOINT, {
         path: rootPath,
-        recursive: false,
+        recursive,
       });
       if (!page) return [];
       const out: FileEntry[] = [];
@@ -332,9 +337,12 @@ function createDropboxFileStore(
         for (const entry of page.entries) {
           if (entry[".tag"] !== "file") continue;
           const path = relativePath(entry);
-          // A relative path with a slash sits inside a subfolder (another
-          // namespace's folder when listing at the root) — skip it.
-          if (path && !path.includes("/")) out.push({ path, rev: entry.rev });
+          if (!path) continue;
+          // When shallow, a relative path with a slash sits inside a subfolder
+          // — skip it. When recursive, those nested note files are the point.
+          if (recursive || !path.includes("/")) {
+            out.push({ path, rev: entry.rev });
+          }
         }
         if (!page.has_more) break;
         const next = await listOnce(LIST_FOLDER_CONTINUE_ENDPOINT, {

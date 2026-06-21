@@ -74,6 +74,7 @@ import {
 import type { FileEntry, FileStore } from "./file-store.ts";
 import {
   filesToSnapshot,
+  noteFilePath,
   noteFileStem,
   noteToMarkdown,
   snapshotToFiles,
@@ -307,6 +308,17 @@ export function createDirectoryAdapter(
   // write so `save` skips a redundant rewrite when the folders didn't change.
   let lastFoldersJson: string | null = null;
 
+  // The folder registry from the last load / save, kept so the per-note
+  // encryption migrate / demigrate paths (which only receive a `Note`) can
+  // resolve a note's physical folder directory the same way `snapshotToFiles`
+  // does. The plaintext `.md` of a grouped note lives at `<folder-dir>/<stem>.md`.
+  let lastFolders: Folder[] = [];
+
+  // The path a note's plaintext `.md` file lives at, folder-aware.
+  function plaintextNotePath(note: Note): string {
+    return noteFilePath(note, lastFolders);
+  }
+
   // Read the folder registry sidecar, tolerating a missing / corrupt file by
   // yielding no folders. Records the canonical bytes so the next save can tell
   // whether the registry actually changed. Skips the read entirely when the
@@ -314,6 +326,7 @@ export function createDirectoryAdapter(
   async function readFolders(entries: readonly FileEntry[]): Promise<Folder[]> {
     if (!entries.some((e) => e.path === FOLDERS_FILE_NAME)) {
       lastFoldersJson = null;
+      lastFolders = [];
       return [];
     }
     let raw: string | null;
@@ -324,6 +337,7 @@ export function createDirectoryAdapter(
     }
     if (raw === null) {
       lastFoldersJson = null;
+      lastFolders = [];
       return [];
     }
     let folders: Folder[];
@@ -333,6 +347,7 @@ export function createDirectoryAdapter(
       folders = [];
     }
     lastFoldersJson = serializeFolders(folders);
+    lastFolders = folders;
     return folders;
   }
 
@@ -950,8 +965,11 @@ export function createDirectoryAdapter(
     } else {
       const snapshot = parse(text);
       snapshotForAttachments = snapshot;
+      // Remember the registry so the encryption migrate / demigrate paths can
+      // resolve a note's physical folder directory the same way this save does.
+      lastFolders = snapshot.folders ?? [];
       for (const note of snapshot.notes) {
-        pathToNoteId.set(`${noteFileStem(note)}.md`, note.id);
+        pathToNoteId.set(noteFilePath(note, snapshot.folders), note.id);
       }
       for (const file of snapshotToFiles(snapshot)) {
         desired.set(file.path, { stored: file.text, source: file.text });
@@ -1122,9 +1140,20 @@ export function createDirectoryAdapter(
     const keys = await ensureKeys();
     if (!keys) return false;
     const stem = noteFileStem(note);
-    const mdPath = `${stem}.md`;
+    // The plaintext note lives at its folder-aware path; tolerate a flat path
+    // too (a document written before folders became physical, or one a
+    // plaintext save hasn't re-placed yet) so enabling encryption never leaves
+    // a plaintext copy stranded on disk.
+    const folderPath = plaintextNotePath(note);
+    const flatPath = `${stem}.md`;
+    const mdPath =
+      (await store.read(folderPath)) !== null
+        ? folderPath
+        : (await store.read(flatPath)) !== null
+          ? flatPath
+          : null;
     // Already migrated (no plaintext note file left)?
-    if ((await store.read(mdPath)) === null) {
+    if (mdPath === null) {
       encStatus.set(note.id, "encrypted");
       return false;
     }
@@ -1213,10 +1242,12 @@ export function createDirectoryAdapter(
       }
     }
 
-    // 2. Write + verify the plaintext markdown note file.
+    // 2. Write + verify the plaintext markdown note file at its folder-aware
+    // path, so disabling encryption lands a grouped note back in its folder
+    // directory rather than flat at the notes root.
     onStep?.({ phase: "note" });
-    const mdPath = `${stem}.md`;
-    const text = noteToMarkdown(note);
+    const mdPath = plaintextNotePath(note);
+    const text = noteToMarkdown(note, mdPath.includes("/") ? 1 : 0);
     const rev = await store.write(mdPath, text);
     track(mdPath, text, rev);
     const readBack = await store.read(mdPath);

@@ -476,3 +476,67 @@ describe("directory adapter — folders sidecar", () => {
     expect(parse((await a.load())!.text).folders).toBeUndefined();
   });
 });
+
+describe("directory adapter — physical folder directories", () => {
+  it("files a grouped note into a real subdirectory and loads it back", async () => {
+    const store = memoryStore();
+    const a = adapter(store);
+    const folder = { id: "f1", name: "Work", createdAt: 5 };
+    const filed = { ...createNote(1), folderId: "f1" };
+    await a.save(serialize({ notes: [filed], folders: [folder] }));
+
+    const paths = (await store.list()).map((e) => e.path);
+    // The note's `.md` sits inside the folder's directory, not at the root.
+    expect(paths.some((p) => p.startsWith("work/") && p.endsWith(".md"))).toBe(
+      true,
+    );
+
+    const loaded = parse((await a.load())!.text);
+    expect(loaded.notes[0]?.folderId).toBe("f1");
+    expect(loaded.folders).toEqual([folder]);
+  });
+
+  it("relocates the file when a note moves between folders", async () => {
+    const store = memoryStore();
+    const a = adapter(store);
+    const folders = [
+      { id: "f1", name: "Work", createdAt: 5 },
+      { id: "f2", name: "Home", createdAt: 6 },
+    ];
+    const note = { ...createNote(1), folderId: "f1" };
+    const s1 = await a.save(serialize({ notes: [note], folders }));
+    const before = (await store.list()).map((e) => e.path);
+    expect(before.some((p) => p.startsWith("work/") && p.endsWith(".md"))).toBe(
+      true,
+    );
+
+    // Move it to the other folder; the old directory's file is removed and a
+    // new one written under the new folder.
+    const moved = { ...note, folderId: "f2" };
+    await a.save(serialize({ notes: [moved], folders }), s1.revision);
+    const after = (await store.list()).map((e) => e.path);
+    expect(after.some((p) => p.startsWith("home/"))).toBe(true);
+    expect(after.some((p) => p.startsWith("work/"))).toBe(false);
+
+    // It still loads back into the new folder.
+    expect(parse((await a.load())!.text).notes[0]?.folderId).toBe("f2");
+  });
+
+  it("moves a note out to the root when it leaves its folder", async () => {
+    const store = memoryStore();
+    const a = adapter(store);
+    const folder = { id: "f1", name: "Work", createdAt: 5 };
+    const note = { ...createNote(1), folderId: "f1" };
+    const s1 = await a.save(serialize({ notes: [note], folders: [folder] }));
+    expect((await store.list()).some((e) => e.path.startsWith("work/"))).toBe(
+      true,
+    );
+
+    const loose = { ...createNote(1), id: note.id };
+    await a.save(serialize({ notes: [loose], folders: [folder] }), s1.revision);
+    const paths = (await store.list()).map((e) => e.path);
+    expect(paths.some((p) => p.startsWith("work/"))).toBe(false);
+    expect(paths).toContain(notePath(loose));
+    expect(parse((await a.load())!.text).notes[0]?.folderId).toBeUndefined();
+  });
+});
