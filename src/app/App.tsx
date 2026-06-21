@@ -68,7 +68,9 @@ import {
 import { CopyNoteButton } from "../ui/CopyNoteButton.tsx";
 import { NoteDragItem, NoteDragProvider } from "../ui/note-drag.tsx";
 import {
+  NOTE_DROP_ARCHIVE,
   NOTE_DROP_ATTR,
+  NOTE_DROP_NS_PREFIX,
   NOTE_DROP_ROOT,
   useNoteDropKey,
 } from "../ui/note-drag-context.ts";
@@ -397,6 +399,36 @@ export function App() {
     if (id === editingId) setEditingId(null);
   }
 
+  // Move a note into another namespace (sidebar drag): write it into the
+  // target's document, then remove it from this one. Best-effort — if the
+  // target write fails (offline cloud), the note is left where it is. If the
+  // moved note was open, leave the editor since it's gone from this namespace.
+  async function moveToNamespace(id: string, slug: string) {
+    const note = allNotes.find((n) => n.id === id);
+    if (!note) return;
+    if (await storage.moveNoteToNamespace(note, slug)) {
+      remove(id);
+      if (id === editingId) setEditingId(null);
+      if (id === readingId) setReadingId(null);
+    }
+  }
+
+  // The sidebar drag layer reports a drop by its target key; resolve it to the
+  // right action. Routed through a ref so the provider's `onDrop` identity stays
+  // stable (it feeds a context every note row subscribes to) while still seeing
+  // the latest closures here.
+  const dropHandlerRef = useRef<(id: string, key: string) => void>(() => {});
+  dropHandlerRef.current = (id: string, key: string) => {
+    if (key === NOTE_DROP_ROOT) moveNote(id, null);
+    else if (key === NOTE_DROP_ARCHIVE) archiveNote(id);
+    else if (key.startsWith(NOTE_DROP_NS_PREFIX)) {
+      void moveToNamespace(id, key.slice(NOTE_DROP_NS_PREFIX.length));
+    } else moveNote(id, key);
+  };
+  const handleNoteDrop = useCallback((id: string, key: string) => {
+    dropHandlerRef.current(id, key);
+  }, []);
+
   // Restore from the archive page's swipe gesture: the note leaves the archive
   // list and reappears in the overview, but we stay on the archive page.
   function restoreNote(id: string) {
@@ -436,7 +468,7 @@ export function App() {
             `--app-height`/`--app-top` (the vars `useViewportHeight` mirrors)
             keeps it filling the visible band, so the header stays frozen. */}
           <div className="fixed flex overflow-hidden" style={APP_VIEWPORT_RECT}>
-            <NoteDragProvider onMove={moveNote}>
+            <NoteDragProvider onDrop={handleNoteDrop}>
               <SideMenu
                 notes={notes}
                 activeNoteId={editingId}
@@ -455,6 +487,7 @@ export function App() {
                 canRedo={canRedo}
                 folders={folders}
                 onMoveNote={moveNote}
+                onMoveNoteToNamespace={moveToNamespace}
                 onCreateFolder={createFolder}
                 onRenameFolder={renameFolder}
                 onRemoveFolder={removeFolder}

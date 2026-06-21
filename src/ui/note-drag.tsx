@@ -40,16 +40,18 @@ import { NoteIcon } from "./icons.tsx";
 import {
   ActionsContext,
   DropKeyContext,
-  NOTE_DROP_ROOT,
   useTouchNoteDrag,
   type DragActions,
 } from "./note-drag-context.ts";
 
 export function NoteDragProvider({
-  onMove,
+  onDrop,
   children,
 }: {
-  onMove: (noteId: string, folderId: string | null) => void;
+  // Fired when a note is released over a drop target. `key` is the target's
+  // `data-note-drop` value (folder id / `NOTE_DROP_ROOT` / `NOTE_DROP_ARCHIVE`
+  // / `ns:<slug>`); the caller resolves it to the right action.
+  onDrop: (noteId: string, key: string) => void;
   children: ReactNode;
 }) {
   const [dragging, setDragging] = useState<{ title: string } | null>(null);
@@ -87,9 +89,7 @@ export function NoteDragProvider({
       commit() {
         const noteId = noteIdRef.current;
         const key = dropKeyRef.current;
-        if (noteId && key !== null) {
-          onMove(noteId, key === NOTE_DROP_ROOT ? null : key);
-        }
+        if (noteId && key !== null) onDrop(noteId, key);
         noteIdRef.current = null;
         dropKeyRef.current = null;
         setDragging(null);
@@ -102,7 +102,7 @@ export function NoteDragProvider({
         setDropKey(null);
       },
     }),
-    [onMove, positionGhost],
+    [onDrop, positionGhost],
   );
 
   return (

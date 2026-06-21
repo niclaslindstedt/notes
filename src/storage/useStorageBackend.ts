@@ -218,6 +218,13 @@ export interface UseStorageBackend {
   activeNamespace: string;
   /** Make a namespace active, swapping which document the app reads/writes. */
   switchNamespace: (slug: string) => void;
+  /**
+   * Move a note (with its attachment bytes) into another namespace on the same
+   * backend: write it into the target namespace's document, returning true on
+   * success. The caller removes it from the source namespace. A no-op (false)
+   * for the active namespace, an unknown target, or while locked.
+   */
+  moveNoteToNamespace: (note: Note, targetSlug: string) => Promise<boolean>;
   /** Create a namespace from a display name and switch to it. */
   createNamespace: (name: string, appearance?: NamespaceAppearance) => void;
   /** Change a namespace's display name (its data stays put). */
@@ -460,63 +467,69 @@ export function useStorageBackend(): UseStorageBackend {
   // `onAccessTokenRefreshed`. Keyed on `activeNamespace` so switching the
   // namespace rebuilds the document adapter (and its offline cache) onto the
   // new namespace's storage location.
-  const inner = useMemo<StorageAdapter>(() => {
-    switch (selection.kind) {
-      // Cloud backends mirror their bytes into a local cache so the document
-      // can be unlocked, read, and edited offline (the cache holds the
-      // encrypted envelope when encryption is on). Folder / browser are
-      // already on-device, so they need no mirror.
-      case "dropbox":
-        return withLocalCache(
-          createDropboxAdapter(
-            selection.auth,
-            fetch,
-            activeNamespace,
-            directoryCrypto,
-          ),
-          {
-            storage: globalThis.localStorage,
-            key: localCacheKey("dropbox", activeNamespace),
-            seal,
-            unseal,
-          },
-        );
-      case "gdrive":
-        return withLocalCache(
-          createGdriveAdapter(
-            selection.token,
-            fetch,
-            activeNamespace,
-            directoryCrypto,
-          ),
-          {
-            storage: globalThis.localStorage,
-            key: localCacheKey("gdrive", activeNamespace),
-            seal,
-            unseal,
-          },
-        );
-      case "folder":
-        return createFolderAdapter({
-          directoryHandle: selection.handle,
-          namespace: activeNamespace,
-          onPermissionLost: markFolderPermissionLost,
-          crypto: directoryCrypto,
-        });
-      case "browser":
-        return new BrowserLocalStorageAdapter(
-          globalThis.localStorage,
-          activeNamespace,
-        );
-    }
-  }, [
-    selection,
-    activeNamespace,
-    markFolderPermissionLost,
-    directoryCrypto,
-    seal,
-    unseal,
-  ]);
+  // Build the unwrapped backend adapter for *any* namespace on the current
+  // selection. Factored out of `inner` so a cross-namespace move can spin up an
+  // adapter for the target namespace's storage location without switching to it.
+  const makeInner = useCallback(
+    (namespace: string): StorageAdapter => {
+      switch (selection.kind) {
+        // Cloud backends mirror their bytes into a local cache so the document
+        // can be unlocked, read, and edited offline (the cache holds the
+        // encrypted envelope when encryption is on). Folder / browser are
+        // already on-device, so they need no mirror.
+        case "dropbox":
+          return withLocalCache(
+            createDropboxAdapter(
+              selection.auth,
+              fetch,
+              namespace,
+              directoryCrypto,
+            ),
+            {
+              storage: globalThis.localStorage,
+              key: localCacheKey("dropbox", namespace),
+              seal,
+              unseal,
+            },
+          );
+        case "gdrive":
+          return withLocalCache(
+            createGdriveAdapter(
+              selection.token,
+              fetch,
+              namespace,
+              directoryCrypto,
+            ),
+            {
+              storage: globalThis.localStorage,
+              key: localCacheKey("gdrive", namespace),
+              seal,
+              unseal,
+            },
+          );
+        case "folder":
+          return createFolderAdapter({
+            directoryHandle: selection.handle,
+            namespace,
+            onPermissionLost: markFolderPermissionLost,
+            crypto: directoryCrypto,
+          });
+        case "browser":
+          return new BrowserLocalStorageAdapter(
+            globalThis.localStorage,
+            namespace,
+          );
+      }
+    },
+    [selection, markFolderPermissionLost, directoryCrypto, seal, unseal],
+  );
+
+  // The active namespace's adapter — rebuilt when the namespace or backend
+  // changes so it (and its offline cache) point at the right storage location.
+  const inner = useMemo<StorageAdapter>(
+    () => makeInner(activeNamespace),
+    [makeInner, activeNamespace],
+  );
 
   // The active backend's root settings store — the same selection as `inner`
   // but independent of encryption (settings are app-wide plaintext). Null for
@@ -916,6 +929,67 @@ export function useStorageBackend(): UseStorageBackend {
     setActiveNamespaceState(slug);
   }, []);
 
+  const moveNoteToNamespace = useCallback(
+    async (note: Note, targetSlug: string): Promise<boolean> => {
+      if (locked) return false;
+      if (targetSlug === activeNamespace) return false;
+      if (!namespaces.some((n) => n.slug === targetSlug)) return false;
+
+      // Bring the note's attachment bytes in hand (the list loads metadata
+      // only) so they travel into the target namespace's store, where the
+      // directory adapter externalises them on save.
+      let moved: Note = note;
+      if (note.attachments?.length) {
+        const copy: Note = {
+          ...note,
+          attachments: note.attachments.map((a) => ({ ...a })),
+        };
+        for (const a of copy.attachments!) {
+          if (a.data) continue;
+          const got = await inner.fetchAttachment?.(note, a.filename);
+          if (got) a.data = bytesToDataUrl(got.mime, got.bytes);
+        }
+        moved = copy;
+      }
+      // The target namespace has its own folders, so the source folder link is
+      // meaningless there — drop it.
+      if (moved.folderId) {
+        moved = { ...moved };
+        delete moved.folderId;
+      }
+
+      // The browser store needs the whole-document encryption wrapper; the
+      // file/cloud adapters encrypt per-file internally via `directoryCrypto`.
+      const target =
+        selection.kind === "browser"
+          ? wrapBrowserForActive(makeInner(targetSlug))
+          : makeInner(targetSlug);
+      const prev = await target.load().catch(() => null);
+      const doc = prev ? parse(prev.text) : parse(null);
+      doc.notes = [moved, ...doc.notes.filter((n) => n.id !== moved.id)];
+      try {
+        await target.save(serialize(doc), prev?.revision);
+      } catch (err) {
+        log.warn(
+          `moveNoteToNamespace: target save failed (${targetSlug})`,
+          err,
+        );
+        return false;
+      }
+      log.info(`moveNoteToNamespace: ${note.id} → ${targetSlug}`);
+      return true;
+    },
+    [
+      locked,
+      activeNamespace,
+      namespaces,
+      inner,
+      selection.kind,
+      wrapBrowserForActive,
+      makeInner,
+    ],
+  );
+
   const createNamespace = useCallback(
     (name: string, appearance?: NamespaceAppearance) => {
       const created = registryAddNamespace(name);
@@ -1029,6 +1103,7 @@ export function useStorageBackend(): UseStorageBackend {
     namespaces,
     activeNamespace,
     switchNamespace,
+    moveNoteToNamespace,
     createNamespace,
     renameNamespace,
     setNamespaceAppearance,

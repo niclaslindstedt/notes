@@ -45,8 +45,10 @@ import {
 import { useModalDispatch } from "./modal-bus.ts";
 import { NoteDragItem } from "./note-drag.tsx";
 import {
+  NOTE_DROP_ARCHIVE,
   NOTE_DROP_ATTR,
   NOTE_DROP_ROOT,
+  noteDropNamespaceKey,
   useNoteDropKey,
 } from "./note-drag-context.ts";
 import { AchievementsMenuItem } from "./achievements/AchievementsMenuItem.tsx";
@@ -128,6 +130,8 @@ type Props = {
   folders: Folder[];
   /** Move a note into `folderId`, or out of any folder when `null`. */
   onMoveNote: (id: string, folderId: string | null) => void;
+  /** Move a note into another namespace (drop onto its row). */
+  onMoveNoteToNamespace: (id: string, slug: string) => void;
   /** Create a folder; returns its id so the new folder can auto-expand. */
   onCreateFolder: (name: string) => string;
   /** Rename a folder. */
@@ -164,6 +168,7 @@ export function SideMenu({
   canRedo,
   folders,
   onMoveNote,
+  onMoveNoteToNamespace,
   onCreateFolder,
   onRenameFolder,
   onRemoveFolder,
@@ -225,6 +230,18 @@ export function SideMenu({
     const id = e.dataTransfer.getData(NOTE_DND_TYPE) || draggingNote;
     endNoteDrag();
     if (id) onMoveNote(id, folderId);
+  }
+  function dropOnNamespace(e: ReactDragEvent, slug: string) {
+    e.preventDefault();
+    const id = e.dataTransfer.getData(NOTE_DND_TYPE) || draggingNote;
+    endNoteDrag();
+    if (id) onMoveNoteToNamespace(id, slug);
+  }
+  function dropOnArchive(e: ReactDragEvent) {
+    e.preventDefault();
+    const id = e.dataTransfer.getData(NOTE_DND_TYPE) || draggingNote;
+    endNoteDrag();
+    if (id) onArchiveNote(id);
   }
   const {
     open,
@@ -376,12 +393,23 @@ export function SideMenu({
         ) : (
           <NamespaceGlyph className="h-5 w-5" />
         );
+        // Every namespace but the active one is a drop target: dropping a note
+        // onto it moves the note into that namespace.
+        const droppable = ns.slug !== activeNamespace;
+        const nsKey = noteDropNamespaceKey(ns.slug);
         return (
           <NavItem
             key={ns.slug}
             icon={icon}
             label={ns.name}
             active={ns.slug === activeNamespace}
+            dropId={droppable ? nsKey : undefined}
+            isDropTarget={
+              droppable && (dropTarget === nsKey || activeDropKey === nsKey)
+            }
+            onDragOver={droppable ? (e) => allowDropOn(e, nsKey) : undefined}
+            onDragLeave={droppable ? () => setDropTarget(null) : undefined}
+            onDrop={droppable ? (e) => dropOnNamespace(e, ns.slug) : undefined}
             onClick={() => {
               onSwitchNamespace(ns.slug);
               close();
@@ -522,6 +550,14 @@ export function SideMenu({
         label={t("nav.archive")}
         active={archiveActive}
         badge={archivedCount > 0 ? archivedCount : undefined}
+        dropId={NOTE_DROP_ARCHIVE}
+        isDropTarget={
+          dropTarget === NOTE_DROP_ARCHIVE ||
+          activeDropKey === NOTE_DROP_ARCHIVE
+        }
+        onDragOver={(e) => allowDropOn(e, NOTE_DROP_ARCHIVE)}
+        onDragLeave={() => setDropTarget(null)}
+        onDrop={dropOnArchive}
         onClick={() => {
           onOpenArchive();
           close();
@@ -953,6 +989,11 @@ function NavItem({
   badge,
   trailing,
   onClick,
+  dropId,
+  isDropTarget = false,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }: {
   icon: ReactNode;
   label: string;
@@ -969,6 +1010,14 @@ function NavItem({
   // Optional trailing element (e.g. the green encryption lock on a note row).
   trailing?: ReactNode;
   onClick: () => void;
+  // Drop-target wiring: a `data-note-drop` key (so the touch drag layer
+  // hit-tests it) plus the desktop HTML5 handlers and a highlight flag. Used
+  // to make a namespace row or the Archive row accept a dragged note.
+  dropId?: string;
+  isDropTarget?: boolean;
+  onDragOver?: (e: ReactDragEvent) => void;
+  onDragLeave?: (e: ReactDragEvent) => void;
+  onDrop?: (e: ReactDragEvent) => void;
 }) {
   return (
     <button
@@ -977,14 +1026,20 @@ function NavItem({
       aria-current={active ? "page" : undefined}
       disabled={disabled}
       onClick={onClick}
+      {...(dropId !== undefined ? { [NOTE_DROP_ATTR]: dropId } : {})}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
       className={`flex w-full items-center gap-3 py-[var(--density-row-py)] text-left text-sm ${
         indent ? "pr-5 pl-11" : "px-5"
       } ${
         disabled
           ? "cursor-not-allowed text-muted opacity-40"
-          : active
-            ? "cursor-pointer bg-surface-2 font-semibold text-fg-bright"
-            : "cursor-pointer text-fg hover:bg-surface-2 hover:text-fg-bright"
+          : isDropTarget
+            ? "cursor-pointer bg-accent/15 text-fg-bright ring-1 ring-accent/40 ring-inset"
+            : active
+              ? "cursor-pointer bg-surface-2 font-semibold text-fg-bright"
+              : "cursor-pointer text-fg hover:bg-surface-2 hover:text-fg-bright"
       }`}
     >
       <span className={active ? "text-accent" : "text-muted"}>{icon}</span>
