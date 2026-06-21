@@ -16,11 +16,23 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
-// The sentinel folder key for the "ungrouped" drop zone (drop a note here to
-// take it out of every folder), and the attribute a drop target advertises
-// itself with. Shared so the side menu and overview agree on both.
+// Drop-target keys carried in the `data-note-drop` attribute. The dragged item
+// reads the key under the finger and the provider hands it to `onDrop`, which
+// resolves it to an action:
+//   - `NOTE_DROP_ROOT`    — the "ungrouped" zone (take the note out of its folder)
+//   - `NOTE_DROP_ARCHIVE` — the Archive row (archive the note)
+//   - `ns:<slug>`         — a namespace row (move the note to that namespace)
+//   - anything else       — a folder id (file the note into that folder)
+// The namespace/archive targets live in the side menu only.
 export const NOTE_DROP_ROOT = "__root__";
+export const NOTE_DROP_ARCHIVE = "__archive__";
+export const NOTE_DROP_NS_PREFIX = "ns:";
 export const NOTE_DROP_ATTR = "data-note-drop";
+
+/** The drop key for a namespace row, by its slug. */
+export function noteDropNamespaceKey(slug: string): string {
+  return `${NOTE_DROP_NS_PREFIX}${slug}`;
+}
 
 // Hold this long without moving to pick a note up; abort the press if the
 // finger travels more than this many px first (it's a scroll or a swipe).

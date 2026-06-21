@@ -213,6 +213,7 @@ Honour these when naming a new file, key, or string.
 | **Folder row** / **expand a folder** / **new folder** (sidebar) | `FolderRow`, `FolderEditRow`, the folders block in `SideMenu` (`src/ui/SideMenu.tsx`); drag-to-file via `NOTE_DND_TYPE`. [→](overview.md#folders-in-the-side-menu) |
 | **Folder section** / **drag a note into a folder** (overview) | the folder grouping + drop targets in `NoteList` (`src/app/App.tsx`). [→](overview.md#folders-in-the-overview) |
 | **Long-press to drag** / **pick up a note** / **drag-to-folder on mobile** / **touch drag** | `NoteDragProvider`, `NoteDragItem` (`src/ui/note-drag.tsx`); `useTouchNoteDrag`, `useNoteDropKey`, `NOTE_DROP_ATTR`, `NOTE_DROP_ROOT` (`src/ui/note-drag-context.ts`). [→](overview.md#note-drag-touch--pointer) |
+| **Drag a note to a namespace / to the archive** (sidebar) | drop keys `NOTE_DROP_ARCHIVE`, `noteDropNamespaceKey` (`src/ui/note-drag-context.ts`); `onMoveNoteToNamespace` + the namespace/Archive drop rows in `SideMenu`; `moveNoteToNamespace` (`src/storage/useStorageBackend.ts`). [→](overview.md#note-drag-touch--pointer) |
 | **Folder picker** (editor)                                 | `FolderPicker` (`src/app/App.tsx`), built on `SelectPicker`. [→](overview.md#folder-picker)                  |
 | **Folders sidecar** / **`folders.json`**                   | `FOLDERS_FILE_NAME`, `readFolders` / `injectFolders` / `persistFolders` (`src/storage/directory-adapter.ts`); `parseFolders` / `serializeFolders` (`src/storage/serialize.ts`). [→](overview.md#folders-sidecar) |
 
