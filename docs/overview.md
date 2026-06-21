@@ -767,8 +767,9 @@ centre**, opened from the [sync glyph](#sync-status) whatever the current state.
 It lays out, top to bottom:
 
 - **Status** — the headline state (saving / error / throttled / offline /
-  in-sync), the failure reason verbatim, and the Reconnect, Save now / Try
-  again, and Reload-from-backend actions (each glyphed).
+  in-sync) and the failure reason verbatim, with a compact reload glyph beside
+  the status card (whatever the state) and the contextual Reconnect / Save now /
+  Try again actions below it (each glyphed).
 - **Activity** (only when something is happening) — the notes whose file is
   uploading this second (resolved from the [per-note upload
   spinner](#per-note-upload-spinner) ids that `SyncIndicator` maps to titles)
