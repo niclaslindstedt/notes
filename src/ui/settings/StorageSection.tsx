@@ -6,8 +6,9 @@ import type {
   EncryptionProgress,
   UseStorageBackend,
 } from "../../storage/useStorageBackend.ts";
-import { ShieldIcon, SpinnerIcon } from "../icons.tsx";
+import { ShieldIcon } from "../icons.tsx";
 import { BusyLabel } from "../BusyLabel.tsx";
+import { CipherGlyph } from "../CipherGlyph.tsx";
 import { STEP_MESSAGE_KEY } from "../encryption-progress.ts";
 import { scrollFocusedIntoView } from "../hooks/scrollFocusedIntoView.ts";
 import { Button } from "../form/Button.tsx";
@@ -444,7 +445,7 @@ function EncryptionSection({
           className="flex flex-col gap-1 rounded-[var(--radius)] border border-line bg-surface-2 px-2.5 py-1.5"
         >
           <div className="flex items-center gap-2">
-            <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
+            <CipherGlyph className="shrink-0 text-xs text-accent" />
             <span className="truncate text-xs text-muted">{statusMessage}</span>
           </div>
           {queueBusy && (

@@ -7,8 +7,9 @@ import type {
   UseStorageBackend,
 } from "../storage/useStorageBackend.ts";
 import { BusyLabel } from "./BusyLabel.tsx";
+import { CipherGlyph } from "./CipherGlyph.tsx";
 import { UNLOCK_STEP_MESSAGE_KEY } from "./encryption-progress.ts";
-import { ShieldIcon, SpinnerIcon } from "./icons.tsx";
+import { ShieldIcon } from "./icons.tsx";
 
 // Full-screen unlock gate shown when encryption is on but no passphrase is
 // held this session (a fresh reload). It covers the app so the encrypted
@@ -96,7 +97,7 @@ export function UnlockGate({ storage }: Props) {
             aria-label={t("settings.unlock.statusAria")}
             className="flex items-center gap-2 rounded-[var(--radius)] border border-line bg-surface-2 px-2.5 py-1.5"
           >
-            <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
+            <CipherGlyph className="shrink-0 text-xs text-accent" />
             <span className="truncate text-xs text-muted">{step}</span>
           </div>
         )}
