@@ -117,9 +117,43 @@ export const FOLDERS_FILE_NAME = "folders.json";
 // Suffix of an encrypted per-note file. The stem is the opaque keyed-HMAC ref.
 const ENC_SUFFIX = ".enc";
 
-// What the encrypted load reports as it unseals each per-file note in sequence:
-// the note's title plus its position in the run, so the unlock gate can name the
-// note currently being decrypted and show how far through it is.
+// How many encrypted note files to read + decrypt at once during an unlock /
+// encrypted load. Sequential decryption made a cold load O(notes) network
+// round-trips on a cloud backend (tens of seconds for a 500-note vault); a
+// bounded pool overlaps the reads and the (off-main-thread) AES work while
+// staying well under the cloud APIs' rate limits — unlike an unbounded
+// `Promise.all`, which would fire 500 simultaneous fetches and trip throttling.
+const ENC_LOAD_CONCURRENCY = 8;
+
+// Map over `items` running at most `limit` jobs at once, preserving input order
+// in the result. Used to parallelise the encrypted load's per-note decrypt
+// without bursting the backend.
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  async function worker(): Promise<void> {
+    for (;;) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index]!, index);
+    }
+  }
+  const workers: Promise<void>[] = [];
+  for (let i = 0; i < Math.min(limit, items.length); i += 1) {
+    workers.push(worker());
+  }
+  await Promise.all(workers);
+  return results;
+}
+
+// What the encrypted load reports as it unseals each per-file note: the note's
+// title plus a running count, so the unlock gate can name the note that just
+// decrypted and show how far through the run it is. With the load now decrypting
+// in a bounded pool, the count is completion order, not on-disk order.
 export type DecryptNoteInfo = {
   title: string;
   index: number;
@@ -130,8 +164,8 @@ export type DecryptNoteReporter = (info: DecryptNoteInfo) => void;
 // The session passphrase, by reference so it can change at runtime (unlock /
 // enable / disable) without rebuilding the adapter. `onDecryptNote` is an
 // optional reporter ref the encrypted load drains once per note as it decrypts
-// them one at a time — the unlock flow points it at the gate's status line while
-// it unlocks, and clears it afterward, so it costs nothing the rest of the time.
+// them (in a bounded pool) — the unlock flow points it at the gate's status line
+// while it unlocks, and clears it afterward, so it costs nothing the rest of the time.
 export type DirectoryCrypto = {
   passwordRef: { readonly current: string | null };
   onDecryptNote?: { readonly current: DecryptNoteReporter | null };
@@ -208,10 +242,18 @@ export type DirectoryAdapterOptions = {
 };
 
 // One desired file: the bytes to write (`stored`) and the plaintext source to
-// hash for change detection (`source`). In plaintext mode the two are equal; in
-// encrypted mode `stored` is fresh ciphertext (new IV every time) while
-// `source` is the stable plaintext, so an unchanged note isn't re-uploaded.
-type DesiredFile = { stored: string; source: string };
+// hash for change detection (`source`). In plaintext mode `stored` is the source
+// itself. In encrypted mode `stored` is filled lazily via `seal` — only for the
+// files `plan` actually decides to write — so a single edit in a 500-note vault
+// re-encrypts one note, not all of them (sealing is gzip + AES-GCM + base64 per
+// note, far too costly to spend on every unchanged note each save). `source` is
+// the stable plaintext, hashed for change detection (so a fresh-IV re-encryption
+// of an unchanged note never looks like a change) and compared on verify.
+type DesiredFile = {
+  stored?: string;
+  source: string;
+  seal?: () => Promise<string>;
+};
 
 // The on-disk path of a plaintext attachment file, relative to the attachment
 // store root: `<note-stem>/<filename>`.
@@ -434,13 +476,21 @@ export function createDirectoryAdapter(
   // Session keys, derived once per passphrase. The key-params file is read (or
   // created) the first time encryption is active, so every device shares salts.
   let keyCache: { password: string; keys: SessionKeys } | null = null;
+  // Memoised opaque file refs. `deriveRef` is a keyed HMAC of the session
+  // fileKey + a stable label/id, so within a session each ref is deterministic
+  // and cheap to remember — this turns the per-save path computation (one HMAC
+  // per note, every save) into a map lookup after the first time. Cleared
+  // whenever the keys change (password switch / lock) since the fileKey does.
+  const refCache = new Map<string, string>();
   async function ensureKeys(): Promise<SessionKeys | null> {
     const password = crypto?.passwordRef.current ?? null;
     if (!password) {
       keyCache = null;
+      refCache.clear();
       return null;
     }
     if (keyCache && keyCache.password === password) return keyCache.keys;
+    refCache.clear();
     let params = parseKeyParams(await store.read(KEY_PARAMS_FILE));
     if (!params) {
       params = newKeyParams();
@@ -449,6 +499,20 @@ export function createDirectoryAdapter(
     const keys = await deriveSessionKeys(password, params);
     keyCache = { password, keys };
     return keys;
+  }
+
+  async function cachedRef(
+    keys: SessionKeys,
+    label: string,
+    id: string,
+  ): Promise<string> {
+    const cacheKey = `${label} ${id}`;
+    let ref = refCache.get(cacheKey);
+    if (ref === undefined) {
+      ref = await deriveRef(keys.fileKey, label, id);
+      refCache.set(cacheKey, ref);
+    }
+    return ref;
   }
 
   function track(path: string, source: string, rev: string | undefined): void {
@@ -464,7 +528,7 @@ export function createDirectoryAdapter(
     keys: SessionKeys,
     noteId: string,
   ): Promise<string> {
-    return `${await deriveRef(keys.fileKey, "note", noteId)}${ENC_SUFFIX}`;
+    return `${await cachedRef(keys, "note", noteId)}${ENC_SUFFIX}`;
   }
 
   async function attBlobPath(
@@ -472,7 +536,7 @@ export function createDirectoryAdapter(
     noteId: string,
     filename: string,
   ): Promise<string> {
-    return deriveRef(keys.fileKey, "att", `${noteId} ${filename}`);
+    return cachedRef(keys, "att", `${noteId} ${filename}`);
   }
 
   // -- Plaintext load --------------------------------------------------------
@@ -564,28 +628,42 @@ export function createDirectoryAdapter(
 
     const notes: Note[] = [];
     const seen = new Set<string>();
-    // Encrypted notes (already migrated), unsealed one at a time. On a cloud
-    // backend each read is a network fetch, so the per-note reporter lets the
-    // unlock gate name the note it's on instead of one undifferentiated wait.
+    // Encrypted notes (already migrated), unsealed with a bounded pool. On a
+    // cloud backend each read is a network fetch, so overlapping them turns a
+    // cold load from O(notes) sequential round-trips into a handful of waves.
+    // The per-note reporter still drives the unlock gate's status line, but a
+    // note's title lives inside its ciphertext (unknown until decrypted), so it
+    // fires as each note finishes with a completion counter for `index` — the
+    // line updates live, just not in on-disk order.
     const reportNote = crypto?.onDecryptNote?.current;
     let decrypted = 0;
-    for (const path of encPaths) {
-      const text = await store.read(path);
-      if (text === null) continue;
-      const opened = await openString(keys.contentKey, text);
-      const json = new TextDecoder().decode(opened.bytes);
-      track(path, json, revisions.get(path));
-      const note = encJsonToNote(json);
-      if (note) {
-        notes.push(note);
-        seen.add(note.id);
-        status.set(note.id, "encrypted");
-        decrypted += 1;
-        reportNote?.({
-          title: note.title,
-          index: decrypted,
-          total: encPaths.length,
-        });
+    const opened = await mapWithConcurrency(
+      encPaths,
+      ENC_LOAD_CONCURRENCY,
+      async (path) => {
+        const text = await store.read(path);
+        if (text === null) return null;
+        const blob = await openString(keys.contentKey, text);
+        const json = new TextDecoder().decode(blob.bytes);
+        const note = encJsonToNote(json);
+        if (note) {
+          decrypted += 1;
+          reportNote?.({
+            title: note.title,
+            index: decrypted,
+            total: encPaths.length,
+          });
+        }
+        return { path, json, note };
+      },
+    );
+    for (const entry of opened) {
+      if (!entry) continue;
+      track(entry.path, entry.json, revisions.get(entry.path));
+      if (entry.note) {
+        notes.push(entry.note);
+        seen.add(entry.note.id);
+        status.set(entry.note.id, "encrypted");
       }
     }
     // Plaintext remnants from an in-progress migration: merge any note not yet
@@ -916,8 +994,12 @@ export function createDirectoryAdapter(
     await Promise.all(
       toWrite.map(async (path) => {
         const d = desired.get(path)!;
+        // Encrypted notes are sealed here, lazily, so only the files actually
+        // being written pay the AES cost — and only after the conflict check
+        // below has cleared, so an aborted save wastes no encryption.
+        const bytes = d.stored ?? (d.seal ? await d.seal() : d.source);
         try {
-          const rev = await store.write(path, d.stored);
+          const rev = await store.write(path, bytes);
           track(path, d.source, rev);
           written.set(path, rev);
         } catch (err) {
@@ -975,9 +1057,11 @@ export function createDirectoryAdapter(
         const path = await encNotePath(keys, note.id);
         pathToNoteId.set(path, note.id);
         const source = noteToEncJson(note);
+        // Seal lazily: only the notes `plan` selects for writing are encrypted
+        // (see `DesiredFile`), so one edit in a large vault re-seals one note.
         desired.set(path, {
           source,
-          stored: await sealString(keys.contentKey, source),
+          seal: () => sealString(keys.contentKey, source),
         });
       }
       supersededKind = "toEncrypted";
