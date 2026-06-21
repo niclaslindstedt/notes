@@ -813,14 +813,31 @@ revision, "keep the other copy" adopts the remote bytes.
 blocks the app on a fresh reload when encryption is on but no passphrase is
 cached (it's session-only by design). The appearance theme stays visible under
 the gate. While the passphrase is being checked the **Unlock** button swaps in a
-spinner (`BusyLabel`, `src/ui/BusyLabel.tsx`) and a status line beneath it
-flashes the phase the unlock is in ("Decrypting your notes…", "Finalizing…"),
-fed by an `onProgress` callback that `storage.unlock` calls as it brackets the
-`load()` that derives the key, reads, and decrypts — so the gate hints at what's
-happening instead of sitting blank. The phase→string map (`STEP_MESSAGE_KEY`,
-`src/ui/encryption-progress.ts`) and the spinner label are shared verbatim with
-the [storage tab's encryption status bar](#storage-settings). See
+spinner (`BusyLabel`, `src/ui/BusyLabel.tsx`) and a status line beneath it leads
+with the [cipher glyph](#cipher-glyph) and flashes the phase the unlock is in
+("Decrypting your notes…", "Finalizing…"), fed by an `onProgress` callback that
+`storage.unlock` calls as it brackets the `load()` that derives the key, reads,
+and decrypts — so the gate hints at what's happening instead of sitting blank.
+The phase→string map (`STEP_MESSAGE_KEY`, `src/ui/encryption-progress.ts`) and
+the status-line glyph are shared verbatim with the
+[storage tab's encryption status bar](#storage-settings). See
 [encryption](#encryption).
+
+### Cipher glyph
+
+`CipherGlyph` (`src/ui/CipherGlyph.tsx`) — the small "encryptish" progress mark
+shown in place of a spinner on both encryption status lines (the
+[unlock gate](#unlock-gate) and the [storage tab's encryption status
+bar](#storage-settings)). It is a short run of monospace cipher characters
+(hex digits and a few symbols) that gently re-scramble — a couple of cells shift
+per tick rather than the whole row at once, so it reads as a flowing cipher
+without strobing, and it animates without rotating the way a spinner does. It
+honours reduce-motion both ways: it never starts the timer when the OS
+`prefers-reduced-motion` is set, and freezes mid-flight when the in-app
+**Reduce motion** toggle (see [appearance settings](#appearance-settings)),
+mirrored onto `<html data-reduce-motion>`, is on — holding a static frame that
+still reads as encrypted bytes. It is `aria-hidden`; the surrounding
+`role="status"` line carries the readable phase text.
 
 ## Settings tabs
 
@@ -863,8 +880,9 @@ or off is depends on the backend:
   background queue converts the notes one at a time. So the **encryption status
   bar** here reflects that queue (`StorageSection` reads the live `conversion`
   snapshot the [encryption migration](#encryption-migration) hook returns, passed
-  down from `App`): it flashes exactly which note — and which of that note's
-  attachments — is being sealed or unsealed right now (`Encrypting "Groceries"…`,
+  down from `App`): led by the [cipher glyph](#cipher-glyph), it flashes exactly
+  which note — and which of that note's attachments — is being sealed or unsealed
+  right now (`Encrypting "Groceries"…`,
   `Decrypting "photo.png" (attachment of "Trip")…`), and below it a line tells
   the user **they can close settings — the conversion finishes in the
   background**. The messages flash by too fast to read in full by design; they're
@@ -874,7 +892,8 @@ or off is depends on the backend:
   just as backgroundable.
 - **On the This-device backend** there is no per-note representation (the whole
   document is one envelope), so the toggle still does the work in one pass: the
-  buttons spin and the bar flashes the coarse phases (`Reading…`,
+  buttons spin (the `BusyLabel` spinner) and the bar — led by the
+  [cipher glyph](#cipher-glyph) — flashes the coarse phases (`Reading…`,
   `Deriving encryption key…`, `Encrypting…`, `Saving…`, `Finalizing…`) the
   `onProgress` callback reports.
 
