@@ -250,6 +250,74 @@ describe("directory adapter — encrypted per-file", () => {
     await a.save(serialize({ notes: [note] }), s1.revision);
     expect(writes).toBe(0);
   });
+
+  it("seals only the changed note when one of many is edited", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    // Count how many times note bytes are actually sealed (a `.enc` write is the
+    // observable proxy for a `sealString` call). A single edit in a many-note
+    // vault must seal exactly one note, not the whole document.
+    let encWrites = 0;
+    const counting: FileStore = {
+      list: () => store.list(),
+      read: (p) => store.read(p),
+      write: (p, t) => {
+        if (p.endsWith(".enc")) encWrites += 1;
+        return store.write(p, t);
+      },
+      remove: (p) => store.remove(p),
+    };
+    const a = encAdapter(counting, att, { current: "pw" });
+    const notes: Note[] = Array.from({ length: 10 }, (_, i) => ({
+      ...createNote(i + 1),
+      title: `Note ${i}`,
+      body: `body ${i}`,
+    }));
+    const s1 = await a.save(serialize({ notes }));
+    expect(encWrites).toBe(10);
+
+    encWrites = 0;
+    const edited = notes.map((n, i) =>
+      i === 3 ? { ...n, body: "changed body" } : n,
+    );
+    await a.save(serialize({ notes: edited }), s1.revision);
+    expect(encWrites).toBe(1);
+  });
+
+  it("decrypts every note on load with a bounded pool of many notes", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const notes: Note[] = Array.from({ length: 25 }, (_, i) => ({
+      ...createNote(i + 1),
+      title: `Note ${i}`,
+      body: `secret ${i}`,
+    }));
+    await encAdapter(store, att, { current: "pw" }).save(serialize({ notes }));
+
+    const seen: Array<{ index: number; total: number }> = [];
+    const crypto: DirectoryCrypto = {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (info) => seen.push(info) },
+    };
+    const b = createDirectoryAdapter(
+      store,
+      { id: "folder", label: "T" },
+      att,
+      crypto,
+    );
+    const loaded = parse((await b.load())!.text).notes;
+    expect(loaded).toHaveLength(25);
+    expect(loaded.map((n) => n.body).sort()).toEqual(
+      notes.map((n) => n.body).sort(),
+    );
+    // Every note is reported, totals are consistent, and the completion counter
+    // covers 1..25 exactly once (parallel completion order, hence the sort).
+    expect(seen).toHaveLength(25);
+    expect(seen.every((s) => s.total === 25)).toBe(true);
+    expect(seen.map((s) => s.index).sort((x, y) => x - y)).toEqual(
+      Array.from({ length: 25 }, (_, i) => i + 1),
+    );
+  });
 });
 
 describe("directory adapter — atomic representation switch", () => {

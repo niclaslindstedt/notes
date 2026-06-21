@@ -192,10 +192,14 @@ export function useEncryptionMigration({
           setConversion(IDLE);
           onDoneRef.current?.();
         } else {
-          // Every note (and its attachments) now sealed → the milestone.
+          // Every note (and its attachments) now sealed → the milestone. Read
+          // the status map once, not once per note — `getStatus` clones it on
+          // each call, so calling it inside `.every()` was O(notes²).
+          const finalStatus = getStatus?.();
           if (
             total > 0 &&
-            notes.every((n) => getStatus?.()?.get(n.id) === "encrypted")
+            finalStatus &&
+            notes.every((n) => finalStatus.get(n.id) === "encrypted")
           ) {
             unlock("fortKnox");
           }

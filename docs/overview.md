@@ -835,9 +835,12 @@ notes…", "Unlocking your notes…") via `UNLOCK_STEP_MESSAGE_KEY`
 copy; the status-line glyph and the underlying `STEP_MESSAGE_KEY` map are still
 shared with the
 [storage tab's encryption status bar](#storage-settings). On a file/cloud
-backend, where the per-file notes are unsealed one at a time inside the
-directory adapter's encrypted load, the gate names the note it's on and how far
-through it is ("Decrypting "Groceries" (3/12)…"): `storage.unlock` points the
+backend, where the per-file notes are unsealed by a bounded concurrency pool
+inside the directory adapter's encrypted load (so a cold unlock of a large vault
+overlaps its reads instead of paying one network round-trip per note), the gate
+names each note as it finishes and how far through it is ("Decrypting
+"Groceries" (3/12)…", a completion counter rather than on-disk order):
+`storage.unlock` points the
 `directoryCrypto.onDecryptNote` reporter ref at the gate's status callback for
 the duration of the unlock (clearing it afterward), so each note flows up as a
 `decrypting` phase carrying an `EncryptionProgressDetail`
@@ -1133,7 +1136,11 @@ the revisions it produced to tell listing lag from a real remote edit, and
 tolerates lost acks. When a session passphrase is held it switches to the
 **encrypted per-file representation** — one `<ref>.enc` per note, one opaque
 blob per attachment, change-detected by hashing the *plaintext* source so a
-fresh-IV re-encryption isn't a spurious change — and exposes `fetchAttachment`,
+fresh-IV re-encryption isn't a spurious change. Sealing (gzip + AES-GCM) is
+deferred until *after* change detection picks the files to write, so one edit in
+a 500-note vault encrypts one note rather than all of them; the opaque per-note
+filename refs (a keyed HMAC) are memoised per session so the same save doesn't
+re-derive every note's path. It also exposes `fetchAttachment`,
 `getEncryptionStatus`, `migrateNote`, and `splitLegacyBlob` for the
 [encryption migration](#encryption-migration). A representation conversion is
 the one case it removes files it didn't author, done atomically (write-new →
