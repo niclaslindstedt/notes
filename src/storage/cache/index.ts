@@ -31,6 +31,7 @@ import {
   type StorageAdapter,
   type StoredSnapshot,
 } from "../adapter.ts";
+import { isEncryptedEnvelope } from "../crypto.ts";
 import { DEFAULT_NAMESPACE_SLUG } from "../namespaces.ts";
 
 const log = createLogger("cache");
@@ -152,10 +153,15 @@ export function withLocalCache(
     }
   }
 
-  // Forward the inner capabilities verbatim. The cache could answer a
-  // synchronous read, but a live load is always preferred over a possibly
-  // stale mirror, and the cloud adapters carry no `loadSync` anyway.
+  // Forward the inner capabilities and add `loadSync`: the mirror lets a cloud
+  // backend paint its last-known notes on the first frame instead of a blank
+  // list while the network round-trip runs. The async `load()` still fires
+  // immediately after and replaces these bytes with the fresh remote copy —
+  // showing a few seconds of stale data is the deliberate trade for not
+  // flashing an empty list on every reload. The cloud adapters carry no
+  // `loadSync` of their own, so this is the only source of one here.
   const capabilities = new Set<AdapterCapability>(inner.capabilities);
+  capabilities.add("loadSync");
 
   return {
     id: inner.id,
@@ -163,6 +169,17 @@ export function withLocalCache(
     saveDebounceMs: inner.saveDebounceMs,
     capabilities,
     getRevision: inner.getRevision ? () => inner.getRevision!() : undefined,
+
+    loadSync(): StoredSnapshot | null {
+      const cached = readCache();
+      if (!cached) return null;
+      // While encryption is on the mirror holds a sealed envelope, and
+      // unsealing is async — so there's no synchronous answer to give. Defer
+      // to `load()` for that case (only reachable once unlocked anyway; a
+      // locked store is served by the no-op adapter, never this one).
+      if (isEncryptedEnvelope(cached.text)) return null;
+      return { text: cached.text, revision: cached.revision };
+    },
 
     async load(): Promise<StoredSnapshot | null> {
       try {
