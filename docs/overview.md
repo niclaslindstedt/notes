@@ -599,7 +599,10 @@ namespace switcher, the recent-notes list (with swipe-to-remove rows), the
 archive link, a side-by-side undo/redo button pair pinned to the foot of the
 list, and a footer (settings, privacy, changelog,
 source, donate). It reads state from `NavContext` and dispatches modal-open
-commands on the [modal bus](#modal-bus).
+commands on the [modal bus](#modal-bus). Switching the active namespace leaves
+the editor but deliberately keeps the drawer open, so several namespaces can be
+hopped between in one go; opening a note (and the footer/modal actions) still
+closes it.
 
 ### Floating menu button
 
@@ -814,12 +817,15 @@ blocks the app on a fresh reload when encryption is on but no passphrase is
 cached (it's session-only by design). The appearance theme stays visible under
 the gate. While the passphrase is being checked the **Unlock** button swaps in a
 spinner (`BusyLabel`, `src/ui/BusyLabel.tsx`) and a status line beneath it
-flashes the phase the unlock is in ("Decrypting your notes…", "Finalizing…"),
-fed by an `onProgress` callback that `storage.unlock` calls as it brackets the
-`load()` that derives the key, reads, and decrypts — so the gate hints at what's
-happening instead of sitting blank. The phase→string map (`STEP_MESSAGE_KEY`,
-`src/ui/encryption-progress.ts`) and the spinner label are shared verbatim with
-the [storage tab's encryption status bar](#storage-settings). See
+flashes the phase the unlock is in, fed by an `onProgress` callback that
+`storage.unlock` calls as it brackets the `load()` that derives the key, reads,
+and decrypts — so the gate hints at what's happening instead of sitting blank.
+The gate uses its own unlock-specific phrasing for those three phases
+("Checking your passphrase…", "Decrypting your notes…", "Unlocking your
+notes…") via `UNLOCK_STEP_MESSAGE_KEY` (`src/ui/encryption-progress.ts`) rather
+than the generic encryption-toggle copy; the spinner label and the underlying
+`STEP_MESSAGE_KEY` map are still shared with the
+[storage tab's encryption status bar](#storage-settings). See
 [encryption](#encryption).
 
 ## Settings tabs

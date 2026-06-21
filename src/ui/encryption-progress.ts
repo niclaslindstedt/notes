@@ -13,3 +13,18 @@ export const STEP_MESSAGE_KEY: Record<EncryptionProgressStep, MessageKey> = {
   saving: "settings.storage.encryptionStepSaving",
   finalizing: "settings.storage.encryptionStepFinalizing",
 };
+
+// The unlock gate brackets a single `load()` with derivingKey → decrypting →
+// finalizing, so it names those three phases in the user's own terms ("checking
+// your passphrase", "unlocking your notes") rather than reusing the generic
+// encryption-toggle copy. The remaining phases never fire during unlock but are
+// mapped through for type completeness.
+export const UNLOCK_STEP_MESSAGE_KEY: Record<
+  EncryptionProgressStep,
+  MessageKey
+> = {
+  ...STEP_MESSAGE_KEY,
+  derivingKey: "settings.unlock.stepDerivingKey",
+  decrypting: "settings.unlock.stepDecrypting",
+  finalizing: "settings.unlock.stepFinalizing",
+};

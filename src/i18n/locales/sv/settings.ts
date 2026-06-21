@@ -197,6 +197,9 @@ const settings: SettingsCatalog = {
     passphrase: "Lösenfras",
     unlock: "Lås upp",
     statusAria: "Upplåsningsförlopp",
+    stepDerivingKey: "Kontrollerar din lösenfras…",
+    stepDecrypting: "Dekrypterar dina anteckningar…",
+    stepFinalizing: "Låser upp dina anteckningar…",
     wrong: "Den lösenfrasen fungerade inte.",
     offline:
       "Du är offline och inget är cachat på den här enheten ännu. Anslut till internet och försök igen.",

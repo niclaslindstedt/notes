@@ -198,6 +198,9 @@ const settings = {
     passphrase: "Passphrase",
     unlock: "Unlock",
     statusAria: "Unlock progress",
+    stepDerivingKey: "Checking your passphrase…",
+    stepDecrypting: "Decrypting your notes…",
+    stepFinalizing: "Unlocking your notes…",
     wrong: "That passphrase didn't work.",
     offline:
       "You're offline and nothing is cached on this device yet. Connect to the internet and try again.",

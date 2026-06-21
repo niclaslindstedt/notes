@@ -560,10 +560,7 @@ export function SideMenu({
             onDragOver={droppable ? (e) => allowDropOn(e, nsKey) : undefined}
             onDragLeave={droppable ? () => setDropTarget(null) : undefined}
             onDrop={droppable ? (e) => dropOnNamespace(e, ns.slug) : undefined}
-            onClick={() => {
-              onSwitchNamespace(ns.slug);
-              close();
-            }}
+            onClick={() => onSwitchNamespace(ns.slug)}
           />
         );
       })}
