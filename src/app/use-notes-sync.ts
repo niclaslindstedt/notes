@@ -396,9 +396,12 @@ export function useNotesSync(deps: {
 
   // Reload whenever the active adapter instance changes. On first mount this
   // re-confirms the loadSync seed (same bytes, no flicker); on a mid-session
-  // swap (backend change, encryption unlock) it loads the new backend's
-  // document and replaces what's on screen. Any pending save against the old
-  // backend is flushed first so an in-flight edit isn't dropped, and the
+  // swap (namespace switch, backend change, encryption unlock) it reseeds the
+  // on-screen document from the new adapter's synchronous cached index right
+  // away, then loads the live copy and reconciles. Reseeding synchronously is
+  // what stops a swap from showing the *previous* namespace's notes (or a blank
+  // list) for the seconds the async load can take. Any pending save against the
+  // old backend is flushed first so an in-flight edit isn't dropped, and the
   // concurrency token resets so the first save against the new backend isn't
   // rejected.
   useEffect(() => {
@@ -422,6 +425,18 @@ export function useNotesSync(deps: {
     setStatusDetail(null);
     setDirty(false);
     setLoaded(false);
+    // Paint the new adapter's last-known document synchronously, so a namespace
+    // switch (or backend swap) shows the *target's* content on the first frame
+    // instead of leaving the previous namespace's notes — or a blank list — on
+    // screen for the seconds the async `load()` can take. `loadSync` is the
+    // adapter's cached index: the stored document for the browser backend, the
+    // offline mirror for the cloud backends. Absent (a never-visited namespace,
+    // or a still-sealed encrypted mirror) it parses to a blank document — showing
+    // nothing beats showing the wrong namespace's notes. The async `load()` below
+    // still runs and reconciles with the live copy.
+    const seeded = parse(active.loadSync?.()?.text);
+    setDoc(seeded);
+    resetHistory?.current(seeded);
     let cancelled = false;
     void active
       .load()

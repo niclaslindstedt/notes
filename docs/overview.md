@@ -524,7 +524,15 @@ that's the [sync engine](#sync-engine).
 `useNotesSync` (`src/app/use-notes-sync.ts`) — the debounced-save state machine
 between the in-memory document and the active `StorageAdapter`. On
 mount/backend-swap it loads the document (or the offline cache); edits schedule
-a debounced save (per-backend `saveDebounceMs`). It owns `SaveStatus` (`idle` /
+a debounced save (per-backend `saveDebounceMs`). On any adapter swap (a
+[namespace](#namespaces) switch, a backend change, an encryption unlock) it first
+reseeds the on-screen document **synchronously** from the new adapter's
+[`loadSync`](#offline-cache) cached index, then runs the async `load()` and
+reconciles — so a switch paints the target's content on the first frame instead
+of leaving the previous namespace's notes (or a blank list) on screen for the
+seconds a cloud/folder load can take. A target with nothing cached parses to a
+blank document, since showing nothing beats showing the wrong namespace. It owns
+`SaveStatus` (`idle` /
 `saving` / `saved` / `error` / `conflict` / `auth-error` / `throttled`),
 exponential-backoff retry of transient failures, rate-limit cooldowns, offline
 fallback, and conflict detection (every save carries a `baseRevision`). `setDoc`
