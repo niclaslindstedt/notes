@@ -52,7 +52,7 @@ Honour these when naming a new file, key, or string.
 | **Entry point** / **startup** / **path switch**            | `src/app/main.tsx`. [→](overview.md#entry-point--path-switch)                                                |
 | **Note list** / **the overview** / **the list** / **main screen** | `NoteList` in `src/app/App.tsx`; visible set from `notes` (`useNotes`). [→](overview.md#note-list--overview) |
 | **Note card** / **the card**                               | `NoteCard` / `SwipeableNoteCard` in `src/app/App.tsx`. [→](overview.md#note-card)                            |
-| **Note-list layout** / **cards vs rows** / **card layout** / **row layout** | `Appearance.listLayout`, `ListLayout`, `LIST_LAYOUTS` (`src/theme/themes.ts`); the segmented control in `AppearanceSection`; read by `NoteCard`. [→](overview.md#note-list-layout) |
+| **Note-list layout** / **cards vs rows vs list** / **card layout** / **row layout** / **list layout** / **file-explorer view** | `Appearance.listLayout`, `ListLayout`, `LIST_LAYOUTS` (`src/theme/themes.ts`); the segmented control in `AppearanceSection`; read by `NoteCard` (the `list` early-return is the bare file-explorer row). [→](overview.md#note-list-layout) |
 | **Archive view** / **the archive**                         | `ArchiveList` / `ReadOnlyNote` in `src/app/App.tsx`; `view === "archive"`. [→](overview.md#archive-view)     |
 | **Header** / **the top bar**                               | header markup in `src/app/App.tsx` (app title, sync glyph, trophy button). [→](overview.md#app-shell)        |
 | **App title** / **wordmark**                               | `AppTitle` (`src/ui/AppTitle.tsx`). [→](overview.md#app-title)                                               |

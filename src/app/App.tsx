@@ -59,6 +59,7 @@ import {
   FolderIcon,
   FolderOpenIcon,
   LockIcon,
+  NoteIcon,
   PlusIcon,
   RestoreIcon,
   SpinnerIcon,
@@ -644,6 +645,9 @@ function NoteList({
 }) {
   const t = useT();
   const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
+  // The bare file-explorer listing wants its rows packed tight, like files in a
+  // tree; cards and rows keep the roomier gap that suits their chrome.
+  const listGap = useAppearance().listLayout === "list" ? "gap-0.5" : "gap-2";
   // The folder under the finger during a touch long-press drag (the desktop
   // path uses `dropTarget` below); either lights up the matching section.
   const activeDropKey = useNoteDropKey();
@@ -743,7 +747,9 @@ function NoteList({
         {empty ? (
           <p className="mt-16 text-center text-muted">{t("app.empty")}</p>
         ) : folders.length === 0 ? (
-          <ul className="flex flex-col gap-2">{notes.map(renderCard)}</ul>
+          <ul className={`flex flex-col ${listGap}`}>
+            {notes.map(renderCard)}
+          </ul>
         ) : (
           <div className="flex flex-col gap-3">
             {/* One section per folder — a header that collapses it and doubles
@@ -802,7 +808,7 @@ function NoteList({
                     </button>
                   </div>
                   {expanded && folderNotes.length > 0 && (
-                    <ul className="flex flex-col gap-2 pt-1 pl-3">
+                    <ul className={`flex flex-col ${listGap} pt-1 pl-3`}>
                       {folderNotes.map(renderCard)}
                     </ul>
                   )}
@@ -828,7 +834,7 @@ function NoteList({
                 {t("nav.noFolder")}
               </p>
               {ungrouped.length > 0 && (
-                <ul className="flex flex-col gap-2">
+                <ul className={`flex flex-col ${listGap}`}>
                   {ungrouped.map(renderCard)}
                 </ul>
               )}
@@ -881,9 +887,43 @@ function NoteCard({
   uploading?: boolean;
 }) {
   const t = useT();
-  // The overview's two looks (Settings → Appearance → Note list): `cards` is
-  // the roomier, multi-line treatment; `rows` is the compact one-line list.
-  const cards = useAppearance().listLayout === "cards";
+  // The overview's three looks (Settings → Appearance → Note list): `cards` is
+  // the roomier, multi-line treatment; `rows` is the compact one-line list with
+  // a title and a one-line excerpt; `list` is the bare file-explorer listing —
+  // a file glyph and the title only, no excerpt and no card chrome.
+  const layout = useAppearance().listLayout;
+  const cards = layout === "cards";
+  const list = layout === "list";
+
+  // The file-explorer listing: just a document glyph and the title, dense and
+  // chrome-free so a folder's notes read like files in a tree. No excerpt, and
+  // the lock / upload glyphs still ride alongside the title.
+  if (list) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-center gap-2 rounded-[var(--radius)] px-2 py-1.5 text-left text-sm text-fg-bright transition-colors hover:bg-surface-2"
+      >
+        <NoteIcon className="h-4 w-4 shrink-0 text-muted" />
+        <span className="truncate">{noteTitle(note)}</span>
+        {uploading ? (
+          <>
+            <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" />
+            <span className="sr-only">{t("app.uploadingNote")}</span>
+          </>
+        ) : (
+          encrypted && (
+            <>
+              <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
+              <span className="sr-only">{t("app.encryptedNote")}</span>
+            </>
+          )
+        )}
+      </button>
+    );
+  }
+
   const preview = cards ? notePreviewBlock(note) : notePreview(note);
   // Only fade the tail when there's plausibly more text below the clamp — a
   // short note shouldn't have its one line dimmed. A cheap content heuristic

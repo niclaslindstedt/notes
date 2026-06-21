@@ -251,19 +251,22 @@ export const LINK_SHORTEN_LENGTHS: readonly number[] = [0, 8, 12, 16, 24];
 // How the overview lays each note out. `rows` is the compact list — title plus
 // a one-line excerpt; `cards` is the taller, roomier treatment — title plus a
 // multi-line excerpt that clamps its height and fades its tail out, so the list
-// reads more like a wall of cards than a dense index. A device/user preference
-// that rides alongside the appearance settings (it changes nothing about the
-// note document), so it lives in the synced `Appearance`, not the note model.
-export type ListLayout = "rows" | "cards";
+// reads more like a wall of cards than a dense index; `list` is the densest of
+// the three — a bare file-explorer listing of titles only, each note a single
+// icon-and-name row with no excerpt, so the overview reads like a file tree. A
+// device/user preference that rides alongside the appearance settings (it
+// changes nothing about the note document), so it lives in the synced
+// `Appearance`, not the note model.
+export type ListLayout = "rows" | "cards" | "list";
 
-export const LIST_LAYOUTS: readonly ListLayout[] = ["rows", "cards"];
+export const LIST_LAYOUTS: readonly ListLayout[] = ["rows", "cards", "list"];
 
 // Cards is the default — the overview should feel inviting out of the box, not
 // like a terse file listing.
 export const DEFAULT_LIST_LAYOUT: ListLayout = "cards";
 
 export function isListLayout(v: unknown): v is ListLayout {
-  return v === "rows" || v === "cards";
+  return v === "rows" || v === "cards" || v === "list";
 }
 
 // Where the side menu places folders relative to the loose (ungrouped) notes

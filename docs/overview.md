@@ -75,17 +75,23 @@ The preview body honours the [note-list layout](#note-list-layout)
 (`notePreview`); in **cards** it's a multi-line excerpt (`notePreviewBlock`)
 that keeps the note's line breaks, clamps its height, and fades its tail out
 with a CSS mask gradient when there's more text below the clamp (a cheap
-content-length heuristic decides whether to fade, so a short note isn't dimmed).
+content-length heuristic decides whether to fade, so a short note isn't dimmed);
+in **list** there's no preview at all — `NoteCard` returns early to a bare
+file-explorer row of a document glyph plus the title.
 
 ### Note-list layout
 
-The overview's two looks, chosen in Settings → Appearance → Note list
-(`Appearance.listLayout`, a `ListLayout` of `"rows" | "cards"` in
+The overview's three looks, chosen in Settings → Appearance → Note list
+(`Appearance.listLayout`, a `ListLayout` of `"rows" | "cards" | "list"` in
 `src/theme/themes.ts`; the control is a segmented row in `AppearanceSection`).
 **Cards** is the default — taller, roomier note cards with a multi-line,
 tail-fading excerpt so the overview reads like a wall of cards. **Rows** is the
-compact one-line list. It's a synced appearance preference (it changes nothing
-about the note document), and switching it the first time unlocks the
+compact one-line list — a title plus a one-line excerpt. **List** is the densest
+— a bare file-explorer listing of titles only: each note is a single
+document-glyph-and-name row with no excerpt and no card chrome, packed tight
+(`NoteList` tightens the row gap to `gap-0.5`) under its folder header so the
+overview reads like a file tree. It's a synced appearance preference (it changes
+nothing about the note document), and switching it the first time unlocks the
 **Gallery** achievement. Read by `NoteCard`, which applies to the archive view's
 cards too.
 

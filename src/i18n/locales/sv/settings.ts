@@ -109,8 +109,9 @@ const settings: SettingsCatalog = {
     listLayout: "Layout",
     listLayoutRows: "Rader",
     listLayoutCards: "Kort",
+    listLayoutList: "Lista",
     listLayoutHint:
-      "Rader är en kompakt enradslista; kort är högre och visar mer av varje anteckning innan den tonas ut.",
+      "Rader är en kompakt enradslista; kort är högre och visar mer av varje anteckning innan den tonas ut; lista är en avskalad filträdsvy med endast titlar.",
     sidebar: "Sidofält",
     folderPlacement: "Mappar",
     folderPlacementTop: "Överst",
