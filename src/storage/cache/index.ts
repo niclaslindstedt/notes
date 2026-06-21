@@ -33,8 +33,22 @@ import {
 } from "../adapter.ts";
 import { isEncryptedEnvelope } from "../crypto.ts";
 import { DEFAULT_NAMESPACE_SLUG } from "../namespaces.ts";
+import { backoffDelayMs } from "../save-retry.ts";
 
 const log = createLogger("cache");
+
+// A single dropped request — a flaky-link blip, an iOS Safari "Load failed"
+// TypeError — shouldn't flip the whole app to "offline". A load that looks like
+// a network failure is retried this many times (short backoff) before we fall
+// back to the mirror and raise the offline banner, so "offline" reflects a
+// sustained outage rather than one hiccup. Typed errors (auth/conflict/rate
+// limit) are never retried here — they aren't offline and have their own
+// handling. The save path has its own engine-level retry, so this guards loads
+// only.
+const LOAD_OFFLINE_RETRIES = 2;
+
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 // Raised by callers that need a backend round-trip but found neither the
 // network nor a cached copy to fall back on — e.g. unlocking on a brand-new
@@ -66,6 +80,8 @@ export type LocalCacheOptions = {
    */
   seal?: (plaintext: string) => Promise<string>;
   unseal?: (sealed: string) => Promise<string>;
+  /** Backoff sleep between load retries; injectable so tests stay instant. */
+  sleep?: (ms: number) => Promise<void>;
 };
 
 // A failure means "serve the cache" only when it's a raw network error, never
@@ -110,6 +126,7 @@ export function withLocalCache(
   options: LocalCacheOptions,
 ): StorageAdapter {
   const { storage, key, seal, unseal } = options;
+  const sleep = options.sleep ?? defaultSleep;
 
   // Seal plaintext into the mirror format (or pass through when no seal is
   // wired). Best-effort: if sealing throws we'd rather skip caching than crash a
@@ -182,54 +199,72 @@ export function withLocalCache(
     },
 
     async load(): Promise<StoredSnapshot | null> {
-      try {
-        // Hand the inner backend our cached copy (unsealed) so a file-per-note
-        // backend can fetch only the notes whose revision moved instead of
-        // re-reading the whole folder — the read half of keeping a large note
-        // set in sync.
-        let previous: StoredSnapshot | undefined;
-        const cached = readCache();
-        if (cached) {
-          try {
-            previous = { ...cached, text: await unsealFromCache(cached.text) };
-          } catch {
-            // A mirror we can't unseal (no key yet) is no use as a reuse hint.
-            previous = undefined;
-          }
+      // Hand the inner backend our cached copy (unsealed) so a file-per-note
+      // backend can fetch only the notes whose revision moved instead of
+      // re-reading the whole folder — the read half of keeping a large note
+      // set in sync. Computed once; reused across the offline retries below.
+      let previous: StoredSnapshot | undefined;
+      const cachedHint = readCache();
+      if (cachedHint) {
+        try {
+          previous = {
+            ...cachedHint,
+            text: await unsealFromCache(cachedHint.text),
+          };
+        } catch {
+          // A mirror we can't unseal (no key yet) is no use as a reuse hint.
+          previous = undefined;
         }
-        const snap = await inner.load(previous);
-        if (snap) {
-          try {
-            writeCache({
-              text: await sealForCache(snap.text),
-              revision: snap.revision,
-            });
-          } catch (err) {
-            log.warn("load: sealing cache failed — skipping mirror", err);
+      }
+
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const snap = await inner.load(previous);
+          if (snap) {
+            try {
+              writeCache({
+                text: await sealForCache(snap.text),
+                revision: snap.revision,
+              });
+            } catch (err) {
+              log.warn("load: sealing cache failed — skipping mirror", err);
+            }
+          } else {
+            // The remote genuinely has nothing — drop any stale mirror so an
+            // offline read can't resurrect a document that was deleted.
+            clearCache();
           }
-        } else {
-          // The remote genuinely has nothing — drop any stale mirror so an
-          // offline read can't resurrect a document that was deleted.
-          clearCache();
-        }
-        return snap;
-      } catch (err) {
-        if (isOfflineError(err)) {
-          const cached = readCache();
-          if (cached) {
-            log.info("load: backend offline — serving cached copy");
-            return {
-              ...cached,
-              text: await unsealFromCache(cached.text),
-              offline: true,
-            };
+          return snap;
+        } catch (err) {
+          if (isOfflineError(err)) {
+            // Don't flip to offline on one blip: give a network failure a
+            // couple of quick retries first, so a single dropped request
+            // (common on mobile) recovers without the banner ever showing.
+            if (attempt < LOAD_OFFLINE_RETRIES) {
+              log.info(
+                `load: network failure (attempt ${attempt + 1}) — retrying before offline`,
+              );
+              await sleep(
+                backoffDelayMs(attempt, { baseMs: 300, maxMs: 2000 }),
+              );
+              continue;
+            }
+            const cached = readCache();
+            if (cached) {
+              log.info("load: backend offline — serving cached copy");
+              return {
+                ...cached,
+                text: await unsealFromCache(cached.text),
+                offline: true,
+              };
+            }
+            log.warn("load: backend offline and no cached copy");
           }
-          log.warn("load: backend offline and no cached copy");
+          // Either a real (typed) error, or offline with an empty cache. Let
+          // the caller decide — `useStorageBackend.unlock` maps the latter to a
+          // distinct "you're offline" message.
+          throw err;
         }
-        // Either a real (typed) error, or offline with an empty cache. Let
-        // the caller decide — `useStorageBackend.unlock` maps the latter to a
-        // distinct "you're offline" message.
-        throw err;
       }
     },
 

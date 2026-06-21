@@ -191,6 +191,7 @@ export function App() {
         !storage.locked &&
         storage.backend !== "browser",
       disabling: storage.encryptionDisabling,
+      paused: sync.offline,
       notes: sync.doc.notes,
       getStatus: storage.getEncryptionStatus,
       migrateNote: storage.migrateNote,
