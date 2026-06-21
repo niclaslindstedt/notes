@@ -76,7 +76,7 @@ export function HomePage() {
           <ul className="ml-5 list-disc space-y-1.5">
             <li>
               Write, edit, and organise plain-text notes — each with its own
-              editable title (heading the page beside the app glyph) and a
+              editable title (heading the page beside a back button) and a
               Markdown body that formats as you type. New notes can be named
               automatically by date and time or with a running number, and each
               note is tidied as it's saved — trailing spaces trimmed and a

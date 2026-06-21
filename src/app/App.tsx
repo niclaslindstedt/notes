@@ -59,7 +59,6 @@ import {
   FolderIcon,
   FolderOpenIcon,
   LockIcon,
-  NotesMarkIcon,
   PlusIcon,
   RestoreIcon,
   SpinnerIcon,
@@ -85,7 +84,7 @@ import {
   applyFaviconHref,
   namespaceFaviconHref,
 } from "../ui/namespace-favicon.ts";
-import { NavContext, useNav } from "../ui/nav-context.ts";
+import { NavContext } from "../ui/nav-context.ts";
 import { APP_VIEWPORT_RECT } from "../ui/appViewportRect.ts";
 import { SideMenu } from "../ui/SideMenu.tsx";
 import { PullToRefreshIndicator } from "../ui/PullToRefreshIndicator.tsx";
@@ -512,6 +511,7 @@ export function App() {
                     note={editing}
                     editor={editor}
                     folders={folders}
+                    onBack={showAll}
                     onMoveFolder={(folderId) => moveNote(editing.id, folderId)}
                     onChange={(body) => update(editing.id, body)}
                     onTitleChange={(title) => retitle(editing.id, title)}
@@ -1227,6 +1227,7 @@ function Editor({
   note,
   editor,
   folders,
+  onBack,
   onMoveFolder,
   onChange,
   onTitleChange,
@@ -1240,6 +1241,8 @@ function Editor({
   editor: EditorSettings;
   /** Folders the note can be filed into, for the header folder picker. */
   folders: Folder[];
+  /** Leave the editor and return to the overview (the header back button). */
+  onBack: () => void;
   /** File the open note into `folderId`, or out of any folder when `null`. */
   onMoveFolder: (folderId: string | null) => void;
   onChange: (body: string) => void;
@@ -1252,7 +1255,6 @@ function Editor({
   onAttach: (attachment: Attachment) => void;
 }) {
   const t = useT();
-  const nav = useNav();
   const maxWidth = editorMarginMaxWidth(editor.margin);
   // A brand-new note opens with the caret in the title so it's ready to be
   // named; opening an existing note focuses nothing, so the soft keyboard
@@ -1284,33 +1286,32 @@ function Editor({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* The title heads the page, prefixed by the app glyph — the editable
-          document title, the way checklist heads each list with its name and
-          icon. Pressing the glyph opens the side menu, so it doubles as the
-          page's menu button; there is no Back button — the menu's "Show all"
-          returns to the overview. The glyph box matches the title's first-line
-          height (leading-tight on text-lg) and centres the icon within it, so
-          the two stay vertically aligned even when a long title wraps and the
-          header top-aligns the rest. A single-line title centres the whole row;
-          once it wraps the header top-aligns so the glyph and the copy/sync
-          buttons stay pinned to the first line. */}
+      {/* The title heads the page, prefixed by a back button — pressing it
+          leaves the editor and returns to the overview (the side menu is
+          reached the usual ways). The button box matches the title's
+          first-line height (leading-tight on text-lg) and centres the icon
+          within it, so the two stay vertically aligned even when a long title
+          wraps and the header top-aligns the rest. A single-line title centres
+          the whole row; once it wraps the header top-aligns so the button and
+          the copy/sync buttons stay pinned to the first line. */}
       <header
         className={`sticky top-0 z-10 flex gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))] ${titleMultiline ? "items-start" : "items-center"}`}
       >
         <button
           type="button"
-          onClick={nav.toggle}
-          aria-label={t("nav.open")}
+          onClick={onBack}
+          aria-label={t("app.back")}
+          title={t("app.back")}
           className="flex h-[1.40625rem] shrink-0 cursor-pointer items-center text-accent outline-none"
         >
-          {/* While the open note is being written to the backend, the brand
+          {/* While the open note is being written to the backend, the back
               glyph becomes a spinner so the note you're editing shows its own
               sync state (the header cloud glyph means "any sync", this one
-              means "this note"). The button still opens the menu. */}
+              means "this note"). The button still goes back. */}
           {uploading ? (
             <SpinnerIcon className="h-6 w-6 animate-spin text-muted" />
           ) : (
-            <NotesMarkIcon className="h-6 w-6" />
+            <ArrowLeftIcon className="h-6 w-6" />
           )}
         </button>
         <TitleField
