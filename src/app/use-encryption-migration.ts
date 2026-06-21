@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { unlock } from "../achievements/index.ts";
-import { noteTitle, type Note } from "../domain/note.ts";
+import type { Note } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 import { useT } from "../i18n/index.ts";
 import type { NoteConversionStep } from "../storage/adapter.ts";
@@ -49,6 +49,12 @@ type Options = {
   enabled: boolean;
   /** Turning encryption off: run the reverse (decrypt) conversion instead. */
   disabling: boolean;
+  /**
+   * The backend is unreachable (offline). The converter reads/writes the live
+   * backend, so the queue holds here rather than failing every note against an
+   * unreachable server — it resumes automatically when connectivity returns.
+   */
+  paused?: boolean;
   /** The notes to converge to the target representation. */
   notes: readonly Note[];
   /** The adapter's current per-note status (seed + resume hint). */
@@ -77,6 +83,7 @@ export type UseEncryptionMigration = {
 export function useEncryptionMigration({
   enabled,
   disabling,
+  paused = false,
   notes,
   getStatus,
   migrateNote,
@@ -111,8 +118,12 @@ export function useEncryptionMigration({
       note: Note,
       step: NoteConversionStep,
     ) => {
-      const title = noteTitle(note);
       const tt = tRef.current;
+      // A note whose ciphertext we couldn't read this session has no decrypted
+      // title yet; show a neutral placeholder rather than the misleading
+      // "Untitled note" fallback (which a named-but-unread note would hit).
+      const title =
+        note.title.trim() || tt("settings.storage.conversionUntitled");
       if (step.phase === "attachment") {
         return tt(
           direction === "encrypt"
@@ -138,11 +149,27 @@ export function useEncryptionMigration({
       setConversion(IDLE);
       return;
     }
-    const myRun = ++runRef.current;
-    const cancelled = () => runRef.current !== myRun;
     const direction: "encrypt" | "decrypt" = disabling ? "decrypt" : "encrypt";
 
+    // Seed the locks from the adapter's last-known status so they render
+    // immediately — kept even while paused.
     setStatus(new Map(getStatus?.() ?? new Map()));
+
+    if (paused) {
+      // Offline: don't burn the queue against an unreachable backend. Show a
+      // neutral "paused" line (no error) and resume when `paused` flips back.
+      setConversion({
+        ...IDLE,
+        direction,
+        total: notes.length,
+        message: tRef.current("settings.storage.conversionPaused"),
+      });
+      return;
+    }
+
+    const myRun = ++runRef.current;
+    const cancelled = () => runRef.current !== myRun;
+
     const total = notes.length;
     setConversion({ ...IDLE, busy: true, direction, total });
 
@@ -173,6 +200,17 @@ export function useEncryptionMigration({
             const text = messageFor(direction, note, step);
             setConversion((prev) => ({ ...prev, message: text }));
             pushLog(text, "info");
+          },
+          onRetry: (note, _err, attempt) => {
+            if (cancelled()) return;
+            const text = tRef.current("settings.storage.conversionRetry", {
+              title:
+                note.title.trim() ||
+                tRef.current("settings.storage.conversionUntitled"),
+              attempt,
+            });
+            setConversion((prev) => ({ ...prev, message: text }));
+            pushLog(text, "warn");
           },
           onNoteDone: (note) => {
             if (cancelled()) return;
@@ -226,6 +264,7 @@ export function useEncryptionMigration({
   }, [
     enabled,
     disabling,
+    paused,
     notesKey,
     migrateNote,
     demigrateNote,

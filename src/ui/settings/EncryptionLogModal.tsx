@@ -15,7 +15,9 @@ export type EncryptionLogEntry = {
   /** Already-translated, human-readable line. */
   text: string;
   ts: number;
-  level: "info" | "error";
+  // "warn" marks a recoverable hiccup (a transient retry) — distinct from a
+  // hard "error" that stopped the run.
+  level: "info" | "warn" | "error";
 };
 
 // A live snapshot of the background encryption conversion (the paced per-note
@@ -77,7 +79,9 @@ export function EncryptionLogModal({ open, entries, onClose }: Props) {
                 className={`flex flex-wrap items-baseline gap-2 border-b border-l-2 border-line px-2.5 py-1.5 last:border-b-0 ${
                   entry.level === "error"
                     ? "border-l-danger"
-                    : "border-l-accent"
+                    : entry.level === "warn"
+                      ? "border-l-link"
+                      : "border-l-accent"
                 }`}
               >
                 <span className="text-muted tabular-nums">
@@ -85,7 +89,11 @@ export function EncryptionLogModal({ open, entries, onClose }: Props) {
                 </span>
                 <span
                   className={`break-words whitespace-pre-wrap ${
-                    entry.level === "error" ? "text-danger" : "text-fg"
+                    entry.level === "error"
+                      ? "text-danger"
+                      : entry.level === "warn"
+                        ? "text-link"
+                        : "text-fg"
                   }`}
                 >
                   {entry.text}

@@ -1238,9 +1238,18 @@ reports flips immediately (the encrypted load merges any not-yet-converted
 remnants, so the document stays complete and the run is resumable across a
 reload), then the queue converts one note at a time — small pacing gap +
 `RateLimitError` backoff so a big folder never bursts the cloud API, and the
-settings modal can be **closed while it runs**. Existing users on a legacy
-whole-document `notes.json` are upgraded first by `splitLegacyBlob` (forward
-only). Each converter reports fine-grained steps (each attachment, then the note
+settings modal can be **closed while it runs**. Failures are **triaged, not
+blanket-aborted**, so a flaky link can't strand a folder half-converted: a
+*transient* error (a dropped fetch / "Load failed", a 5xx) retries the same
+note with growing backoff up to a budget (`onRetry` surfaces "retrying…" in
+the log) before giving up; a *permanent* one (auth expired, a write conflict)
+propagates straight to its reconnect / resolve UI. While the backend is
+**offline** the queue holds entirely (`paused`) rather than failing every note
+against an unreachable server — it keeps the locks visible, shows a neutral
+"paused" line, and **resumes on its own when connectivity returns** (the hook
+re-runs when `paused` flips, and each converter is idempotent so it picks up
+where it left off). Existing users on a legacy whole-document `notes.json` are
+upgraded first by `splitLegacyBlob` (forward only). Each converter reports fine-grained steps (each attachment, then the note
 file) so the [storage settings](#storage-settings) can flash what it's on, and
 the hook returns both the per-note `encrypted` / `pending` status map
 (`getEncryptionStatus`, drives the green [lock](#note-card) in the overview and
@@ -1255,9 +1264,12 @@ plaintext it calls `onDisableComplete` to finalise the turn-off.
 into localStorage (per-backend, per-namespace) so the document reads and edits
 offline. It sits between the cloud adapter and the encryption wrapper, so cached
 bytes are exactly what the cloud holds (encrypted if encryption is on). On a
-network failure (`isOfflineError`) it falls back to the cache and flags
-`offline: true`; typed errors (conflict/auth/rate-limit) bypass the cache so
-their handlers still fire, and an empty cache raises `OfflineUnavailableError`.
+network failure (`isOfflineError`) it **retries the load a couple of times with
+short backoff before** falling back to the cache and flagging `offline: true`,
+so a single dropped request (a flaky mobile link, an iOS Safari "Load failed"
+`TypeError`) doesn't flap the offline banner — only a sustained outage does;
+typed errors (conflict/auth/rate-limit) bypass the cache so their handlers
+still fire, and an empty cache raises `OfflineUnavailableError`.
 The wrapper also exposes `loadSync` from the mirror, so a cloud backend paints
 its last-known notes on the first frame instead of flashing an empty list while
 the network round-trip runs (the async `load()` then replaces them with the

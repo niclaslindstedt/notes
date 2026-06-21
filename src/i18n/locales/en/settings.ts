@@ -184,6 +184,11 @@ const settings = {
     encryptingAttachment: "Encrypting “{filename}” (attachment of “{title}”)…",
     decryptingNote: "Decrypting “{title}”…",
     decryptingAttachment: "Decrypting “{filename}” (attachment of “{title}”)…",
+    conversionRetry:
+      "Couldn't reach the backend — retrying “{title}” (attempt {attempt})…",
+    conversionPaused:
+      "Paused while offline — resumes when the connection returns.",
+    conversionUntitled: "this note",
     conversionCanClose:
       "You can now close settings — this finishes in the background.",
     encryptionFailed: "Something went wrong. Tap to see the log.",

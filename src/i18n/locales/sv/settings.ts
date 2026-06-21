@@ -183,6 +183,11 @@ const settings: SettingsCatalog = {
     encryptingAttachment: "Krypterar ”{filename}” (bilaga till ”{title}”)…",
     decryptingNote: "Dekrypterar ”{title}”…",
     decryptingAttachment: "Dekrypterar ”{filename}” (bilaga till ”{title}”)…",
+    conversionRetry:
+      "Kunde inte nå backend – försöker igen med ”{title}” (försök {attempt})…",
+    conversionPaused:
+      "Pausad medan du är offline – återupptas när anslutningen kommer tillbaka.",
+    conversionUntitled: "den här anteckningen",
     conversionCanClose:
       "Du kan stänga inställningarna nu – det här slutförs i bakgrunden.",
     encryptionFailed: "Något gick fel. Tryck för att se loggen.",

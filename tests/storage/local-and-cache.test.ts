@@ -89,12 +89,49 @@ describe("withLocalCache", () => {
     const cached = withLocalCache(adapter, {
       storage,
       key: localCacheKey("dropbox"),
+      sleep: async () => {},
     });
     await cached.save("v1");
     setOffline(true);
     const snap = await cached.load();
     expect(snap?.text).toBe("v1");
     expect(snap?.offline).toBe(true);
+  });
+
+  it("rides out a transient blip without flagging offline", async () => {
+    const storage = memoryStorage();
+    let stored: StoredSnapshot | null = { text: "v1", revision: "r1" };
+    let failuresLeft = 0;
+    let loads = 0;
+    const adapter: StorageAdapter = {
+      id: "dropbox",
+      label: "Blippy",
+      capabilities: new Set(),
+      async load() {
+        loads++;
+        if (failuresLeft > 0) {
+          failuresLeft--;
+          throw new TypeError("Load failed");
+        }
+        return stored;
+      },
+      async save(text) {
+        stored = { text, revision: "r1" };
+        return stored;
+      },
+    };
+    const cached = withLocalCache(adapter, {
+      storage,
+      key: localCacheKey("dropbox"),
+      sleep: async () => {},
+    });
+    // Two dropped requests, then success — within the retry budget, so the
+    // load recovers and never reports offline.
+    failuresLeft = 2;
+    const snap = await cached.load();
+    expect(snap?.text).toBe("v1");
+    expect(snap?.offline).toBeUndefined();
+    expect(loads).toBe(3);
   });
 
   it("persists an offline save locally and re-throws so the engine retries", async () => {
@@ -177,6 +214,7 @@ describe("withLocalCache — sealed mirror (encryption on)", () => {
       key: localCacheKey("dropbox"),
       seal: (t) => encryptText(t, "pw"),
       unseal: (t) => decryptEnvelope(t, "pw"),
+      sleep: async () => {},
     });
 
     const secret = JSON.stringify({ notes: [{ id: "a", body: "TOPSECRET" }] });
