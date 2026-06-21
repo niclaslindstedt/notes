@@ -611,7 +611,7 @@ function FolderPicker({
           <span className="truncate">{o?.label ?? t("nav.noFolder")}</span>
         </span>
       )}
-      triggerClassName="flex max-w-[9rem] cursor-pointer items-center gap-1 rounded-[var(--radius)] border border-line bg-transparent px-2 py-1 text-left text-sm text-fg hover:border-accent focus-visible:border-accent focus-visible:outline-none"
+      triggerClassName="flex h-9 max-w-[9rem] cursor-pointer items-center gap-1 rounded-[var(--radius)] border border-line bg-transparent px-2 text-left text-sm text-fg hover:border-accent focus-visible:border-accent focus-visible:outline-none"
       panelClassName="max-h-64 overflow-y-auto"
     />
   );
