@@ -211,7 +211,7 @@ export interface UseStorageBackend {
    */
   finishDisableEncryption: () => void;
   /** Supply the passphrase for an already-encrypted store; throws if wrong. */
-  unlock: (password: string) => Promise<void>;
+  unlock: (password: string, onProgress?: EncryptionProgress) => Promise<void>;
   /** Namespaces known on this device (default always first). */
   namespaces: Namespace[];
   /** The active namespace's slug. */
@@ -901,15 +901,20 @@ export function useStorageBackend(): UseStorageBackend {
   }, [applyPassword]);
 
   const unlock = useCallback(
-    async (candidate: string) => {
+    async (candidate: string, onProgress?: EncryptionProgress) => {
       if (!candidate) throw new Error("Passphrase is required");
       // Tentatively activate the candidate so the directory adapter derives keys
       // and decrypts the per-file notes (or the offline cache falls back and
       // unseals against it). A wrong passphrase surfaces as an AES-GCM auth
       // failure ("Wrong password"); an unreachable backend with nothing cached
       // maps to the distinct "you're offline" error.
+      // The phases bracket the single `inner.load()` that does the real work
+      // (derive key → read → decrypt) so the unlock gate can flash what's
+      // happening instead of sitting blank.
+      onProgress?.("derivingKey");
       passwordRef.current = candidate;
       try {
+        onProgress?.("decrypting");
         await inner.load();
       } catch (err) {
         passwordRef.current = password;
@@ -919,6 +924,7 @@ export function useStorageBackend(): UseStorageBackend {
         log.warn("unlock: backend unreachable and no cached copy", err);
         throw new OfflineUnavailableError(undefined, { cause: err });
       }
+      onProgress?.("finalizing");
       applyPassword(candidate);
     },
     [inner, password, applyPassword],

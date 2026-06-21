@@ -140,7 +140,7 @@ Honour these when naming a new file, key, or string.
 | **Sync details modal** / **cloud sync command centre** / **what went wrong with sync** / **sync log (in the modal)** | `SyncDetailsModal` (`src/ui/SyncDetailsModal.tsx`); the in-modal sync-log panel filters the [logger](#logger) buffer by `SYNC_LOG_SCOPES`. [→](overview.md#sync-details-modal)                       |
 | **Conflict modal** / **another device edited** / **keep mine** | `ConflictModal` (`src/ui/ConflictModal.tsx`). [→](overview.md#conflict-modal)                                 |
 | **Encryption log modal** / **encryption log**              | `EncryptionLogModal` (`src/ui/settings/EncryptionLogModal.tsx`). [→](overview.md#encryption-log-modal)        |
-| **Unlock gate** / **passphrase prompt**                    | `UnlockGate` (`src/ui/UnlockGate.tsx`). [→](overview.md#unlock-gate)                                          |
+| **Unlock gate** / **passphrase prompt** / **unlock status** / **unlock spinner** | `UnlockGate` (`src/ui/UnlockGate.tsx`); shares `BusyLabel` (`src/ui/BusyLabel.tsx`) + `STEP_MESSAGE_KEY` (`src/ui/encryption-progress.ts`) with the encryption status bar. [→](overview.md#unlock-gate) |
 
 ## Settings tabs
 
@@ -150,7 +150,7 @@ Honour these when naming a new file, key, or string.
 | **Appearance settings** / **theme picker / font / density** | `AppearanceSection` (`src/ui/settings/AppearanceSection.tsx`); `ColorPalette` (`src/ui/ColorPalette.tsx`). [→](overview.md#appearance-settings) |
 | **Editor settings** / **margin / word-wrap / spell-check** | `EditorSection` (`src/ui/settings/EditorSection.tsx`). [→](overview.md#editor-settings)                       |
 | **Storage settings** / **pick a backend / encryption**     | `StorageSection` (`src/ui/settings/StorageSection.tsx`). [→](overview.md#storage-settings)                    |
-| **Encryption status bar** / **encryption progress** / **turn-on/off spinner** / **"You can now close settings"** | status-bar + `ButtonLabel` spinner in `EncryptionSection` (`src/ui/settings/StorageSection.tsx`), fed by the `EncryptionConversionState` snapshot; `EncryptionProgress`, `EncryptionProgressStep` (`src/storage/useStorageBackend.ts`). [→](overview.md#storage-settings) |
+| **Encryption status bar** / **encryption progress** / **turn-on/off spinner** / **"You can now close settings"** | status-bar + `BusyLabel` spinner (`src/ui/BusyLabel.tsx`) in `EncryptionSection` (`src/ui/settings/StorageSection.tsx`), fed by the `EncryptionConversionState` snapshot; `STEP_MESSAGE_KEY` (`src/ui/encryption-progress.ts`); `EncryptionProgress`, `EncryptionProgressStep` (`src/storage/useStorageBackend.ts`). [→](overview.md#storage-settings) |
 | **Developer settings** / **dev mode**                      | `DeveloperSection` (`src/ui/settings/DeveloperSection.tsx`); `useDevMode` (`src/dev/useDevMode.ts`). [→](overview.md#developer-settings) |
 | **Fake data** / **sample data** / **seed** / **Holodeck**  | `useDevSeed` (`src/dev/useDevSeed.ts`) + `createDevSeedAdapter` (`src/storage/dev-seed/index.ts`); env seed `seedDevData` / `buildSeed` (`src/dev/seed.ts`). [→](overview.md#fake-data) |
 | **Logs tab** / **captured logs**                           | `LogsSection` (`src/ui/settings/LogsSection.tsx`); `logger` (`src/dev/logger.ts`). [→](overview.md#logs)      |

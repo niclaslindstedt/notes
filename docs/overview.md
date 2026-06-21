@@ -805,7 +805,15 @@ revision, "keep the other copy" adopts the remote bytes.
 `UnlockGate` (`src/ui/UnlockGate.tsx`) — the full-screen passphrase form that
 blocks the app on a fresh reload when encryption is on but no passphrase is
 cached (it's session-only by design). The appearance theme stays visible under
-the gate. See [encryption](#encryption).
+the gate. While the passphrase is being checked the **Unlock** button swaps in a
+spinner (`BusyLabel`, `src/ui/BusyLabel.tsx`) and a status line beneath it
+flashes the phase the unlock is in ("Decrypting your notes…", "Finalizing…"),
+fed by an `onProgress` callback that `storage.unlock` calls as it brackets the
+`load()` that derives the key, reads, and decrypts — so the gate hints at what's
+happening instead of sitting blank. The phase→string map (`STEP_MESSAGE_KEY`,
+`src/ui/encryption-progress.ts`) and the spinner label are shared verbatim with
+the [storage tab's encryption status bar](#storage-settings). See
+[encryption](#encryption).
 
 ## Settings tabs
 

@@ -2,8 +2,13 @@ import { useState, type FormEvent } from "react";
 
 import { useT } from "../i18n/index.ts";
 import { OfflineUnavailableError } from "../storage/cache/index.ts";
-import type { UseStorageBackend } from "../storage/useStorageBackend.ts";
-import { ShieldIcon } from "./icons.tsx";
+import type {
+  EncryptionProgress,
+  UseStorageBackend,
+} from "../storage/useStorageBackend.ts";
+import { BusyLabel } from "./BusyLabel.tsx";
+import { STEP_MESSAGE_KEY } from "./encryption-progress.ts";
+import { ShieldIcon, SpinnerIcon } from "./icons.tsx";
 
 // Full-screen unlock gate shown when encryption is on but no passphrase is
 // held this session (a fresh reload). It covers the app so the encrypted
@@ -20,14 +25,21 @@ export function UnlockGate({ storage }: Props) {
   const [pass, setPass] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The phase line the unlock flow reports while it derives the key and
+  // decrypts the notes, mirroring the storage tab's encryption status bar so
+  // the gate hints at what's happening instead of sitting blank.
+  const [step, setStep] = useState<string | null>(null);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (busy || !pass) return;
     setBusy(true);
     setError(null);
+    setStep(null);
+    const onProgress: EncryptionProgress = (s) =>
+      setStep(t(STEP_MESSAGE_KEY[s]));
     try {
-      await storage.unlock(pass);
+      await storage.unlock(pass, onProgress);
       setPass("");
     } catch (err) {
       if (err instanceof OfflineUnavailableError) {
@@ -37,6 +49,7 @@ export function UnlockGate({ storage }: Props) {
       }
     } finally {
       setBusy(false);
+      setStep(null);
     }
   };
 
@@ -59,9 +72,10 @@ export function UnlockGate({ storage }: Props) {
           onChange={(e) => setPass(e.target.value)}
           placeholder={t("settings.unlock.passphrase")}
           aria-label={t("settings.unlock.passphrase")}
+          disabled={busy}
           // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
-          className="rounded-[var(--radius)] border border-line bg-surface-2 px-3 py-2 text-sm text-fg outline-none focus:border-accent"
+          className="rounded-[var(--radius)] border border-line bg-surface-2 px-3 py-2 text-sm text-fg outline-none focus:border-accent disabled:opacity-50"
         />
         {error && (
           <p role="alert" className="text-xs text-danger">
@@ -73,8 +87,18 @@ export function UnlockGate({ storage }: Props) {
           disabled={busy || !pass}
           className="cursor-pointer rounded-[var(--radius)] border border-accent bg-accent/15 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {t("settings.unlock.unlock")}
+          <BusyLabel busy={busy}>{t("settings.unlock.unlock")}</BusyLabel>
         </button>
+        {busy && step && (
+          <div
+            role="status"
+            aria-label={t("settings.unlock.statusAria")}
+            className="flex items-center gap-2 rounded-[var(--radius)] border border-line bg-surface-2 px-2.5 py-1.5"
+          >
+            <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
+            <span className="truncate text-xs text-muted">{step}</span>
+          </div>
+        )}
       </form>
     </div>
   );

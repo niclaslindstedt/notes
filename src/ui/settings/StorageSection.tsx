@@ -1,13 +1,14 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 
-import { useT, type MessageKey } from "../../i18n/index.ts";
+import { useT } from "../../i18n/index.ts";
 import type { BackendId } from "../../storage/backend-preference.ts";
 import type {
   EncryptionProgress,
-  EncryptionProgressStep,
   UseStorageBackend,
 } from "../../storage/useStorageBackend.ts";
 import { ShieldIcon, SpinnerIcon } from "../icons.tsx";
+import { BusyLabel } from "../BusyLabel.tsx";
+import { STEP_MESSAGE_KEY } from "../encryption-progress.ts";
 import { scrollFocusedIntoView } from "../hooks/scrollFocusedIntoView.ts";
 import { Button } from "../form/Button.tsx";
 import {
@@ -16,17 +17,6 @@ import {
   type EncryptionLogEntry,
 } from "./EncryptionLogModal.tsx";
 import { Section } from "./shared.tsx";
-
-// Maps each progress phase the storage layer reports to the catalog string the
-// status bar flashes. Module-level so the record is built once, not per render.
-const STEP_MESSAGE_KEY: Record<EncryptionProgressStep, MessageKey> = {
-  reading: "settings.storage.encryptionStepReading",
-  derivingKey: "settings.storage.encryptionStepDerivingKey",
-  encrypting: "settings.storage.encryptionStepEncrypting",
-  decrypting: "settings.storage.encryptionStepDecrypting",
-  saving: "settings.storage.encryptionStepSaving",
-  finalizing: "settings.storage.encryptionStepFinalizing",
-};
 
 // Storage settings: pick the backend that persists the notes (this device /
 // local folder / Dropbox / Google Drive) and toggle at-rest encryption.
@@ -417,9 +407,9 @@ function EncryptionSection({
           </p>
           <div className="flex items-center gap-2">
             <Button type="submit" variant="primary" disabled={busy}>
-              <ButtonLabel busy={busy}>
+              <BusyLabel busy={busy}>
                 {t("settings.storage.enableEncryption")}
-              </ButtonLabel>
+              </BusyLabel>
             </Button>
             <Button
               type="button"
@@ -441,9 +431,9 @@ function EncryptionSection({
 
       {on && (
         <Button variant="danger" onClick={() => void disable()} disabled={busy}>
-          <ButtonLabel busy={busy}>
+          <BusyLabel busy={busy}>
             {t("settings.storage.disableEncryption")}
-          </ButtonLabel>
+          </BusyLabel>
         </Button>
       )}
 
@@ -489,23 +479,5 @@ function EncryptionSection({
         onClose={() => setLogOpen(false)}
       />
     </Section>
-  );
-}
-
-// A button label that swaps in a leading spinner while a flow runs, so the
-// turn-on / turn-off button itself shows it's working — not just the status bar.
-function ButtonLabel({
-  busy,
-  children,
-}: {
-  busy: boolean;
-  children: ReactNode;
-}) {
-  if (!busy) return <>{children}</>;
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
-      {children}
-    </span>
   );
 }
