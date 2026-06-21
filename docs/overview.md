@@ -1241,7 +1241,7 @@ the notes list).
 `SideMenu` (`src/ui/SideMenu.tsx`) renders the folders and the ungrouped notes
 together in one root drop zone below the Notes heading. The Notes heading
 carries no trailing action — adding a folder lives on the action bar below as
-the **New folder** `BarButton` (`FolderPlusIcon`), beside New note. Pressing it
+the **New folder** `BarButton` (a plain `FolderIcon`), beside New note. Pressing it
 drops an inline, unnamed `FolderEditRow` into the list — commit a name
 (Enter / blur) to persist it, or defocus it empty to discard it (the row simply
 vanishes, so a misfire costs nothing). Each `FolderRow` expands to

@@ -29,7 +29,6 @@ import {
   CogIcon,
   FolderIcon,
   FolderOpenIcon,
-  FolderPlusIcon,
   HeartIcon,
   ListIcon,
   LockIcon,
@@ -644,7 +643,7 @@ export function SideMenu({
             }}
           />
           <BarButton
-            icon={<FolderPlusIcon className="h-5 w-5" />}
+            icon={<FolderIcon className="h-5 w-5" />}
             label={t("nav.newFolder")}
             onClick={() => setCreatingFolder(true)}
           />
