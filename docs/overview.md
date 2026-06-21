@@ -244,7 +244,7 @@ keystroke, which is why it lives in `domain/`.
 `TitleField` in `src/app/App.tsx` — the note's title field above the editor. It
 is an auto-growing textarea, so a long title wraps onto further lines and the
 field grows to fit instead of scrolling out of view. A single-line title is
-vertically centred against the app glyph and the copy/sync buttons; once it
+vertically centred against the back button and the copy/sync buttons; once it
 wraps the header top-aligns so those stay pinned to the first line (the field
 reports the one-line↔multi-line transition up via `onMultilineChange`). Opening
 an existing note focuses nothing, so the soft keyboard stays down until the user
@@ -954,7 +954,7 @@ The header [sync glyph](#sync-status) reports one global save state; this is its
 per-note counterpart — a small spinner next to exactly the notes whose file is
 being pushed to the backend right now, shown on the overview
 [note card](#note-card), the side-menu note row, and (for the note open in the
-editor) in place of the brand glyph left of the title, so the note you're
+editor) in place of the back button left of the title, so the note you're
 editing shows its own sync state while the header cloud glyph keeps meaning
 "any sync, including other notes". The signal originates in the
 [directory adapter](#directory-adapter): `save` maps each changed note's file
