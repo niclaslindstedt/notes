@@ -41,6 +41,7 @@ import {
   TypeGlyph,
   UndoGlyph,
   WandGlyph,
+  WorkflowGlyph,
 } from "./glyphs.tsx";
 import type { Achievement } from "./types.ts";
 
@@ -196,6 +197,19 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       slices: (s) => [s.appearance.listLayout],
       predicate: (prev, next) =>
         prev.appearance.listLayout !== next.appearance.listLayout,
+    },
+  },
+  {
+    id: "sidebarArranger",
+    tier: "intermediate",
+    glyph: WorkflowGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.appearance.folderPlacement, s.appearance.noteSortKey],
+      predicate: (prev, next) =>
+        prev.appearance.folderPlacement !== next.appearance.folderPlacement ||
+        prev.appearance.noteSortKey !== next.appearance.noteSortKey,
     },
   },
   {

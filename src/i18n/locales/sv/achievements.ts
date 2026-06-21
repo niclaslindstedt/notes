@@ -99,6 +99,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Inställningar → Utseende visar översikten på två sätt: kompakta enradsrader, eller högre kort som visar flera rader av varje anteckning och tonar ut slutet. Välj det som är lättast för dig att överblicka.",
     },
+    sidebarArranger: {
+      name: "Omarrangeraren",
+      condition: "Ändra hur sidomenyn ordnar mappar och anteckningar.",
+      learnMore:
+        "Inställningar → Utseende → Sidofält avgör om mappar fästs ovanför anteckningarna eller blandas in bland dem, och om sidomenyn sorterar efter namn eller efter vad du senast ändrade.",
+    },
     marginalia: {
       name: "Marginalanteckningar",
       condition: "Justera redigerarens skrivkolumnmarginaler.",

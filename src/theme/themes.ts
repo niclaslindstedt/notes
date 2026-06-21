@@ -266,6 +266,39 @@ export function isListLayout(v: unknown): v is ListLayout {
   return v === "rows" || v === "cards";
 }
 
+// Where the side menu places folders relative to the loose (ungrouped) notes
+// above the action bar. `top` pins every folder above the loose notes (the
+// historical layout); `mixed` drops folders into the same sorted run as the
+// notes, so a folder sorts by the same key as a note — its name, or the
+// timestamp of its most-recently-edited note. A side-menu layout preference,
+// so it rides alongside the appearance settings.
+export type FolderPlacement = "top" | "mixed";
+
+export const FOLDER_PLACEMENTS: readonly FolderPlacement[] = ["top", "mixed"];
+
+// Folders-on-top is the default — it matches the historical drawer layout.
+export const DEFAULT_FOLDER_PLACEMENT: FolderPlacement = "top";
+
+export function isFolderPlacement(v: unknown): v is FolderPlacement {
+  return v === "top" || v === "mixed";
+}
+
+// What the side menu sorts notes (and, under `mixed` placement, folders) by.
+// `modified` keeps the most-recently-edited first (the historical order);
+// `name` sorts alphabetically by title. A side-menu layout preference that
+// rides alongside the appearance settings.
+export type NoteSortKey = "modified" | "name";
+
+export const NOTE_SORT_KEYS: readonly NoteSortKey[] = ["modified", "name"];
+
+// Last-modified is the default — the drawer has always led with what you
+// touched most recently.
+export const DEFAULT_NOTE_SORT_KEY: NoteSortKey = "modified";
+
+export function isNoteSortKey(v: unknown): v is NoteSortKey {
+  return v === "modified" || v === "name";
+}
+
 export type RadiusPreset = "none" | "sm" | "md" | "lg";
 export type DensityPreset = "compact" | "comfortable" | "spacious";
 

@@ -131,8 +131,10 @@ export function HomePage() {
             </li>
             <li>
               Pick a theme and appearance that suits you — including whether the
-              overview lists notes as compact rows or roomier cards; your
-              preferences are remembered on the device.
+              overview lists notes as compact rows or roomier cards, and how the
+              side menu orders your folders and notes (folders on top or mixed
+              in, sorted by name or by what you edited last); your preferences
+              are remembered on the device.
             </li>
             <li>
               Use the app in <em>English</em> or <em>Swedish</em> — it follows

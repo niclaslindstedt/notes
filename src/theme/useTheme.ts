@@ -33,20 +33,26 @@ import {
   COLOR_KEY_TO_CSS_VAR,
   DEFAULT_CUSTOM_THEME,
   DEFAULT_EDITOR_SETTINGS,
+  DEFAULT_FOLDER_PLACEMENT,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SCALE,
   DEFAULT_LIST_LAYOUT,
+  DEFAULT_NOTE_SORT_KEY,
   DEFAULT_THEME,
   FONT_FAMILIES,
   FONT_SCALE_PRESETS,
   isEditorMargin,
+  isFolderPlacement,
   isListLayout,
+  isNoteSortKey,
   LINK_SHORTEN_LENGTHS,
   type CustomTheme,
   type DensityPreset,
   type EditorSettings,
+  type FolderPlacement,
   type FontFamilyId,
   type ListLayout,
+  type NoteSortKey,
   type RadiusPreset,
   type ThemePreset,
 } from "./themes.ts";
@@ -55,7 +61,9 @@ export type {
   CustomTheme,
   CustomThemeColors,
   EditorSettings,
+  FolderPlacement,
   ListLayout,
+  NoteSortKey,
   ThemePreset,
 } from "./themes.ts";
 
@@ -74,6 +82,12 @@ export type Appearance = {
   // How the overview lays each note out — a compact one-line `rows` list or
   // the taller, multi-line `cards` treatment.
   listLayout: ListLayout;
+  // Where the side menu places folders relative to the loose notes — pinned
+  // above them (`top`) or interleaved with them in sort order (`mixed`).
+  folderPlacement: FolderPlacement;
+  // What the side menu sorts notes (and, under `mixed`, folders) by — most
+  // recently modified, or alphabetically by name.
+  noteSortKey: NoteSortKey;
   // Note-writing surface preferences (margins, wrap, live Markdown).
   editor: EditorSettings;
   // Earned achievements: a map of achievement `id` → unlock timestamp (ms
@@ -96,6 +110,8 @@ export const DEFAULT_APPEARANCE: Appearance = {
   fontScale: DEFAULT_FONT_SCALE,
   customTheme: DEFAULT_CUSTOM_THEME,
   listLayout: DEFAULT_LIST_LAYOUT,
+  folderPlacement: DEFAULT_FOLDER_PLACEMENT,
+  noteSortKey: DEFAULT_NOTE_SORT_KEY,
   editor: DEFAULT_EDITOR_SETTINGS,
   achievements: {},
   unseenAchievements: [],
@@ -213,6 +229,12 @@ function coerce(raw: unknown): Appearance {
     listLayout: isListLayout(raw.listLayout)
       ? raw.listLayout
       : DEFAULT_LIST_LAYOUT,
+    folderPlacement: isFolderPlacement(raw.folderPlacement)
+      ? raw.folderPlacement
+      : DEFAULT_FOLDER_PLACEMENT,
+    noteSortKey: isNoteSortKey(raw.noteSortKey)
+      ? raw.noteSortKey
+      : DEFAULT_NOTE_SORT_KEY,
     editor: {
       margin: isEditorMargin(editor.margin)
         ? editor.margin

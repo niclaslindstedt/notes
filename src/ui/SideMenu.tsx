@@ -11,6 +11,8 @@ import { BUILD_LABEL } from "../build-env.ts";
 import { noteTitle, type Folder, type Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import type { Namespace } from "../storage/namespaces.ts";
+import { useAppearance } from "../theme/useTheme.ts";
+import type { NoteSortKey } from "../theme/themes.ts";
 import { APP_VIEWPORT_RECT } from "./appViewportRect.ts";
 import { useNav } from "./nav-context.ts";
 import { useDraggableMenuButton } from "./hooks/useDraggableMenuButton.ts";
@@ -65,10 +67,16 @@ import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
 //
 // The drawer lists every note by its title (the switcher — tap to open it
 // in the editor). Notes can be grouped into folders: the Notes heading's
-// action creates one inline (a folder glyph, not a "+"), each folder row
-// expands to reveal its notes plus a per-folder "New note", and a "New note"
-// row of its own sits just above "Show all". A note can be dragged onto a
+// action creates one inline (a folder glyph, not a "+"), and each folder row
+// expands to reveal its notes. A "+" pinned to the far right of a folder row
+// starts a new note filed into that folder. A note can be dragged onto a
 // folder (or onto the ungrouped zone to leave one) to file it.
+//
+// Two side-menu layout preferences ride on the appearance store: folders can
+// be pinned above the loose notes (`folderPlacement: "top"`) or interleaved
+// with them in sort order (`"mixed"`), and the list sorts by last-modified or
+// by name (`noteSortKey`). New note, Show all, and Archive share one compact
+// button row (saving vertical space) just below the note list.
 // Pinned to the bottom is what was the top-right burger menu — settings and
 // the project links (privacy, source with the app version as a subtitle,
 // and an optional donate), in inverted order so the whole of it sits flush
@@ -94,6 +102,84 @@ const MAX_RECENT_NOTES = 6;
 // desktop HTML5 path. The touch path and the ungrouped-zone sentinel
 // (`NOTE_DROP_ROOT`) are shared from `note-drag.tsx`.
 const NOTE_DND_TYPE = "application/x-notes-note-id";
+
+// Sort notes for the drawer by the active key: most-recently-edited first, or
+// alphabetically by title (case-insensitive). Never mutates the input.
+function sortNotesBy(notes: readonly Note[], key: NoteSortKey): Note[] {
+  if (key === "name") {
+    return [...notes].sort((a, b) =>
+      noteTitle(a).localeCompare(noteTitle(b), undefined, {
+        sensitivity: "base",
+      }),
+    );
+  }
+  return [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+// A folder's effective "modified" time: the newest `updatedAt` among the notes
+// filed in it, falling back to its own creation time when it's empty. Lets a
+// folder sort by recency against loose notes under `mixed` placement.
+function folderModifiedAt(folder: Folder, notes: readonly Note[]): number {
+  let max = folder.createdAt;
+  for (const n of notes) {
+    if (n.folderId === folder.id && n.updatedAt > max) max = n.updatedAt;
+  }
+  return max;
+}
+
+// Folders ordered by the active key — alphabetically by name, or by their
+// most-recently-edited note. Never mutates the input.
+function sortFoldersBy(
+  folders: readonly Folder[],
+  notes: readonly Note[],
+  key: NoteSortKey,
+): Folder[] {
+  if (key === "name") {
+    return [...folders].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+    );
+  }
+  return [...folders].sort(
+    (a, b) => folderModifiedAt(b, notes) - folderModifiedAt(a, notes),
+  );
+}
+
+// `mixed` placement: one interleaved run of folders and loose notes, sorted by
+// the active key so a folder sits among the notes by its name or its newest
+// note. `allNotes` is the full note set (used for a folder's modified time);
+// `folders` and `loose` are the already-filtered, display-ordered inputs.
+type TopLevelItem =
+  | { kind: "folder"; folder: Folder }
+  | { kind: "note"; note: Note };
+
+function mixTopLevel(
+  folders: readonly Folder[],
+  loose: readonly Note[],
+  allNotes: readonly Note[],
+  key: NoteSortKey,
+): TopLevelItem[] {
+  const items: TopLevelItem[] = [
+    ...folders.map((folder) => ({ kind: "folder" as const, folder })),
+    ...loose.map((note) => ({ kind: "note" as const, note })),
+  ];
+  items.sort((a, b) => {
+    if (key === "name") {
+      const an = a.kind === "folder" ? a.folder.name : noteTitle(a.note);
+      const bn = b.kind === "folder" ? b.folder.name : noteTitle(b.note);
+      return an.localeCompare(bn, undefined, { sensitivity: "base" });
+    }
+    const am =
+      a.kind === "folder"
+        ? folderModifiedAt(a.folder, allNotes)
+        : a.note.updatedAt;
+    const bm =
+      b.kind === "folder"
+        ? folderModifiedAt(b.folder, allNotes)
+        : b.note.updatedAt;
+    return bm - am;
+  });
+  return items;
+}
 
 type Props = {
   /** Notes to list, in display order (most-recently-edited first). */
@@ -183,6 +269,11 @@ export function SideMenu({
   const drawerId = useId();
   const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
 
+  // Side-menu layout preferences (synced via the appearance store): whether
+  // folders pin above the loose notes or sort in among them, and the sort key
+  // applied to both notes and (under `mixed`) folders.
+  const { folderPlacement, noteSortKey } = useAppearance();
+
   // Folder UI state: which folders are expanded, whether the inline "new
   // folder" input is showing, and which folder (if any) is being renamed in
   // place. All view-local — the persisted registry lives in the notes store.
@@ -222,11 +313,17 @@ export function SideMenu({
   function allowDropOn(e: ReactDragEvent, key: string) {
     if (!draggingNote) return;
     e.preventDefault();
+    // Folders now nest inside the ungrouped root drop zone, so stop the
+    // hover from bubbling up and lighting the root highlight at the same time.
+    e.stopPropagation();
     e.dataTransfer.dropEffect = "move";
     if (dropTarget !== key) setDropTarget(key);
   }
   function dropOn(e: ReactDragEvent, folderId: string | null) {
     e.preventDefault();
+    // A drop on a folder must not also bubble to the root zone (which would
+    // immediately move the note back out to the top level).
+    e.stopPropagation();
     const id = e.dataTransfer.getData(NOTE_DND_TYPE) || draggingNote;
     endNoteDrag();
     if (id) onMoveNote(id, folderId);
@@ -307,6 +404,16 @@ export function SideMenu({
     (n) => !n.folderId || !folderIds.has(n.folderId),
   );
 
+  // The loose notes the drawer actually shows, sorted by the active key and
+  // capped so the list never crowds out the menu below. Folders are sorted by
+  // the same key — by name, or by their most-recently-edited note (`mixed`
+  // placement interleaves the two runs; `top` keeps folders above the notes).
+  const recentUngrouped = sortNotesBy(ungrouped, noteSortKey).slice(
+    0,
+    MAX_RECENT_NOTES,
+  );
+  const sortedFolders = sortFoldersBy(folders, notes, noteSortKey);
+
   // One note row: the swipe/right-click wrapper around a NavItem, made
   // draggable so it can be dropped onto a folder to file it — HTML5 drag on
   // desktop, a press-and-hold gesture on touch (see `note-drag.tsx`).
@@ -358,6 +465,57 @@ export function SideMenu({
           {row}
         </SwipeToRemove>
       </NoteDragItem>
+    );
+  }
+
+  // One folder: its header row (a drop target for filing a dragged note) plus,
+  // when expanded, the notes filed inside it — sorted by the active key. The
+  // header carries a far-right "+" that starts a new note inside the folder.
+  function renderFolder(folder: Folder) {
+    if (renamingFolderId === folder.id) {
+      return (
+        <FolderEditRow
+          key={folder.id}
+          initial={folder.name}
+          placeholder={t("nav.folderName")}
+          onCommit={(name) => {
+            onRenameFolder(folder.id, name);
+            setRenamingFolderId(null);
+          }}
+          onCancel={() => setRenamingFolderId(null)}
+        />
+      );
+    }
+    const folderNotes = sortNotesBy(
+      notes.filter((n) => n.folderId === folder.id),
+      noteSortKey,
+    );
+    const expanded = expandedFolders.has(folder.id);
+    return (
+      <div key={folder.id} {...{ [NOTE_DROP_ATTR]: folder.id }}>
+        <FolderRow
+          name={folder.name}
+          count={folderNotes.length}
+          expanded={expanded}
+          isDropTarget={dropTarget === folder.id || activeDropKey === folder.id}
+          renameLabel={t("nav.renameFolder")}
+          deleteLabel={t("nav.deleteFolder")}
+          addNoteLabel={t("nav.newNote")}
+          onToggle={() => toggleFolder(folder.id)}
+          onRename={() => setRenamingFolderId(folder.id)}
+          onDelete={() => onRemoveFolder(folder.id)}
+          onAddNote={() => {
+            onAddNote(folder.id);
+            close();
+          }}
+          onDragOver={(e) => allowDropOn(e, folder.id)}
+          onDragLeave={() => setDropTarget(null)}
+          onDrop={(e) => dropOn(e, folder.id)}
+        />
+        {expanded && (
+          <div>{folderNotes.map((note) => renderNoteRow(note, true))}</div>
+        )}
+      </div>
     );
   }
 
@@ -418,9 +576,10 @@ export function SideMenu({
         );
       })}
       {/* The Notes heading's trailing action is a folder-add (a "+" overlaid
-          on a folder), not a plain "+": adding a note now has its own row
-          below. Pressing it drops an inline, unnamed folder input into the
-          list; defocusing it empty discards it (see FolderEditRow). */}
+          on a folder), not a plain "+": adding a note lives on the action bar
+          below (and on each folder's own "+"). Pressing it drops an inline,
+          unnamed folder input into the list; defocusing it empty discards it
+          (see FolderEditRow). */}
       <SectionHeader
         label={t("nav.notes")}
         border
@@ -439,63 +598,12 @@ export function SideMenu({
           onCancel={() => setCreatingFolder(false)}
         />
       )}
-      {/* Folders, each expandable to reveal its notes plus a per-folder "New
-          note" row, and a drop target for filing a dragged note. */}
-      {folders.map((folder) => {
-        const folderNotes = notes.filter((n) => n.folderId === folder.id);
-        const expanded = expandedFolders.has(folder.id);
-        if (renamingFolderId === folder.id) {
-          return (
-            <FolderEditRow
-              key={folder.id}
-              initial={folder.name}
-              placeholder={t("nav.folderName")}
-              onCommit={(name) => {
-                onRenameFolder(folder.id, name);
-                setRenamingFolderId(null);
-              }}
-              onCancel={() => setRenamingFolderId(null)}
-            />
-          );
-        }
-        return (
-          <div key={folder.id} {...{ [NOTE_DROP_ATTR]: folder.id }}>
-            <FolderRow
-              name={folder.name}
-              count={folderNotes.length}
-              expanded={expanded}
-              isDropTarget={
-                dropTarget === folder.id || activeDropKey === folder.id
-              }
-              renameLabel={t("nav.renameFolder")}
-              deleteLabel={t("nav.deleteFolder")}
-              onToggle={() => toggleFolder(folder.id)}
-              onRename={() => setRenamingFolderId(folder.id)}
-              onDelete={() => onRemoveFolder(folder.id)}
-              onDragOver={(e) => allowDropOn(e, folder.id)}
-              onDragLeave={() => setDropTarget(null)}
-              onDrop={(e) => dropOn(e, folder.id)}
-            />
-            {expanded && (
-              <div>
-                {folderNotes.map((note) => renderNoteRow(note, true))}
-                <NavItem
-                  icon={<PlusIcon className="h-5 w-5" />}
-                  label={t("nav.newNote")}
-                  active={false}
-                  indent
-                  onClick={() => {
-                    onAddNote(folder.id);
-                    close();
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        );
-      })}
-      {/* Ungrouped recent notes. Also the drop zone for moving a note OUT of a
-          folder — drop one here and it returns to the top level. */}
+      {/* The top-level list: folders (each expandable, a "+" on its far right
+          starts a note inside it) and the loose recent notes, ordered by the
+          active sort key. Under `top` placement the folders stay pinned above
+          the notes; under `mixed` the two runs interleave in sort order. The
+          whole region is the root drop zone — dropping a note here (outside any
+          folder) returns it to the top level. */}
       <div
         {...{ [NOTE_DROP_ATTR]: NOTE_DROP_ROOT }}
         onDragOver={(e) => allowDropOn(e, NOTE_DROP_ROOT)}
@@ -507,62 +615,65 @@ export function SideMenu({
             : undefined
         }
       >
-        {ungrouped.length === 0 ? (
-          folders.length === 0 ? (
-            <p className="px-5 py-[var(--density-row-py)] text-sm text-muted">
-              {t("nav.notesEmpty")}
-            </p>
-          ) : null
+        {sortedFolders.length === 0 && recentUngrouped.length === 0 ? (
+          <p className="px-5 py-[var(--density-row-py)] text-sm text-muted">
+            {t("nav.notesEmpty")}
+          </p>
+        ) : folderPlacement === "mixed" ? (
+          mixTopLevel(sortedFolders, recentUngrouped, notes, noteSortKey).map(
+            (item) =>
+              item.kind === "folder"
+                ? renderFolder(item.folder)
+                : renderNoteRow(item.note),
+          )
         ) : (
-          ungrouped
-            .slice(0, MAX_RECENT_NOTES)
-            .map((note) => renderNoteRow(note))
+          <>
+            {sortedFolders.map(renderFolder)}
+            {recentUngrouped.map((note) => renderNoteRow(note))}
+          </>
         )}
       </div>
-      {/* "New note" — the add control that used to live as a "+" on the Notes
-          heading, now its own row just above "Show all". */}
-      <NavItem
-        icon={<PlusIcon className="h-5 w-5" />}
-        label={t("nav.newNote")}
-        active={false}
-        onClick={() => {
-          onAddNote();
-          close();
-        }}
-      />
-      {/* "Show all" opens the full overview — and, with the Back button gone
-          from the editor, it's how you return there. Active (accent) whenever
-          the overview rather than a note or the archive is showing. */}
-      <NavItem
-        icon={<ListIcon className="h-5 w-5" />}
-        label={t("nav.showAll")}
-        active={showAllActive}
-        onClick={() => {
-          onShowAll();
-          close();
-        }}
-      />
-      {/* Archive lives at the foot of the notes list — a view onto the
-          archived notes, not a section of its own. The count badge mirrors the
-          number of archived notes (hidden when the archive is empty). */}
-      <NavItem
-        icon={<ArchiveIcon className="h-5 w-5" />}
-        label={t("nav.archive")}
-        active={archiveActive}
-        badge={archivedCount > 0 ? archivedCount : undefined}
-        dropId={NOTE_DROP_ARCHIVE}
-        isDropTarget={
-          dropTarget === NOTE_DROP_ARCHIVE ||
-          activeDropKey === NOTE_DROP_ARCHIVE
-        }
-        onDragOver={(e) => allowDropOn(e, NOTE_DROP_ARCHIVE)}
-        onDragLeave={() => setDropTarget(null)}
-        onDrop={dropOnArchive}
-        onClick={() => {
-          onOpenArchive();
-          close();
-        }}
-      />
+      {/* New note / Show all / Archive share one compact button row to save
+          vertical space (the way Undo / Redo do at the foot). Show all and
+          Archive light up (accent) when their view is showing; Archive carries
+          the archived-note count and accepts a dragged note as a drop target. */}
+      <div className="flex gap-2 px-3 pt-2 pb-1">
+        <BarButton
+          icon={<PlusIcon className="h-5 w-5" />}
+          label={t("nav.newNote")}
+          onClick={() => {
+            onAddNote();
+            close();
+          }}
+        />
+        <BarButton
+          icon={<ListIcon className="h-5 w-5" />}
+          label={t("nav.showAll")}
+          active={showAllActive}
+          onClick={() => {
+            onShowAll();
+            close();
+          }}
+        />
+        <BarButton
+          icon={<ArchiveIcon className="h-5 w-5" />}
+          label={t("nav.archive")}
+          active={archiveActive}
+          badge={archivedCount > 0 ? archivedCount : undefined}
+          dropId={NOTE_DROP_ARCHIVE}
+          isDropTarget={
+            dropTarget === NOTE_DROP_ARCHIVE ||
+            activeDropKey === NOTE_DROP_ARCHIVE
+          }
+          onDragOver={(e) => allowDropOn(e, NOTE_DROP_ARCHIVE)}
+          onDragLeave={() => setDropTarget(null)}
+          onDrop={dropOnArchive}
+          onClick={() => {
+            onOpenArchive();
+            close();
+          }}
+        />
+      </div>
       {/* Undo / redo: a pair of side-by-side buttons pinned to the foot of
           the list (mt-auto), so they sit just above the footer's divider and
           fall under the thumb. Two columns share one row to save vertical
@@ -768,9 +879,11 @@ function FolderRow({
   isDropTarget,
   renameLabel,
   deleteLabel,
+  addNoteLabel,
   onToggle,
   onRename,
   onDelete,
+  onAddNote,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -781,9 +894,11 @@ function FolderRow({
   isDropTarget: boolean;
   renameLabel: string;
   deleteLabel: string;
+  addNoteLabel: string;
   onToggle: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onAddNote: () => void;
   onDragOver: (e: ReactDragEvent) => void;
   onDragLeave: (e: ReactDragEvent) => void;
   onDrop: (e: ReactDragEvent) => void;
@@ -795,33 +910,50 @@ function FolderRow({
   const swipe = useSwipeReveal(REMOVE_ACTION_W);
 
   const header = (
-    <button
-      type="button"
-      aria-expanded={expanded}
-      onClick={onToggle}
-      className="flex w-full min-w-0 cursor-pointer items-center gap-2 py-[var(--density-row-py)] pr-3 pl-3 text-left text-fg hover:text-fg-bright"
-    >
-      <span className="text-muted">
-        {expanded ? (
-          <ChevronDownIcon className="h-4 w-4" />
-        ) : (
-          <ChevronRightIcon className="h-4 w-4" />
-        )}
-      </span>
-      <span className={expanded ? "text-accent" : "text-muted"}>
-        {expanded ? (
-          <FolderOpenIcon className="h-5 w-5" />
-        ) : (
-          <FolderIcon className="h-5 w-5" />
-        )}
-      </span>
-      <span className="flex-1 truncate">{name}</span>
-      {count > 0 && (
-        <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-xs text-muted tabular-nums">
-          {count}
+    // The toggle and the "+" are siblings, not nested buttons: tapping the
+    // label expands the folder; the far-right "+" starts a note filed inside
+    // it. Both sit inside the swipe / right-click wrappers below.
+    <div className="flex w-full min-w-0 items-center">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={onToggle}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-[var(--density-row-py)] pr-1 pl-3 text-left text-fg hover:text-fg-bright"
+      >
+        <span className="text-muted">
+          {expanded ? (
+            <ChevronDownIcon className="h-4 w-4" />
+          ) : (
+            <ChevronRightIcon className="h-4 w-4" />
+          )}
         </span>
-      )}
-    </button>
+        <span className={expanded ? "text-accent" : "text-muted"}>
+          {expanded ? (
+            <FolderOpenIcon className="h-5 w-5" />
+          ) : (
+            <FolderIcon className="h-5 w-5" />
+          )}
+        </span>
+        <span className="flex-1 truncate">{name}</span>
+        {count > 0 && (
+          <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-xs text-muted tabular-nums">
+            {count}
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onAddNote();
+        }}
+        aria-label={addNoteLabel}
+        title={addNoteLabel}
+        className="mr-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg-bright"
+      >
+        <PlusIcon className="h-4 w-4" />
+      </button>
+    </div>
   );
 
   if (isDesktop) {
@@ -1083,6 +1215,62 @@ function EditButton({
     >
       <span className={disabled ? "" : "text-muted"}>{icon}</span>
       <span>{label}</span>
+    </button>
+  );
+}
+
+// New note / Show all / Archive render as a compact three-up button row
+// instead of three full-width rows, saving vertical space the way Undo / Redo
+// do. Icon stacked over a small label; the active view tints accent, and the
+// Archive button doubles as a drop target with its count as a corner badge.
+function BarButton({
+  icon,
+  label,
+  active = false,
+  badge,
+  onClick,
+  dropId,
+  isDropTarget = false,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+}: {
+  icon: ReactNode;
+  label: string;
+  active?: boolean;
+  badge?: number;
+  onClick: () => void;
+  dropId?: string;
+  isDropTarget?: boolean;
+  onDragOver?: (e: ReactDragEvent) => void;
+  onDragLeave?: (e: ReactDragEvent) => void;
+  onDrop?: (e: ReactDragEvent) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      aria-current={active ? "page" : undefined}
+      onClick={onClick}
+      {...(dropId !== undefined ? { [NOTE_DROP_ATTR]: dropId } : {})}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={`relative flex flex-1 cursor-pointer flex-col items-center gap-1 rounded-md border py-2 text-xs ${
+        isDropTarget
+          ? "border-accent/40 bg-accent/15 text-fg-bright"
+          : active
+            ? "border-line bg-surface-2 font-semibold text-fg-bright"
+            : "border-line text-fg hover:bg-surface-2 hover:text-fg-bright"
+      }`}
+    >
+      <span className={active ? "text-accent" : "text-muted"}>{icon}</span>
+      <span className="max-w-full truncate">{label}</span>
+      {badge !== undefined && (
+        <span className="absolute -top-1.5 -right-1.5 rounded-full bg-surface-3 px-1.5 py-0.5 text-[10px] leading-none text-muted tabular-nums">
+          {badge}
+        </span>
+      )}
     </button>
   );
 }

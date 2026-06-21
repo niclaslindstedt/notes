@@ -797,7 +797,10 @@ edge swipe; mobile PWA only), and the dev-mode toggle.
 
 `AppearanceSection` (`src/ui/settings/AppearanceSection.tsx`) — the
 live-repainting theme picker (presets or the custom editor), the
-[note-list layout](#note-list-layout) toggle (rows vs cards), font family and
+[note-list layout](#note-list-layout) toggle (rows vs cards), the **Sidebar**
+group (folder placement — folders on top vs mixed in — and the side-menu sort
+key — last modified vs name; see
+[folders in the side menu](#folders-in-the-side-menu)), font family and
 text-scale pickers (non-default fonts load on demand), density, and corner
 radius. The custom editor uses `ColorPalette` (`src/ui/ColorPalette.tsx`) to
 edit individual [colour slots](#custom-theme).
@@ -1219,24 +1222,43 @@ the notes list).
 
 ### Folders in the side menu
 
-`SideMenu` (`src/ui/SideMenu.tsx`) renders the folders between the Notes heading
-and the ungrouped notes. The Notes heading's trailing action is a **folder-add**
-glyph (`FolderPlusIcon`), not the old "+": pressing it drops an inline,
-unnamed `FolderEditRow` into the list — commit a name (Enter / blur) to persist
-it, or defocus it empty to discard it (the row simply vanishes, so a misfire
-costs nothing). Each `FolderRow` expands to reveal its notes (indented) plus a
-per-folder "New note" row that creates a note already filed inside it. The
-row's edit and delete actions stay hidden until summoned, the way a note's do:
-a **left swipe** latches open an `[edit | delete]` strip (sharing the width of
-a note's single delete button, split in two) on touch, and a **right-click**
-opens the same two actions on a computer (`RowActionMenu`); editing swaps the
-row for the inline `FolderEditRow`. The add control that used to sit as a "+"
-on the Notes heading is now its own
-**"New note"** row just above "Show all". A note row can be **dragged onto a
-folder** to file it, or onto the ungrouped zone to take it out of one. On a
-pointer device this is native HTML5 drag (`NOTE_DND_TYPE` carries the note id;
-the highlight follows `dropTarget`); on a touchscreen it's a **press-and-hold**
-gesture (see [note drag](#note-drag-touch--pointer)), with the
+`SideMenu` (`src/ui/SideMenu.tsx`) renders the folders and the ungrouped notes
+together in one root drop zone below the Notes heading. The Notes heading's
+trailing action is a **folder-add** glyph (`FolderPlusIcon`), not the old "+":
+pressing it drops an inline, unnamed `FolderEditRow` into the list — commit a
+name (Enter / blur) to persist it, or defocus it empty to discard it (the row
+simply vanishes, so a misfire costs nothing). Each `FolderRow` expands to
+reveal its notes (indented), and carries a **"+" pinned to its far right**
+(`onAddNote`) that starts a note already filed inside it — replacing the old
+per-folder "New note" row. The folder row's edit and delete actions stay hidden
+until summoned, the way a note's do: a **left swipe** latches open an
+`[edit | delete]` strip (sharing the width of a note's single delete button,
+split in two) on touch, and a **right-click** opens the same two actions on a
+computer (`RowActionMenu`); editing swaps the row for the inline
+`FolderEditRow`.
+
+How the folders and loose notes are ordered is two appearance preferences (see
+[appearance store](#appearance-store)). **`folderPlacement`** is `top`
+(folders pinned above the loose notes — the historical layout) or `mixed`
+(folders interleaved with the notes by the sort key, via `mixTopLevel`).
+**`noteSortKey`** is `modified` (most-recently-edited first) or `name`
+(alphabetical); `sortNotesBy` orders the notes and a folder's contents, and
+`sortFoldersBy` orders the folders — by name, or by their newest note's
+timestamp (`folderModifiedAt`). The loose notes are still capped at
+`MAX_RECENT_NOTES`. Both are set in **Appearance → Sidebar**.
+
+**New note / Show all / Archive** share one compact three-up button row
+(`BarButton`) below the list, instead of three full-width rows, to save
+vertical space — the way Undo / Redo do at the foot. Show all and Archive tint
+accent when their view is showing; Archive carries the archived-note count as a
+corner badge and doubles as a drop target.
+
+A note row can be **dragged onto a folder** to file it, or onto the ungrouped
+root zone to take it out of one. On a pointer device this is native HTML5 drag
+(`NOTE_DND_TYPE` carries the note id; the highlight follows `dropTarget`, and a
+drop on a folder calls `stopPropagation` so it doesn't bubble to the root
+zone); on a touchscreen it's a **press-and-hold** gesture (see
+[note drag](#note-drag-touch--pointer)), with the
 [folder picker](#folder-picker) as a keyboard/quick alternative.
 
 ### Folders in the overview
@@ -1317,8 +1339,11 @@ also moves.
 
 `useTheme.ts` (`src/theme/`) — the external store (persisted to
 `notes/appearance`) holding `Appearance`: `theme`, `fontFamily`, `fontScale`,
-`customTheme`, `editor` ([Editor settings](#editor-settings)), and the
-achievements map + unseen queue. `useAppearance` reads it, `updateAppearance` /
+`customTheme`, `listLayout`, `folderPlacement` and `noteSortKey` (the side-menu
+layout preferences — see
+[folders in the side menu](#folders-in-the-side-menu)), `editor`
+([Editor settings](#editor-settings)), and the achievements map + unseen queue.
+`useAppearance` reads it, `updateAppearance` /
 `setTheme` write it, `useApplyAppearance` projects it onto the DOM. Achievement
 progress lives here so it syncs across devices via [settings
 sync](#settings-sync).
