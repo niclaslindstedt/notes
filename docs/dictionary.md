@@ -175,6 +175,7 @@ Honour these when naming a new file, key, or string.
 | **Storage adapter** / **the byte contract**                | `StorageAdapter`, `StoredSnapshot`, `ConflictError`, `AuthError`, `RateLimitError` (`src/storage/adapter.ts`). [→](overview.md#storage-adapter) |
 | **Storage backend hook** / **wire the active backend**     | `useStorageBackend`, `UseStorageBackend` (`src/storage/useStorageBackend.ts`). [→](overview.md#storage-backend-hook) |
 | **Backend preference** / **which backend / tokens**        | `backend-preference.ts`, `BackendId` (`src/storage/`). [→](overview.md#backend-preference)                    |
+| **Active note cursor** / **resume last note** / **reopen the note I was on** | `getActiveNote` / `setActiveNote` (`src/storage/active-note-preference.ts`); seeds `editingId` in `src/app/App.tsx`. [→](overview.md#active-note-cursor)                    |
 | **Serialize / parse** / **the load-save pipeline**         | `serialize`, `parse` (`src/storage/serialize.ts`). [→](overview.md#serialize--parse)                          |
 | **Migrations** / **document version**                      | `migrate`, `LATEST_VERSION` (`src/storage/migrations.ts`). [→](overview.md#migrations)                        |
 | **This device backend** / **local storage**                | `BrowserLocalStorageAdapter` (`src/storage/local/index.ts`). [→](overview.md#local-backend)                  |

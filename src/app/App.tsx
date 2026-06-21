@@ -30,6 +30,10 @@ import { useT } from "../i18n/index.ts";
 import { isStandaloneMobile } from "../pwa/standalone.ts";
 import { createDevSeedAdapter } from "../storage/dev-seed/index.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
+import {
+  getActiveNote,
+  setActiveNote,
+} from "../storage/active-note-preference.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import {
   unlockAchievements,
@@ -171,7 +175,20 @@ export function App() {
     canRedo,
     sync,
   } = useNotes(seedAdapter ?? storage.adapter, formatting);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // Restore the note that was open in the active namespace before the last
+  // reload / PWA upgrade, so a refresh lands back where you left off instead of
+  // dropping to the overview. Once the (possibly async-loading) document
+  // arrives, `editing` below resolves the id to the note; a stale id (the note
+  // was deleted elsewhere) simply resolves to nothing and falls back to the
+  // overview.
+  const [editingId, setEditingId] = useState<string | null>(() =>
+    getActiveNote(storage.activeNamespace),
+  );
+  // Persist the open note per namespace so it survives a reload / upgrade. The
+  // active-namespace pointer is itself per-device, so the pair stays consistent.
+  useEffect(() => {
+    setActiveNote(storage.activeNamespace, editingId);
+  }, [storage.activeNamespace, editingId]);
   // Which list the main area shows when nothing is open in the editor / reader.
   const [view, setView] = useState<"notes" | "archive">("notes");
   // An archived note opened read-only (tapped from the archive page). Distinct
@@ -268,12 +285,13 @@ export function App() {
     applyFaviconHref(faviconHref);
   }, [faviconHref]);
 
-  // Switch namespace and leave the editor — the note that was open belongs to
-  // the namespace we're leaving, so the new namespace's list is what should
-  // show.
+  // Switch namespace and reopen wherever you last were in the target — the note
+  // that was open belongs to the namespace we're leaving, so we restore the new
+  // namespace's own remembered note (or its overview if none), the same place a
+  // reload would land.
   function switchNamespace(slug: string) {
     storage.switchNamespace(slug);
-    setEditingId(null);
+    setEditingId(getActiveNote(slug));
     setReadingId(null);
     setView("notes");
   }
