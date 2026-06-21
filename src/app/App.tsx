@@ -756,7 +756,7 @@ function NoteList({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [empty, onNew]);
+  }, [empty, loading, onNew]);
 
   const folderIds = new Set(folders.map((f) => f.id));
   const ungrouped = notes.filter(

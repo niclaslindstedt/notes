@@ -1238,6 +1238,25 @@ document in one pass and take an optional `onProgress` callback (`reading →
 derivingKey → encrypting`/`decrypting → saving → finalizing`) the
 [storage settings](#storage-settings) status bar feeds on.
 
+The encrypted **load** is cached so the same notes are never decrypted twice
+needlessly. Every `load()` still runs a fresh `store.list()` (so it can never
+serve data staler than the backend), but keys two in-memory caches off the
+revisions that listing reports: a **load memo** returns the previously-built
+snapshot whole when the entire listing is byte-identical, and a **per-note
+cache** (`encNoteCache`, keyed by `<path>@<rev>`) reuses each note's already-
+unsealed JSON when only some files moved — the encrypted-mode counterpart of the
+plaintext path's `reusableFiles`. Together these collapse the unlock's two
+back-to-back loads (the gate verifies the passphrase with one `load()`, then the
+adapter swap from the locked placeholder to the real adapter triggers another)
+into a single decrypt, make an idle [live pull](#live-pull) cost one listing
+instead of a full re-decrypt of the vault, and reduce a one-note remote edit to a
+single re-decrypt. Saves keep the per-note cache warm with the plaintext they
+just wrote, and both caches are dropped whenever the keys change (lock / unlock /
+passphrase switch). A fully-migrated vault also skips the attachment listing on
+load entirely (each encrypted note already carries its attachment metadata in its
+own JSON), walking it only while plaintext remnants from an in-progress migration
+remain.
+
 ### Encryption migration
 
 `src/storage/encryption-migration.ts` (`runEncryptionMigration`) + the

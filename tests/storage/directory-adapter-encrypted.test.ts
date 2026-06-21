@@ -284,6 +284,120 @@ describe("directory adapter — encrypted per-file", () => {
     expect(encWrites).toBe(1);
   });
 
+  it("a second load of unchanged bytes re-decrypts nothing (load memo)", async () => {
+    // The unlock flow loads twice over identical bytes — the gate verifies the
+    // passphrase with one load, then the adapter swap triggers another. Count
+    // `.enc` reads to prove the second load reuses the first's decrypted
+    // snapshot instead of re-reading + re-decrypting every note.
+    const store = memoryStore();
+    const att = memoryAttachments();
+    let encReads = 0;
+    const counting: FileStore = {
+      list: () => store.list(),
+      read: (p) => {
+        if (p.endsWith(".enc")) encReads += 1;
+        return store.read(p);
+      },
+      write: (p, t) => store.write(p, t),
+      remove: (p) => store.remove(p),
+    };
+    const notes: Note[] = Array.from({ length: 5 }, (_, i) => ({
+      ...createNote(i + 1),
+      title: `Note ${i}`,
+      body: `secret ${i}`,
+    }));
+    await encAdapter(store, att, { current: "pw" }).save(serialize({ notes }));
+
+    const b = encAdapter(counting, att, { current: "pw" });
+    const first = parse((await b.load())!.text).notes;
+    expect(first).toHaveLength(5);
+    expect(encReads).toBe(5);
+
+    // Second load — nothing changed on disk → zero further reads, same content.
+    encReads = 0;
+    const second = parse((await b.load())!.text).notes;
+    expect(encReads).toBe(0);
+    expect(second.map((n) => n.body).sort()).toEqual(
+      first.map((n) => n.body).sort(),
+    );
+  });
+
+  it("re-decrypts only the note whose file changed (incremental reuse)", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    let encReads = 0;
+    const counting: FileStore = {
+      list: () => store.list(),
+      read: (p) => {
+        if (p.endsWith(".enc")) encReads += 1;
+        return store.read(p);
+      },
+      write: (p, t) => store.write(p, t),
+      remove: (p) => store.remove(p),
+    };
+    const notes: Note[] = Array.from({ length: 6 }, (_, i) => ({
+      ...createNote(i + 1),
+      title: `Note ${i}`,
+      body: `body ${i}`,
+    }));
+    const writer = encAdapter(counting, att, { current: "pw" });
+    const s1 = await writer.save(serialize({ notes }));
+
+    // Prime the reader's cache with a full load.
+    const reader = encAdapter(counting, att, { current: "pw" });
+    await reader.load();
+
+    // A different device edits one note; the reader pulls again.
+    encReads = 0;
+    const edited = notes.map((n, i) =>
+      i === 2 ? { ...n, body: "changed" } : n,
+    );
+    await writer.save(serialize({ notes: edited }), s1.revision);
+    const reloaded = parse((await reader.load())!.text).notes;
+
+    // Exactly one `.enc` re-read: the changed note. The other five are reused.
+    expect(encReads).toBe(1);
+    expect(reloaded.find((n) => n.body === "changed")).toBeTruthy();
+    expect(reloaded).toHaveLength(6);
+  });
+
+  it("skips the attachment listing once notes are fully migrated", async () => {
+    // A fully-encrypted vault carries attachment metadata in each note's JSON,
+    // so a load needn't list the attachment store — proving that saves a cloud
+    // round-trip. (With a plaintext remnant present it must still list.)
+    const store = memoryStore();
+    // Wrap a fresh attachments store so we can count list() calls.
+    const backing = memoryAttachments();
+    let attLists = 0;
+    const countingAtt: MemAttachments = {
+      files: backing.files,
+      list: () => {
+        attLists += 1;
+        return backing.list();
+      },
+      read: (p) => backing.read(p),
+      write: (p, b, m) => backing.write(p, b, m),
+      remove: (p) => backing.remove(p),
+    };
+
+    const { note } = noteWithImage(1);
+    await encAdapter(store, countingAtt, { current: "pw" }).save(
+      serialize({ notes: [note] }),
+    );
+
+    attLists = 0;
+    const b = encAdapter(store, countingAtt, { current: "pw" });
+    const loaded = parse((await b.load())!.text).notes[0]!;
+    // Metadata still reconstructed from the note JSON, with no listing walked.
+    expect(loaded.attachments).toEqual([
+      { filename: "abcd1234-pic.png", mime: "image/png" },
+    ]);
+    expect(attLists).toBe(0);
+    // Bytes are still fetchable on demand.
+    const got = await b.fetchAttachment!(loaded, "abcd1234-pic.png");
+    expect([...got!.bytes]).toEqual([72, 101, 108, 108, 111]);
+  });
+
   it("decrypts every note on load with a bounded pool of many notes", async () => {
     const store = memoryStore();
     const att = memoryAttachments();
