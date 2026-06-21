@@ -1401,6 +1401,15 @@ folder it renders a collapsible section per folder (each a drop target, with a
 like the side-menu rows — HTML5 drag on a pointer device, press-and-hold on
 touch. With no folders it falls back to the flat list unchanged.
 
+Each folder header carries the same hidden edit + delete actions the side
+menu's [`FolderRow`](#folders-in-the-side-menu) does (`OverviewFolderHeader` in
+`src/app/App.tsx`): a **left swipe** latches open an `[edit | delete]` strip on
+touch (`useSwipeReveal`, no archive analogue so a right swipe is inert), and a
+**right-click** opens the same two actions on a computer (`RowActionMenu`).
+Editing swaps the header for the inline `FolderRenameRow` name editor (the
+overview's counterpart of `FolderEditRow`); deleting only ungroups the folder's
+notes and is undoable, so — like a note delete — it needs no confirm beat.
+
 ### Note drag (touch / pointer)
 
 `src/ui/note-drag.tsx` (+ `note-drag-context.ts`) is the shared drag layer both
