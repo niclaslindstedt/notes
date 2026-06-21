@@ -48,6 +48,7 @@ import { useFileDrop } from "../ui/hooks/useFileDrop.ts";
 import { useMediaQuery } from "../ui/hooks/useMediaQuery.ts";
 import { usePullToRefresh } from "../ui/hooks/usePullToRefresh.ts";
 import { useRowSwipe } from "../ui/hooks/useRowSwipe.ts";
+import { useSwipeReveal } from "../ui/hooks/useSwipeReveal.ts";
 import { useSuppressSwipeNavigation } from "../ui/hooks/useSuppressSwipeNavigation.ts";
 import { useUndoRedoShortcuts } from "../ui/hooks/useUndoRedoShortcuts.ts";
 import { useViewportHeight } from "../ui/hooks/useViewportHeight.ts";
@@ -60,6 +61,7 @@ import {
   FolderOpenIcon,
   LockIcon,
   NoteIcon,
+  PencilIcon,
   PlusIcon,
   RestoreIcon,
   SpinnerIcon,
@@ -566,6 +568,8 @@ export function App() {
                     onArchive={archiveNote}
                     onDelete={removeNote}
                     onMoveNote={moveNote}
+                    onRenameFolder={renameFolder}
+                    onRemoveFolder={removeFolder}
                     syncSlot={syncSlot}
                     encStatus={encStatus}
                     uploadingIds={uploadingIds}
@@ -643,6 +647,8 @@ function NoteList({
   onArchive,
   onDelete,
   onMoveNote,
+  onRenameFolder,
+  onRemoveFolder,
   syncSlot,
   encStatus,
   uploadingIds,
@@ -657,6 +663,10 @@ function NoteList({
   onDelete: (id: string) => void;
   /** Move a note into `folderId`, or out of any folder when `null`. */
   onMoveNote: (id: string, folderId: string | null) => void;
+  /** Rename a folder. */
+  onRenameFolder: (id: string, name: string) => void;
+  /** Delete a folder (its notes fall back to the top level). */
+  onRemoveFolder: (id: string) => void;
   syncSlot: ReactNode;
   encStatus?: Map<string, "encrypted" | "pending">;
   /** Ids of notes whose file is being uploaded to the backend right now. */
@@ -673,6 +683,9 @@ function NoteList({
   // Collapsed folders (default expanded) and the desktop drag-to-file state —
   // mirrors the side menu, so a note can be dropped onto a folder here too.
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  // Which folder (if any) is being renamed in place — swaps its header for the
+  // inline name editor, mirroring the side menu. View-local, like `collapsed`.
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [draggingNote, setDraggingNote] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
@@ -800,42 +813,31 @@ function NoteList({
                       : ""
                   }`}
                 >
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => toggleFolder(folder.id)}
-                      aria-expanded={expanded}
-                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-[var(--radius)] px-1 py-1.5 text-left text-sm font-semibold text-fg-bright hover:bg-surface-2"
-                    >
-                      <span className="text-muted">
-                        {expanded ? (
-                          <ChevronDownIcon className="h-4 w-4" />
-                        ) : (
-                          <ChevronRightIcon className="h-4 w-4" />
-                        )}
-                      </span>
-                      <span className="text-accent">
-                        {expanded ? (
-                          <FolderOpenIcon className="h-5 w-5" />
-                        ) : (
-                          <FolderIcon className="h-5 w-5" />
-                        )}
-                      </span>
-                      <span className="flex-1 truncate">{folder.name}</span>
-                      <span className="shrink-0 text-xs text-muted tabular-nums">
-                        {folderNotes.length}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onNew(folder.id)}
-                      aria-label={t("nav.newNote")}
-                      title={t("nav.newNote")}
-                      className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg-bright"
-                    >
-                      <PlusIcon className="h-4 w-4" />
-                    </button>
-                  </div>
+                  {renamingFolderId === folder.id ? (
+                    <FolderRenameRow
+                      initial={folder.name}
+                      placeholder={t("nav.folderName")}
+                      onCommit={(name) => {
+                        onRenameFolder(folder.id, name);
+                        setRenamingFolderId(null);
+                      }}
+                      onCancel={() => setRenamingFolderId(null)}
+                    />
+                  ) : (
+                    <OverviewFolderHeader
+                      name={folder.name}
+                      count={folderNotes.length}
+                      expanded={expanded}
+                      renameLabel={t("nav.renameFolder")}
+                      deleteLabel={t("nav.deleteFolder")}
+                      addNoteLabel={t("nav.newNote")}
+                      actionsLabel={t("nav.folderActions")}
+                      onToggle={() => toggleFolder(folder.id)}
+                      onAddNote={() => onNew(folder.id)}
+                      onRename={() => setRenamingFolderId(folder.id)}
+                      onDelete={() => onRemoveFolder(folder.id)}
+                    />
+                  )}
                   {expanded && folderNotes.length > 0 && (
                     <ul className={`flex flex-col ${listGap} pt-1 pl-3`}>
                       {folderNotes.map(renderCard)}
@@ -898,6 +900,218 @@ function NoteList({
         </span>
         <span className="hidden md:inline">{t("app.newNote")}</span>
       </button>
+    </div>
+  );
+}
+
+// The overview folder header's rename + delete actions stay hidden until
+// summoned, mirroring the side menu's `FolderRow`: a LEFT swipe latches open an
+// `[edit | delete]` strip on touch, and a RIGHT-CLICK opens the same two
+// actions on a computer (`RowActionMenu`). A folder has no archive analogue, so
+// — like the side-menu row — `useSwipeReveal` gets no `onArchive` and a right
+// swipe is inert. The width of the two-button strip matches the side menu.
+const FOLDER_ACTION_W = 96;
+
+function OverviewFolderHeader({
+  name,
+  count,
+  expanded,
+  renameLabel,
+  deleteLabel,
+  addNoteLabel,
+  actionsLabel,
+  onToggle,
+  onAddNote,
+  onRename,
+  onDelete,
+}: {
+  name: string;
+  count: number;
+  expanded: boolean;
+  renameLabel: string;
+  deleteLabel: string;
+  addNoteLabel: string;
+  actionsLabel: string;
+  onToggle: () => void;
+  onAddNote: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
+  const swipe = useSwipeReveal(FOLDER_ACTION_W);
+
+  // The expand toggle and the trailing "+" (new note in this folder) are
+  // siblings, not nested buttons — the same shape the inline header had before
+  // the swipe / right-click wrappers were added around it.
+  const header = (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-[var(--radius)] px-1 py-1.5 text-left text-sm font-semibold text-fg-bright hover:bg-surface-2"
+      >
+        <span className="text-muted">
+          {expanded ? (
+            <ChevronDownIcon className="h-4 w-4" />
+          ) : (
+            <ChevronRightIcon className="h-4 w-4" />
+          )}
+        </span>
+        <span className="text-accent">
+          {expanded ? (
+            <FolderOpenIcon className="h-5 w-5" />
+          ) : (
+            <FolderIcon className="h-5 w-5" />
+          )}
+        </span>
+        <span className="flex-1 truncate">{name}</span>
+        <span className="shrink-0 text-xs text-muted tabular-nums">
+          {count}
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={onAddNote}
+        aria-label={addNoteLabel}
+        title={addNoteLabel}
+        className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg-bright"
+      >
+        <PlusIcon className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
+  // On a computer the swipe gives way to a right-click menu of the same actions
+  // (see `RowActionMenu`); a plain click still toggles the folder.
+  if (isDesktop) {
+    return (
+      <RowActionMenu
+        ariaLabel={actionsLabel}
+        actions={[
+          {
+            label: renameLabel,
+            icon: <PencilIcon className="h-5 w-5" />,
+            onSelect: onRename,
+          },
+          {
+            label: deleteLabel,
+            icon: <TrashIcon className="h-5 w-5" />,
+            onSelect: onDelete,
+            danger: true,
+          },
+        ]}
+      >
+        {header}
+      </RowActionMenu>
+    );
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-[var(--radius)]">
+      {/* Edit + Delete — the trailing strip a left swipe latches open. Hidden
+          until the row is swiped left. */}
+      <div
+        aria-hidden={swipe.offset >= 0}
+        className={`absolute inset-0 flex items-center justify-end ${
+          swipe.offset < 0 ? "" : "invisible"
+        }`}
+      >
+        <div className="flex h-full" style={{ width: FOLDER_ACTION_W }}>
+          <button
+            type="button"
+            onClick={() => {
+              swipe.close();
+              onRename();
+            }}
+            aria-label={renameLabel}
+            className="flex h-full flex-1 items-center justify-center bg-surface-3 text-fg-bright"
+          >
+            <PencilIcon className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              swipe.close();
+              onDelete();
+            }}
+            aria-label={deleteLabel}
+            className="flex h-full flex-1 items-center justify-center rounded-r-[var(--radius)] bg-danger text-white"
+          >
+            <TrashIcon className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+      <div
+        {...swipe.handlers}
+        style={{ transform: `translateX(${swipe.offset}px)` }}
+        className={`relative bg-page-bg [touch-action:pan-y] ${
+          swipe.animating ? "transition-transform duration-200" : ""
+        }`}
+      >
+        {header}
+      </div>
+    </div>
+  );
+}
+
+// The inline folder-name editor the overview swaps a folder header for while
+// it's being renamed — the overview counterpart of the side menu's
+// `FolderEditRow`. Commits on Enter or blur with a non-empty trimmed name;
+// Escape (or an empty name) cancels. The `committed` latch stops the blur that
+// trails an Enter from firing the commit twice.
+function FolderRenameRow({
+  initial,
+  placeholder,
+  onCommit,
+  onCancel,
+}: {
+  initial: string;
+  placeholder: string;
+  onCommit: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [committed, setCommitted] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+  }, []);
+  function finish() {
+    if (committed) return;
+    setCommitted(true);
+    const name = value.trim();
+    if (name) onCommit(name);
+    else onCancel();
+  }
+  return (
+    <div className="flex items-center gap-2 px-1 py-1.5">
+      <span className="text-accent">
+        <FolderIcon className="h-5 w-5" />
+      </span>
+      <input
+        ref={ref}
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={finish}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            finish();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setCommitted(true);
+            onCancel();
+          }
+        }}
+        className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-semibold text-fg-bright outline-none placeholder:text-muted/60"
+      />
     </div>
   );
 }
