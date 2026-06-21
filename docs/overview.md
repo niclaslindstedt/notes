@@ -1072,6 +1072,19 @@ tokens, and the encryption mode. These are device-local (never in the synced
 document, which would create a bootstrap loop) and read on boot before any
 backend resolves.
 
+### Active note cursor
+
+`src/storage/active-note-preference.ts` — a per-device, per-namespace
+localStorage cursor (`getActiveNote` / `setActiveNote`, keyed
+`notes:active-note:<slug>`) remembering which note was open in the editor.
+`App` seeds `editingId` from it on mount and writes it back whenever the open
+note changes, so a reload or PWA upgrade lands back on the same note instead of
+the overview; switching namespaces restores that namespace's own remembered
+note. Like the [backend preference](#backend-preference) and the active-namespace
+pointer, it's a device-local cursor (where you were looking, not shared document
+state), so it lives outside the synced snapshot. A stale id (the note was
+deleted elsewhere) resolves to nothing and falls back to the overview.
+
 ### Serialize / parse
 
 `src/storage/serialize.ts` — `serialize` turns a domain `Snapshot` into stored
