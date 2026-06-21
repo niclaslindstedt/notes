@@ -66,17 +66,18 @@ import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
 // identical section list (`sections` below); only the framing differs.
 //
 // The drawer lists every note by its title (the switcher — tap to open it
-// in the editor). Notes can be grouped into folders: the Notes heading's
-// action creates one inline (a folder glyph, not a "+"), and each folder row
-// expands to reveal its notes. A "+" pinned to the far right of a folder row
-// starts a new note filed into that folder. A note can be dragged onto a
-// folder (or onto the ungrouped zone to leave one) to file it.
+// in the editor). Notes can be grouped into folders: the action bar's New
+// folder button creates one inline, and each folder row expands to reveal its
+// notes. A "+" pinned to the far right of a folder row starts a new note filed
+// into that folder. A note can be dragged onto a folder (or onto the ungrouped
+// zone to leave one) to file it.
 //
 // Two side-menu layout preferences ride on the appearance store: folders can
 // be pinned above the loose notes (`folderPlacement: "top"`) or interleaved
 // with them in sort order (`"mixed"`), and the list sorts by last-modified or
-// by name (`noteSortKey`). New note, Show all, and Archive share one compact
-// button row (saving vertical space) just below the note list.
+// by name (`noteSortKey`). New note, New folder, Show all, and Archive share
+// one compact four-up button row (saving vertical space) just below the note
+// list.
 // Pinned to the bottom is what was the top-right burger menu — settings and
 // the project links (privacy, source with the app version as a subtitle,
 // and an optional donate), in inverted order so the whole of it sits flush
@@ -575,18 +576,11 @@ export function SideMenu({
           />
         );
       })}
-      {/* The Notes heading's trailing action is a folder-add (a "+" overlaid
-          on a folder), not a plain "+": adding a note lives on the action bar
-          below (and on each folder's own "+"). Pressing it drops an inline,
-          unnamed folder input into the list; defocusing it empty discards it
-          (see FolderEditRow). */}
-      <SectionHeader
-        label={t("nav.notes")}
-        border
-        onAdd={() => setCreatingFolder(true)}
-        addLabel={t("nav.newFolder")}
-        addIcon={<FolderPlusIcon className="h-4 w-4" />}
-      />
+      {/* Both add actions — New note and New folder — live on the action bar
+          below the list, so the heading carries no trailing "+". A new folder
+          drops an inline, unnamed folder input into the list; defocusing it
+          empty discards it (see FolderEditRow). */}
+      <SectionHeader label={t("nav.notes")} border />
       {creatingFolder && (
         <FolderEditRow
           placeholder={t("nav.folderName")}
@@ -633,46 +627,55 @@ export function SideMenu({
           </>
         )}
       </div>
-      {/* New note / Show all / Archive share one compact button row to save
-          vertical space (the way Undo / Redo do at the foot). Show all and
-          Archive light up (accent) when their view is showing; Archive carries
-          the archived-note count and accepts a dragged note as a drop target. */}
-      <div className="flex gap-2 px-3 pt-2 pb-1">
-        <BarButton
-          icon={<PlusIcon className="h-5 w-5" />}
-          label={t("nav.newNote")}
-          onClick={() => {
-            onAddNote();
-            close();
-          }}
-        />
-        <BarButton
-          icon={<ListIcon className="h-5 w-5" />}
-          label={t("nav.showAll")}
-          active={showAllActive}
-          onClick={() => {
-            onShowAll();
-            close();
-          }}
-        />
-        <BarButton
-          icon={<ArchiveIcon className="h-5 w-5" />}
-          label={t("nav.archive")}
-          active={archiveActive}
-          badge={archivedCount > 0 ? archivedCount : undefined}
-          dropId={NOTE_DROP_ARCHIVE}
-          isDropTarget={
-            dropTarget === NOTE_DROP_ARCHIVE ||
-            activeDropKey === NOTE_DROP_ARCHIVE
-          }
-          onDragOver={(e) => allowDropOn(e, NOTE_DROP_ARCHIVE)}
-          onDragLeave={() => setDropTarget(null)}
-          onDrop={dropOnArchive}
-          onClick={() => {
-            onOpenArchive();
-            close();
-          }}
-        />
+      {/* New note / New folder / Show all / Archive share one compact button
+          row to save vertical space (the way Undo / Redo do at the foot). The
+          four cells split the width evenly so the bar reads symmetric. Show all
+          and Archive light up (accent) when their view is showing; Archive
+          carries the archived-note count and accepts a dragged note as a drop
+          target. New folder drops the inline name input into the list above. */}
+      <div className="px-3 pt-2 pb-1">
+        <div className="flex divide-x divide-line overflow-hidden rounded-md border border-line">
+          <BarButton
+            icon={<PlusIcon className="h-5 w-5" />}
+            label={t("nav.newNote")}
+            onClick={() => {
+              onAddNote();
+              close();
+            }}
+          />
+          <BarButton
+            icon={<FolderPlusIcon className="h-5 w-5" />}
+            label={t("nav.newFolder")}
+            onClick={() => setCreatingFolder(true)}
+          />
+          <BarButton
+            icon={<ListIcon className="h-5 w-5" />}
+            label={t("nav.showAll")}
+            active={showAllActive}
+            onClick={() => {
+              onShowAll();
+              close();
+            }}
+          />
+          <BarButton
+            icon={<ArchiveIcon className="h-5 w-5" />}
+            label={t("nav.archive")}
+            active={archiveActive}
+            badge={archivedCount > 0 ? archivedCount : undefined}
+            dropId={NOTE_DROP_ARCHIVE}
+            isDropTarget={
+              dropTarget === NOTE_DROP_ARCHIVE ||
+              activeDropKey === NOTE_DROP_ARCHIVE
+            }
+            onDragOver={(e) => allowDropOn(e, NOTE_DROP_ARCHIVE)}
+            onDragLeave={() => setDropTarget(null)}
+            onDrop={dropOnArchive}
+            onClick={() => {
+              onOpenArchive();
+              close();
+            }}
+          />
+        </div>
       </div>
       {/* Undo / redo: a pair of side-by-side buttons pinned to the foot of
           the list (mt-auto), so they sit just above the footer's divider and
@@ -1219,10 +1222,13 @@ function EditButton({
   );
 }
 
-// New note / Show all / Archive render as a compact three-up button row
-// instead of three full-width rows, saving vertical space the way Undo / Redo
-// do. Icon stacked over a small label; the active view tints accent, and the
-// Archive button doubles as a drop target with its count as a corner badge.
+// New note / New folder / Show all / Archive render as a compact four-up
+// segmented bar instead of full-width rows, saving vertical space the way
+// Undo / Redo do. The cells sit flush against one another (the parent owns the
+// border, rounding, and inner `divide-x` dividers) and split the width evenly
+// so the bar reads symmetric. The buttons are icon-only (the label rides on
+// `aria-label` / `title`); the active view tints accent, and the Archive button
+// doubles as a drop target with its count as a corner badge.
 function BarButton({
   icon,
   label,
@@ -1251,23 +1257,24 @@ function BarButton({
       type="button"
       role="menuitem"
       aria-current={active ? "page" : undefined}
+      aria-label={label}
+      title={label}
       onClick={onClick}
       {...(dropId !== undefined ? { [NOTE_DROP_ATTR]: dropId } : {})}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`relative flex flex-1 cursor-pointer flex-col items-center gap-1 rounded-md border py-2 text-xs ${
+      className={`relative flex flex-1 cursor-pointer items-center justify-center py-2.5 ${
         isDropTarget
-          ? "border-accent/40 bg-accent/15 text-fg-bright"
+          ? "bg-accent/15 text-fg-bright"
           : active
-            ? "border-line bg-surface-2 font-semibold text-fg-bright"
-            : "border-line text-fg hover:bg-surface-2 hover:text-fg-bright"
+            ? "bg-surface-2 text-fg-bright"
+            : "text-fg hover:bg-surface-2 hover:text-fg-bright"
       }`}
     >
       <span className={active ? "text-accent" : "text-muted"}>{icon}</span>
-      <span className="max-w-full truncate">{label}</span>
       {badge !== undefined && (
-        <span className="absolute -top-1.5 -right-1.5 rounded-full bg-surface-3 px-1.5 py-0.5 text-[10px] leading-none text-muted tabular-nums">
+        <span className="absolute top-0.5 right-0.5 rounded-full bg-surface-3 px-1 py-0.5 text-[10px] leading-none text-muted tabular-nums">
           {badge}
         </span>
       )}
