@@ -111,11 +111,15 @@ into new notes via `useNotes().importFiles`, landing as a single undo step.
 ### Update toast
 
 `UpdateToast` (`src/ui/UpdateToast.tsx`) — a soft toast pinned above the bottom
-safe-area inset announcing "a new build is ready — reload to apply". Driven by
-`usePwaUpdate` (`src/pwa/usePwaUpdate.ts`): the new service worker parks in
-`waiting`, the toast shows download progress and the incoming version, and the
-page only swaps when the user clicks Reload (never silently mid-edit). See also
-[PWA update](#pwa-update).
+safe-area inset announcing "Update ready" with the incoming version (truncated
+so a long version label never wraps). Driven by `usePwaUpdate`
+(`src/pwa/usePwaUpdate.ts`): the new service worker parks in `waiting`, and the
+page only swaps when the user presses the primary **Update** button — which
+carries the whole "apply it" affordance, so the copy no longer spells out
+"reload to apply" — never silently mid-edit. When the side menu is pinned open
+as a docked sidebar (≥768px) the toast insets past it on the side it docks
+(reading `nav.pinned` / `position.side`) so it centres within the notes content
+area rather than the whole viewport. See also [PWA update](#pwa-update).
 
 ### Icons
 
