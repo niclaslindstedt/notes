@@ -1239,11 +1239,12 @@ the notes list).
 ### Folders in the side menu
 
 `SideMenu` (`src/ui/SideMenu.tsx`) renders the folders and the ungrouped notes
-together in one root drop zone below the Notes heading. The Notes heading's
-trailing action is a **folder-add** glyph (`FolderPlusIcon`), not the old "+":
-pressing it drops an inline, unnamed `FolderEditRow` into the list — commit a
-name (Enter / blur) to persist it, or defocus it empty to discard it (the row
-simply vanishes, so a misfire costs nothing). Each `FolderRow` expands to
+together in one root drop zone below the Notes heading. The Notes heading
+carries no trailing action — adding a folder lives on the action bar below as
+the **New folder** `BarButton` (`FolderPlusIcon`), beside New note. Pressing it
+drops an inline, unnamed `FolderEditRow` into the list — commit a name
+(Enter / blur) to persist it, or defocus it empty to discard it (the row simply
+vanishes, so a misfire costs nothing). Each `FolderRow` expands to
 reveal its notes (indented), and carries a **"+" pinned to its far right**
 (`onAddNote`) that starts a note already filed inside it — replacing the old
 per-folder "New note" row. The folder row's edit and delete actions stay hidden
@@ -1263,11 +1264,15 @@ How the folders and loose notes are ordered is two appearance preferences (see
 timestamp (`folderModifiedAt`). The loose notes are still capped at
 `MAX_RECENT_NOTES`. Both are set in **Appearance → Sidebar**.
 
-**New note / Show all / Archive** share one compact three-up button row
-(`BarButton`) below the list, instead of three full-width rows, to save
-vertical space — the way Undo / Redo do at the foot. Show all and Archive tint
-accent when their view is showing; Archive carries the archived-note count as a
-corner badge and doubles as a drop target.
+**New note / New folder / Show all / Archive** share one compact four-up
+segmented bar (`BarButton`) below the list, instead of full-width rows, to save
+vertical space — the way Undo / Redo do at the foot. The cells sit flush against
+one another (the parent owns the border, rounding, and inner dividers) and split
+the width evenly so the bar reads symmetric. The buttons are **icon-only** — the
+label rides on `aria-label` / `title` rather than visible text. New folder drops
+the inline `FolderEditRow` into the list above; Show all and Archive tint accent
+when their view is showing; Archive carries the archived-note count as a corner
+badge and doubles as a drop target.
 
 A note row can be **dragged onto a folder** to file it, or onto the ungrouped
 root zone to take it out of one. On a pointer device this is native HTML5 drag
