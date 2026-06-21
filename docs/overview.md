@@ -826,7 +826,15 @@ notes…", "Unlocking your notes…") via `UNLOCK_STEP_MESSAGE_KEY`
 (`src/ui/encryption-progress.ts`) rather than the generic encryption-toggle
 copy; the status-line glyph and the underlying `STEP_MESSAGE_KEY` map are still
 shared with the
-[storage tab's encryption status bar](#storage-settings). See
+[storage tab's encryption status bar](#storage-settings). On a file/cloud
+backend, where the per-file notes are unsealed one at a time inside the
+directory adapter's encrypted load, the gate names the note it's on and how far
+through it is ("Decrypting "Groceries" (3/12)…"): `storage.unlock` points the
+`directoryCrypto.onDecryptNote` reporter ref at the gate's status callback for
+the duration of the unlock (clearing it afterward), so each note flows up as a
+`decrypting` phase carrying an `EncryptionProgressDetail`
+(`{ title, index, total }`). The browser backend decrypts one whole envelope, so
+it just keeps the generic "Decrypting your notes…" line. See
 [encryption](#encryption).
 
 ### Cipher glyph

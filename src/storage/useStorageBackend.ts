@@ -45,6 +45,7 @@ import {
   withLocalCache,
 } from "./cache/index.ts";
 import { decryptEnvelope, encryptText, isEncryptedEnvelope } from "./crypto.ts";
+import type { DecryptNoteReporter } from "./directory-adapter.ts";
 import {
   type DropboxAuth,
   completeDropboxAuth,
@@ -115,7 +116,19 @@ export type EncryptionProgressStep =
   | "decrypting"
   | "saving"
   | "finalizing";
-export type EncryptionProgress = (step: EncryptionProgressStep) => void;
+// Optional per-note context a phase can carry — only the `decrypting` phase of
+// an unlock fills it in, once per note as the file/cloud backend unseals them in
+// sequence, so the status line can name the note being decrypted (and how far
+// through the run it is) instead of a single undifferentiated wait.
+export type EncryptionProgressDetail = {
+  title: string;
+  index: number;
+  total: number;
+};
+export type EncryptionProgress = (
+  step: EncryptionProgressStep,
+  detail?: EncryptionProgressDetail,
+) => void;
 
 export interface UseStorageBackend {
   /** The adapter to hand to the sync engine. A no-op placeholder while locked. */
@@ -314,7 +327,14 @@ export function useStorageBackend(): UseStorageBackend {
   // adapter never needs rebuilding when the passphrase changes (unlock / enable
   // / disable). Kept in lockstep with the `password` state via `applyPassword`.
   const passwordRef = useRef<string | null>(null);
-  const directoryCrypto = useMemo(() => ({ passwordRef }), []);
+  // Points at the unlock gate's status callback only while an unlock is in
+  // flight, so the directory adapter can report each note as it decrypts it.
+  // Null the rest of the time — a steady-state load reports nothing.
+  const decryptNoteRef = useRef<DecryptNoteReporter | null>(null);
+  const directoryCrypto = useMemo(
+    () => ({ passwordRef, onDecryptNote: decryptNoteRef }),
+    [],
+  );
   // Set or clear the session passphrase in one place: the imperative ref (read
   // by the adapters) and the React state (drives `locked` / re-renders).
   const applyPassword = useCallback((next: string | null) => {
@@ -913,6 +933,13 @@ export function useStorageBackend(): UseStorageBackend {
       // happening instead of sitting blank.
       onProgress?.("derivingKey");
       passwordRef.current = candidate;
+      // Forward each note the file/cloud backend unseals to the status line, so
+      // a long decrypt names the note it's on. Cleared in `finally` so it never
+      // fires for a steady-state load. The browser backend decrypts one whole
+      // envelope (no per-note events), so it just keeps the generic phase line.
+      decryptNoteRef.current = onProgress
+        ? (info) => onProgress("decrypting", info)
+        : null;
       try {
         onProgress?.("decrypting");
         await inner.load();
@@ -923,6 +950,8 @@ export function useStorageBackend(): UseStorageBackend {
         }
         log.warn("unlock: backend unreachable and no cached copy", err);
         throw new OfflineUnavailableError(undefined, { cause: err });
+      } finally {
+        decryptNoteRef.current = null;
       }
       onProgress?.("finalizing");
       applyPassword(candidate);

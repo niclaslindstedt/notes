@@ -117,10 +117,24 @@ export const FOLDERS_FILE_NAME = "folders.json";
 // Suffix of an encrypted per-note file. The stem is the opaque keyed-HMAC ref.
 const ENC_SUFFIX = ".enc";
 
+// What the encrypted load reports as it unseals each per-file note in sequence:
+// the note's title plus its position in the run, so the unlock gate can name the
+// note currently being decrypted and show how far through it is.
+export type DecryptNoteInfo = {
+  title: string;
+  index: number;
+  total: number;
+};
+export type DecryptNoteReporter = (info: DecryptNoteInfo) => void;
+
 // The session passphrase, by reference so it can change at runtime (unlock /
-// enable / disable) without rebuilding the adapter.
+// enable / disable) without rebuilding the adapter. `onDecryptNote` is an
+// optional reporter ref the encrypted load drains once per note as it decrypts
+// them one at a time — the unlock flow points it at the gate's status line while
+// it unlocks, and clears it afterward, so it costs nothing the rest of the time.
 export type DirectoryCrypto = {
   passwordRef: { readonly current: string | null };
+  onDecryptNote?: { readonly current: DecryptNoteReporter | null };
 };
 
 function isMarkdownPath(path: string): boolean {
@@ -550,7 +564,11 @@ export function createDirectoryAdapter(
 
     const notes: Note[] = [];
     const seen = new Set<string>();
-    // Encrypted notes (already migrated).
+    // Encrypted notes (already migrated), unsealed one at a time. On a cloud
+    // backend each read is a network fetch, so the per-note reporter lets the
+    // unlock gate name the note it's on instead of one undifferentiated wait.
+    const reportNote = crypto?.onDecryptNote?.current;
+    let decrypted = 0;
     for (const path of encPaths) {
       const text = await store.read(path);
       if (text === null) continue;
@@ -562,6 +580,12 @@ export function createDirectoryAdapter(
         notes.push(note);
         seen.add(note.id);
         status.set(note.id, "encrypted");
+        decrypted += 1;
+        reportNote?.({
+          title: note.title,
+          index: decrypted,
+          total: encPaths.length,
+        });
       }
     }
     // Plaintext remnants from an in-progress migration: merge any note not yet

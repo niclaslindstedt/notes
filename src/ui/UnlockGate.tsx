@@ -38,8 +38,16 @@ export function UnlockGate({ storage }: Props) {
     setBusy(true);
     setError(null);
     setStep(null);
-    const onProgress: EncryptionProgress = (s) =>
-      setStep(t(UNLOCK_STEP_MESSAGE_KEY[s]));
+    const onProgress: EncryptionProgress = (s, detail) =>
+      setStep(
+        detail
+          ? t("settings.unlock.decryptingNote", {
+              title: detail.title || t("settings.unlock.untitledNote"),
+              index: detail.index,
+              total: detail.total,
+            })
+          : t(UNLOCK_STEP_MESSAGE_KEY[s]),
+      );
     try {
       await storage.unlock(pass, onProgress);
       setPass("");
