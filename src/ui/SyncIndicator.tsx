@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { unlock } from "../achievements/index.ts";
+import { noteTitle, type Note } from "../domain/note.ts";
 import type { UseStorageBackend } from "../storage/useStorageBackend.ts";
 import type { NotesSync } from "../app/use-notes-sync.ts";
+import type { EncryptionConversionState } from "./settings/EncryptionLogModal.tsx";
 import { SyncDetailsModal } from "./SyncDetailsModal.tsx";
 import { SyncStatus } from "./SyncStatus.tsx";
 
@@ -10,16 +12,38 @@ import { SyncStatus } from "./SyncStatus.tsx";
 // checklist's header cloud glyph + sync-details modal. Owns the modal's open
 // state and derives the provider name / reconnect gesture from the active
 // backend, so `SyncStatus` (the morphing glyph button) and `SyncDetailsModal`
-// (the info dialog) stay pure presentational pieces. The browser backend has
-// no remote to sync against, so nothing renders for it.
+// (the command-centre dialog) stay pure presentational pieces. It also resolves
+// the ids of the notes uploading right now into titles for the modal's live
+// activity list. The browser backend has no remote to sync against, so nothing
+// renders for it.
 
 type Props = {
   sync: NotesSync;
   storage: UseStorageBackend;
+  /** Notes whose file is being written to the backend this second. */
+  uploadingIds: ReadonlySet<string>;
+  /** The active document's notes, for resolving upload ids to titles. */
+  notes: readonly Note[];
+  /** Live snapshot of the background encrypt/decrypt conversion. */
+  conversion: EncryptionConversionState;
 };
 
-export function SyncIndicator({ sync, storage }: Props) {
+export function SyncIndicator({
+  sync,
+  storage,
+  uploadingIds,
+  notes,
+  conversion,
+}: Props) {
   const [open, setOpen] = useState(false);
+
+  const uploads = useMemo(
+    () =>
+      notes
+        .filter((n) => uploadingIds.has(n.id))
+        .map((n) => ({ id: n.id, title: noteTitle(n) })),
+    [notes, uploadingIds],
+  );
 
   // The browser backend has no remote to sync against — nothing to show.
   if (storage.backend === "browser") return null;
@@ -44,7 +68,6 @@ export function SyncIndicator({ sync, storage }: Props) {
         status={sync.status}
         dirty={sync.dirty}
         offline={sync.offline}
-        onSave={sync.saveNow}
         onOpenDetails={() => setOpen(true)}
       />
       <SyncDetailsModal
@@ -56,6 +79,9 @@ export function SyncIndicator({ sync, storage }: Props) {
         statusDetail={sync.statusDetail}
         dirty={sync.dirty}
         offline={sync.offline}
+        encrypted={storage.encryption === "encrypted"}
+        uploads={uploads}
+        conversion={conversion}
         onSaveNow={sync.saveNow}
         onReload={() => {
           unlock("freshPull");

@@ -453,7 +453,15 @@ export function App() {
     return <UnlockGate storage={storage} />;
   }
 
-  const syncSlot = <SyncIndicator sync={sync} storage={storage} />;
+  const syncSlot = (
+    <SyncIndicator
+      sync={sync}
+      storage={storage}
+      uploadingIds={uploadingIds}
+      notes={sync.doc.notes}
+      conversion={encConversion}
+    />
+  );
 
   return (
     <AttachmentFetchContext.Provider value={storage.fetchAttachment}>
