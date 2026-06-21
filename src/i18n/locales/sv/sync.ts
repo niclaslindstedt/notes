@@ -19,6 +19,26 @@ const sync: SyncCatalog = {
   reloadFromBackend: "Läs in från lagringen",
   openIn: "Öppna i {provider}",
 
+  activity: "Aktivitet",
+  uploadingFiles: "Laddar upp nu",
+  uploadingCount: "{n} filer",
+  encryptingHeading: "Krypterar lagrat",
+  decryptingHeading: "Dekrypterar lagrat",
+  conversionCount: "{done} av {total}",
+  conversionFailed: "Konverteringen stoppades",
+
+  encryptionLabel: "Kryptering",
+  encryptionOn: "På",
+  encryptionOff: "Av",
+
+  syncLog: "Synkningslogg",
+  viewSyncLog: "Visa synkningslogg",
+  hideSyncLog: "Dölj synkningslogg",
+  syncLogEmpty: "Ingen synkningsaktivitet loggad ännu.",
+  copyLog: "Kopiera",
+  copied: "Kopierat",
+  copyFailed: "Kopiering misslyckades",
+
   offlineHeading: "Du är offline",
   offlineDetail:
     "Du redigerar kopian som är sparad på den här enheten. Den synkas tillbaka till {provider} när anslutningen återställs.",

@@ -14,11 +14,10 @@ import {
 // checklist's `SyncStatus`. One glyph that morphs with state: a cloud-upload
 // (link ring) when there are unsaved edits to push, a spinner while a save is
 // in flight, a green cloud-check when the backend is in sync, and a coloured
-// cloud-alert for conflict / auth / throttle / generic errors. Tapping the
-// upload glyph saves now; every other state opens the sync-details modal.
-// Errors take precedence over the dirty upload glyph because if the round-trip
-// is failing, "save now" can't make progress until the user sees and acts on
-// it.
+// cloud-alert for conflict / auth / throttle / generic errors. Whatever the
+// state, tapping it opens the sync-details modal — the command centre where the
+// status is spelled out and Save now / Reconnect / Reload live — so the glyph
+// stays a single, predictable way in even mid-save.
 
 type Props = {
   providerName: string;
@@ -26,7 +25,6 @@ type Props = {
   dirty: boolean;
   /** True when the backend is unreachable and we're on the on-device copy. */
   offline: boolean;
-  onSave: () => void;
   onOpenDetails: () => void;
 };
 
@@ -39,7 +37,6 @@ type View = {
   label: string;
   tone: Tone;
   spin?: boolean;
-  action: "save" | "open";
 };
 
 function viewFor(
@@ -57,7 +54,6 @@ function viewFor(
       Icon: CloudOffIcon,
       label: t("sync.offline"),
       tone: "warn",
-      action: "open",
     };
   }
   switch (status) {
@@ -67,35 +63,30 @@ function viewFor(
         label: t("sync.saving"),
         tone: "busy",
         spin: true,
-        action: "open",
       };
     case "error":
       return {
         Icon: CloudAlertIcon,
         label: t("sync.failed"),
         tone: "err",
-        action: "open",
       };
     case "throttled":
       return {
         Icon: CloudAlertIcon,
         label: t("sync.throttled"),
         tone: "warn",
-        action: "open",
       };
     case "auth-error":
       return {
         Icon: CloudAlertIcon,
         label: t("sync.reauthRequired"),
         tone: "err",
-        action: "open",
       };
     case "conflict":
       return {
         Icon: CloudAlertIcon,
         label: t("sync.syncConflict"),
         tone: "err",
-        action: "open",
       };
     case "saved":
     case "idle":
@@ -104,13 +95,11 @@ function viewFor(
             Icon: CloudUploadIcon,
             label: t("sync.saveUnsaved"),
             tone: "push",
-            action: "save",
           }
         : {
             Icon: CloudCheckIcon,
             label: t("sync.syncedTo", { provider: providerName }),
             tone: "ok",
-            action: "open",
           };
   }
 }
@@ -128,24 +117,19 @@ export function SyncStatus({
   status,
   dirty,
   offline,
-  onSave,
   onOpenDetails,
 }: Props) {
   const t = useT();
   const view = viewFor(t, status, dirty, offline, providerName);
   const busy = status === "saving";
-  const onClick = view.action === "save" ? onSave : onOpenDetails;
   return (
     <button
       type="button"
-      onClick={onClick}
-      disabled={busy}
+      onClick={onOpenDetails}
       title={view.label}
       aria-label={view.label}
       aria-busy={busy || undefined}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius)] border bg-transparent focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none ${
-        busy ? "cursor-not-allowed" : "cursor-pointer"
-      } ${TONE_CLASS[view.tone]}`}
+      className={`inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--radius)] border bg-transparent focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none ${TONE_CLASS[view.tone]}`}
     >
       <view.Icon
         className={`h-[18px] w-[18px] ${view.spin ? "animate-spin" : ""}`}

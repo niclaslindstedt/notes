@@ -137,7 +137,7 @@ Honour these when naming a new file, key, or string.
 | **Changelog modal** / **what's new**                       | `ChangelogModal` (`src/ui/changelog/ChangelogModal.tsx`). [→](overview.md#changelog-modal)                   |
 | **Achievements modal** / **trophy tour**                   | `AchievementsModal` (`src/ui/achievements/AchievementsModal.tsx`). [→](overview.md#achievements-modal)        |
 | **Unlock modal** / **achievement notification**            | `AchievementUnlockModal` (`src/ui/achievements/AchievementUnlockModal.tsx`). [→](overview.md#unlock-modal)    |
-| **Sync details modal** / **what went wrong with sync**     | `SyncDetailsModal` (`src/ui/SyncDetailsModal.tsx`). [→](overview.md#sync-details-modal)                       |
+| **Sync details modal** / **cloud sync command centre** / **what went wrong with sync** / **sync log (in the modal)** | `SyncDetailsModal` (`src/ui/SyncDetailsModal.tsx`); the in-modal sync-log panel filters the [logger](#logger) buffer by `SYNC_LOG_SCOPES`. [→](overview.md#sync-details-modal)                       |
 | **Conflict modal** / **another device edited** / **keep mine** | `ConflictModal` (`src/ui/ConflictModal.tsx`). [→](overview.md#conflict-modal)                                 |
 | **Encryption log modal** / **encryption log**              | `EncryptionLogModal` (`src/ui/settings/EncryptionLogModal.tsx`). [→](overview.md#encryption-log-modal)        |
 | **Unlock gate** / **passphrase prompt**                    | `UnlockGate` (`src/ui/UnlockGate.tsx`). [→](overview.md#unlock-gate)                                          |

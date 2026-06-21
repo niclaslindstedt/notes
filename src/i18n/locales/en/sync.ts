@@ -26,6 +26,30 @@ const sync = {
   reloadFromBackend: "Reload from backend",
   openIn: "Open in {provider}",
 
+  // Live activity block (what the sync is doing right now).
+  activity: "Activity",
+  uploadingFiles: "Uploading now",
+  uploadingCount: "{n} files",
+  encryptingHeading: "Encrypting at rest",
+  decryptingHeading: "Decrypting at rest",
+  conversionCount: "{done} of {total}",
+  conversionFailed: "Conversion stopped",
+
+  // Details grid.
+  encryptionLabel: "Encryption",
+  encryptionOn: "On",
+  encryptionOff: "Off",
+
+  // Sync log (always-on in-memory ring buffer, surfaced here regardless of
+  // the developer-mode capture toggle).
+  syncLog: "Sync log",
+  viewSyncLog: "View sync log",
+  hideSyncLog: "Hide sync log",
+  syncLogEmpty: "No sync activity logged yet.",
+  copyLog: "Copy",
+  copied: "Copied",
+  copyFailed: "Copy failed",
+
   // Per-state heading shown in the modal's status block, plus the
   // explanatory "what / why" line beneath it.
   offlineHeading: "You're offline",

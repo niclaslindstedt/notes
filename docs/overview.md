@@ -762,12 +762,35 @@ otherwise.
 
 ### Sync details modal
 
-`SyncDetailsModal` (`src/ui/SyncDetailsModal.tsx`) — opened from the [sync
-glyph](#sync-status). Explains the current state (saving / error / throttled /
-offline / in-sync), shows the failure reason verbatim, links out to the
-backend's web UI, and offers Reconnect, Save now / Try again, and Reload-from-
-backend. Its content is short and opens no soft keyboard, so it renders as a
-compact `centered` card rather than the full-screen mobile sheet.
+`SyncDetailsModal` (`src/ui/SyncDetailsModal.tsx`) — the cloud-sync **command
+centre**, opened from the [sync glyph](#sync-status) whatever the current state.
+It lays out, top to bottom:
+
+- **Status** — the headline state (saving / error / throttled / offline /
+  in-sync), the failure reason verbatim, and the Reconnect, Save now / Try
+  again, and Reload-from-backend actions (each glyphed).
+- **Activity** (only when something is happening) — the notes whose file is
+  uploading this second (resolved from the [per-note upload
+  spinner](#per-note-upload-spinner) ids that `SyncIndicator` maps to titles)
+  and the background [encryption conversion](#encryption-migration)'s live
+  progress: a heading (Encrypting / Decrypting at rest), a `done / total`
+  counter, a fill bar, and the per-note / per-attachment message — the same
+  feed the [Storage tab](#storage-settings)'s status bar flashes. A stopped
+  conversion shows its error here.
+- **Details** — a two-column grid pairing the backend (cloud / folder glyph)
+  with the at-rest **Encryption** state (On / Off), then the on-disk file
+  location.
+- **Sync log** — a collapsible panel reading the cloud-sync scopes straight from
+  the in-memory log ring buffer (`getLogs` / `subscribeToLogs`, see
+  [logger](#logger)), filtered to a `SYNC_LOG_SCOPES` allowlist. It shows even
+  when the developer-mode capture toggle is off (capture only governs
+  persistence across reloads, not the live buffer), with a Copy button — so a
+  non-developer can read what sync is doing without entering dev mode.
+
+The status copy names the bare service ("Synced to Dropbox"), since the
+Encryption column now carries the at-rest state. Its content is short and opens
+no soft keyboard, so it renders as a compact `centered` card rather than the
+full-screen mobile sheet.
 
 ### Conflict modal
 
@@ -914,9 +937,11 @@ body, so a picker on a control near the bottom of the modal isn't clipped.
 
 `SyncStatus` (`src/ui/SyncStatus.tsx`) — the single header glyph that morphs
 with sync state (cloud-upload when dirty, spinner when saving, cloud-check when
-in sync, cloud-alert on error/offline). Tapping the upload glyph saves
-immediately; every other state opens the [sync details modal](#sync-details-modal).
-Errors take precedence over the dirty state.
+in sync, cloud-alert on error/offline). Tapping it always opens the [sync
+details modal](#sync-details-modal) — the command centre where the status is
+spelled out and Save now lives — whatever the state, including mid-save, so the
+glyph stays one predictable way in. Errors take precedence over the dirty state
+for which glyph shows.
 
 ### Sync indicator
 
