@@ -22,7 +22,6 @@ import { useSwipeReveal } from "./hooks/useSwipeReveal.ts";
 import { RowActionMenu } from "./RowActionMenu.tsx";
 import {
   ArchiveIcon,
-  CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   CodeIcon,
@@ -420,13 +419,7 @@ export function SideMenu({
   function renderNoteRow(note: Note, indent = false) {
     const row = (
       <NavItem
-        icon={
-          note.id === activeNoteId ? (
-            <CheckIcon className="h-5 w-5" />
-          ) : (
-            <NoteIcon className="h-5 w-5" />
-          )
-        }
+        icon={<NoteIcon className="h-5 w-5" />}
         label={noteTitle(note)}
         active={note.id === activeNoteId}
         indent={indent}
@@ -536,9 +529,10 @@ export function SideMenu({
       />
       {namespaces.map((ns) => {
         // A namespace that picked an icon or colour shows its own glyph,
-        // tinted to that colour. One left untouched gets the plain check
-        // (active) / folder (inactive) treatment so the active set reads at a
-        // glance — the NamespaceGlyph fallback is itself a folder.
+        // tinted to that colour. One left untouched gets the plain folder
+        // fallback; the active set reads at a glance from the row's accent
+        // highlight (and the icon's accent tint) rather than a swapped-in
+        // checkmark.
         const customised = Boolean(ns.glyph || ns.color);
         const icon = customised ? (
           <NamespaceGlyph
@@ -546,8 +540,6 @@ export function SideMenu({
             className="h-5 w-5"
             style={ns.color ? { color: ns.color } : undefined}
           />
-        ) : ns.slug === activeNamespace ? (
-          <CheckIcon className="h-5 w-5" />
         ) : (
           <NamespaceGlyph className="h-5 w-5" />
         );
@@ -1172,7 +1164,7 @@ function NavItem({
           : isDropTarget
             ? "cursor-pointer bg-accent/15 text-fg-bright ring-1 ring-accent/40 ring-inset"
             : active
-              ? "cursor-pointer bg-surface-2 font-semibold text-fg-bright"
+              ? "cursor-pointer bg-accent/20 font-semibold text-fg-bright shadow-[inset_3px_0_0_var(--color-accent)]"
               : "cursor-pointer text-fg hover:bg-surface-2 hover:text-fg-bright"
       }`}
     >
