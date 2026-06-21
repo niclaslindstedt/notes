@@ -359,62 +359,71 @@ export function SyncDetailsModal({
         {/* Headline status — what sync is doing and, on failure, why. */}
         <section className="flex flex-col gap-2">
           <SectionLabel>{t("sync.status")}</SectionLabel>
-          <div
-            className={`flex items-start gap-2 rounded-[var(--radius)] border px-2.5 py-2 ${TONE_BORDER[state.tone]}`}
-          >
-            <state.Icon
-              className={`mt-0.5 h-4 w-4 shrink-0 ${TONE_TEXT[state.tone]} ${
-                state.spin ? "animate-spin" : ""
-              }`}
-            />
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className={`text-sm font-bold ${TONE_TEXT[state.tone]}`}>
-                {state.label}
-              </span>
-              {state.detail && (
-                <p className="text-xs break-words whitespace-pre-wrap text-fg">
-                  {state.detail}
-                </p>
+          {/* The status card and a reload glyph share a row — reload is a
+              compact icon here (whatever the state) rather than a full-width
+              button below, to save vertical space. */}
+          <div className="flex items-stretch gap-2">
+            <div
+              className={`flex flex-1 items-start gap-2 rounded-[var(--radius)] border px-2.5 py-2 ${TONE_BORDER[state.tone]}`}
+            >
+              <state.Icon
+                className={`mt-0.5 h-4 w-4 shrink-0 ${TONE_TEXT[state.tone]} ${
+                  state.spin ? "animate-spin" : ""
+                }`}
+              />
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className={`text-sm font-bold ${TONE_TEXT[state.tone]}`}>
+                  {state.label}
+                </span>
+                {state.detail && (
+                  <p className="text-xs break-words whitespace-pre-wrap text-fg">
+                    {state.detail}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onReload}
+              title={t("sync.reloadFromBackend")}
+              aria-label={t("sync.reloadFromBackend")}
+              className="inline-flex w-10 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-line bg-surface-2 text-muted hover:border-accent hover:text-accent"
+            >
+              <RefreshIcon className="h-4 w-4" />
+            </button>
+          </div>
+
+          {(showReconnect || showSaveNow) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {showReconnect && (
+                <button
+                  type="button"
+                  onClick={handleReconnect}
+                  disabled={reconnectPending}
+                  aria-busy={reconnectPending || undefined}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-[var(--radius)] border border-accent bg-accent/10 px-3 py-1.5 text-sm font-bold text-accent hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-70 ${
+                    reconnectPending ? "" : "cursor-pointer"
+                  }`}
+                >
+                  <ReconnectIcon
+                    className={`h-3.5 w-3.5 ${reconnectPending ? "animate-spin" : ""}`}
+                  />
+                  {reconnectLabel}
+                </button>
+              )}
+
+              {showSaveNow && (
+                <button
+                  type="button"
+                  onClick={onSaveNow}
+                  className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-[var(--radius)] border border-accent bg-accent/10 px-3 py-1.5 text-sm font-bold text-accent hover:bg-accent/20"
+                >
+                  <CloudUploadIcon className="h-3.5 w-3.5" />
+                  {saveLabel}
+                </button>
               )}
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {showReconnect && (
-              <button
-                type="button"
-                onClick={handleReconnect}
-                disabled={reconnectPending}
-                aria-busy={reconnectPending || undefined}
-                className={`inline-flex items-center justify-center gap-1.5 rounded-[var(--radius)] border border-accent bg-accent/10 px-3 py-1.5 text-sm font-bold text-accent hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-70 ${
-                  reconnectPending ? "" : "cursor-pointer"
-                }`}
-              >
-                <ReconnectIcon
-                  className={`h-3.5 w-3.5 ${reconnectPending ? "animate-spin" : ""}`}
-                />
-                {reconnectLabel}
-              </button>
-            )}
-
-            {showSaveNow && (
-              <button
-                type="button"
-                onClick={onSaveNow}
-                className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-[var(--radius)] border border-accent bg-accent/10 px-3 py-1.5 text-sm font-bold text-accent hover:bg-accent/20"
-              >
-                <CloudUploadIcon className="h-3.5 w-3.5" />
-                {saveLabel}
-              </button>
-            )}
-
-            <Button variant="secondary" onClick={onReload}>
-              <span className="inline-flex items-center gap-1.5">
-                <RefreshIcon className="h-3.5 w-3.5" />
-                {t("sync.reloadFromBackend")}
-              </span>
-            </Button>
-          </div>
+          )}
 
           {reconnectError && (
             <p className="text-xs break-words text-danger">{reconnectError}</p>
