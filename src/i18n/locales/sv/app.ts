@@ -4,6 +4,7 @@ const app: AppCatalog = {
   title: "Notes",
   empty:
     "Inga anteckningar än. Tryck på + (eller tryck Enter) för att skriva din första.",
+  loading: "Laddar anteckningar…",
   newNote: "Ny anteckning",
   back: "Tillbaka",
   startWriting: "Börja skriva…",

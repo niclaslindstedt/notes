@@ -23,6 +23,10 @@ const nav = {
   noFolder: "No folder",
   showAll: "Show all",
   notesEmpty: "No notes yet.",
+  // Shown in the notes list while the active namespace's first load is still
+  // in flight (a folder/cloud round-trip), so a switch shows "loading" rather
+  // than the misleading "No notes yet." until the document lands.
+  notesLoading: "Loading notes…",
   deleteNote: "Delete note",
   undo: "Undo",
   redo: "Redo",

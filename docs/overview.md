@@ -57,7 +57,11 @@ public pages are English-only and bypass i18n.
 set (`notes` from `useNotes`: active, non-blank, sorted newest-edited) as a
 column of `NoteCard`s, with pull-to-refresh on remote backends and a control
 to create a new note. Tapping a card opens it in the `Editor`; the empty state
-prompts the first note.
+prompts the first note. While the active namespace's first load is still in
+flight with nothing seeded (`loading` — see [namespace loading](#namespaces)),
+it shows a spinner + `app.loading` instead of the empty prompt, so switching
+into a folder/cloud namespace reads as "loading" rather than "empty" until the
+document lands.
 
 ### Note card
 
@@ -610,7 +614,10 @@ source, donate). It reads state from `NavContext` and dispatches modal-open
 commands on the [modal bus](#modal-bus). Switching the active namespace leaves
 the editor but deliberately keeps the drawer open, so several namespaces can be
 hopped between in one go; opening a note (and the footer/modal actions) still
-closes it.
+closes it. The notes list shows a spinner + `nav.notesLoading` while the
+switched-to namespace's first load is still in flight with nothing seeded
+(`loading` — see [namespace loading](#namespaces)), so the drawer never reads as
+"No notes yet." for the seconds a folder/cloud fetch takes.
 
 ### Floating menu button
 
@@ -1269,6 +1276,21 @@ root folder. Helpers: `addNamespace`, `renameNamespace`, `removeNamespace`,
 `setNamespaceAppearance`, `slugify`, and the location mappers
 (`namespaceLocalKey`, `namespaceNotesFolder`). The active slug
 (`getActiveNamespaceSlug`) is a per-device cursor, not shared.
+
+**Switching loads the new namespace's document.** `switchNamespace` rebuilds
+the document adapter onto the target's storage location, and the
+[sync engine](#sync-engine) reseeds the on-screen document synchronously from
+the adapter's `loadSync` fast path (the browser store's bytes, or a cloud
+backend's offline mirror) before the async `load()` reconciles with the live
+copy — so a switch paints the target's notes on the first frame rather than the
+previous namespace's. When there's nothing to seed (a namespace never visited
+on this device, so no mirror exists yet) the folder/cloud `load()` is a real
+round-trip, and `App` derives a `notesLoading` flag (`!sync.loaded`, the backend
+isn't the synchronous browser store, and no notes/folders are seeded) that the
+[note list](#note-list--overview) and [side menu](#side-menu) render as a
+spinner + loading hint (`app.loading` / `nav.notesLoading`) — so the empty list
+reads as "loading" rather than the misleading "No notes yet." until the fetch
+lands. The browser store loads synchronously, so it never enters this state.
 
 ### Namespace registry store
 

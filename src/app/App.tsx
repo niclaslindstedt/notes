@@ -202,6 +202,20 @@ export function App() {
   // has no per-note upload to watch.
   const uploadingIds = useUploadStatus(storage.adapter);
 
+  // The active namespace's first load hasn't landed yet and we have nothing to
+  // paint from the synchronous seed — so the list region shows a "loading"
+  // hint instead of the misleading "No notes yet." Only the folder/cloud
+  // backends ever sit in this state: their `load()` is a real round-trip, and a
+  // never-visited namespace has no offline mirror for `loadSync` to seed from,
+  // so switching into one would otherwise read as empty for the seconds the
+  // fetch takes. The browser store loads synchronously, so an empty namespace
+  // there is genuinely empty from the first frame and never "loading".
+  const notesLoading =
+    !sync.loaded &&
+    storage.backend !== "browser" &&
+    notes.length === 0 &&
+    folders.length === 0;
+
   // When the floating button is hidden (only possible in the standalone
   // mobile PWA), an inward swipe from the drawer's resting edge opens it.
   // The hook itself stands down while a modal is open; we gate it off too
@@ -479,6 +493,7 @@ export function App() {
             <NoteDragProvider onDrop={handleNoteDrop}>
               <SideMenu
                 notes={notes}
+                loading={notesLoading}
                 activeNoteId={editingId}
                 onSelectNote={(id) => switchTo(id)}
                 onShowAll={showAll}
@@ -544,6 +559,7 @@ export function App() {
                 ) : (
                   <NoteList
                     notes={notes}
+                    loading={notesLoading}
                     folders={folders}
                     onOpen={(id) => switchTo(id)}
                     onNew={openNew}
@@ -620,6 +636,7 @@ function FolderPicker({
 
 function NoteList({
   notes,
+  loading = false,
   folders,
   onOpen,
   onNew,
@@ -631,6 +648,8 @@ function NoteList({
   uploadingIds,
 }: {
   notes: Note[];
+  /** The active namespace's first load is still in flight with nothing seeded. */
+  loading?: boolean;
   folders: Folder[];
   onOpen: (id: string) => void;
   onNew: (folderId?: string) => void;
@@ -688,10 +707,13 @@ function NoteList({
   }
 
   // With no notes yet, pressing Enter (a physical keyboard, so desktop) starts
-  // the first note — the empty state's primary action without a tap.
+  // the first note — the empty state's primary action without a tap. Suppressed
+  // while the namespace is still loading: there's no empty state to act on yet,
+  // and a fresh note would land in a document the in-flight load is about to
+  // replace.
   const empty = notes.length === 0 && folders.length === 0;
   useEffect(() => {
-    if (!empty) return;
+    if (!empty || loading) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Enter" || e.metaKey || e.ctrlKey || e.altKey) return;
       const el = document.activeElement;
@@ -745,7 +767,14 @@ function NoteList({
 
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 pt-3 pb-24 md:pb-3">
         {empty ? (
-          <p className="mt-16 text-center text-muted">{t("app.empty")}</p>
+          loading ? (
+            <p className="mt-16 flex items-center justify-center gap-2 text-center text-muted">
+              <SpinnerIcon className="h-4 w-4 animate-spin" />
+              {t("app.loading")}
+            </p>
+          ) : (
+            <p className="mt-16 text-center text-muted">{t("app.empty")}</p>
+          )
         ) : folders.length === 0 ? (
           <ul className={`flex flex-col ${listGap}`}>
             {notes.map(renderCard)}

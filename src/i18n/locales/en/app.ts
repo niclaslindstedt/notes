@@ -7,6 +7,10 @@ import type { Widen } from "./_widen.ts";
 const app = {
   title: "Notes",
   empty: "No notes yet. Tap + (or press Enter) to write your first one.",
+  // Shown on the overview while the active namespace's first load is still in
+  // flight (a folder/cloud round-trip), so switching into it shows "loading"
+  // rather than the misleading empty prompt until the document lands.
+  loading: "Loading notes…",
   newNote: "New note",
   back: "Back",
   startWriting: "Start writing…",

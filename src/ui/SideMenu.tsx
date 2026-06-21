@@ -183,6 +183,11 @@ function mixTopLevel(
 type Props = {
   /** Notes to list, in display order (most-recently-edited first). */
   notes: Note[];
+  /**
+   * The active namespace's first load is still in flight with nothing seeded
+   * yet — so the list shows a "loading" hint rather than the empty-state text.
+   */
+  loading?: boolean;
   /** The note currently open in the editor, if any. */
   activeNoteId: string | null;
   /** Open a note in the editor. */
@@ -237,6 +242,7 @@ type Props = {
 
 export function SideMenu({
   notes,
+  loading = false,
   activeNoteId,
   onSelectNote,
   onShowAll,
@@ -598,9 +604,16 @@ export function SideMenu({
         }
       >
         {sortedFolders.length === 0 && recentUngrouped.length === 0 ? (
-          <p className="px-5 py-[var(--density-row-py)] text-sm text-muted">
-            {t("nav.notesEmpty")}
-          </p>
+          loading ? (
+            <p className="flex items-center gap-2 px-5 py-[var(--density-row-py)] text-sm text-muted">
+              <SpinnerIcon className="h-4 w-4 shrink-0 animate-spin" />
+              {t("nav.notesLoading")}
+            </p>
+          ) : (
+            <p className="px-5 py-[var(--density-row-py)] text-sm text-muted">
+              {t("nav.notesEmpty")}
+            </p>
+          )
         ) : folderPlacement === "mixed" ? (
           mixTopLevel(sortedFolders, recentUngrouped, notes, noteSortKey).map(
             (item) =>
