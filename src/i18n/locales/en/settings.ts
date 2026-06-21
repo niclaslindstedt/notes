@@ -114,8 +114,9 @@ const settings = {
     listLayout: "Layout",
     listLayoutRows: "Rows",
     listLayoutCards: "Cards",
+    listLayoutList: "List",
     listLayoutHint:
-      "Rows is a compact one-line list; cards are taller, showing more of each note before fading out.",
+      "Rows is a compact one-line list; cards are taller, showing more of each note before fading out; list is a bare file-explorer listing of titles only.",
     sidebar: "Sidebar",
     folderPlacement: "Folders",
     folderPlacementTop: "On top",

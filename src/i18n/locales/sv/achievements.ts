@@ -95,9 +95,9 @@ const achievements: AchievementsCatalog = {
     },
     gallery: {
       name: "Galleri",
-      condition: "Växla anteckningslistan mellan rader och kort.",
+      condition: "Växla anteckningslistan till en annan layout.",
       learnMore:
-        "Inställningar → Utseende visar översikten på två sätt: kompakta enradsrader, eller högre kort som visar flera rader av varje anteckning och tonar ut slutet. Välj det som är lättast för dig att överblicka.",
+        "Inställningar → Utseende visar översikten på tre sätt: kompakta enradsrader, högre kort som visar flera rader av varje anteckning och tonar ut slutet, eller en avskalad filträdsvy med endast titlar. Välj det som är lättast för dig att överblicka.",
     },
     sidebarArranger: {
       name: "Omarrangeraren",

@@ -101,9 +101,9 @@ const achievements = {
     },
     gallery: {
       name: "Gallery",
-      condition: "Switch the note list between rows and cards.",
+      condition: "Switch the note list to a different layout.",
       learnMore:
-        "Settings → Appearance lays the overview out two ways: compact one-line rows, or taller cards that show several lines of each note and fade the tail out. Pick whichever you like to scan.",
+        "Settings → Appearance lays the overview out three ways: compact one-line rows, taller cards that show several lines of each note and fade the tail out, or a bare file-explorer list of titles only. Pick whichever you like to scan.",
     },
     sidebarArranger: {
       name: "Rearranger",

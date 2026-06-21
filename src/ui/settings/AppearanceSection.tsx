@@ -130,7 +130,9 @@ export function AppearanceSection({
               label:
                 id === "cards"
                   ? t("settings.appearance.listLayoutCards")
-                  : t("settings.appearance.listLayoutRows"),
+                  : id === "list"
+                    ? t("settings.appearance.listLayoutList")
+                    : t("settings.appearance.listLayoutRows"),
             }))}
             onChange={(v) => onUpdate("listLayout", v)}
           />
