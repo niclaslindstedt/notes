@@ -66,17 +66,38 @@ would surface a non-event in the changelog).
    `chore(scope):`, …) is usually enough to spot which commits introduced
    a feature and which polished or fixed it.
 
-3. **List existing fragments.** These are the `Added` / `Changed` parents
-   for any in-flight features:
+3. **List existing fragments — all of them — and search them for this
+   change's feature.** These are the `Added` / `Changed` parents for any
+   in-flight features:
 
    ```sh
    .agent/skills/write-changeset/list-fragments.sh
    ```
 
-   The script prints every `.changes/unreleased/*.md` file with its
+   The script prints **every** `.changes/unreleased/*.md` file with its
    front-matter and body, separated by `=== <filename> ===` headers.
    Exits with a "No unreleased fragments." note (on stderr) when the queue
    is empty.
+
+   **Always enumerate the full queue with this script — never with
+   `ls … | head`, a glob, or a guessed keyword grep.** `ls` sorts by
+   timestamp prefix and `head` truncates it, so a folder fragment can sit
+   below the fold while the first ten rows show none — leading you to
+   "there's no parent fragment, so I'll write a new one" when in fact the
+   feature is already queued and unreleased. Read the whole listing.
+
+   Then **search it for the noun this change is about** before concluding
+   no parent exists. If your PR touches "the folder glyph", grep the full
+   listing for `folder`; if it touches "the sync chip", grep for `sync`:
+
+   ```sh
+   .agent/skills/write-changeset/list-fragments.sh | grep -i -C2 '<feature-noun>'
+   ```
+
+   A hit means the feature is almost certainly in-flight (step 3 of the
+   decision tree) — fold into that fragment or `no-changelog`, do **not**
+   open a new one. Zero hits across the _whole_ queue is the only thing
+   that justifies treating the feature as already-shipped.
 
 4. **Pull the current change's diff and intent.** What did this PR change,
    and which previous commit (if any) introduced the codepath it touches?
@@ -264,6 +285,15 @@ Before opening the PR:
   would say "Fixed: the new folder picker no longer flickers" — but the
   picker has never been in production, so no user saw the flicker. Fold it
   into the picker's `Added` fragment instead, or label `no-changelog`.
+
+- **Concluding "no parent fragment exists" from a partial listing.** This
+  is the trap that produces the pitfall above: you skim `ls
+  .changes/unreleased/ | head`, see no `folder*` row in the first handful,
+  and write a new `Fixed` fragment — while a dozen folder fragments sit
+  lower in the (timestamp-sorted) directory, unreleased. Before you decide
+  a feature has shipped, enumerate the **whole** queue with
+  `list-fragments.sh` and grep it for the feature noun (discovery step 3).
+  "I didn't see one" is not "there isn't one".
 
 - **Writing a separate fragment for each commit in a multi-PR feature.** A
   single feature that lands across three PRs needs exactly one fragment.
