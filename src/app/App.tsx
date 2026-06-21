@@ -718,7 +718,7 @@ function NoteList({
                   onDragOver={(e) => allowDropOn(e, folder.id)}
                   onDragLeave={() => setDropTarget(null)}
                   onDrop={(e) => dropOn(e, folder.id)}
-                  className={`rounded-[var(--radius)] ${
+                  className={`rounded-[var(--radius)] p-1.5 ${
                     dropTarget === folder.id || activeDropKey === folder.id
                       ? "bg-accent/10 ring-1 ring-accent/40"
                       : ""
@@ -761,7 +761,7 @@ function NoteList({
                     </button>
                   </div>
                   {expanded && folderNotes.length > 0 && (
-                    <ul className="flex flex-col gap-2 pt-1 pl-6">
+                    <ul className="flex flex-col gap-2 pt-1 pl-3">
                       {folderNotes.map(renderCard)}
                     </ul>
                   )}
@@ -776,7 +776,7 @@ function NoteList({
               onDragOver={(e) => allowDropOn(e, NOTE_DROP_ROOT)}
               onDragLeave={() => setDropTarget(null)}
               onDrop={(e) => dropOn(e, null)}
-              className={`rounded-[var(--radius)] ${
+              className={`rounded-[var(--radius)] p-1.5 ${
                 dropTarget === NOTE_DROP_ROOT ||
                 activeDropKey === NOTE_DROP_ROOT
                   ? "bg-accent/10 ring-1 ring-accent/40"
