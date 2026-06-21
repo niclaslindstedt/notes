@@ -384,7 +384,8 @@ export function FolderOpenIcon({ className }: IconProps) {
   );
 }
 
-/** A folder with a plus — the "new folder" action on the Notes heading. */
+/** A folder with a plus — kept for any callers that want the badged glyph.
+ *  The sidebar "new folder" action uses a plain {@link FolderIcon} instead. */
 export function FolderPlusIcon({ className }: IconProps) {
   return (
     <svg
