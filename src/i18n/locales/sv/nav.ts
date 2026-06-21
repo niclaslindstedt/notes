@@ -18,6 +18,7 @@ const nav: NavCatalog = {
   noFolder: "Ingen mapp",
   showAll: "Visa alla",
   notesEmpty: "Inga anteckningar än.",
+  notesLoading: "Laddar anteckningar…",
   deleteNote: "Ta bort anteckning",
   undo: "Ångra",
   redo: "Gör om",
