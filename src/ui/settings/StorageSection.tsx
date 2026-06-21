@@ -8,6 +8,7 @@ import type {
   UseStorageBackend,
 } from "../../storage/useStorageBackend.ts";
 import { ShieldIcon, SpinnerIcon } from "../icons.tsx";
+import { scrollFocusedIntoView } from "../hooks/scrollFocusedIntoView.ts";
 import { Button } from "../form/Button.tsx";
 import {
   EncryptionLogModal,
@@ -395,6 +396,7 @@ function EncryptionSection({
             type="password"
             value={pass}
             onChange={(e) => setPass(e.target.value)}
+            onFocus={(e) => scrollFocusedIntoView(e.currentTarget)}
             placeholder={t("settings.storage.passphrase")}
             aria-label={t("settings.storage.passphrase")}
             disabled={busy}
@@ -404,6 +406,7 @@ function EncryptionSection({
             type="password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
+            onFocus={(e) => scrollFocusedIntoView(e.currentTarget)}
             placeholder={t("settings.storage.passphraseConfirm")}
             aria-label={t("settings.storage.passphraseConfirm")}
             disabled={busy}
