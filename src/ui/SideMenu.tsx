@@ -288,6 +288,12 @@ export function SideMenu({
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
 
+  // Whether the Namespaces section is collapsed. Defaults to collapsed so the
+  // drawer leads with the notes; the active namespace still shows while
+  // collapsed (so you always see where you are), and tapping the heading
+  // expands the full switcher. View-local, like the folder expand state.
+  const [namespacesCollapsed, setNamespacesCollapsed] = useState(true);
+
   // Desktop HTML5 drag-to-file state. `draggingNote` gates the drop targets (so
   // a stray dragover from outside doesn't light them up) and `dropTarget`
   // drives the hover highlight — a folder id, or `NOTE_DROP_ROOT` for "out of
@@ -535,8 +541,21 @@ export function SideMenu({
         onAdd={() => pick(() => dispatch({ kind: "namespaces" }))}
         addLabel={t("nav.manageNamespaces")}
         addIcon={<CogIcon className="h-4 w-4" />}
+        collapsible
+        collapsed={namespacesCollapsed}
+        onToggle={() => setNamespacesCollapsed((v) => !v)}
+        toggleLabel={
+          namespacesCollapsed
+            ? t("nav.expandNamespaces")
+            : t("nav.collapseNamespaces")
+        }
       />
-      {namespaces.map((ns) => {
+      {/* Collapsed, the switcher shows only the active namespace (so you always
+          see where you are); expanded, it lists them all. */}
+      {(namespacesCollapsed
+        ? namespaces.filter((ns) => ns.slug === activeNamespace)
+        : namespaces
+      ).map((ns) => {
         // A namespace that picked an icon or colour shows its own glyph,
         // tinted to that colour. One left untouched gets the plain folder
         // fallback; the active set reads at a glance from the row's accent
@@ -835,22 +854,54 @@ function SectionHeader({
   onAdd,
   addLabel,
   addIcon = <PlusIcon className="h-4 w-4" />,
+  collapsible = false,
+  collapsed = false,
+  onToggle,
+  toggleLabel,
 }: {
   label: string;
   border?: boolean;
   onAdd?: () => void;
   addLabel?: string;
   addIcon?: ReactNode;
+  // When set, the heading becomes a button with a leading chevron that toggles
+  // the section open/closed (used by Namespaces). The chevron sits to the left
+  // of the label, matching the folder rows' affordance.
+  collapsible?: boolean;
+  collapsed?: boolean;
+  onToggle?: () => void;
+  toggleLabel?: string;
 }) {
+  const labelEl = (
+    <span className="text-xs font-semibold tracking-wide text-muted uppercase">
+      {label}
+    </span>
+  );
   return (
     <div
       className={`flex items-center justify-between gap-2 px-5 pt-3 pb-1 ${
         border ? "border-t border-line" : ""
       }`}
     >
-      <span className="text-xs font-semibold tracking-wide text-muted uppercase">
-        {label}
-      </span>
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          aria-label={toggleLabel}
+          title={toggleLabel}
+          className="-ml-1 flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded py-0.5 pl-1 text-left text-muted hover:text-fg-bright"
+        >
+          {collapsed ? (
+            <ChevronRightIcon className="h-3.5 w-3.5 shrink-0" />
+          ) : (
+            <ChevronDownIcon className="h-3.5 w-3.5 shrink-0" />
+          )}
+          {labelEl}
+        </button>
+      ) : (
+        labelEl
+      )}
       {onAdd && (
         <button
           type="button"

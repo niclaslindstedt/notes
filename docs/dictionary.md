@@ -202,6 +202,7 @@ Honour these when naming a new file, key, or string.
 | Term                                                       | Refers to                                                                                                   |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | **Namespace** / **bucket of notes** / **switch namespace** | `Namespace`, `addNamespace`, `setActiveNamespaceSlug`, `slugify` (`src/storage/namespaces.ts`). [→](overview.md#namespaces) |
+| **Collapse namespaces** / **namespaces chevron** / **collapsible namespaces** | `namespacesCollapsed` + the `collapsible` `SectionHeader` in `SideMenu` (`src/ui/SideMenu.tsx`). [→](overview.md#side-menu) |
 | **Namespace registry store** / **`namespaces.json`**       | `NamespaceRegistryStore`, `fileNamespaceStore` (`src/storage/namespace-store.ts`). [→](overview.md#namespace-registry-store) |
 | **Namespace glyph** / **namespace icon**                   | `NamespaceGlyph` (`src/ui/NamespaceGlyph.tsx`); glyph catalog (`src/ui/glyphs.ts`, `GlyphGrid`). [→](overview.md#namespace-glyph) |
 | **Namespace color**                                        | `src/ui/namespace-colors.ts`. [→](overview.md#namespace-color)                                               |
