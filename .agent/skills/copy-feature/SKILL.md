@@ -47,6 +47,9 @@ Do **not** invoke when:
 git clone --depth 1 https://github.com/niclaslindstedt/checklist.git /tmp/checklist
 ```
 
+Drop `--depth 1` (or use `--depth 50`) when the user points you at a specific
+commit/PR, so the `git log` / `git show` in Step 1 can reach it.
+
 If even that is blocked (no outbound network at all), ask the user to add
 `niclaslindstedt/checklist` to the session's repository scope, or to paste the
 relevant files — don't guess at checklist's implementation from memory.
@@ -66,9 +69,26 @@ ls src/ui src/app/modals    # components and modal hosts live here
 rg -l "<FeatureName>" src    # ripgrep the term and the component name
 ```
 
-Read `/tmp/checklist/AGENTS.md` and `/tmp/checklist/docs/` first — checklist
-keeps a dictionary/overview that maps user vocabulary ("the sync glyph", "keep
-mine") to concrete files. Use it to resolve what the user actually means.
+**Read the docs before the code — on both sides.** Start with the
+`docs/dictionary.md` + `docs/overview.md` pair (checklist keeps the same pair we
+do), *then* the git history, *then* the source. The order matters:
+
+1. **`docs/dictionary.md`** maps the user's word ("the sync glyph", "keep mine",
+   "the button island") to the concrete file(s) — read both
+   `/tmp/checklist/docs/dictionary.md` (to find what to port) **and** our own
+   `docs/dictionary.md` (to find what we already call the same concept, and the
+   notes term to translate into).
+2. **`docs/overview.md`** explains how that subsystem behaves and every other
+   surface it touches — read the same term in `/tmp/checklist/docs/overview.md`
+   so you port the whole feature, not just the one file the request named. Read
+   our `docs/overview.md` entry too when we already have a partial version (the
+   "we're already half there" case).
+3. Only **after** the docs have oriented you do you dig into the git history /
+   changeset fragments (below) and then the actual code.
+
+Skipping the dictionary/overview is how a port misses a surface, re-invents a
+token we already have, or leaves a checklist noun in our code. Also read
+`/tmp/checklist/AGENTS.md` for the repo-wide conventions.
 
 Trace the whole dependency cone of the feature:
 
@@ -79,6 +99,37 @@ Trace the whole dependency cone of the feature:
 - Styles: Tailwind classes plus any CSS variables from `src/styles/` /
   `src/theme/`.
 - npm dependencies it imports (check `/tmp/checklist/package.json`).
+
+### Read the feature's history for the *why*, not just the *what*
+
+The current source tells you **what** the feature does; its **git history tells
+you why it's shaped that way** — the design intent, the trap it avoids, the
+behaviours it deliberately changed. Read it before porting so you re-create the
+reasoning, not just the lines. Find the commits that built the feature and read
+each one's message **and** the artifacts that carry the rationale:
+
+```sh
+cd /tmp/checklist
+# Commits that touched the feature's files, newest first:
+git log --oneline -30 -- src/ui/<Component>.tsx src/storage/<x>.ts
+# The full message + diff for the one that introduced it:
+git show <hash>
+```
+
+> **Learning, baked in:** checklist (like us) **squash-merges**, so a commit's
+> body is usually *empty* — the subject line is just the PR title
+> (`feat(nav): … (#118)`). The real rationale lives in the artifacts that PR
+> shipped: the **`.changes/unreleased/*.md` changeset fragment** (the
+> user-facing "what changed and why" in one sentence) and the
+> **`docs/overview.md` / `docs/*.md` diff** in the same commit (the design
+> narrative). Read those with `git show <hash> -- .changes/ docs/` when the
+> commit body is bare. If the PR number is referenced (`(#118)`) and you have
+> network, the GitHub PR description / review discussion can add context — but
+> the in-repo changeset + docs diff are authoritative and always reachable.
+
+To clone deep enough for this, drop `--depth 1` (or use `--depth 50`) in Step 0
+when the user points you at a specific commit/PR ("the redesigned action bar
+from #112"), so `git log` / `git show` can reach it.
 
 ## Step 2 — Map checklist paths to notes paths
 
@@ -245,11 +296,14 @@ reuse them rather than re-porting:
   the device-local controls (language, menu-activation, dev mode) and storage
   connections still apply immediately. The mobile section dropdown is
   an inline `absolute` panel with a `fixed inset-0` catch-all to dismiss —
-  checklist's `FloatingPanel` was **not** needed because the panel sits just
-  below the header, within the card. `SelectPicker` / `FloatingPanel` remain
-  un-ported — wrap-radio rows + `SegmentedRow` cover the pickers; bring
-  `FloatingPanel` over only when a feature needs a genuinely positioned
-  popover.
+  checklist's `FloatingPanel` was **not** needed for the settings dropdown
+  because the panel sits just below the header, within the card.
+- **Floating popover** — `src/ui/FloatingPanel.tsx` (portalled, escape +
+  outside-click dismissal, auto-flips above when there's no room below) over
+  `src/ui/hooks/useFloatingPosition.ts`, `src/ui/hooks/useEscapeKey.ts`, and
+  `src/ui/DismissBackdrop.tsx`. Used by the side-menu footer **About** dropdown;
+  reuse it for any genuinely positioned popover. `SelectPicker` remains
+  un-ported — wrap-radio rows + `SegmentedRow` cover the in-modal pickers.
 - **Namespaces** — `src/storage/namespaces.ts` (registry + the
   `namespaceLocalKey` / `namespaceCloudFolder` location helpers) and
   `namespace-store.ts` (the `namespaces.json` root registry, the

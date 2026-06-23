@@ -5,6 +5,7 @@ import type { Widen } from "./_widen.ts";
 
 const menu = {
   settings: "Settings",
+  about: "About",
   changelog: "What's new",
   privacy: "Privacy",
   source: "Source",
