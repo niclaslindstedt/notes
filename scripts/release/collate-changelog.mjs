@@ -29,10 +29,20 @@
 // Filename convention: <unix-ts>-<slug>.md. The timestamp gives a
 // deterministic lexical sort that loosely tracks commit order; the
 // slug is for human scanning. Fragments without front-matter, with
-// an unknown type, or with an empty body fail the script loudly.
+// an unknown type, or with an empty body fail the script loudly (the
+// parsing and validation live in fragments.mjs, shared with the
+// compute-bump.mjs sibling so the two never disagree on what a valid
+// fragment is).
 
-import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import {
+  TYPES,
+  FRAG_DIR,
+  listFragmentFiles,
+  parseFragment,
+} from "./fragments.mjs";
 
 const VERSION = process.argv[2];
 if (!/^\d+\.\d+\.\d+$/.test(VERSION ?? "")) {
@@ -40,21 +50,10 @@ if (!/^\d+\.\d+\.\d+$/.test(VERSION ?? "")) {
   process.exit(2);
 }
 
-const TYPES = [
-  "Added",
-  "Changed",
-  "Fixed",
-  "Removed",
-  "Security",
-  "Deprecated",
-];
-const FRAG_DIR = ".changes/unreleased";
 const CHANGELOG = "CHANGELOG.md";
 const DATE = new Date().toISOString().slice(0, 10);
 
-const files = readdirSync(FRAG_DIR)
-  .filter((n) => n.endsWith(".md") && !n.startsWith("."))
-  .sort();
+const files = listFragmentFiles();
 
 if (files.length === 0) {
   console.error(
@@ -68,40 +67,7 @@ if (files.length === 0) {
 
 const grouped = Object.fromEntries(TYPES.map((t) => [t, []]));
 for (const file of files) {
-  const raw = readFileSync(join(FRAG_DIR, file), "utf8");
-  const m = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/.exec(raw);
-  if (!m) {
-    console.error(
-      `bad fragment ${file}: missing front-matter. ` +
-        `Expected:\n---\ntype: Added\ntitle: Short title\n---\n\n<summary>`,
-    );
-    process.exit(1);
-  }
-  // Parse the front-matter block as simple `key: value` lines.
-  const front = {};
-  for (const line of m[1].split("\n")) {
-    if (line.trim() === "") continue;
-    const kv = /^([A-Za-z]+):\s*(.*)$/.exec(line);
-    if (!kv) {
-      console.error(
-        `bad fragment ${file}: malformed front-matter line "${line}"`,
-      );
-      process.exit(1);
-    }
-    front[kv[1].trim()] = kv[2].trim();
-  }
-  const type = (front.type ?? "").trim();
-  if (!TYPES.includes(type)) {
-    console.error(
-      `bad fragment ${file}: type "${type}" not in ${TYPES.join(", ")}`,
-    );
-    process.exit(1);
-  }
-  const body = m[2].trim();
-  if (!body) {
-    console.error(`bad fragment ${file}: empty body`);
-    process.exit(1);
-  }
+  const { front, body, type } = parseFragment(file);
   // Compose the bullet: an optional bold title, the summary, and an
   // optional "Learn more" link to the feature doc. Multi-line bodies are
   // indented under the bullet so the rendered markdown stays well-formed.

@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt fmt-check icons dev dev-seed preview clean install changelog
+.PHONY: build test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump
 
 install:
 	npm ci
@@ -43,6 +43,12 @@ changelog:
 		echo "usage: make changelog VERSION=X.Y.Z"; exit 2; \
 	}
 	node scripts/release/collate-changelog.mjs $(VERSION)
+
+# Print the semver bump (patch/minor/major) the Release workflow will
+# auto-derive from the current .changes/unreleased/ fragments. Read-only
+# — touches nothing.
+bump:
+	@node scripts/release/compute-bump.mjs
 
 clean:
 	rm -rf dist dev-dist node_modules

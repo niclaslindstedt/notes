@@ -208,19 +208,31 @@ so the slots don't clobber one another's service worker on the shared origin.
 
 ### Cutting a release
 
-Releases are manual: dispatch `.github/workflows/release.yml`
-(`workflow_dispatch` only) with a `bump`:
+Releases are manual to *trigger* but automatic to *size*: dispatch
+`.github/workflows/release.yml` (`workflow_dispatch` only) and leave `bump`
+on its `auto` default. The workflow derives the semver bump from the
+`.changes/unreleased/` fragments' front-matter
+(`scripts/release/compute-bump.mjs`), taking the **highest** level any
+fragment implies:
 
-- `patch` — bug fixes, no visible behaviour change beyond the fix.
-- `minor` — new user-facing feature or visible behaviour change. Default.
-- `major` — breaking change to the persisted-note shape an older build can't
-  read, or a deliberate UX overhaul.
+- `patch` — only `Fixed` / `Security` fragments: bug fixes, no visible
+  behaviour change beyond the fix.
+- `minor` — any `Added` / `Changed` / `Removed` / `Deprecated` fragment: a new
+  user-facing feature or visible behaviour change.
+- `major` — any fragment flagged `breaking: true`: a breaking change to the
+  persisted-note shape an older build can't read, or a deliberate UX overhaul.
+  A genuinely breaking removal is `type: Removed` **plus** `breaking: true`,
+  not `Removed` alone.
+
+Set `bump` to an explicit `patch` / `minor` / `major` on dispatch only to
+override that derivation. Preview the auto-derived bump locally with
+`make bump` (read-only).
 
 The workflow collates `.changes/unreleased/` into a dated `CHANGELOG.md`
 section, bumps `package.json`, tags `vX.Y.Z`, creates a GitHub Release from
 that section, and chains into `pages.yml` so the tag is served at `/`
-immediately. Preview locally with `make changelog VERSION=X.Y.Z` (consumes
-the fragments — run on a scratch branch).
+immediately. Preview the changelog locally with `make changelog VERSION=X.Y.Z`
+(consumes the fragments — run on a scratch branch).
 
 ### Changeset fragments
 
@@ -232,6 +244,7 @@ When a PR introduces a **user-visible** change, drop a small markdown file in
 type: Added
 title: Short title
 doc: some-feature   # optional
+breaking: true      # optional — forces a major release bump
 ---
 
 One sentence users will read in the changelog.
@@ -239,8 +252,13 @@ One sentence users will read in the changelog.
 
 `type:` is one of `Added | Changed | Fixed | Removed | Security |
 Deprecated` (Keep a Changelog). `title:` (optional) is a short noun phrase
-bolded at the head of the bullet; the body is a **one-sentence** summary. The
-collator (`scripts/release/collate-changelog.mjs`) renders the bullet as
+bolded at the head of the bullet; the body is a **one-sentence** summary.
+`breaking:` (optional) escalates the auto-derived release bump to `major` when
+the change is one an older build can't survive — set it on the one fragment
+describing the break (see "Cutting a release"). Fragment parsing and
+validation are shared by the collator and the bump-computer
+(`scripts/release/fragments.mjs`): the collator
+(`scripts/release/collate-changelog.mjs`) renders the bullet as
 `- **<title>** — <summary>` and validates the front-matter at release time —
 an unknown `type:`, a malformed line, or an empty body fails the run loudly.
 The timestamp filename prefix keeps the lexical sort deterministic so
