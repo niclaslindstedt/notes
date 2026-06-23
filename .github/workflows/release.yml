@@ -1,11 +1,17 @@
 name: Release
 
-# Manual-only. The maintainer dispatches this with a chosen semver
-# bump; the workflow consumes .changes/unreleased/ into a new
-# CHANGELOG section, bumps package.json, tags vX.Y.Z, pushes, creates
-# a GitHub Release, then chains into pages.yml so the new tag is
-# served at `/` (and the same code at `/preview/` because main now
-# matches the tag) without waiting for the next push.
+# Manual-only. The maintainer dispatches this and the workflow derives
+# the semver bump from the changeset fragments in .changes/unreleased/
+# (their front-matter carries the Added/Changed/Fixed/... type and an
+# optional `breaking: true` — see scripts/release/compute-bump.mjs),
+# then consumes those fragments into a new CHANGELOG section, bumps
+# package.json, tags vX.Y.Z, pushes, creates a GitHub Release, then
+# chains into pages.yml so the new tag is served at `/` (and the same
+# code at `/preview/` because main now matches the tag) without waiting
+# for the next push.
+#
+# `bump` defaults to `auto` — the fragment-derived bump above. Set it to
+# an explicit patch/minor/major only to override that derivation.
 #
 # `commit` is normally empty — the release is cut from main HEAD and
 # the release commit is fast-forwarded onto main. Set it to a sha or
@@ -21,11 +27,12 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: "Semver bump"
+        description: "Semver bump. 'auto' derives it from the .changes/unreleased/ fragments (breaking → major, Added/Changed/Removed/Deprecated → minor, Fixed/Security → patch). Pick patch/minor/major to override."
         required: true
         type: choice
-        default: minor
+        default: auto
         options:
+          - auto
           - patch
           - minor
           - major
@@ -81,6 +88,22 @@ jobs:
         if: inputs.commit != ''
         run: npm ci
 
+      # Resolve the effective bump. `auto` (the default) derives it from
+      # the changeset fragments' front-matter so the release needs no
+      # human judgement; an explicit patch/minor/major from the dispatch
+      # form overrides that derivation.
+      - name: Resolve bump
+        id: resolve
+        run: |
+          if [ "${{ inputs.bump }}" = "auto" ] || [ -z "${{ inputs.bump }}" ]; then
+            BUMP=$(node scripts/release/compute-bump.mjs)
+            echo "Auto-derived bump from fragments: $BUMP"
+          else
+            BUMP="${{ inputs.bump }}"
+            echo "Using requested bump override: $BUMP"
+          fi
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+
       - name: Bump version
         id: bump
         run: |
@@ -96,7 +119,7 @@ jobs:
           if [ -n "$LATEST_TAG" ]; then
             npm version "${LATEST_TAG#v}" --no-git-tag-version --allow-same-version >/dev/null
           fi
-          NEW=$(npm version ${{ inputs.bump }} --no-git-tag-version)
+          NEW=$(npm version ${{ steps.resolve.outputs.bump }} --no-git-tag-version)
           echo "version=${NEW#v}" >> "$GITHUB_OUTPUT"
           echo "tag=$NEW" >> "$GITHUB_OUTPUT"
           echo "Bumped from ${LATEST_TAG:-package.json} to $NEW"

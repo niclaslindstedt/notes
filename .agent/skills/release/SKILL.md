@@ -12,13 +12,21 @@ production `/` slot of the GitHub Pages deploy at
 checklist around it.
 
 `release.yml` is **`workflow_dispatch`-only** and takes two inputs:
-`bump` (`patch` / `minor` / `major`, default `minor`) and an optional
-`commit` (a sha or ref to release from). Choose:
+`bump` (`auto` / `patch` / `minor` / `major`, default `auto`) and an
+optional `commit` (a sha or ref to release from). Leave `bump` on `auto`
+in the normal case — the workflow derives the level from the
+`.changes/unreleased/` fragments' front-matter
+(`scripts/release/compute-bump.mjs`), taking the **highest** of:
 
-- `patch` — bug fixes, no visible behaviour change beyond the fix.
-- `minor` — a new user-facing feature or visible behaviour change. Default.
-- `major` — a breaking change to the persisted-note shape an older build
-  can't read, or a deliberate UX overhaul.
+- `patch` — only `Fixed` / `Security` fragments: bug fixes, no visible
+  behaviour change beyond the fix.
+- `minor` — any `Added` / `Changed` / `Removed` / `Deprecated` fragment: a
+  new user-facing feature or visible behaviour change.
+- `major` — any fragment flagged `breaking: true`: a breaking change to the
+  persisted-note shape an older build can't read, or a deliberate UX overhaul.
+
+Preview what `auto` will pick with `make bump` (read-only). Pass an explicit
+`patch` / `minor` / `major` only to override the derivation.
 
 Until the first release exists, `pages.yml` serves `main` at `/` (there
 is no `/preview/` slot yet); the first dispatch creates the first `v*`
@@ -80,11 +88,13 @@ Before dispatching anything, confirm:
 
 ## Dispatch
 
-Trigger the workflow with the chosen bump:
+Trigger the workflow — omit `bump` to auto-derive it from the fragments,
+or override it explicitly:
 
 ```sh
-gh workflow run release.yml -f bump=minor       # or patch / major
-gh run watch                                    # follow the run
+gh workflow run release.yml                      # auto-derive the bump
+gh workflow run release.yml -f bump=minor        # or patch / major to override
+gh run watch                                     # follow the run
 ```
 
 (If `gh` is unavailable, dispatch from the Actions tab, or use the
