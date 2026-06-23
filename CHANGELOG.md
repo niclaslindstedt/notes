@@ -13,6 +13,21 @@ predate the pipeline.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-06-23
+
+### Added
+
+- **Collapsible namespaces** — The Namespaces section in the side menu now collapses behind a chevron on its heading — collapsed by default and showing just the active namespace — so the drawer leads with your notes.
+
+### Changed
+
+- **Compact folder picker on mobile** — The editor's folder picker now shows just its icon on phones to save header space, and the icon glows in the accent colour when a note is filed in a folder.
+
+### Fixed
+
+- **New-folder row alignment** — The inline "new folder" input now lines up its folder glyph with the existing folders' glyphs instead of sitting one notch to the left.
+- **Folders after unlocking on a cloud backend** — The folder registry is now read directly from its sidecar rather than trusting the directory listing, so folders (including empty ones) show immediately after unlocking encryption on app start instead of only after switching namespaces.
+
 ## [1.0.0] - 2026-06-22
 
 ### Added
