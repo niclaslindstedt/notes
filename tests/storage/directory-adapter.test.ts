@@ -108,6 +108,74 @@ describe("directory adapter", () => {
     expect(parse(loaded?.text).folders).toEqual(registry);
   });
 
+  it("retries a transiently-failing folders.json read instead of dropping folders", async () => {
+    // A cold-start request burst can get the one folders.json read rate-limited
+    // (429) even though the note reads succeed. A thrown read must not be read
+    // as "no folders": it's retried, and the registry survives.
+    const backing = memoryStore();
+    const a = adapter(backing);
+    const registry = [{ id: "f1", name: "Noteringar", createdAt: 1 }];
+    await a.save(
+      serialize({
+        notes: [{ ...createNote(1), folderId: "f1" }],
+        folders: registry,
+      }),
+    );
+
+    let folderReads = 0;
+    const flaky: FileStore = {
+      list: () => backing.list(),
+      read: (p) => {
+        if (p === "folders.json") {
+          folderReads += 1;
+          if (folderReads === 1) throw new Error("429 rate limited");
+        }
+        return backing.read(p);
+      },
+      write: (p, t) => backing.write(p, t),
+      remove: (p) => backing.remove(p),
+    };
+    const reader = adapter(flaky);
+    const loaded = await reader.load();
+    expect(folderReads).toBeGreaterThan(1); // it retried
+    expect(parse(loaded?.text).folders).toEqual(registry);
+  });
+
+  it("does not memoize a load whose folders.json read failed (self-heals on refresh)", async () => {
+    // If the sidecar read fails for every attempt of one load, the folderless
+    // result must NOT be cached — a later load (live-pull) re-reads and recovers
+    // the folders without the adapter being rebuilt.
+    const backing = memoryStore();
+    const a = adapter(backing);
+    const registry = [{ id: "f1", name: "Noteringar", createdAt: 1 }];
+    await a.save(
+      serialize({
+        notes: [{ ...createNote(1), folderId: "f1" }],
+        folders: registry,
+      }),
+    );
+
+    let foldersDown = true;
+    const reader = adapter({
+      list: () => backing.list(),
+      read: (p) => {
+        if (p === "folders.json" && foldersDown) throw new Error("offline");
+        return backing.read(p);
+      },
+      write: (p, t) => backing.write(p, t),
+      remove: (p) => backing.remove(p),
+    });
+
+    const first = await reader.load();
+    expect(parse(first?.text).folders ?? []).toEqual([]); // couldn't read it
+
+    // The sidecar comes back; a refresh recovers the folders (not stuck on a
+    // memoized folderless snapshot).
+    foldersDown = false;
+    const second = await reader.load();
+    expect(parse(second?.text).folders).toEqual(registry);
+  });
+
   it("raises ConflictError only when a note we're writing moved remotely", async () => {
     const store = memoryStore();
     const a = adapter(store);

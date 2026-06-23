@@ -1540,7 +1540,14 @@ known path is strongly consistent — trusting the listing made the load cache a
 folderless snapshot until the adapter was rebuilt (the "switch namespaces back
 and forth" workaround), and dropped empty folders along with it. The extra read
 is paid only when the listing actually moved, since an unchanged backend is
-served from the [load memo](#directory-adapter). Like `namespaces.json`
+served from the [load memo](#directory-adapter). The read itself is also
+**retried** a few times: a *thrown* read (a cold-start rate-limit from the
+load's request burst, a dropped request) is not "no folders" — treating it as
+empty was a second way the registry got dropped and cached. If every attempt
+fails, `readFolders` keeps the previously-known folders and clears its
+`foldersReadOk` flag so the load is **not memoized** (and a later refresh
+re-reads it) rather than the folderless result sticking until a rebuild. Like
+`namespaces.json`
 it stays plaintext even under encryption — names aren't secret and must be
 readable before the unlock gate — and it is metadata, never read as a note nor
 removed on a representation switch. It sits outside the aggregate revision, so a
