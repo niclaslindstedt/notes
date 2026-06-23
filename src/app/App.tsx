@@ -635,9 +635,9 @@ function FolderPicker({
   onChange: (folderId: string) => void;
 }) {
   const t = useT();
-  // The folder name eats scarce header width on a phone; there, show just the
-  // icon. Desktop keeps the label since the room is there.
-  const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
+  // The folder name eats scarce header width on a narrow viewport; there, show
+  // just the icon. Once the window is wide enough the label comes back.
+  const wideEnough = useMediaQuery("(min-width: 640px)");
   const options = [
     { value: "", label: <span className="italic">{t("nav.noFolder")}</span> },
     ...folders.map((f) => ({ value: f.id, label: f.name })),
@@ -656,12 +656,12 @@ function FolderPicker({
           <FolderIcon
             className={`h-4 w-4 shrink-0 ${filed ? "text-accent" : "text-muted"}`}
           />
-          {isDesktop && (
+          {wideEnough && (
             <span className="truncate">{o?.label ?? t("nav.noFolder")}</span>
           )}
         </span>
       )}
-      triggerClassName={`flex h-9 cursor-pointer items-center gap-1 rounded-[var(--radius)] border border-line bg-transparent px-2 text-left text-sm text-fg hover:border-accent focus-visible:border-accent focus-visible:outline-none ${isDesktop ? "max-w-[9rem]" : ""}`}
+      triggerClassName={`flex h-9 cursor-pointer items-center gap-1 rounded-[var(--radius)] border border-line bg-transparent px-2 text-left text-sm text-fg hover:border-accent focus-visible:border-accent focus-visible:outline-none ${wideEnough ? "max-w-[9rem]" : ""}`}
       panelClassName="max-h-64 overflow-y-auto"
     />
   );
