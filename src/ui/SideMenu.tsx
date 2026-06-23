@@ -1095,6 +1095,10 @@ function FolderEditRow({
   }
   return (
     <div className="flex items-center gap-2 py-[var(--density-row-py)] pr-2 pl-3">
+      {/* An empty chevron-sized spacer (no chevron — a brand-new folder can't
+          be expanded) keeps the folder glyph aligned with the existing
+          folders' glyphs, which sit one notch right of their chevron. */}
+      <span className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="text-muted">
         <FolderIcon className="h-5 w-5" />
       </span>
