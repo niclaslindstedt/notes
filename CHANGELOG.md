@@ -13,6 +13,17 @@ predate the pipeline.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-23
+
+### Changed
+
+- **Button island and About dropdown in the side menu** — The side menu's New note / New folder / Show all / Archive buttons and Undo / Redo now share one bordered button island at the foot of the list, and the footer's project links fold into a tidy "About" dropdown.
+
+### Fixed
+
+- **Folders dropped by a flaky sidecar read on cloud unlock** — Reading the folder registry now retries on a transient failure and never caches a folderless result when the read failed, so folders no longer disappear after unlocking on a cloud backend until you switch namespaces.
+- **Even button-island spacing and trimmed note titles** — The side-menu button island now sits with the same gap below it as on its sides, and a note title can no longer start or end with a space.
+
 ## [1.0.1] - 2026-06-23
 
 ### Added
