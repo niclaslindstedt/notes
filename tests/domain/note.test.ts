@@ -125,6 +125,14 @@ describe("note domain", () => {
     );
   });
 
+  it("trims the title on retitle so it never starts or ends with a space", () => {
+    expect(retitleNote(createNote(0), "  Hello world  ", 1).title).toBe(
+      "Hello world",
+    );
+    expect(retitleNote(createNote(0), "\tTabbed\n", 1).title).toBe("Tabbed");
+    expect(retitleNote(createNote(0), "   ", 1).title).toBe("");
+  });
+
   it("bumps updatedAt on edit / retitle without touching createdAt", () => {
     const note = editNote(createNote(100), "hi", 200);
     expect(note.createdAt).toBe(100);

@@ -99,13 +99,16 @@ export function editNote(
   return next;
 }
 
-/** Return a copy of `note` with a new title and a bumped `updatedAt`. */
+// Return a copy of `note` with a new title and a bumped `updatedAt`. The title
+// is trimmed so a stored title can never start or end with a space — leading /
+// trailing whitespace is never meaningful in a title and would otherwise leak
+// into the file/cloud filename slug and the list ordering.
 export function retitleNote(
   note: Note,
   title: string,
   now: number = Date.now(),
 ): Note {
-  return { ...note, title, updatedAt: now };
+  return { ...note, title: title.trim(), updatedAt: now };
 }
 
 /** Create an empty folder named `name`, stamped at `now`. The name is trimmed. */

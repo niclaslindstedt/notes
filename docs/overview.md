@@ -459,8 +459,9 @@ collapses into one step.
 
 ### Retitle
 
-`retitleNote` (`src/domain/note.ts`) replaces the title and bumps `updatedAt`;
-exposed as `useNotes().retitle`. See [title field](#title-field).
+`retitleNote` (`src/domain/note.ts`) replaces the title (trimmed, so a stored
+title never starts or ends with a space) and bumps `updatedAt`; exposed as
+`useNotes().retitle`. See [title field](#title-field).
 
 ### Archive / restore
 
