@@ -19,8 +19,10 @@ describe("ChangelogModal", () => {
 
   it("drills into a feature doc via a Learn more link and back again", () => {
     render(<ChangelogModal open onClose={vi.fn()} />);
-    // The storage release note carries `[Learn more](feature:storage)`.
-    fireEvent.click(screen.getByRole("button", { name: "Learn more" }));
+    // Several release notes now carry `[Learn more](feature:…)` links; clicking
+    // any one drills into its feature doc, so take the first.
+    const [learnMore] = screen.getAllByRole("button", { name: "Learn more" });
+    fireEvent.click(learnMore!);
     expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByRole("heading", { name: "Changelog" })).toBeTruthy();
