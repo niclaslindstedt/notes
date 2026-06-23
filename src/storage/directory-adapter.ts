@@ -388,14 +388,20 @@ export function createDirectoryAdapter(
 
   // Read the folder registry sidecar, tolerating a missing / corrupt file by
   // yielding no folders. Records the canonical bytes so the next save can tell
-  // whether the registry actually changed. Skips the read entirely when the
-  // listing shows no sidecar, so a folder-less document costs no extra fetch.
-  async function readFolders(entries: readonly FileEntry[]): Promise<Folder[]> {
-    if (!entries.some((e) => e.path === FOLDERS_FILE_NAME)) {
-      lastFoldersJson = null;
-      lastFolders = [];
-      return [];
-    }
+  // whether the registry actually changed.
+  //
+  // The sidecar is read directly rather than gated on the directory listing: a
+  // cloud `list()` is only eventually consistent — right after startup Dropbox's
+  // `list_folder` can omit `folders.json` even though it's really there — while
+  // a read of a known path is strongly consistent. Trusting the listing made a
+  // cold-start load (unlock on app start / upgrade reload) drop every folder,
+  // and the load memo cached that folderless snapshot until the adapter was
+  // rebuilt (the "switch namespaces back and forth" workaround). The folders are
+  // the registry's, so this also keeps *empty* folders — the ones no note links
+  // to — which a notes-only reconstruction would lose. The extra read is paid
+  // only when the listing actually moved: an unchanged backend is served from
+  // the load memo above, which never reaches here.
+  async function readFolders(): Promise<Folder[]> {
     let raw: string | null;
     try {
       raw = await store.read(FOLDERS_FILE_NAME);
@@ -821,7 +827,7 @@ export function createDirectoryAdapter(
     // Folder registry sidecar — read alongside the notes so an empty folder (or
     // the display names the note files don't carry) survives. A namespace whose
     // only content is empty folders still loads as a real, non-null document.
-    const folders = await readFolders(entries);
+    const folders = await readFolders();
     const emptyWithFolders = (): StoredSnapshot | null =>
       folders.length === 0
         ? null

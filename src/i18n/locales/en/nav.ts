@@ -12,6 +12,8 @@ const nav = {
   chooseSection: "Choose section",
   namespaces: "Namespaces",
   manageNamespaces: "Manage namespaces",
+  expandNamespaces: "Show all namespaces",
+  collapseNamespaces: "Collapse namespaces",
   notes: "Notes",
   newNote: "New note",
   newFolder: "New folder",

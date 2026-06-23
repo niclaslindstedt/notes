@@ -7,6 +7,8 @@ const nav: NavCatalog = {
   chooseSection: "Välj sektion",
   namespaces: "Namnrymder",
   manageNamespaces: "Hantera namnrymder",
+  expandNamespaces: "Visa alla namnrymder",
+  collapseNamespaces: "Fäll ihop namnrymder",
   notes: "Anteckningar",
   newNote: "Ny anteckning",
   newFolder: "Ny mapp",

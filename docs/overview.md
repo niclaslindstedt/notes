@@ -611,7 +611,12 @@ namespace switcher, the recent-notes list (with swipe-to-remove rows), the
 archive link, a side-by-side undo/redo button pair pinned to the foot of the
 list, and a footer (settings, privacy, changelog,
 source, donate). It reads state from `NavContext` and dispatches modal-open
-commands on the [modal bus](#modal-bus). Switching the active namespace leaves
+commands on the [modal bus](#modal-bus). The **Namespaces** heading is a
+collapsible toggle (a chevron to the left of the label, via `SectionHeader`'s
+`collapsible` props): collapsed by default — and showing only the *active*
+namespace, so you always see where you are — it expands to the full switcher on
+tap, keeping the drawer led by the notes. The collapse state is view-local
+(resets to collapsed on a fresh app load). Switching the active namespace leaves
 the editor but deliberately keeps the drawer open, so several namespaces can be
 hopped between in one go; opening a note (and the footer/modal actions) still
 closes it. The notes list shows a spinner + `nav.notesLoading` while the
@@ -1527,7 +1532,15 @@ disk until a note is filed into it. The [directory adapter](#directory-adapter)
 owns it: `readFolders` / `injectFolders` fold the registry into the loaded
 snapshot (and load a namespace whose only content is empty folders as a real,
 non-null document), and `persistFolders` writes it back when it changed (writing
-`[]` to clear a registry whose folders were all removed). Like `namespaces.json`
+`[]` to clear a registry whose folders were all removed). `readFolders` reads
+the sidecar **directly by path** rather than gating on the directory listing: a
+cloud `list()` is only eventually consistent and can omit `folders.json` right
+after a cold start (unlock on app start / upgrade reload), while a read of a
+known path is strongly consistent — trusting the listing made the load cache a
+folderless snapshot until the adapter was rebuilt (the "switch namespaces back
+and forth" workaround), and dropped empty folders along with it. The extra read
+is paid only when the listing actually moved, since an unchanged backend is
+served from the [load memo](#directory-adapter). Like `namespaces.json`
 it stays plaintext even under encryption — names aren't secret and must be
 readable before the unlock gate — and it is metadata, never read as a note nor
 removed on a representation switch. It sits outside the aggregate revision, so a

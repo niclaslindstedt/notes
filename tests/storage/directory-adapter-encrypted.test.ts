@@ -216,6 +216,43 @@ describe("directory adapter — encrypted per-file", () => {
     expect(seen.map((s) => s.index).sort()).toEqual([1, 2]);
   });
 
+  it("recovers folders on unlock when the listing lags but the sidecar reads", async () => {
+    // The Dropbox cold-start / upgrade-reload bug: `list_folder` is eventually
+    // consistent and can omit `folders.json` right after startup, so a note's
+    // folder id (carried in its encrypted JSON — frontmatter is the source of
+    // truth) resolves to nothing and the note renders orphaned until the
+    // adapter is rebuilt. A direct read of the known path is consistent, so a
+    // referenced folder is still recovered.
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const registry = [
+      { id: "f1", name: "Noteringar", createdAt: 1 },
+      { id: "f2", name: "Empty", createdAt: 2 },
+    ];
+    const notes = Array.from({ length: 4 }, (_, i) => ({
+      ...createNote(i + 1),
+      title: `Note ${i}`,
+      body: `secret ${i}`,
+      folderId: "f1",
+    }));
+    await encAdapter(store, att, { current: "pw" }).save(
+      serialize({ notes, folders: registry }),
+    );
+
+    // A fresh (cold-start) adapter whose listing drops folders.json.
+    const lagging: FileStore = {
+      list: async () =>
+        (await store.list()).filter((e) => e.path !== "folders.json"),
+      read: (p) => store.read(p),
+      write: (p, t) => store.write(p, t),
+      remove: (p) => store.remove(p),
+    };
+    const reader = encAdapter(lagging, att, { current: "pw" });
+    const loaded = await reader.load();
+    // Every folder survives — including the empty one no note links to.
+    expect(parse(loaded!.text).folders).toEqual(registry);
+  });
+
   it("rejects the wrong passphrase on load", async () => {
     const store = memoryStore();
     const att = memoryAttachments();

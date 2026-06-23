@@ -75,6 +75,39 @@ describe("directory adapter", () => {
     expect(await store.list()).toHaveLength(1);
   });
 
+  it("recovers folders when the listing lags but the sidecar reads (cloud eventual consistency)", async () => {
+    // Dropbox's `list_folder` is eventually consistent: right after a cold
+    // start it can omit a file that's really there, while a direct read of a
+    // known path is strongly consistent. Simulate that — `folders.json` is
+    // present and readable, but the listing drops it — and prove the load still
+    // surfaces every folder (including the *empty* one no note links to)
+    // instead of caching a folderless snapshot.
+    const backing = memoryStore();
+    const a = adapter(backing);
+    const registry = [
+      { id: "f1", name: "Noteringar", createdAt: 1 },
+      { id: "f2", name: "Empty", createdAt: 2 },
+    ];
+    await a.save(
+      serialize({
+        notes: [{ ...createNote(1), folderId: "f1" }],
+        folders: registry,
+      }),
+    );
+
+    // A reader whose listing hides folders.json (the lag) but whose reads work.
+    const lagging: FileStore = {
+      list: async () =>
+        (await backing.list()).filter((e) => e.path !== "folders.json"),
+      read: (p) => backing.read(p),
+      write: (p, t) => backing.write(p, t),
+      remove: (p) => backing.remove(p),
+    };
+    const reader = adapter(lagging);
+    const loaded = await reader.load();
+    expect(parse(loaded?.text).folders).toEqual(registry);
+  });
+
   it("raises ConflictError only when a note we're writing moved remotely", async () => {
     const store = memoryStore();
     const a = adapter(store);
@@ -219,11 +252,14 @@ describe("directory adapter", () => {
 
   it("reuses unchanged notes on load and fetches only what moved", async () => {
     const real = memoryStore();
+    // Count only note (`.md`) reads — the folder sidecar is read on every
+    // changed load (strongly-consistent, unlike the listing) and isn't part of
+    // the incremental-note-sync this asserts.
     let reads = 0;
     const counting: FileStore = {
       list: () => real.list(),
       read: (p) => {
-        reads += 1;
+        if (p.endsWith(".md")) reads += 1;
         return real.read(p);
       },
       write: (p, t) => real.write(p, t),
