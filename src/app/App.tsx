@@ -635,10 +635,16 @@ function FolderPicker({
   onChange: (folderId: string) => void;
 }) {
   const t = useT();
+  // The folder name eats scarce header width on a phone; there, show just the
+  // icon. Desktop keeps the label since the room is there.
+  const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
   const options = [
     { value: "", label: <span className="italic">{t("nav.noFolder")}</span> },
     ...folders.map((f) => ({ value: f.id, label: f.name })),
   ];
+  // A note that's in a folder lights its icon up in the accent colour; "no
+  // folder" stays muted grey so the filed-vs-unfiled state reads at a glance.
+  const filed = value !== "";
   return (
     <SelectPicker
       value={value}
@@ -647,11 +653,15 @@ function FolderPicker({
       ariaLabel={t("nav.moveToFolder")}
       renderValue={(o) => (
         <span className="flex items-center gap-1.5">
-          <FolderIcon className="h-4 w-4 shrink-0 text-muted" />
-          <span className="truncate">{o?.label ?? t("nav.noFolder")}</span>
+          <FolderIcon
+            className={`h-4 w-4 shrink-0 ${filed ? "text-accent" : "text-muted"}`}
+          />
+          {isDesktop && (
+            <span className="truncate">{o?.label ?? t("nav.noFolder")}</span>
+          )}
         </span>
       )}
-      triggerClassName="flex h-9 max-w-[9rem] cursor-pointer items-center gap-1 rounded-[var(--radius)] border border-line bg-transparent px-2 text-left text-sm text-fg hover:border-accent focus-visible:border-accent focus-visible:outline-none"
+      triggerClassName={`flex h-9 cursor-pointer items-center gap-1 rounded-[var(--radius)] border border-line bg-transparent px-2 text-left text-sm text-fg hover:border-accent focus-visible:border-accent focus-visible:outline-none ${isDesktop ? "max-w-[9rem]" : ""}`}
       panelClassName="max-h-64 overflow-y-auto"
     />
   );

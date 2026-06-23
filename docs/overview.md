@@ -1500,6 +1500,10 @@ both namespaces, the one rough edge of the cross-document move).
 header (shown only when folders exist) listing "No folder" plus every folder —
 the cross-platform way to file the open note, since it works on touch where
 drag-and-drop doesn't. Choosing an entry calls `moveNote` for the open note.
+Its trigger collapses to just the folder icon on a phone (the name eats scarce
+header width there) and keeps the label on desktop; the icon glows in the
+accent colour when the note is filed and stays muted grey for "No folder", so
+the filed-vs-unfiled state reads at a glance.
 
 ### Folders sidecar
 
