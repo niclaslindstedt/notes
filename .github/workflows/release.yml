@@ -115,6 +115,8 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
           VITE_DROPBOX_APP_FOLDER: ${{ vars.VITE_DROPBOX_APP_FOLDER }}
+          # Optional donate link in the side menu. Unset -> the row is hidden.
+          VITE_DONATE_URL: ${{ vars.VITE_DONATE_URL }}
 
       - name: Commit + tag
         env:
