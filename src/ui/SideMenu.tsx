@@ -29,6 +29,7 @@ import {
   FolderIcon,
   FolderOpenIcon,
   HeartIcon,
+  HelpCircleIcon,
   ListIcon,
   LockIcon,
   MenuIcon,
@@ -53,6 +54,17 @@ import {
 } from "./note-drag-context.ts";
 import { AchievementsMenuItem } from "./achievements/AchievementsMenuItem.tsx";
 import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
+import { FloatingPanel } from "./FloatingPanel.tsx";
+import type { FloatingPlacement } from "./hooks/useFloatingPosition.ts";
+
+// The footer "About" dropdown opens "up and to the left" of its trigger:
+// `useFloatingPosition` flips it above automatically (there is no room below
+// at the foot of the drawer), and it widens to at least the trigger.
+const ABOUT_PLACEMENT: FloatingPlacement = {
+  width: { kind: "min", minPx: 200 },
+  anchor: "left",
+  coordinateSpace: "viewport",
+};
 
 // The navigation drawer. On viewports narrower than the smallest iPad it
 // collapses to a single floating button the user can drag to either side
@@ -73,13 +85,16 @@ import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
 // Two side-menu layout preferences ride on the appearance store: folders can
 // be pinned above the loose notes (`folderPlacement: "top"`) or interleaved
 // with them in sort order (`"mixed"`), and the list sorts by last-modified or
-// by name (`noteSortKey`). New note, New folder, Show all, and Archive share
-// one compact four-up button row (saving vertical space) just below the note
-// list.
-// Pinned to the bottom is what was the top-right burger menu — settings and
-// the project links (privacy, source with the app version as a subtitle,
-// and an optional donate), in inverted order so the whole of it sits flush
-// at the foot of the drawer. The open/position state comes from `useNav`;
+// by name (`noteSortKey`). New note, New folder, Show all, Archive and
+// Undo / Redo share one bordered "button island" (saving vertical space) just
+// below the note list — a top row of create/navigate actions and a bottom row
+// of history actions, split by a divider so the six icon buttons read as one
+// block.
+// Pinned to the bottom is what was the top-right burger menu — an optional
+// donate, the trophy (achievements), an "About" dropdown that folds away the
+// project links (What's new, source with the app version as a subtitle,
+// privacy), and settings pinned last — so the whole of it sits flush at the
+// foot of the drawer. The open/position state comes from `useNav`;
 // the footer actions `dispatch` a modal command on the bus. The note list
 // and its verbs are passed as props from App, which owns the notes store.
 //
@@ -293,6 +308,11 @@ export function SideMenu({
   // collapsed (so you always see where you are), and tapping the heading
   // expands the full switcher. View-local, like the folder expand state.
   const [namespacesCollapsed, setNamespacesCollapsed] = useState(true);
+
+  // The footer "About" dropdown (What's new / source / privacy), opened against
+  // `aboutRef` and flipped upward by `FloatingPanel`.
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const aboutRef = useRef<HTMLButtonElement>(null);
 
   // Desktop HTML5 drag-to-file state. `draggingNote` gates the drop targets (so
   // a stray dragover from outside doesn't light them up) and `dropTarget`
@@ -650,77 +670,83 @@ export function SideMenu({
           </>
         )}
       </div>
-      {/* New note / New folder / Show all / Archive share one compact button
-          row to save vertical space (the way Undo / Redo do at the foot). The
-          four cells split the width evenly so the bar reads symmetric. Show all
-          and Archive light up (accent) when their view is showing; Archive
-          carries the archived-note count and accepts a dragged note as a drop
-          target. New folder drops the inline name input into the list above. */}
-      <div className="px-3 pt-2 pb-1">
-        <div className="flex divide-x divide-line overflow-hidden rounded-md border border-line">
-          <BarButton
-            icon={<PlusIcon className="h-5 w-5" />}
-            label={t("nav.newNote")}
-            onClick={() => {
-              onAddNote();
-              close();
-            }}
-          />
-          <BarButton
-            icon={<FolderIcon className="h-5 w-5" />}
-            label={t("nav.newFolder")}
-            onClick={() => setCreatingFolder(true)}
-          />
-          <BarButton
-            icon={<ListIcon className="h-5 w-5" />}
-            label={t("nav.showAll")}
-            active={showAllActive}
-            onClick={() => {
-              onShowAll();
-              close();
-            }}
-          />
-          <BarButton
-            icon={<ArchiveIcon className="h-5 w-5" />}
-            label={t("nav.archive")}
-            active={archiveActive}
-            badge={archivedCount > 0 ? archivedCount : undefined}
-            dropId={NOTE_DROP_ARCHIVE}
-            isDropTarget={
-              dropTarget === NOTE_DROP_ARCHIVE ||
-              activeDropKey === NOTE_DROP_ARCHIVE
-            }
-            onDragOver={(e) => allowDropOn(e, NOTE_DROP_ARCHIVE)}
-            onDragLeave={() => setDropTarget(null)}
-            onDrop={dropOnArchive}
-            onClick={() => {
-              onOpenArchive();
-              close();
-            }}
-          />
+      {/* The button island: New note / New folder / Show all / Archive and
+          Undo / Redo share one bordered block pinned to the foot of the list
+          (mt-auto), so it falls under the thumb no matter how long the note
+          list is. A top row of create/navigate actions and a bottom row of
+          history actions are split by a divider, so the six icon buttons read
+          as one coherent unit rather than competing widgets. Each cell splits
+          its row's width evenly; the parent owns the border, rounding, and the
+          inner dividers. Show all and Archive light up (accent) when their view
+          is showing; Archive carries the archived-note count and accepts a
+          dragged note as a drop target. New folder drops the inline name input
+          into the list above. Undo / redo dim and go inert at the ends of the
+          timeline but keep the drawer open so a burst of reverts can be applied
+          without reopening it. */}
+      <div className="mt-auto px-3 pt-2 pb-1">
+        <div className="divide-y divide-line overflow-hidden rounded-md border border-line">
+          <div className="flex divide-x divide-line">
+            <BarButton
+              icon={<PlusIcon className="h-5 w-5" />}
+              label={t("nav.newNote")}
+              onClick={() => {
+                onAddNote();
+                close();
+              }}
+            />
+            <BarButton
+              icon={<FolderIcon className="h-5 w-5" />}
+              label={t("nav.newFolder")}
+              onClick={() => setCreatingFolder(true)}
+            />
+            <BarButton
+              icon={<ListIcon className="h-5 w-5" />}
+              label={t("nav.showAll")}
+              active={showAllActive}
+              onClick={() => {
+                onShowAll();
+                close();
+              }}
+            />
+            <BarButton
+              icon={<ArchiveIcon className="h-5 w-5" />}
+              label={t("nav.archive")}
+              active={archiveActive}
+              badge={archivedCount > 0 ? archivedCount : undefined}
+              dropId={NOTE_DROP_ARCHIVE}
+              isDropTarget={
+                dropTarget === NOTE_DROP_ARCHIVE ||
+                activeDropKey === NOTE_DROP_ARCHIVE
+              }
+              onDragOver={(e) => allowDropOn(e, NOTE_DROP_ARCHIVE)}
+              onDragLeave={() => setDropTarget(null)}
+              onDrop={dropOnArchive}
+              onClick={() => {
+                onOpenArchive();
+                close();
+              }}
+            />
+          </div>
+          <div className="flex divide-x divide-line">
+            <BarButton
+              icon={<UndoIcon className="h-5 w-5" />}
+              label={t("nav.undo")}
+              disabled={!canUndo}
+              onClick={onUndo}
+            />
+            <BarButton
+              icon={<RedoIcon className="h-5 w-5" />}
+              label={t("nav.redo")}
+              disabled={!canRedo}
+              onClick={onRedo}
+            />
+          </div>
         </div>
       </div>
-      {/* Undo / redo: a pair of side-by-side buttons pinned to the foot of
-          the list (mt-auto), so they sit just above the footer's divider and
-          fall under the thumb. Two columns share one row to save vertical
-          space; each keeps the drawer open so a burst of reverts can be
-          applied without reopening it. */}
-      <div className="mt-auto flex gap-2 px-3 pt-3 pb-1">
-        <EditButton
-          icon={<UndoIcon className="h-5 w-5" />}
-          label={t("nav.undo")}
-          disabled={!canUndo}
-          onClick={onUndo}
-        />
-        <EditButton
-          icon={<RedoIcon className="h-5 w-5" />}
-          label={t("nav.redo")}
-          disabled={!canRedo}
-          onClick={onRedo}
-        />
-      </div>
-      {/* The old top-right burger menu, pinned to the foot of the drawer
-          with its order inverted so it reads bottom-up. */}
+      {/* The relocated burger menu, pinned to the foot of the drawer: Donate,
+          the trophy (achievements), an "About" dropdown that folds away the
+          project links (What's new / source / privacy), and Settings pinned
+          last under the thumb. */}
       <div className="flex flex-col border-t border-line [padding-top:calc(1.25rem_-_var(--density-row-py))]">
         {donateUrl && (
           <MenuLink
@@ -731,32 +757,67 @@ export function SideMenu({
             onClick={close}
           />
         )}
-        <MenuLink
-          icon={<CodeIcon className="h-5 w-5" />}
-          label={t("menu.source")}
-          href={SOURCE_URL}
-          external
-          sublabel={BUILD_LABEL}
-          onClick={close}
-        />
-        <MenuLink
-          icon={<ShieldIcon className="h-5 w-5" />}
-          label={t("menu.privacy")}
-          href={privacyUrl}
-          onClick={close}
-        />
         <AchievementsMenuItem onClose={close} />
-        <MenuButton
-          icon={<SparklesIcon className="h-5 w-5" />}
-          label={t("menu.changelog")}
-          onClick={() => pick(() => dispatch({ kind: "changelog" }))}
-        />
+        {/* About: a single row that reveals the project links in an upward-
+            flipping dropdown (there's no room below at the foot of the drawer).
+            It reads as a plain footer row — no chevron — and just toggles the
+            panel open and shut. */}
+        <button
+          ref={aboutRef}
+          type="button"
+          role="menuitem"
+          aria-haspopup="menu"
+          aria-expanded={aboutOpen}
+          onClick={() => setAboutOpen((v) => !v)}
+          className="flex w-full cursor-pointer items-center gap-3 px-5 py-[var(--density-row-py)] text-left text-sm text-fg hover:bg-surface-2 hover:text-fg-bright"
+        >
+          <span className="text-muted">
+            <HelpCircleIcon className="h-5 w-5" />
+          </span>
+          <span className="flex-1">{t("menu.about")}</span>
+        </button>
         <MenuButton
           icon={<CogIcon className="h-5 w-5" />}
           label={t("menu.settings")}
           onClick={() => pick(() => dispatch({ kind: "settings" }))}
         />
       </div>
+      <FloatingPanel
+        open={aboutOpen}
+        onClose={() => setAboutOpen(false)}
+        triggerRef={aboutRef}
+        placement={ABOUT_PLACEMENT}
+        className="py-1"
+      >
+        <MenuButton
+          icon={<SparklesIcon className="h-5 w-5" />}
+          label={t("menu.changelog")}
+          onClick={() => {
+            setAboutOpen(false);
+            pick(() => dispatch({ kind: "changelog" }));
+          }}
+        />
+        <MenuLink
+          icon={<CodeIcon className="h-5 w-5" />}
+          label={t("menu.source")}
+          href={SOURCE_URL}
+          external
+          sublabel={BUILD_LABEL}
+          onClick={() => {
+            setAboutOpen(false);
+            close();
+          }}
+        />
+        <MenuLink
+          icon={<ShieldIcon className="h-5 w-5" />}
+          label={t("menu.privacy")}
+          href={privacyUrl}
+          onClick={() => {
+            setAboutOpen(false);
+            close();
+          }}
+        />
+      </FloatingPanel>
     </>
   );
 
@@ -1251,51 +1312,20 @@ function NavItem({
   );
 }
 
-// Undo / redo render as a side-by-side pair rather than full-width rows so
-// the two fit on one line at the foot of the drawer. Each is a self-contained
-// bordered button (icon + label, centred) that dims and goes inert at the
-// ends of the timeline, where there is nothing to revert or re-apply.
-function EditButton({
-  icon,
-  label,
-  disabled = false,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex flex-1 items-center justify-center gap-2 rounded-md border border-line py-2.5 text-sm ${
-        disabled
-          ? "cursor-not-allowed text-muted opacity-40"
-          : "cursor-pointer text-fg hover:bg-surface-2 hover:text-fg-bright"
-      }`}
-    >
-      <span className={disabled ? "" : "text-muted"}>{icon}</span>
-      <span>{label}</span>
-    </button>
-  );
-}
-
-// New note / New folder / Show all / Archive render as a compact four-up
-// segmented bar instead of full-width rows, saving vertical space the way
-// Undo / Redo do. The cells sit flush against one another (the parent owns the
-// border, rounding, and inner `divide-x` dividers) and split the width evenly
-// so the bar reads symmetric. The buttons are icon-only (the label rides on
-// `aria-label` / `title`); the active view tints accent, and the Archive button
-// doubles as a drop target with its count as a corner badge.
+// New note / New folder / Show all / Archive and Undo / Redo render as compact
+// segmented rows inside the button island instead of full-width rows, saving
+// vertical space. The cells sit flush against one another (the parent owns the
+// border, rounding, and inner `divide-x` / `divide-y` dividers) and split their
+// row's width evenly so each row reads symmetric. The buttons are icon-only (the
+// label rides on `aria-label` / `title`); the active view tints accent, the
+// Archive button doubles as a drop target with its count as a corner badge, and
+// undo / redo dim and go inert (`disabled`) at the ends of the timeline.
 function BarButton({
   icon,
   label,
   active = false,
   badge,
+  disabled = false,
   onClick,
   dropId,
   isDropTarget = false,
@@ -1307,6 +1337,7 @@ function BarButton({
   label: string;
   active?: boolean;
   badge?: number;
+  disabled?: boolean;
   onClick: () => void;
   dropId?: string;
   isDropTarget?: boolean;
@@ -1321,17 +1352,20 @@ function BarButton({
       aria-current={active ? "page" : undefined}
       aria-label={label}
       title={label}
+      disabled={disabled}
       onClick={onClick}
       {...(dropId !== undefined ? { [NOTE_DROP_ATTR]: dropId } : {})}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`relative flex flex-1 cursor-pointer items-center justify-center py-2.5 ${
-        isDropTarget
-          ? "bg-accent/15 text-fg-bright"
-          : active
-            ? "bg-surface-2 text-fg-bright"
-            : "text-fg hover:bg-surface-2 hover:text-fg-bright"
+      className={`relative flex flex-1 items-center justify-center py-2.5 ${
+        disabled
+          ? "cursor-not-allowed text-muted opacity-40"
+          : isDropTarget
+            ? "cursor-pointer bg-accent/15 text-fg-bright"
+            : active
+              ? "cursor-pointer bg-surface-2 text-fg-bright"
+              : "cursor-pointer text-fg hover:bg-surface-2 hover:text-fg-bright"
       }`}
     >
       <span className={active ? "text-accent" : "text-muted"}>{icon}</span>

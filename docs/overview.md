@@ -580,8 +580,9 @@ entry; a `mergeKey` collapses rapid same-key records (a typing session) into one
 step, while creates/deletes always land as their own steps. `reset` rebuilds the
 timeline whenever the document arrives from outside the edit path (load, reload,
 conflict-adopt). `useUndoRedoShortcuts` (`src/ui/hooks/useUndoRedoShortcuts.ts`)
-binds ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z; the side menu also has a side-by-side
-undo/redo button pair at the foot of the drawer.
+binds ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z; the side menu also exposes undo/redo as the
+bottom row of the [button island](#folders-in-the-side-menu) at the foot of the
+list.
 
 ### Settings sync
 
@@ -607,10 +608,12 @@ threaded props.
 
 `SideMenu` (`src/ui/SideMenu.tsx`) — the navigation surface: a drawer over a
 dimmed backdrop on phones, an always-docked panel on tablets+. It holds the
-namespace switcher, the recent-notes list (with swipe-to-remove rows), the
-archive link, a side-by-side undo/redo button pair pinned to the foot of the
-list, and a footer (settings, privacy, changelog,
-source, donate). It reads state from `NavContext` and dispatches modal-open
+namespace switcher, the recent-notes list (with swipe-to-remove rows), a
+bordered [button island](#folders-in-the-side-menu) (New note / New folder /
+Show all / Archive over Undo / Redo) pinned to the foot of the list, and a
+footer (an optional donate, the trophy, an **About** dropdown that folds away the
+project links — What's new, source, privacy — and settings). It reads state from
+`NavContext` and dispatches modal-open
 commands on the [modal bus](#modal-bus). The **Namespaces** heading is a
 collapsible toggle (a chevron to the left of the label, via `SectionHeader`'s
 `collapsible` props): collapsed by default — and showing only the *active*
@@ -1426,15 +1429,28 @@ How the folders and loose notes are ordered is two appearance preferences (see
 timestamp (`folderModifiedAt`). The loose notes are still capped at
 `MAX_RECENT_NOTES`. Both are set in **Appearance → Sidebar**.
 
-**New note / New folder / Show all / Archive** share one compact four-up
-segmented bar (`BarButton`) below the list, instead of full-width rows, to save
-vertical space — the way Undo / Redo do at the foot. The cells sit flush against
-one another (the parent owns the border, rounding, and inner dividers) and split
-the width evenly so the bar reads symmetric. The buttons are **icon-only** — the
-label rides on `aria-label` / `title` rather than visible text. New folder drops
-the inline `FolderEditRow` into the list above; Show all and Archive tint accent
-when their view is showing; Archive carries the archived-note count as a corner
-badge and doubles as a drop target.
+The **button island** is one bordered block (`BarButton`) pinned to the foot of
+the list (`mt-auto`), instead of full-width rows, to save vertical space: a top
+row of **New note / New folder / Show all / Archive** and a bottom row of
+**Undo / Redo**, split by a divider so the six icon buttons read as one coherent
+unit rather than competing widgets. The cells sit flush against one another (the
+parent owns the border, rounding, and the inner `divide-x` / `divide-y`
+dividers) and split their row's width evenly so each row reads symmetric. The
+buttons are **icon-only** — the label rides on `aria-label` / `title` rather than
+visible text. New folder drops the inline `FolderEditRow` into the list above;
+Show all and Archive tint accent when their view is showing; Archive carries the
+archived-note count as a corner badge and doubles as a drop target; Undo / Redo
+dim and go inert (`disabled`) at the ends of the timeline but keep the drawer
+open so a burst of reverts can be applied without reopening it.
+
+The drawer's **footer** — pinned below the island — is the relocated burger
+menu: an optional donate link, the trophy ([achievements](#achievements)), an
+**About** dropdown, and settings pinned last. The **About** row is a plain
+footer row (no chevron) that toggles a `FloatingPanel` of the project links —
+What's new ([changelog](#changelog--whats-new)), source (with the build label as
+a subtitle), and privacy. The panel flips **upward** (`ABOUT_PLACEMENT`,
+anchored left, viewport-spaced) because there is no room below it at the foot of
+the drawer.
 
 A note row can be **dragged onto a folder** to file it, or onto the ungrouped
 root zone to take it out of one. On a pointer device this is native HTML5 drag
