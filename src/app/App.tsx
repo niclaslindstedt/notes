@@ -1756,9 +1756,17 @@ function TitleField({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const flush = useCallback(() => {
-    if (latest.current === committed.current) return;
-    committed.current = latest.current;
-    onChangeRef.current(latest.current);
+    // Trim on commit so a stored title never starts or ends with a space (the
+    // domain enforces this too); spaces are still free to type mid-edit. Reflect
+    // the trimmed value back into the field so it shows what was actually saved.
+    const trimmed = latest.current.trim();
+    if (trimmed === committed.current) return;
+    committed.current = trimmed;
+    if (trimmed !== latest.current) {
+      latest.current = trimmed;
+      setDraft(trimmed);
+    }
+    onChangeRef.current(trimmed);
   }, []);
 
   // The title settling — losing focus, or the editor tearing down — both
