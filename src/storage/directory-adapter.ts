@@ -117,6 +117,17 @@ export const FOLDERS_FILE_NAME = "folders.json";
 // Suffix of an encrypted per-note file. The stem is the opaque keyed-HMAC ref.
 const ENC_SUFFIX = ".enc";
 
+// The folder sidecar read is retried so a transient cloud failure (a cold-start
+// 429 from the load's request burst, a dropped request) isn't mistaken for "no
+// folders" — which would drop the whole registry. A few short, backing-off
+// attempts comfortably outlast a brief rate-limit window without stalling a
+// genuinely folder-less load for long.
+const FOLDERS_READ_ATTEMPTS = 3;
+const FOLDERS_READ_BACKOFF_MS = 250;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 // How many encrypted note files to read + decrypt at once during an unlock /
 // encrypted load. Sequential decryption made a cold load O(notes) network
 // round-trips on a cloud backend (tens of seconds for a 500-note vault); a
@@ -381,32 +392,61 @@ export function createDirectoryAdapter(
   // does. The plaintext `.md` of a grouped note lives at `<folder-dir>/<stem>.md`.
   let lastFolders: Folder[] = [];
 
+  // Whether the last `readFolders` actually read the sidecar (vs. a thrown,
+  // retried-out failure). When false the load isn't memoized, so a transient
+  // read failure can't cache a folderless registry — a later refresh re-reads
+  // it instead of the adapter having to be rebuilt.
+  let foldersReadOk = true;
+
   // The path a note's plaintext `.md` file lives at, folder-aware.
   function plaintextNotePath(note: Note): string {
     return noteFilePath(note, lastFolders);
   }
 
-  // Read the folder registry sidecar, tolerating a missing / corrupt file by
-  // yielding no folders. Records the canonical bytes so the next save can tell
-  // whether the registry actually changed.
+  // Read the folder registry sidecar, tolerating a missing file by yielding no
+  // folders. Records the canonical bytes so the next save can tell whether the
+  // registry actually changed, and sets `foldersReadOk` so the caller can avoid
+  // memoizing (or persisting over) a registry it couldn't actually read.
   //
   // The sidecar is read directly rather than gated on the directory listing: a
   // cloud `list()` is only eventually consistent — right after startup Dropbox's
   // `list_folder` can omit `folders.json` even though it's really there — while
-  // a read of a known path is strongly consistent. Trusting the listing made a
-  // cold-start load (unlock on app start / upgrade reload) drop every folder,
-  // and the load memo cached that folderless snapshot until the adapter was
-  // rebuilt (the "switch namespaces back and forth" workaround). The folders are
-  // the registry's, so this also keeps *empty* folders — the ones no note links
-  // to — which a notes-only reconstruction would lose. The extra read is paid
-  // only when the listing actually moved: an unchanged backend is served from
-  // the load memo above, which never reaches here.
+  // a read of a known path is strongly consistent. The folders are the
+  // registry's, so this also keeps *empty* folders — the ones no note links to —
+  // which a notes-only reconstruction would lose.
+  //
+  // A *failed* read (a thrown error — a cold-start 429 from the load's request
+  // burst, a dropped request) is NOT "no folders": treating it as empty dropped
+  // the whole registry and the load memo cached that folderless snapshot until
+  // the adapter was rebuilt (the "switch namespaces back and forth" workaround).
+  // So the read is retried a few times, and if it still fails the previously
+  // known folders are kept and `foldersReadOk` is cleared so the load isn't
+  // memoized and a later refresh re-reads instead of serving the empty result.
   async function readFolders(): Promise<Folder[]> {
-    let raw: string | null;
-    try {
-      raw = await store.read(FOLDERS_FILE_NAME);
-    } catch {
-      raw = null;
+    let raw: string | null = null;
+    foldersReadOk = false;
+    for (let attempt = 0; attempt < FOLDERS_READ_ATTEMPTS; attempt += 1) {
+      try {
+        raw = await store.read(FOLDERS_FILE_NAME);
+        foldersReadOk = true;
+        break;
+      } catch (err) {
+        log.warn(
+          `${options.id} folders: read failed (attempt ${attempt + 1}/${FOLDERS_READ_ATTEMPTS})`,
+          err,
+        );
+        if (attempt < FOLDERS_READ_ATTEMPTS - 1) {
+          await sleep(FOLDERS_READ_BACKOFF_MS * (attempt + 1));
+        }
+      }
+    }
+    if (!foldersReadOk) {
+      // Couldn't read the sidecar — keep whatever we last knew rather than
+      // clobbering it with an empty registry the listing can't vouch for.
+      log.warn(
+        `${options.id} folders: read failed — keeping ${lastFolders.length} known folder(s)`,
+      );
+      return lastFolders;
     }
     if (raw === null) {
       lastFoldersJson = null;
@@ -421,6 +461,7 @@ export function createDirectoryAdapter(
     }
     lastFoldersJson = serializeFolders(folders);
     lastFolders = folders;
+    log.info(`${options.id} folders: read ${folders.length}`);
     return folders;
   }
 
@@ -838,7 +879,10 @@ export function createDirectoryAdapter(
       if (text === null) return emptyWithFolders();
       log.info(`${options.id} load (encrypted): rev=${shortRev(revision)}`);
       const result = { text: injectFolders(text, folders), revision };
-      lastLoad = { key: fingerprint, snapshot: result };
+      // Only memoize when the folder sidecar was actually read — otherwise a
+      // transient folders-read failure would cache the folderless result and
+      // serve it until the adapter is rebuilt (the bug this guards).
+      if (foldersReadOk) lastLoad = { key: fingerprint, snapshot: result };
       return result;
     }
 
@@ -854,7 +898,7 @@ export function createDirectoryAdapter(
         ? await hydrateAttachments(text)
         : text;
     const result = { text: injectFolders(hydrated, folders), revision };
-    lastLoad = { key: fingerprint, snapshot: result };
+    if (foldersReadOk) lastLoad = { key: fingerprint, snapshot: result };
     return result;
   }
 
