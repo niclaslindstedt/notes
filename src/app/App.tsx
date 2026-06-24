@@ -11,17 +11,11 @@ import {
 
 import { unlock, useAchievementWatcher } from "../achievements/index.ts";
 import { useDevSeed } from "../dev/useDevSeed.ts";
-import {
-  type Attachment,
-  hiddenAttachmentLines,
-} from "../domain/attachment.ts";
-import { classifyLines } from "../domain/markdown.ts";
+import { type Attachment } from "../domain/attachment.ts";
 import {
   defaultNoteTitle,
   isBlank,
   noteTitle,
-  notePreview,
-  notePreviewBlock,
   type Folder,
   type Note,
   type SaveFormatting,
@@ -52,7 +46,6 @@ import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
 import { useFileDrop } from "../ui/hooks/useFileDrop.ts";
 import { useMediaQuery } from "../ui/hooks/useMediaQuery.ts";
 import { usePullToRefresh } from "../ui/hooks/usePullToRefresh.ts";
-import { useRowSwipe } from "../ui/hooks/useRowSwipe.ts";
 import { useSwipeReveal } from "../ui/hooks/useSwipeReveal.ts";
 import { useSuppressSwipeNavigation } from "../ui/hooks/useSuppressSwipeNavigation.ts";
 import { useUndoRedoShortcuts } from "../ui/hooks/useUndoRedoShortcuts.ts";
@@ -64,11 +57,8 @@ import {
   ChevronRightIcon,
   FolderIcon,
   FolderOpenIcon,
-  LockIcon,
-  NoteIcon,
   PencilIcon,
   PlusIcon,
-  RestoreIcon,
   SpinnerIcon,
   TrashIcon,
 } from "../ui/icons.tsx";
@@ -85,9 +75,6 @@ import {
 } from "../ui/note-drag-context.ts";
 import { SelectPicker } from "../ui/form/SelectPicker.tsx";
 import { RowActionMenu } from "../ui/RowActionMenu.tsx";
-import { RenderedLine } from "../ui/MarkdownLine.tsx";
-import { AttachmentsEndBlock } from "../ui/attachments/AttachmentsEndBlock.tsx";
-import { AttachmentsProvider } from "../ui/attachments/AttachmentsProvider.tsx";
 import { AttachmentFetchContext } from "../ui/attachments/fetch-context.ts";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
@@ -96,6 +83,8 @@ import {
 } from "../ui/namespace-favicon.ts";
 import { NavContext } from "../ui/nav-context.ts";
 import { APP_VIEWPORT_RECT } from "../ui/appViewportRect.ts";
+import { ArchiveList, ReadOnlyNote } from "../ui/ArchivedNoteView.tsx";
+import { SwipeableNoteCard } from "../ui/note-list/NoteCard.tsx";
 import { SideMenu } from "../ui/SideMenu.tsx";
 import { PullToRefreshIndicator } from "../ui/PullToRefreshIndicator.tsx";
 import { SyncIndicator } from "../ui/SyncIndicator.tsx";
@@ -1194,416 +1183,6 @@ function FolderRenameRow({
         }}
         className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-semibold text-fg-bright outline-none placeholder:text-muted/60"
       />
-    </div>
-  );
-}
-
-// The per-note encryption lock. Green (accent) once the body is decrypted and
-// loaded this session, gray (muted) while it's still sealed-but-deferred — so a
-// glance at the list tells which notes are warm (open instantly) and which would
-// decrypt on open. See `App`'s lazy-body fetch (`ensureBody`).
-function NoteLock({ loaded }: { loaded: boolean }) {
-  const t = useT();
-  return (
-    <>
-      <LockIcon
-        className={`h-3.5 w-3.5 shrink-0 ${loaded ? "text-accent" : "text-muted"}`}
-      />
-      <span className="sr-only">
-        {t(loaded ? "app.encryptedNoteLoaded" : "app.encryptedNote")}
-      </span>
-    </>
-  );
-}
-
-function NoteCard({
-  note,
-  onOpen,
-  encrypted = false,
-  uploading = false,
-}: {
-  note: Note;
-  onOpen: () => void;
-  /** Show the lock — the note + all its attachments are encrypted at rest (green
-   * once the body is loaded, gray while still deferred). */
-  encrypted?: boolean;
-  /** Show the sync spinner — the note's file is being uploaded right now. */
-  uploading?: boolean;
-}) {
-  const t = useT();
-  // The overview's three looks (Settings → Appearance → Note list): `cards` is
-  // the roomier, multi-line treatment; `rows` is the compact one-line list with
-  // a title and a one-line excerpt; `list` is the bare file-explorer listing —
-  // a file glyph and the title only, no excerpt and no card chrome.
-  const layout = useAppearance().listLayout;
-  const cards = layout === "cards";
-  const list = layout === "list";
-
-  // The lock glyph for an encrypted note. With lazy decryption every note is
-  // sealed at rest, so the lock's *colour* reports whether its body has been
-  // decrypted this session: green (accent) once it's been opened/warmed (body
-  // loaded), gray (muted) while it's still deferred and would need decrypting on
-  // open. `note.body === undefined` is the deferred marker (distinct from "").
-  const lock = encrypted ? <NoteLock loaded={note.body !== undefined} /> : null;
-
-  // The file-explorer listing: just a document glyph and the title, dense and
-  // chrome-free so a folder's notes read like files in a tree. No excerpt, and
-  // the lock / upload glyphs still ride alongside the title.
-  if (list) {
-    return (
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex w-full items-center gap-2 rounded-[var(--radius)] px-2 py-1.5 text-left text-sm text-fg-bright transition-colors hover:bg-surface-2"
-      >
-        <NoteIcon className="h-4 w-4 shrink-0 text-muted" />
-        <span className="truncate">{noteTitle(note)}</span>
-        {uploading ? (
-          <>
-            <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" />
-            <span className="sr-only">{t("app.uploadingNote")}</span>
-          </>
-        ) : (
-          lock
-        )}
-      </button>
-    );
-  }
-
-  const preview = cards ? notePreviewBlock(note) : notePreview(note);
-  // Only fade the tail when there's plausibly more text below the clamp — a
-  // short note shouldn't have its one line dimmed. A cheap content heuristic
-  // (line count or length) stands in for measuring the clamped overflow.
-  const fade =
-    cards && (preview.length > 180 || preview.split("\n").length > 5);
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={`w-full rounded-[var(--radius)] border border-line bg-surface text-left transition-colors hover:bg-surface-2 ${
-        cards ? "px-4 py-3.5" : "px-4 py-3"
-      }`}
-    >
-      <p className="flex items-center gap-1.5 font-medium text-fg-bright">
-        <span className="truncate">{noteTitle(note)}</span>
-        {/* The transient upload spinner takes precedence over the lock: a note
-            being written isn't settled at rest yet, so showing both would
-            misread. The lock returns once the write (and any encryption) is
-            done. */}
-        {uploading ? (
-          <>
-            <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" />
-            <span className="sr-only">{t("app.uploadingNote")}</span>
-          </>
-        ) : (
-          lock
-        )}
-      </p>
-      {preview &&
-        (cards ? (
-          <p
-            className="mt-1.5 max-h-[8.5rem] overflow-hidden text-sm leading-relaxed whitespace-pre-line text-muted"
-            style={
-              fade
-                ? {
-                    maskImage:
-                      "linear-gradient(to bottom, #000 65%, transparent)",
-                    WebkitMaskImage:
-                      "linear-gradient(to bottom, #000 65%, transparent)",
-                  }
-                : undefined
-            }
-          >
-            {preview}
-          </p>
-        ) : (
-          <p className="mt-0.5 truncate text-sm text-muted">{preview}</p>
-        ))}
-    </button>
-  );
-}
-
-// A note card with two swipe outcomes behind a sliding foreground (see
-// `useRowSwipe`): swiping right uncovers the primary backdrop and fires it
-// once past the threshold — archive in the overview, restore on the archive
-// page; swiping left latches a Delete button open. Both are recorded on the
-// undo timeline, so a stray swipe is one Undo away — which is why delete here
-// needs no confirmation. A plain tap still opens the note; the hook swallows
-// the click that trails a real drag.
-function SwipeableNoteCard({
-  note,
-  onOpen,
-  onPrimary,
-  onDelete,
-  primaryLabel,
-  primaryIcon,
-  encrypted = false,
-  uploading = false,
-}: {
-  note: Note;
-  onOpen: () => void;
-  /** The swipe-right outcome — archive in the overview, restore in the archive. */
-  onPrimary: () => void;
-  onDelete: () => void;
-  /** Backdrop label revealed by the swipe-right gesture. */
-  primaryLabel: string;
-  /** Backdrop icon revealed by the swipe-right gesture. */
-  primaryIcon: ReactNode;
-  /** Show the lock — the note is encrypted at rest (green once its body is
-   * loaded, gray while still deferred). */
-  encrypted?: boolean;
-  /** Show the sync spinner — the note's file is being uploaded right now. */
-  uploading?: boolean;
-}) {
-  const t = useT();
-  const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
-  const primary = useCallback(() => onPrimary(), [onPrimary]);
-  const swipe = useRowSwipe(primary);
-
-  // On a computer, swipe gestures give way to a right-click menu of the same
-  // actions (see `RowActionMenu`); the card itself opens on a plain click.
-  if (isDesktop) {
-    return (
-      <RowActionMenu
-        ariaLabel={t("app.noteActions")}
-        actions={[
-          { label: primaryLabel, icon: primaryIcon, onSelect: onPrimary },
-          {
-            label: t("app.delete"),
-            icon: <TrashIcon className="h-4 w-4" />,
-            onSelect: onDelete,
-            danger: true,
-          },
-        ]}
-      >
-        <NoteCard note={note} onOpen={onOpen} uploading={uploading} />
-      </RowActionMenu>
-    );
-  }
-
-  return (
-    <div className="relative overflow-hidden rounded-[var(--radius)]">
-      {/* Primary action — uncovered by swiping the card right. Hidden unless
-          the foreground is sliding right so the slide-off never bares it. */}
-      <div
-        aria-hidden={swipe.offset <= 0}
-        className={`absolute inset-0 flex items-center justify-start gap-2 rounded-[var(--radius)] bg-accent/15 pl-4 text-xs font-semibold tracking-wide text-accent uppercase ${
-          swipe.offset > 0 ? "" : "invisible"
-        }`}
-      >
-        {primaryIcon}
-        {primaryLabel}
-      </div>
-
-      {/* Delete — uncovered by swiping the card left. Kept hidden while the
-          card slides right so it's never exposed on slide-off. */}
-      <div
-        aria-hidden={swipe.offset >= 0}
-        className={`absolute inset-0 flex items-center justify-end ${
-          swipe.offset < 0 ? "" : "invisible"
-        }`}
-      >
-        <button
-          type="button"
-          onClick={onDelete}
-          className="h-full w-24 rounded-r-[var(--radius)] bg-danger text-xs font-semibold tracking-wide text-white uppercase"
-        >
-          {t("app.delete")}
-        </button>
-      </div>
-
-      {/* Sliding foreground — the card itself. */}
-      <div
-        {...swipe.handlers}
-        style={{ transform: `translateX(${swipe.offset}px)` }}
-        className={`relative [touch-action:pan-y] ${
-          swipe.animating ? "transition-transform duration-200" : ""
-        }`}
-      >
-        <NoteCard note={note} onOpen={onOpen} encrypted={encrypted} />
-      </div>
-    </div>
-  );
-}
-
-// The archive page — the notes overview filtered to archived notes. A real
-// view (not a modal) so the side menu's edge-swipe-to-open still works over
-// it. Mirrors the overview's swipeable cards, but swipe-right restores instead
-// of archives, and there's no "new note" button. Tapping a card opens the note
-// read-only (see `ReadOnlyNote`). A back button returns to the overview.
-function ArchiveList({
-  notes,
-  onOpen,
-  onRestore,
-  onDelete,
-  onBack,
-  syncSlot,
-}: {
-  notes: Note[];
-  onOpen: (id: string) => void;
-  onRestore: (id: string) => void;
-  onDelete: (id: string) => void;
-  onBack: () => void;
-  syncSlot: ReactNode;
-}) {
-  const t = useT();
-  return (
-    <div className="flex h-full flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <div className="flex min-w-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={onBack}
-            title={t("app.back")}
-            aria-label={t("app.back")}
-            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-accent/40 bg-transparent text-accent hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
-          >
-            <ArrowLeftIcon className="h-[18px] w-[18px]" />
-          </button>
-          <h1 className="truncate text-lg font-bold tracking-wide text-fg-bright">
-            {t("nav.archiveHeading")}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">{syncSlot}</div>
-      </header>
-
-      <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
-        {notes.length === 0 ? (
-          <p className="mt-16 text-center text-muted">
-            {t("nav.archiveEmpty")}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {notes.map((note) => (
-              <li key={note.id}>
-                <SwipeableNoteCard
-                  note={note}
-                  onOpen={() => onOpen(note.id)}
-                  onPrimary={() => onRestore(note.id)}
-                  onDelete={() => onDelete(note.id)}
-                  primaryLabel={t("nav.restore")}
-                  primaryIcon={<RestoreIcon className="h-4 w-4" />}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// A read-only view of an archived note, opened by tapping it on the archive
-// page. The body is rendered formatted (the same line renderer the live
-// editor uses for inactive lines) but nothing is editable. Two floating
-// actions — styled after checklist's bulk archive/delete buttons — sit at the
-// foot: Restore (unarchives the note and reopens it editable straight away)
-// and Delete (removes it for good — undoable, so no confirm beat).
-function ReadOnlyNote({
-  note,
-  editor,
-  onBack,
-  onRestore,
-  onDelete,
-  syncSlot,
-}: {
-  note: Note;
-  editor: EditorSettings;
-  onBack: () => void;
-  onRestore: () => void;
-  onDelete: () => void;
-  syncSlot: ReactNode;
-}) {
-  const t = useT();
-  const maxWidth = editorMarginMaxWidth(editor.margin);
-  const widthStyle =
-    maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" };
-  const title = note.title.trim();
-  // The body is fetched on open, but guard against a deferred note that hasn't
-  // resolved yet so the reader renders empty rather than crashing.
-  const body = note.body ?? "";
-  // Respect the Markdown-rendering preference: formatted lines when on, the
-  // raw source otherwise — matching how the same note reads in the editor.
-  const blocks = editor.renderMarkdown ? classifyLines(body) : null;
-  const placement = {
-    imagesAtEnd: editor.imagesAtEnd,
-    filesAtEnd: editor.filesAtEnd,
-  };
-  // Lines whose attachment renders in the collected end block instead.
-  const hidden = blocks
-    ? hiddenAttachmentLines(body, placement)
-    : new Set<number>();
-
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <button
-          type="button"
-          onClick={onBack}
-          title={t("app.back")}
-          aria-label={t("app.back")}
-          className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-accent/40 bg-transparent text-accent hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
-        >
-          <ArrowLeftIcon className="h-[18px] w-[18px]" />
-        </button>
-        <div className="flex items-center gap-2">
-          <CopyNoteButton note={note} copyScope={editor.copyScope} />
-          {syncSlot}
-        </div>
-      </header>
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="w-full px-4 pt-4 pb-28" style={widthStyle}>
-          {title && (
-            <h1 className="mb-3 text-2xl font-bold text-fg-bright">{title}</h1>
-          )}
-          {blocks ? (
-            <AttachmentsProvider
-              attachments={note.attachments}
-              note={note}
-              placement={placement}
-            >
-              {blocks.map((block, i) =>
-                hidden.has(i) ? null : (
-                  <div
-                    key={i}
-                    className="text-fg break-words whitespace-pre-wrap"
-                  >
-                    <RenderedLine block={block} />
-                  </div>
-                ),
-              )}
-              <AttachmentsEndBlock />
-            </AttachmentsProvider>
-          ) : (
-            <pre className="text-fg font-[inherit] break-words whitespace-pre-wrap">
-              {note.body}
-            </pre>
-          )}
-        </div>
-      </div>
-
-      {/* Floating actions, after checklist's bulk archive/delete buttons:
-          tinted, rounded, free-standing — Restore (accent/link) and Delete
-          (danger). Restore reopens the note editable; delete is undoable. */}
-      <div className="fixed inset-x-0 bottom-0 z-20 flex justify-center gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <button
-          type="button"
-          onClick={onRestore}
-          className="bg-link/10 text-link hover:bg-link/20 flex cursor-pointer items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold shadow-sm transition-[filter,background-color] active:brightness-90"
-        >
-          <RestoreIcon className="h-5 w-5" />
-          {t("nav.restore")}
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="bg-danger/10 text-danger hover:bg-danger/20 flex cursor-pointer items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold shadow-sm transition-[filter,background-color] active:brightness-90"
-        >
-          <TrashIcon className="h-5 w-5" />
-          {t("app.delete")}
-        </button>
-      </div>
     </div>
   );
 }
