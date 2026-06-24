@@ -30,10 +30,12 @@ describe("buildSeed", () => {
     expect(allNotes.some((n) => n.title === "")).toBe(true);
     expect(allNotes.some((n) => n.title !== "")).toBe(true);
     // Both short and long bodies are present.
-    expect(Math.min(...allNotes.map((n) => n.body.length))).toBeLessThan(80);
-    expect(Math.max(...allNotes.map((n) => n.body.length))).toBeGreaterThan(
-      400,
-    );
+    expect(
+      Math.min(...allNotes.map((n) => (n.body ?? "").length)),
+    ).toBeLessThan(80);
+    expect(
+      Math.max(...allNotes.map((n) => (n.body ?? "").length)),
+    ).toBeGreaterThan(400);
     // At least one archived note.
     expect(allNotes.some((n) => n.archived)).toBe(true);
   });

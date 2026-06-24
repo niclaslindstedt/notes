@@ -56,7 +56,9 @@ const hasAnyNote = (snap: Snapshot) => noteCount(snap) > 0;
 // is writing prose, not just a one-line reminder.
 const hasMultiLineNote = (snap: Snapshot) =>
   snap.notes.some(
-    (n) => n.body.split("\n").filter((line) => line.trim() !== "").length >= 2,
+    (n) =>
+      (n.body ?? "").split("\n").filter((line) => line.trim() !== "").length >=
+      2,
   );
 
 // A note that has been given a title in its own field — the first time someone

@@ -17,6 +17,17 @@ blob. This makes encryption both more private and far lighter to sync.
   appear in your cloud folder.
 - **On-demand attachments.** The note list loads without any attachment bytes;
   an image's bytes are fetched only when you open the note that shows it.
+- **Instant unlock, notes decrypted as you open them.** Alongside the per-note
+  files the app keeps one small encrypted **index** — every note's title,
+  preview, and metadata, but not its body. Unlocking decrypts just that index, so
+  the whole list appears at once however large the vault, instead of waiting for
+  every note to decrypt. Each note's body is then decrypted the moment you open
+  it (a brief "Decrypting…" flashes if it isn't ready yet) and cached, so a note
+  you've opened stays readable even offline; a note you've never opened just
+  needs a connection the first time. The index is only a speed-up: your
+  encrypted note files remain the real copy, so a missing or out-of-date index
+  just falls back to decrypting the notes directly — nothing is ever lost or
+  wrong.
 - **A green lock you can watch fill in.** Turning encryption on starts a paced
   background migration that seals one note at a time (so it never floods the
   cloud API). Each note shows a green lock in the overview and the side menu the

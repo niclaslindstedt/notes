@@ -42,6 +42,10 @@ const app = {
   // Screen-reader label for the spinner shown on a note whose file is being
   // uploaded to the backend right now.
   uploadingNote: "Syncing…",
+  // Shown in the editor body while an opened note's text is being decrypted on
+  // demand (the encrypted file/cloud backends load each body lazily, so opening
+  // opening a note fetches and decrypts just that note's file).
+  decrypting: "Decrypting this note…",
 } as const;
 
 export type AppCatalog = Widen<typeof app>;

@@ -167,8 +167,12 @@ export function HomePage() {
               hold. Each note and each attachment is compressed and encrypted in
               your browser into its own file under an opaque name, so titles,
               filenames, and your images are unreadable in the folder or cloud.
-              A green lock fills in note-by-note as the app seals them, and an
-              opened note downloads only its own attachments.
+              A green lock fills in note-by-note as the app seals them.
+              Unlocking is instant however many notes you have — the list opens
+              from a small encrypted index, and each note&apos;s text is
+              decrypted the moment you open it, so an opened note downloads only
+              its own body and attachments and stays readable offline once
+              you&apos;ve opened it.
             </li>
           </ul>
         </Section>

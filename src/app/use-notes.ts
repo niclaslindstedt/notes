@@ -69,6 +69,12 @@ export type NotesStore = {
   renameFolder: (id: string, name: string) => void;
   /** Delete a folder; its notes survive and fall back to ungrouped. */
   removeFolder: (id: string) => void;
+  // Decrypt and load a deferred note's body (the encrypted file/cloud backends
+  // render the list from an index with bodies left unloaded). Resolves once the
+  // body is in the in-memory document, or immediately when it's already loaded
+  // or the backend doesn't defer bodies. The editor calls this when a note is
+  // opened so it shows the real text rather than an empty body.
+  ensureBody: (id: string) => Promise<void>;
   /** Revert the most recent recorded edit (create / delete / edit session). */
   undo: () => void;
   /** Re-apply the most recently undone edit. */
@@ -158,6 +164,53 @@ export function useNotes(
     [commitSnapshot],
   );
 
+  // Merge a freshly-decrypted body into the on-screen document without bumping
+  // `updatedAt` or scheduling a save — loading a body to read it is not an edit.
+  // Only fills a note that's still deferred, so it can't stomp a concurrent
+  // edit that already put a real body there.
+  const mergeBody = useCallback(
+    (id: string, body: string): void => {
+      const cur = docRef.current;
+      const target = cur.notes.find((n) => n.id === id);
+      if (!target || target.body !== undefined) return;
+      const next: Snapshot = {
+        ...cur,
+        notes: cur.notes.map((n) =>
+          n.id === id ? { ...n, body, preview: undefined } : n,
+        ),
+      };
+      docRef.current = next;
+      sync.setDoc(next);
+    },
+    [sync],
+  );
+
+  const ensureBody = useCallback(
+    async (id: string): Promise<void> => {
+      const note = docRef.current.notes.find((n) => n.id === id);
+      if (!note || note.body !== undefined) return;
+      if (!adapter.fetchNoteBody) return;
+      const body = await adapter.fetchNoteBody(note);
+      if (body !== null) mergeBody(id, body);
+    },
+    [adapter, mergeBody],
+  );
+
+  // Run a mutation that rewrites a note's stored form, loading the note's body
+  // first when it's deferred. The encrypted save never rewrites a deferred note
+  // (its body isn't in memory to seal), so a metadata edit — retitle, archive,
+  // move — must promote the note to loaded first, or the change wouldn't reach
+  // its `.enc` file. Runs synchronously when the body is already loaded (an
+  // already-open note), so it adds no latency in that case.
+  const withBody = useCallback(
+    (id: string, run: () => void): void => {
+      const note = docRef.current.notes.find((n) => n.id === id);
+      if (note && note.body === undefined) void ensureBody(id).then(run);
+      else run();
+    },
+    [ensureBody],
+  );
+
   // A new note opens with the title the caller supplies — the default-title
   // scheme stamps one in (date & time, or the next "Note N"); an empty title
   // leaves the note blank until it's typed into.
@@ -230,13 +283,15 @@ export function useNotes(
 
   const retitle = useCallback(
     (id: string, title: string): void => {
-      commit(
-        (prev) => prev.map((n) => (n.id === id ? retitleNote(n, title) : n)),
-        `Renamed note “${title.trim() || "Untitled note"}”`,
-        `retitle:${id}`,
+      withBody(id, () =>
+        commit(
+          (prev) => prev.map((n) => (n.id === id ? retitleNote(n, title) : n)),
+          `Renamed note “${title.trim() || "Untitled note"}”`,
+          `retitle:${id}`,
+        ),
       );
     },
-    [commit],
+    [commit, withBody],
   );
 
   const remove = useCallback(
@@ -255,24 +310,28 @@ export function useNotes(
     (id: string): void => {
       const target = docRef.current.notes.find((n) => n.id === id);
       const title = target ? noteTitle(target) : "note";
-      commit(
-        (prev) => prev.map((n) => (n.id === id ? setArchived(n, true) : n)),
-        `Archived note “${title}”`,
+      withBody(id, () =>
+        commit(
+          (prev) => prev.map((n) => (n.id === id ? setArchived(n, true) : n)),
+          `Archived note “${title}”`,
+        ),
       );
     },
-    [commit],
+    [commit, withBody],
   );
 
   const restore = useCallback(
     (id: string): void => {
       const target = docRef.current.notes.find((n) => n.id === id);
       const title = target ? noteTitle(target) : "note";
-      commit(
-        (prev) => prev.map((n) => (n.id === id ? setArchived(n, false) : n)),
-        `Restored note “${title}”`,
+      withBody(id, () =>
+        commit(
+          (prev) => prev.map((n) => (n.id === id ? setArchived(n, false) : n)),
+          `Restored note “${title}”`,
+        ),
       );
     },
-    [commit],
+    [commit, withBody],
   );
 
   // Move a note into a folder (or out of every folder when `folderId` is null).
@@ -283,15 +342,17 @@ export function useNotes(
       if (!target) return;
       if ((target.folderId ?? null) === folderId) return;
       const title = noteTitle(target);
-      commit(
-        (prev) =>
-          prev.map((n) => (n.id === id ? setNoteFolder(n, folderId) : n)),
-        folderId
-          ? `Moved note “${title}” to a folder`
-          : `Moved note “${title}” out of its folder`,
+      withBody(id, () =>
+        commit(
+          (prev) =>
+            prev.map((n) => (n.id === id ? setNoteFolder(n, folderId) : n)),
+          folderId
+            ? `Moved note “${title}” to a folder`
+            : `Moved note “${title}” out of its folder`,
+        ),
       );
     },
-    [commit],
+    [commit, withBody],
   );
 
   const createFolder = useCallback(
@@ -330,18 +391,26 @@ export function useNotes(
     (id: string): void => {
       const target = docRef.current.folders?.find((f) => f.id === id);
       const name = target ? target.name : "folder";
-      commitSnapshot(
-        (prev) => ({
-          ...prev,
-          folders: (prev.folders ?? []).filter((f) => f.id !== id),
-          notes: prev.notes.map((n) =>
-            n.folderId === id ? setNoteFolder(n, null) : n,
-          ),
-        }),
-        `Deleted folder “${name}”`,
-      );
+      const run = (): void =>
+        commitSnapshot(
+          (prev) => ({
+            ...prev,
+            folders: (prev.folders ?? []).filter((f) => f.id !== id),
+            notes: prev.notes.map((n) =>
+              n.folderId === id ? setNoteFolder(n, null) : n,
+            ),
+          }),
+          `Deleted folder “${name}”`,
+        );
+      // Clearing the folder rewrites every note that was in it; load any
+      // deferred ones first so the change reaches their `.enc` files.
+      const affected = docRef.current.notes
+        .filter((n) => n.folderId === id && n.body === undefined)
+        .map((n) => n.id);
+      if (affected.length === 0) run();
+      else void Promise.all(affected.map(ensureBody)).then(run);
     },
-    [commitSnapshot],
+    [commitSnapshot, ensureBody],
   );
 
   const undo = useCallback(() => {
@@ -393,6 +462,7 @@ export function useNotes(
     createFolder,
     renameFolder,
     removeFolder,
+    ensureBody,
     undo,
     redo,
     canUndo,

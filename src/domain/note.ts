@@ -12,7 +12,22 @@ import { type Attachment, referencedAttachments } from "./attachment.ts";
 export type Note = {
   id: string;
   title: string;
-  body: string;
+  // The note's text below the title. **Optional** because the encrypted
+  // file/cloud backends load lazily: on unlock the list is rebuilt from a small
+  // encrypted index (titles + a `preview` snippet) and each note's body stays
+  // `undefined` ("deferred") until the note is opened, when it is decrypted on
+  // demand (`StorageAdapter.fetchNoteBody`). `undefined` means **not loaded
+  // yet** — distinct from `""` (loaded and empty) — so a deferred note must
+  // never be written back (it would clobber the real body with nothing); the
+  // save planner skips it. A freshly created or plaintext-loaded note always
+  // has a string body.
+  body?: string;
+  // A denormalised one-paragraph excerpt of the body, carried only while `body`
+  // is deferred so the list still renders real preview text without decrypting
+  // the note. Built at save time by `notePreviewBlock` and stored in the
+  // encrypted index; ignored once the real `body` is present (the preview is
+  // then recomputed from it).
+  preview?: string;
   // Epoch milliseconds. `createdAt` is set once; `updatedAt` moves on
   // every edit and is what the list sorts by (most-recent first).
   createdAt: number;
@@ -184,6 +199,15 @@ const FILE_ATTACHMENT_MARKDOWN_RE = /\[[^\]]*\]\([^)]*attachments\/[^)]*\)/g;
 // spaced string, with attachment markdown removed (it adds nothing to a text
 // excerpt and would otherwise show as `![…](…)` clutter).
 export function notePreview(note: Note): string {
+  // Deferred (body not loaded): fall back to the index-supplied snippet,
+  // collapsed to a single line the way a loaded body would be.
+  if (note.body === undefined) {
+    return (note.preview ?? "")
+      .split("\n")
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .filter((line) => line.length > 0)
+      .join(" ");
+  }
   return note.body
     .replace(IMAGE_MARKDOWN_RE, " ")
     .replace(FILE_ATTACHMENT_MARKDOWN_RE, " ")
@@ -200,6 +224,8 @@ export function notePreview(note: Note): string {
 // height and fades the tail out in CSS. Attachment markdown is stripped the
 // same way as the one-line preview.
 export function notePreviewBlock(note: Note): string {
+  // Deferred (body not loaded): the stored preview is already this block form.
+  if (note.body === undefined) return note.preview ?? "";
   return note.body
     .replace(IMAGE_MARKDOWN_RE, " ")
     .replace(FILE_ATTACHMENT_MARKDOWN_RE, " ")
@@ -211,6 +237,9 @@ export function notePreviewBlock(note: Note): string {
 
 /** True when a note carries no user content and is safe to discard. */
 export function isBlank(note: Note): boolean {
+  // A deferred note is one that already lives encrypted on disk, so it is by
+  // definition not a pristine, discardable scratch note — never blank.
+  if (note.body === undefined) return false;
   return (
     note.title.trim().length === 0 &&
     note.body.trim().length === 0 &&
@@ -365,6 +394,9 @@ export function formatSnapshotForSave(
   if (!fmt.trimTrailingSpaces && !fmt.trailingNewline) return snapshot;
   let changed = false;
   const notes = snapshot.notes.map((note) => {
+    // A deferred note (body not loaded) is left exactly as-is — there is no
+    // body in memory to tidy, and its stored form must not be touched.
+    if (note.body === undefined) return note;
     const body = formatBody(note.body, fmt);
     if (body === note.body) return note;
     changed = true;

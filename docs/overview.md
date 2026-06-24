@@ -851,15 +851,17 @@ notes…", "Unlocking your notes…") via `UNLOCK_STEP_MESSAGE_KEY`
 copy; the status-line glyph and the underlying `STEP_MESSAGE_KEY` map are still
 shared with the
 [storage tab's encryption status bar](#storage-settings). On a file/cloud
-backend, where the per-file notes are unsealed by a bounded concurrency pool
-inside the directory adapter's encrypted load (so a cold unlock of a large vault
-overlaps its reads instead of paying one network round-trip per note), the gate
-names each note as it finishes and how far through it is ("Decrypting
-"Groceries" (3/12)…", a completion counter rather than on-disk order):
-`storage.unlock` points the
+backend the unlock now renders the list from the [note index](#encryption) in a
+single read + decrypt with every body deferred, so it's near-instant and decrypts
+no note bodies up front. When there is no usable index — a vault from before the
+index existed, or one another device left stale — the load falls back to
+decrypting the per-file notes through a bounded concurrency pool (overlapping the
+reads instead of one round-trip per note), and *that* path drives the gate's
+per-note progress line ("Decrypting "Groceries" (3/12)…", a completion counter
+rather than on-disk order): `storage.unlock` points the
 `directoryCrypto.onDecryptNote` reporter ref at the gate's status callback for
-the duration of the unlock (clearing it afterward), so each note flows up as a
-`decrypting` phase carrying an `EncryptionProgressDetail`
+the duration of the unlock (clearing it afterward), so each fallback note flows
+up as a `decrypting` phase carrying an `EncryptionProgressDetail`
 (`{ title, index, total }`). The browser backend decrypts one whole envelope, so
 it just keeps the generic "Decrypting your notes…" line. See
 [encryption](#encryption).
@@ -1169,8 +1171,13 @@ fresh-IV re-encryption isn't a spurious change. Sealing (gzip + AES-GCM) is
 deferred until *after* change detection picks the files to write, so one edit in
 a 500-note vault encrypts one note rather than all of them; the opaque per-note
 filename refs (a keyed HMAC) are memoised per session so the same save doesn't
-re-derive every note's path. It also exposes `fetchAttachment`,
-`getEncryptionStatus`, `migrateNote`, and `splitLegacyBlob` for the
+re-derive every note's path. Alongside the per-note files it maintains the
+sealed [note index](#encryption) (`.index.bin`) so an unlock renders the list
+without decrypting any body, exposing `fetchNoteBody` to decrypt one note's body
+on demand (the deferred-body counterpart of `fetchAttachment`); a deferred note
+is skipped by the save planner so it's never rewritten body-less nor pruned. It
+also exposes `fetchAttachment`, `getEncryptionStatus`, `migrateNote`,
+`demigrateNote`, and `splitLegacyBlob` for the
 [encryption migration](#encryption-migration). A representation conversion is
 the one case it removes files it didn't author, done atomically (write-new →
 verify-by-readback → delete-old over distinct deterministic paths): enabling
@@ -1247,24 +1254,47 @@ document in one pass and take an optional `onProgress` callback (`reading →
 derivingKey → encrypting`/`decrypting → saving → finalizing`) the
 [storage settings](#storage-settings) status bar feeds on.
 
-The encrypted **load** is cached so the same notes are never decrypted twice
-needlessly. Every `load()` still runs a fresh `store.list()` (so it can never
-serve data staler than the backend), but keys two in-memory caches off the
+**Fast unlock via the note index, lazy bodies.** Decrypting every note's `.enc`
+on unlock made a cold load O(notes) reads + decrypts — tens of seconds for a
+large vault. So alongside the per-note files the adapter keeps one sealed **note
+index** (`src/storage/note-index.ts`, written to `.index.bin`): a list of every
+note's metadata — id, title, timestamps, folder, archived flag, attachment
+metadata — plus a `preview` snippet, so the whole list renders from a **single
+read + decrypt** with each note's `body` left **deferred** (`undefined`).
+`Note.body` is therefore optional: `undefined` means "not loaded yet" (distinct
+from `""`), and the in-memory `preview` carries the list text meanwhile. Opening
+a note calls `fetchNoteBody` (the body's counterpart to `fetchAttachment`),
+which decrypts just that note's `.enc`; the editor shows a "Decrypting…"
+placeholder and withholds editing until it lands, so a keystroke can't overwrite
+the unloaded body. Offline is **progressive**: a note becomes readable offline
+once it has been opened (its body is cached on first open); a note never opened
+needs a connection the first time.
+The index is a pure **optimisation, never the source of truth**: the per-note
+files + the listing stay authoritative, so it's written best-effort (last-writer-
+wins, *never* conflict-checked — which is what keeps per-file sync working), and
+on load any `.enc` the index doesn't cover at the current revision (a stale index,
+or a note another device just changed) is decrypted individually as the fallback.
+Because a deferred note's body isn't in memory, the save planner **skips** it
+(never re-writing it body-less, never removing it as an orphan) and attachment
+reconciliation keeps all of its declared blobs; a metadata edit (retitle /
+archive / move) loads the body first so the `.enc` is rewritten faithfully.
+Bodies you've opened ride a second sealed mirror in `withLocalCache`
+(`<key>:bodies`), written debounced so a burst of opens pays the deliberately-
+slow seal once rather than per note — which is what makes an opened note
+reopenable offline.
+
+The encrypted load is also **cached** so the same notes are never decrypted
+twice needlessly. Every `load()` still runs a fresh `store.list()` (so it can
+never serve data staler than the backend), but keys two in-memory caches off the
 revisions that listing reports: a **load memo** returns the previously-built
 snapshot whole when the entire listing is byte-identical, and a **per-note
 cache** (`encNoteCache`, keyed by `<path>@<rev>`) reuses each note's already-
-unsealed JSON when only some files moved — the encrypted-mode counterpart of the
-plaintext path's `reusableFiles`. Together these collapse the unlock's two
-back-to-back loads (the gate verifies the passphrase with one `load()`, then the
-adapter swap from the locked placeholder to the real adapter triggers another)
-into a single decrypt, make an idle [live pull](#live-pull) cost one listing
-instead of a full re-decrypt of the vault, and reduce a one-note remote edit to a
-single re-decrypt. Saves keep the per-note cache warm with the plaintext they
-just wrote, and both caches are dropped whenever the keys change (lock / unlock /
-passphrase switch). A fully-migrated vault also skips the attachment listing on
-load entirely (each encrypted note already carries its attachment metadata in its
-own JSON), walking it only while plaintext remnants from an in-progress migration
-remain.
+unsealed JSON (so an opened body stays loaded across reloads, and a one-note
+remote edit re-decrypts one note). Both caches are dropped whenever the
+keys change (lock / unlock / passphrase switch). A fully-migrated vault also
+skips the attachment listing on load entirely (each encrypted note already
+carries its attachment metadata in its own JSON, as does the index), walking it
+only while plaintext remnants from an in-progress migration remain.
 
 ### Encryption migration
 

@@ -149,8 +149,12 @@ export function noteToMarkdown(note: Note, folderDepth = 0): string {
   // (`../attachments/<stem>/<file>`, with an extra `../` per folder level) so
   // the file opens with working images in any markdown viewer; the in-memory
   // body keeps the rename-proof flat form.
+  // A note serialized to a markdown file is always one whose body is loaded
+  // (plaintext backends never defer, and the encrypted→plaintext path fetches
+  // the body first); the `?? ""` is only a defensive guard against a deferred
+  // note slipping through, never a path that should write away a real body.
   const body = refsToDisk(
-    note.body.replace(/\n+$/, ""),
+    (note.body ?? "").replace(/\n+$/, ""),
     noteFileStem(note),
     folderDepth,
   );

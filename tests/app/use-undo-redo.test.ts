@@ -15,7 +15,7 @@ function snap(...tags: string[]): Snapshot {
   return { notes: tags.map(note) };
 }
 
-const tagsOf = (s: Snapshot): string[] => s.notes.map((n) => n.body);
+const tagsOf = (s: Snapshot): string[] => s.notes.map((n) => n.body ?? "");
 
 // Mount the hook with a helper that records the latest snapshot pushed to
 // `setData`, mirroring how `useNotes` feeds stepped-to documents back into

@@ -107,6 +107,15 @@ export type StorageAdapter = {
     filename: string,
   ): Promise<{ mime: string; bytes: Uint8Array } | null>;
 
+  // Optional on-demand fetch of one note's body, the lazy counterpart of the
+  // encrypted index load: an encrypted vault unlocks by rendering the list from
+  // a small encrypted index with every body deferred, then this decrypts a
+  // single note's `.enc` when it is opened. Returns
+  // the body text, or null when the backend doesn't defer bodies (the body is
+  // already loaded) or the note file is missing. Only the encrypted file
+  // backends implement it.
+  fetchNoteBody?(note: Note): Promise<string | null>;
+
   // Per-note at-rest encryption status from the last load — "encrypted" once a
   // note and all its attachments are sealed, "pending" while an in-progress
   // migration still has a plaintext remnant. Drives the green lock. Empty/absent
