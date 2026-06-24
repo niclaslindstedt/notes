@@ -75,9 +75,6 @@ export function useNoteDragAbort(): number {
 
 export type TouchDragHandlers = Partial<{
   onPointerDown: (e: ReactPointerEvent<HTMLElement>) => void;
-  onPointerMove: (e: ReactPointerEvent<HTMLElement>) => void;
-  onPointerUp: (e: ReactPointerEvent<HTMLElement>) => void;
-  onPointerCancel: (e: ReactPointerEvent<HTMLElement>) => void;
   onClickCapture: (e: ReactMouseEvent) => void;
 }>;
 
@@ -103,6 +100,10 @@ export function useTouchNoteDrag(
   const justDragged = useRef(false);
   // Non-passive scroll blocker installed only while a drag is live.
   const blockScroll = useRef<(e: TouchEvent) => void>(() => {});
+  // Detaches the window move/up/cancel listeners bound for the lifetime of the
+  // active gesture (see `bindWindow`). Held on a ref so `cleanup` can drop them
+  // without depending on the handler identities.
+  const detachWindow = useRef<(() => void) | null>(null);
 
   const clearTimer = useCallback(() => {
     if (timer.current !== null) {
@@ -121,6 +122,8 @@ export function useTouchNoteDrag(
   );
 
   const cleanup = useCallback(() => {
+    detachWindow.current?.();
+    detachWindow.current = null;
     clearTimer();
     const el = targetEl.current;
     const id = pointerId.current;
@@ -138,11 +141,12 @@ export function useTouchNoteDrag(
   }, [clearTimer]);
 
   // Tear the gesture down when the app aborts mid-drag (a sync-conflict modal
-  // took over, a background reload swapped the list). The row may have
-  // unmounted, so no pointerup/cancel will reach these handlers — release the
-  // captured pointer and stop blocking scroll here instead, so nothing is left
-  // latched. `active` is false on mount and whenever idle, so the initial run
-  // (and runs while no drag is live) are no-ops.
+  // took over, a background reload swapped the list). The user is still
+  // holding — no pointerup has fired — so `cleanup` here drops the chip and
+  // detaches the window listeners now, both so the lifted note doesn't hover
+  // over the modal and so a later release can't commit a move into the
+  // unresolved conflict. `active` is false on mount and whenever idle, so the
+  // initial run (and runs while no drag is live) are no-ops.
   useEffect(() => {
     if (active.current) cleanup();
   }, [abortGen, cleanup]);
@@ -156,7 +160,10 @@ export function useTouchNoteDrag(
         try {
           el.setPointerCapture(pointerId.current);
         } catch {
-          // some browsers reject capture mid-gesture — drag still works
+          // Capture is best-effort — it keeps touch events on the row and
+          // suppresses text selection — but correctness no longer depends on
+          // it: move/up/cancel live on `window`, so a release is caught
+          // wherever the pointer ends up even when capture is refused.
         }
       }
       blockScroll.current = (e: TouchEvent) => e.preventDefault();
@@ -170,10 +177,70 @@ export function useTouchNoteDrag(
     [actions, hitTest, noteId, title],
   );
 
-  if (!enabled) return { handlers: {}, dragging: false };
+  // Move / up / cancel run off `window` for the gesture's lifetime, not the
+  // row, so the press is tracked and the release caught wherever the pointer
+  // travels. A pen/touch point that drifts off the row — or a browser that
+  // refused the pointer capture `engage` requests — would otherwise never
+  // deliver the `pointerup`, leaving the lifted note frozen mid-air. Bound on
+  // pointer-down (so even the pre-latch move/up is seen), dropped by `cleanup`.
+  const handleMove = useCallback(
+    (e: PointerEvent) => {
+      if (pointerId.current !== e.pointerId) return;
+      if (!active.current) {
+        // Moved past the slop before the press latched → it's a scroll or a
+        // swipe; stand down and leave the existing gesture untouched.
+        if (
+          Math.abs(e.clientX - startX.current) > MOVE_SLOP ||
+          Math.abs(e.clientY - startY.current) > MOVE_SLOP
+        ) {
+          clearTimer();
+        }
+        return;
+      }
+      if (e.cancelable) e.preventDefault();
+      hitTest(e.clientX, e.clientY);
+    },
+    [clearTimer, hitTest],
+  );
 
-  const handlers: TouchDragHandlers = {
-    onPointerDown(e) {
+  const handleUp = useCallback(
+    (e: PointerEvent) => {
+      if (pointerId.current !== e.pointerId) return;
+      if (active.current) {
+        justDragged.current = true;
+        actions?.commit();
+      }
+      cleanup();
+    },
+    [actions, cleanup],
+  );
+
+  // A browser-initiated `pointercancel` (the UA seized the pointer for its own
+  // gesture) aborts the drag — it must not commit a move the way a release does.
+  const handleCancel = useCallback(
+    (e: PointerEvent) => {
+      if (pointerId.current !== e.pointerId) return;
+      if (active.current) actions?.cancel();
+      cleanup();
+    },
+    [actions, cleanup],
+  );
+
+  const bindWindow = useCallback(() => {
+    detachWindow.current?.();
+    // `passive: false` so `handleMove` may `preventDefault` to block scroll.
+    window.addEventListener("pointermove", handleMove, { passive: false });
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleCancel);
+    detachWindow.current = () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleCancel);
+    };
+  }, [handleMove, handleUp, handleCancel]);
+
+  const onPointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLElement>) => {
       if (e.pointerType === "mouse") return;
       pointerId.current = e.pointerId;
       targetEl.current = e.currentTarget;
@@ -183,47 +250,28 @@ export function useTouchNoteDrag(
       justDragged.current = false;
       const { clientX: x, clientY: y } = e;
       clearTimer();
+      // Bind the rest of the gesture to `window` up front so even a pre-latch
+      // move or a quick tap-release is tracked off the row.
+      bindWindow();
       timer.current = window.setTimeout(() => engage(x, y), LONG_PRESS_MS);
     },
-    onPointerMove(e) {
-      if (pointerId.current !== e.pointerId) return;
-      if (!active.current) {
-        // Moved before the press latched → it's a scroll or a swipe; stand down.
-        if (
-          Math.abs(e.clientX - startX.current) > MOVE_SLOP ||
-          Math.abs(e.clientY - startY.current) > MOVE_SLOP
-        ) {
-          clearTimer();
-        }
-        return;
-      }
-      e.preventDefault();
-      hitTest(e.clientX, e.clientY);
-    },
-    onPointerUp(e) {
-      if (pointerId.current !== e.pointerId) return;
-      if (active.current) {
-        e.preventDefault();
-        justDragged.current = true;
-        actions?.commit();
-      }
-      cleanup();
-    },
-    onPointerCancel(e) {
-      if (pointerId.current !== e.pointerId) return;
-      if (active.current) actions?.cancel();
-      cleanup();
-    },
-    // Swallow the click that trails a drag so releasing over a folder files the
-    // note instead of also opening it.
-    onClickCapture(e) {
-      if (justDragged.current) {
-        e.preventDefault();
-        e.stopPropagation();
-        justDragged.current = false;
-      }
-    },
-  };
+    [bindWindow, clearTimer, engage],
+  );
 
-  return { handlers, dragging };
+  // Swallow the click that trails a drag so releasing over a folder files the
+  // note instead of also opening it.
+  const onClickCapture = useCallback((e: ReactMouseEvent) => {
+    if (justDragged.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      justDragged.current = false;
+    }
+  }, []);
+
+  // Drop any still-bound window listeners if the row unmounts mid-drag.
+  useEffect(() => () => detachWindow.current?.(), []);
+
+  if (!enabled) return { handlers: {}, dragging: false };
+
+  return { handlers: { onPointerDown, onClickCapture }, dragging };
 }

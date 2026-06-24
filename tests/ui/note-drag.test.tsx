@@ -145,6 +145,44 @@ describe("note long-press drag", () => {
     expect(onDrop).not.toHaveBeenCalled();
   });
 
+  // The move/up handlers live on `window`, not the row, so a release that
+  // lands off the dragged row still files the note. Pre-fix they sat on the row
+  // and leaned on pointer capture; a pen/touch point that drifted off it (or a
+  // browser that refused the capture) never delivered the pointerup and the
+  // lifted note froze. The release here fires on `document.body`, which is not
+  // inside the row wrapper — an element-bound handler would never see it.
+  it("commits the drop when the release lands off the dragged row", () => {
+    const onDrop = vi.fn();
+    const { wrapper, getByTestId } = setup(onDrop);
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(
+      getByTestId("folder"),
+    );
+
+    fireEvent.pointerDown(wrapper, touch);
+    act(() => void vi.advanceTimersByTime(400));
+    fireEvent.pointerMove(window, { ...touch, clientX: 50, clientY: 200 });
+    fireEvent.pointerUp(document.body, { pointerId: 1 });
+
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith("n1", "f1");
+  });
+
+  // A browser-initiated pointercancel (the UA seized the pointer) aborts the
+  // drag without committing the half-finished move a deliberate release would.
+  it("aborts without filing when the browser cancels the pointer", () => {
+    const onDrop = vi.fn();
+    const { wrapper, getByTestId } = setup(onDrop);
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(
+      getByTestId("folder"),
+    );
+
+    fireEvent.pointerDown(wrapper, touch);
+    act(() => void vi.advanceTimersByTime(400));
+    fireEvent.pointerMove(window, { ...touch, clientX: 50, clientY: 200 });
+    fireEvent.pointerCancel(window, { pointerId: 1 });
+
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
   // A background save can collide with another device mid-drag, raising the
   // conflict modal over the list. The lifted note must be torn down — otherwise
   // its floating chip stays frozen in mid-air and its captured pointer keeps

@@ -1551,20 +1551,28 @@ targets read the hovered key via `useNoteDropKey` to paint their highlight. The
 side menu and the overview both carry `select-none` so a drag never paints a
 text selection across the rows it crosses.
 
-A drag is only ever ended by the pointerup/cancel (touch) or `dragend` (desktop)
-that lands on the dragged row — so if something seizes the screen mid-drag and
-unmounts that row, neither fires and the lifted note would be stranded: the
-floating chip frozen in mid-air with its pointer still captured, or the desktop
-row stuck dimmed. The concrete trigger is a background save colliding with
-another device, which raises the non-dismissable conflict modal over the list.
-To cover it, `App` hands `NoteDragProvider` an `aborted` prop
-(`sync.conflict !== null`); on its rising edge the provider clears the chip and
-bumps `DragAbortContext`. Each active row's `useTouchNoteDrag` watches that
-generation and releases its pointer capture (and the scroll blocker); the
-native HTML5 drop zones in the overview and side menu watch `useNoteDragAbort`
-and clear their lift styling. The drag-to-folder gesture also reports itself
-through `ReportDragActivityContext` (`src/ui/drag-activity.ts`) so
-pull-to-refresh stands down for its duration — see [pull to refresh](#pull-to-refresh).
+**Ending the gesture reliably.** Only `onPointerDown` lives on the row;
+`useTouchNoteDrag` binds `pointermove`/`pointerup`/`pointercancel` to **`window`**
+for the rest of the drag (dropped on cleanup). Keeping them on the row instead
+would lean on the pointer capture `engage` requests — but capture is best-effort
+(some engines refuse it mid-gesture, and a pen/touch point can drift off the
+row), and a release the row never sees would leave the lifted note frozen
+mid-air. Off `window` the release is caught wherever the pointer ends up; a
+`pointercancel` aborts without filing.
+
+That covers a release that lands anywhere, but not the screen being seized while
+the finger is _still down_ — a background save colliding with another device
+raises the non-dismissable conflict modal over the list mid-drag. For that, `App`
+hands `NoteDragProvider` an `aborted` prop (`sync.conflict !== null`); on its
+rising edge the provider clears the chip and bumps `DragAbortContext`, which each
+active `useTouchNoteDrag` watches to tear its gesture down (so the lifted note
+can't hover over the modal, and a later release can't commit a move into the
+unresolved conflict), and which the native HTML5 drop zones in the overview and
+side menu watch via `useNoteDragAbort` to clear a lift that `dragend` would
+otherwise never resolve once the dragged row unmounts. The drag-to-folder
+gesture also reports itself through `ReportDragActivityContext`
+(`src/ui/drag-activity.ts`) so pull-to-refresh stands down for its duration — see
+[pull to refresh](#pull-to-refresh).
 
 The drop-target keys (see `note-drag-context.ts`) span four kinds of target:
 
