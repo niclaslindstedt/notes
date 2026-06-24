@@ -44,7 +44,7 @@ const app = {
   uploadingNote: "Syncing…",
   // Shown in the editor body while an opened note's text is being decrypted on
   // demand (the encrypted file/cloud backends load each body lazily, so opening
-  // opening a note fetches and decrypts just that note's file).
+  // a note fetches and decrypts just that note's file).
   decrypting: "Decrypting…",
 } as const;
 
