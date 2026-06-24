@@ -29,6 +29,7 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -36,9 +37,11 @@ import {
   type ReactNode,
 } from "react";
 
+import { useReportDragActivity } from "./drag-activity.ts";
 import { NoteIcon } from "./icons.tsx";
 import {
   ActionsContext,
+  DragAbortContext,
   DropKeyContext,
   useTouchNoteDrag,
   type DragActions,
@@ -46,16 +49,24 @@ import {
 
 export function NoteDragProvider({
   onDrop,
+  aborted = false,
   children,
 }: {
   // Fired when a note is released over a drop target. `key` is the target's
   // `data-note-drop` value (folder id / `NOTE_DROP_ROOT` / `NOTE_DROP_ARCHIVE`
   // / `ns:<slug>`); the caller resolves it to the right action.
   onDrop: (noteId: string, key: string) => void;
+  // When true, any in-flight drag is torn down: a sync-conflict modal (or a
+  // background reload) has seized the screen, so the lifted note must not stay
+  // frozen on top of it waiting for a pointerup/`dragend` that won't come.
+  aborted?: boolean;
   children: ReactNode;
 }) {
   const [dragging, setDragging] = useState<{ title: string } | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);
+  // Bumped to tell every active row (and the native drop zones) to tear their
+  // drag down when `aborted` rises — see `DragAbortContext`.
+  const [abortGen, setAbortGen] = useState(0);
   const ghostRef = useRef<HTMLDivElement | null>(null);
   // Latest fingertip position, kept on a ref so the callback ref can place the
   // chip the instant it mounts (see `setGhostRef`).
@@ -91,6 +102,37 @@ export function NoteDragProvider({
     [applyGhostTransform],
   );
 
+  // Drop the floating chip and forget the in-flight drag without committing a
+  // move. Shared by the `cancel` action (a pointercancel) and the abort effect.
+  const cancelDrag = useCallback(() => {
+    noteIdRef.current = null;
+    dropKeyRef.current = null;
+    setDragging(null);
+    setDropKey(null);
+  }, []);
+
+  // Report the live touch/pointer drag up so the document-level pull-to-refresh
+  // stands down — dragging a note downward to a lower folder / the archive
+  // would otherwise arm a refresh at the same time.
+  const reportDrag = useReportDragActivity();
+  const isDragging = dragging !== null;
+  useEffect(() => {
+    reportDrag(isDragging);
+    return () => {
+      if (isDragging) reportDrag(false);
+    };
+  }, [isDragging, reportDrag]);
+
+  // When the app raises `aborted` (a sync-conflict modal surfaced over the
+  // list), tear any in-flight drag down: clear the chip and bump the abort
+  // generation so the active row releases its pointer capture and the native
+  // drop zones drop their lift styling.
+  useEffect(() => {
+    if (!aborted) return;
+    cancelDrag();
+    setAbortGen((g) => g + 1);
+  }, [aborted, cancelDrag]);
+
   const actions = useMemo<DragActions>(
     () => ({
       begin(noteId, title, x, y) {
@@ -118,31 +160,28 @@ export function NoteDragProvider({
         setDragging(null);
         setDropKey(null);
       },
-      cancel() {
-        noteIdRef.current = null;
-        dropKeyRef.current = null;
-        setDragging(null);
-        setDropKey(null);
-      },
+      cancel: cancelDrag,
     }),
-    [onDrop, positionGhost],
+    [onDrop, positionGhost, cancelDrag],
   );
 
   return (
     <ActionsContext.Provider value={actions}>
-      <DropKeyContext.Provider value={dropKey}>
-        {children}
-        {dragging && (
-          <div
-            ref={setGhostRef}
-            aria-hidden
-            className="pointer-events-none fixed top-0 left-0 z-[100] flex max-w-[70vw] items-center gap-2 rounded-[var(--radius)] border border-accent/40 bg-surface-2 px-3 py-1.5 text-sm text-fg-bright shadow-lg"
-          >
-            <NoteIcon className="h-4 w-4 shrink-0 text-accent" />
-            <span className="truncate">{dragging.title || "Untitled"}</span>
-          </div>
-        )}
-      </DropKeyContext.Provider>
+      <DragAbortContext.Provider value={abortGen}>
+        <DropKeyContext.Provider value={dropKey}>
+          {children}
+          {dragging && (
+            <div
+              ref={setGhostRef}
+              aria-hidden
+              className="pointer-events-none fixed top-0 left-0 z-[100] flex max-w-[70vw] items-center gap-2 rounded-[var(--radius)] border border-accent/40 bg-surface-2 px-3 py-1.5 text-sm text-fg-bright shadow-lg"
+            >
+              <NoteIcon className="h-4 w-4 shrink-0 text-accent" />
+              <span className="truncate">{dragging.title || "Untitled"}</span>
+            </div>
+          )}
+        </DropKeyContext.Provider>
+      </DragAbortContext.Provider>
     </ActionsContext.Provider>
   );
 }
