@@ -23,7 +23,7 @@ const app: AppCatalog = {
   },
   encryptedNote: "Krypterad i vila",
   uploadingNote: "Synkar…",
-  decrypting: "Dekrypterar anteckningen…",
+  decrypting: "Dekrypterar…",
 };
 
 export default app;

@@ -45,6 +45,7 @@ import {
   MarkdownEditor,
   type MarkdownEditorHandle,
 } from "../ui/MarkdownEditor.tsx";
+import { CipherGlyph } from "../ui/CipherGlyph.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { DropOverlay } from "../ui/DropOverlay.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
@@ -1677,7 +1678,7 @@ function Editor({
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">
         {loading ? (
           <div className="flex flex-1 items-center justify-center gap-2 p-8 text-sm text-muted">
-            <SpinnerIcon className="h-5 w-5 animate-spin" />
+            <CipherGlyph className="shrink-0 text-accent" />
             {t("app.decrypting")}
           </div>
         ) : editor.renderMarkdown ? (
