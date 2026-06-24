@@ -115,43 +115,6 @@ backend touched if any (Dropbox / Google Drive have no Vitest reach).
 Pin the round-trip behaviour with a serialize/migrate test against the
 local adapter before moving anything. **Severity: 8.**
 
-#### `src/app/App.tsx` — 1567 lines, ~1.6× the cap, components for two more surfaces in one file
-
-**Smell.** The root shell, the entire note-list overview (NoteList,
-folder headers, FolderRenameRow, OverviewFolderHeader), and the editor
-surface (Editor, TitleField, PlainEditor, FolderPicker) still live in one
-1567-line file — over the §20.5 cap, with no opt-out. Re-verify with
-`wc -l src/app/App.tsx` and the `grep -n "^export\|^function\|^const .* = (" `
-component scan. **Seam 1 (the archive view) and the shared note-card
-primitives have already been extracted** (2026-06) — see Landed.
-
-**Plan (multi-PR, one seam per PR, each <500-line diff).** All seams are
-pure presentational extractions to `src/ui/` — no domain logic moves, no
-layering edge crossed (`app → ui` is the allowed direction):
-
-1. ✅ **Archive view** → `src/ui/ArchivedNoteView.tsx` (ArchiveList +
-   ReadOnlyNote). Done 2026-06.
-2. **Editor surface** → `src/ui/NoteEditor.tsx` (Editor + TitleField +
-   PlainEditor + FolderPicker, ~405 lines). Low risk — prop-driven
-   functional components.
-3. **Note-list overview** → `src/ui/note-list/NoteList.tsx` (NoteList +
-   OverviewFolderHeader + FolderRenameRow, ~600 lines). Higher risk —
-   coupled to the `useNoteDropKey` / `useNoteDragAbort` drag context;
-   keep the drag-drop provider in `App` and pass through props. The shared
-   note-card primitives it renders (NoteLock / NoteCard / SwipeableNoteCard)
-   already live in `src/ui/note-list/NoteCard.tsx` — this seam just moves
-   `NoteList` itself into the same directory and imports `./NoteCard`.
-
-Optionally, fold the `pristineNew` / `discardable()` orchestration into a
-`src/app/usePristineNoteTracking.ts` hook (App-level, stays in `src/app/`).
-
-**Risk.** Drag-drop context bridge (NoteList consumes drag context the
-shell provides) and the `pristineNew` discard-tracking are the two coupled
-spots — keep both in `App`, thread callbacks down. No component touches
-`storage.adapter` directly (all go through callbacks), so no storage
-hot-path risk. UI-only, so add/extend jsdom component tests for the
-extracted views as the seam exposes them. **Severity: 7.**
-
 #### `src/ui/SideMenu.tsx` — 1561 lines, sort helpers + container + eight sub-components
 
 **Smell.** 561 lines over the cap. Mixes pure note/folder **sort helpers**
@@ -186,6 +149,47 @@ pure-function move with new domain tests. No storage hot-path. **Severity: 6**
 (with a 3-rated easy-win slice inside it — step 1).
 
 ### Severity 5–6 — friction
+
+#### `src/app/App.tsx` — 1131 lines, ~1.1× the cap, the note-list overview still in the shell
+
+**Smell.** The root shell and the entire note-list overview (NoteList,
+folder headers, FolderRenameRow, OverviewFolderHeader) still live in one
+1131-line file — over the §20.5 cap, with no opt-out. Re-verify with
+`wc -l src/app/App.tsx` and the `grep -n "^export\|^function\|^const .* = (" `
+component scan. **Seam 1 (the archive view + shared note-card primitives)
+and Seam 2 (the editor surface) have already been extracted** (2026-06) —
+see Landed. Only Seam 3 (the note-list overview) remains.
+
+**Plan (one seam per PR, <500-line diff).** The remaining seam is a pure
+presentational extraction to `src/ui/` — no domain logic moves, no
+layering edge crossed (`app → ui` is the allowed direction):
+
+1. ✅ **Archive view** → `src/ui/ArchivedNoteView.tsx` (ArchiveList +
+   ReadOnlyNote). Done 2026-06.
+2. ✅ **Editor surface** → `src/ui/NoteEditor.tsx` (Editor + TitleField +
+   PlainEditor + FolderPicker). Done 2026-06.
+3. **Note-list overview** → `src/ui/note-list/NoteList.tsx` (NoteList +
+   OverviewFolderHeader + FolderRenameRow, ~600 lines). Higher risk —
+   coupled to the `useNoteDropKey` / `useNoteDragAbort` drag context;
+   keep the drag-drop provider in `App` and pass through props. The shared
+   note-card primitives it renders (NoteLock / NoteCard / SwipeableNoteCard)
+   already live in `src/ui/note-list/NoteCard.tsx` — this seam just moves
+   `NoteList` itself into the same directory and imports `./NoteCard`.
+
+Optionally, fold the `pristineNew` / `discardable()` orchestration into a
+`src/app/usePristineNoteTracking.ts` hook (App-level, stays in `src/app/`).
+
+**Risk.** Drag-drop context bridge (NoteList consumes drag context the
+shell provides) and the `pristineNew` discard-tracking are the two coupled
+spots — keep both in `App`, thread callbacks down. NoteList also owns the
+desktop HTML5 drag handlers keyed off `NOTE_DND_TYPE` (the module-local
+const at the top of `App.tsx`, shared only with NoteList) — move that const
+into the new module with it. No component touches `storage.adapter`
+directly (all go through callbacks), so no storage hot-path risk. UI-only,
+so add/extend jsdom component tests for the extracted view as the seam
+exposes it. With Seams 1 & 2 landed the file is only ~1.1× the cap and the
+one remaining seam has clean internal edges, so the rubric puts it in the
+5–6 band now. **Severity: 6.**
 
 #### `src/storage/useStorageBackend.ts` — 1154 lines, four backend concerns in one hook
 
@@ -235,6 +239,17 @@ testability. **Severity: 6.**
 
 ## Landed
 
+- **2026-06 — `App.tsx` Seam 2: editor surface extracted.** Moved `Editor`,
+  `TitleField`, `PlainEditor`, and `FolderPicker` to `src/ui/NoteEditor.tsx`
+  (exporting `Editor`), leaving the `NOTE_DND_TYPE` const behind for Seam 3's
+  `NoteList`. Pure presentational extraction, no behaviour change, no layering
+  edge crossed (`app → ui`). App.tsx 1567 → 1131 lines. Exposed the
+  previously-unreachable editor surface to unit tests (added
+  `tests/ui/note-editor.test.tsx`, +6 tests covering title-buffer-then-settle,
+  body keystroke propagation, the decrypting placeholder, and the
+  folder-picker visibility gate). One seam remains (Seam 3, note-list
+  overview); the entry dropped to the 5–6 band as the file is now ~1.1× the
+  cap.
 - **2026-06 — `App.tsx` Seam 1: archive view + shared note-card primitives
   extracted.** Moved `ArchiveList` + `ReadOnlyNote` to
   `src/ui/ArchivedNoteView.tsx`, and the shared `NoteLock` / `NoteCard` /
