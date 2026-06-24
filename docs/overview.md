@@ -1168,8 +1168,9 @@ folder's subdirectory are found) into a snapshot, writes each note to its
 folder-aware path (`noteFilePath`), writes only changed notes (hash-compared),
 removes only files it authored — so a note that changes folder is moved by
 writing the new path and removing the old — and scopes conflicts per-file so
-another device's edit to a different note never blocks a save. It keeps the
-last-loaded folder registry (`lastFolders`) so the per-note encryption
+another device's edit to a different note never blocks a save. The
+[folder registry](#folders-sidecar) keeps the last-loaded folders (via
+`rememberFolders`) so its `plaintextNotePath` lets the per-note encryption
 migrate / demigrate paths resolve a grouped note's plaintext path the same way a
 save does. It remembers
 the revisions it produced to tell listing lag from a real remote edit, and
@@ -1643,11 +1644,16 @@ never lose a note, and moving a `.md` file between directories by hand doesn't
 re-file it (the next save snaps it back to match the frontmatter). The folder
 **names and any empty folders** live in a plaintext `folders.json` sidecar at
 the notes root (`FOLDERS_FILE_NAME`); an empty folder simply has no directory on
-disk until a note is filed into it. The [directory adapter](#directory-adapter)
-owns it: `readFolders` / `injectFolders` fold the registry into the loaded
-snapshot (and load a namespace whose only content is empty folders as a real,
-non-null document), and `persistFolders` writes it back when it changed (writing
-`[]` to clear a registry whose folders were all removed). `readFolders` reads
+disk until a note is filed into it. A dedicated `createFolderRegistry`
+(`src/storage/folder-registry.ts`) owns it, lifted out of the
+[directory adapter](#directory-adapter) so the sidecar's state and read-retry
+logic live (and test) on their own: `readFolders` / `injectFolders` fold the
+registry into the loaded snapshot (and load a namespace whose only content is
+empty folders as a real, non-null document), and `persistFolders` writes it back
+when it changed (writing `[]` to clear a registry whose folders were all
+removed). The adapter consumes the registry by destructuring those helpers and
+reaches its two stateful touch points via `readOk()` (the load memo gate) and
+`rememberFolders()` (the save). `readFolders` reads
 the sidecar **directly by path** rather than gating on the directory listing: a
 cloud `list()` is only eventually consistent and can omit `folders.json` right
 after a cold start (unlock on app start / upgrade reload), while a read of a
@@ -1660,7 +1666,7 @@ served from the [load memo](#directory-adapter). The read itself is also
 load's request burst, a dropped request) is not "no folders" — treating it as
 empty was a second way the registry got dropped and cached. If every attempt
 fails, `readFolders` keeps the previously-known folders and clears its
-`foldersReadOk` flag so the load is **not memoized** (and a later refresh
+read-OK flag (`readOk()`) so the load is **not memoized** (and a later refresh
 re-reads it) rather than the folderless result sticking until a rebuild. Like
 `namespaces.json`
 it stays plaintext even under encryption — names aren't secret and must be

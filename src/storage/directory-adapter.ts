@@ -61,6 +61,7 @@ import {
   isEncryptedEnvelope,
 } from "./crypto.ts";
 import { createCryptoSession } from "./crypto-session.ts";
+import { createFolderRegistry, injectFolders } from "./folder-registry.ts";
 import {
   openBytes,
   openString,
@@ -82,18 +83,13 @@ import {
   noteToMarkdown,
   snapshotToFiles,
 } from "./markdown/codec.ts";
-import {
-  parse,
-  parseFolders,
-  serialize,
-  serializeFolders,
-} from "./serialize.ts";
+import { parse, serialize } from "./serialize.ts";
 import {
   type Attachment,
   mimeForFilename,
   referencedAttachments,
 } from "../domain/attachment.ts";
-import type { Folder, Note, Snapshot } from "../domain/note.ts";
+import type { Note, Snapshot } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 
 const log = createLogger("sync");
@@ -111,13 +107,10 @@ export const BLOB_FILE_NAME = "notes.json";
 // it); re-exported here so the encryption representation's path set stays
 // importable from this module.
 export { KEY_PARAMS_FILE } from "./crypto-session.ts";
-// The folder registry sidecar (display names + empty folders), beside the note
-// files in the namespace's notes folder. Like the namespace / settings
-// registries it's plaintext JSON — folder names aren't secret, and a note's
-// `folder` frontmatter only carries the id — and metadata, not a note: it's
-// never read as a note nor removed on a representation switch. Notes carry only
-// the folder *id*; this maps id → name and keeps a folder that holds no notes.
-export const FOLDERS_FILE_NAME = "folders.json";
+// The folder registry sidecar is owned by the folder registry (it reads and
+// writes it); re-exported here so the encryption representation's path set stays
+// importable from this module.
+export { FOLDERS_FILE_NAME } from "./folder-registry.ts";
 // Suffix of an encrypted per-note file. The stem is the opaque keyed-HMAC ref.
 const ENC_SUFFIX = ".enc";
 // The encrypted note-index sidecar (see ./note-index.ts): one sealed file
@@ -138,17 +131,6 @@ export const INDEX_FILE_NAME = ".index.bin";
 // the file remains textual to git (a single NUL byte would make git read the
 // whole file as binary, breaking `git diff`/`blame` and the review UI).
 const DEFERRED_SOURCE = "<<deferred-note: body not loaded>>";
-
-// The folder sidecar read is retried so a transient cloud failure (a cold-start
-// 429 from the load's request burst, a dropped request) isn't mistaken for "no
-// folders" — which would drop the whole registry. A few short, backing-off
-// attempts comfortably outlast a brief rate-limit window without stalling a
-// genuinely folder-less load for long.
-const FOLDERS_READ_ATTEMPTS = 3;
-const FOLDERS_READ_BACKOFF_MS = 250;
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
 
 // How many encrypted note files to read + decrypt at once during an unlock /
 // encrypted load. Sequential decryption made a cold load O(notes) network
@@ -418,113 +400,15 @@ export function createDirectoryAdapter(
   let attachmentsTouched = false;
   const uncertain = new Set<string>();
 
-  // The canonical JSON of the folder registry as it currently stands on disk
-  // (null = no `folders.json` sidecar exists). Set on every load and after each
-  // write so `save` skips a redundant rewrite when the folders didn't change.
-  let lastFoldersJson: string | null = null;
-
-  // The folder registry from the last load / save, kept so the per-note
-  // encryption migrate / demigrate paths (which only receive a `Note`) can
-  // resolve a note's physical folder directory the same way `snapshotToFiles`
-  // does. The plaintext `.md` of a grouped note lives at `<folder-dir>/<stem>.md`.
-  let lastFolders: Folder[] = [];
-
-  // Whether the last `readFolders` actually read the sidecar (vs. a thrown,
-  // retried-out failure). When false the load isn't memoized, so a transient
-  // read failure can't cache a folderless registry — a later refresh re-reads
-  // it instead of the adapter having to be rebuilt.
-  let foldersReadOk = true;
-
-  // The path a note's plaintext `.md` file lives at, folder-aware.
-  function plaintextNotePath(note: Note): string {
-    return noteFilePath(note, lastFolders);
-  }
-
-  // Read the folder registry sidecar, tolerating a missing file by yielding no
-  // folders. Records the canonical bytes so the next save can tell whether the
-  // registry actually changed, and sets `foldersReadOk` so the caller can avoid
-  // memoizing (or persisting over) a registry it couldn't actually read.
-  //
-  // The sidecar is read directly rather than gated on the directory listing: a
-  // cloud `list()` is only eventually consistent — right after startup Dropbox's
-  // `list_folder` can omit `folders.json` even though it's really there — while
-  // a read of a known path is strongly consistent. The folders are the
-  // registry's, so this also keeps *empty* folders — the ones no note links to —
-  // which a notes-only reconstruction would lose.
-  //
-  // A *failed* read (a thrown error — a cold-start 429 from the load's request
-  // burst, a dropped request) is NOT "no folders": treating it as empty dropped
-  // the whole registry and the load memo cached that folderless snapshot until
-  // the adapter was rebuilt (the "switch namespaces back and forth" workaround).
-  // So the read is retried a few times, and if it still fails the previously
-  // known folders are kept and `foldersReadOk` is cleared so the load isn't
-  // memoized and a later refresh re-reads instead of serving the empty result.
-  async function readFolders(): Promise<Folder[]> {
-    let raw: string | null = null;
-    foldersReadOk = false;
-    for (let attempt = 0; attempt < FOLDERS_READ_ATTEMPTS; attempt += 1) {
-      try {
-        raw = await store.read(FOLDERS_FILE_NAME);
-        foldersReadOk = true;
-        break;
-      } catch (err) {
-        log.warn(
-          `${options.id} folders: read failed (attempt ${attempt + 1}/${FOLDERS_READ_ATTEMPTS})`,
-          err,
-        );
-        if (attempt < FOLDERS_READ_ATTEMPTS - 1) {
-          await sleep(FOLDERS_READ_BACKOFF_MS * (attempt + 1));
-        }
-      }
-    }
-    if (!foldersReadOk) {
-      // Couldn't read the sidecar — keep whatever we last knew rather than
-      // clobbering it with an empty registry the listing can't vouch for.
-      log.warn(
-        `${options.id} folders: read failed — keeping ${lastFolders.length} known folder(s)`,
-      );
-      return lastFolders;
-    }
-    if (raw === null) {
-      lastFoldersJson = null;
-      lastFolders = [];
-      return [];
-    }
-    let folders: Folder[];
-    try {
-      folders = parseFolders(JSON.parse(raw));
-    } catch {
-      folders = [];
-    }
-    lastFoldersJson = serializeFolders(folders);
-    lastFolders = folders;
-    log.info(`${options.id} folders: read ${folders.length}`);
-    return folders;
-  }
-
-  // Fold the registry's folders into a snapshot's text on load — the notes are
-  // rebuilt from the `.md` / `.enc` files and carry only a folder *id*, so the
-  // names (and any empty folders) come from the sidecar. The legacy single-blob
-  // envelope is opaque, so it's left untouched.
-  function injectFolders(text: string, folders: readonly Folder[]): string {
-    if (folders.length === 0 || isEncryptedEnvelope(text)) return text;
-    const snap = parse(text);
-    snap.folders = [...folders];
-    return serialize(snap);
-  }
-
-  // Write the folder registry sidecar when it changed. Writes `[]` to clear a
-  // sidecar whose folders were all removed; skips entirely on a folder-less
-  // document that never had one, so a plain note folder gains no stray file.
-  async function persistFolders(snapshot: Snapshot | null): Promise<void> {
-    if (!snapshot) return;
-    const folders = snapshot.folders ?? [];
-    if (folders.length === 0 && lastFoldersJson === null) return;
-    const json = serializeFolders(folders);
-    if (json === lastFoldersJson) return;
-    await store.write(FOLDERS_FILE_NAME, json);
-    lastFoldersJson = json;
-  }
+  // The folder-registry concern: the `folders.json` sidecar (display names +
+  // empty folders) and the in-memory state derived from it. `readFolders` /
+  // `persistFolders` move the sidecar's bytes; `plaintextNotePath` resolves a
+  // note's folder-aware `.md` path against the last-known registry; the load
+  // gates its memo on `readOk()` and the save records its registry via
+  // `rememberFolders`. (`injectFolders` is the pure fold-into-snapshot helper,
+  // imported as a module function since it carries no state.)
+  const folderRegistry = createFolderRegistry({ store, id: options.id });
+  const { readFolders, persistFolders, plaintextNotePath } = folderRegistry;
 
   // Per-note upload progress: the ids of notes whose file is being written to
   // the backend right now. `save` marks a note's id while its `store.write` is
@@ -981,7 +865,8 @@ export function createDirectoryAdapter(
       // Only memoize when the folder sidecar was actually read — otherwise a
       // transient folders-read failure would cache the folderless result and
       // serve it until the adapter is rebuilt (the bug this guards).
-      if (foldersReadOk) lastLoad = { key: fingerprint, snapshot: result };
+      if (folderRegistry.readOk())
+        lastLoad = { key: fingerprint, snapshot: result };
       return result;
     }
 
@@ -997,7 +882,8 @@ export function createDirectoryAdapter(
         ? await hydrateAttachments(text)
         : text;
     const result = { text: injectFolders(hydrated, folders), revision };
-    if (foldersReadOk) lastLoad = { key: fingerprint, snapshot: result };
+    if (folderRegistry.readOk())
+      lastLoad = { key: fingerprint, snapshot: result };
     return result;
   }
 
@@ -1323,7 +1209,7 @@ export function createDirectoryAdapter(
       snapshotForAttachments = snapshot;
       // Remember the registry so the encryption migrate / demigrate paths can
       // resolve a note's physical folder directory the same way this save does.
-      lastFolders = snapshot.folders ?? [];
+      folderRegistry.rememberFolders(snapshot.folders ?? []);
       for (const note of snapshot.notes) {
         pathToNoteId.set(noteFilePath(note, snapshot.folders), note.id);
       }
