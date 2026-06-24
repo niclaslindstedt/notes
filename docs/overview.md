@@ -53,7 +53,7 @@ public pages are English-only and bypass i18n.
 
 ### Note list / overview
 
-`NoteList` in `src/app/App.tsx` — the main screen. Renders the visible note
+`NoteList` (`src/ui/note-list/NoteList.tsx`) — the main screen. Renders the visible note
 set (`notes` from `useNotes`: active, non-blank, sorted newest-edited) as a
 column of `NoteCard`s, with pull-to-refresh on remote backends and a control
 to create a new note. Tapping a card opens it in the `Editor`; the empty state
@@ -65,7 +65,7 @@ document lands.
 
 ### Note card
 
-`NoteCard` / `SwipeableNoteCard` in `src/app/App.tsx` — one note in the
+`NoteCard` / `SwipeableNoteCard` (`src/ui/note-list/NoteCard.tsx`) — one note in the
 overview. Shows the note's title (`noteTitle`), plus a **lock** (`LockIcon`,
 rendered by the local `NoteLock` helper) when the note and all its attachments
 are encrypted at rest (the per-note status from the
@@ -106,7 +106,7 @@ cards too.
 
 ### Archive view
 
-`ArchiveList` and `ReadOnlyNote` in `src/app/App.tsx`, shown when
+`ArchiveList` and `ReadOnlyNote` (`src/ui/ArchivedNoteView.tsx`), shown when
 `view === "archive"`. Lists archived notes (`archived` from `useNotes`,
 i.e. `archivedNotes` + `sortByUpdated`); tapping one opens it read-only in
 `ReadOnlyNote`, from which it can be restored (`restore`) or deleted.
@@ -256,7 +256,7 @@ keystroke, which is why it lives in `domain/`.
 
 ### Title field
 
-`TitleField` in `src/app/App.tsx` — the note's title field above the editor. It
+`TitleField` (`src/ui/NoteEditor.tsx`) — the note's title field above the editor. It
 is an auto-growing textarea, so a long title wraps onto further lines and the
 field grows to fit instead of scrolling out of view. A single-line title is
 vertically centred against the back button and the copy/sync buttons; once it
@@ -1516,7 +1516,7 @@ zone); on a touchscreen it's a **press-and-hold** gesture (see
 
 ### Folders in the overview
 
-`NoteList` (`src/app/App.tsx`) mirrors the same grouping: with at least one
+`NoteList` (`src/ui/note-list/NoteList.tsx`) mirrors the same grouping: with at least one
 folder it renders a collapsible section per folder (each a drop target, with a
 "New note" shortcut) followed by the ungrouped notes under a "No folder" label
 (itself the drop zone for moving a note out). Cards drag onto folders exactly
@@ -1525,7 +1525,7 @@ touch. With no folders it falls back to the flat list unchanged.
 
 Each folder header carries the same hidden edit + delete actions the side
 menu's [`FolderRow`](#folders-in-the-side-menu) does (`OverviewFolderHeader` in
-`src/app/App.tsx`): a **left swipe** latches open an `[edit | delete]` strip on
+`src/ui/note-list/NoteList.tsx`): a **left swipe** latches open an `[edit | delete]` strip on
 touch (`useSwipeReveal`, no archive analogue so a right swipe is inert), and a
 **right-click** opens the same two actions on a computer (`RowActionMenu`).
 Editing swaps the header for the inline `FolderRenameRow` name editor (the
@@ -1594,7 +1594,7 @@ both namespaces, the one rough edge of the cross-document move).
 
 ### Folder picker
 
-`FolderPicker` (`src/app/App.tsx`) is a compact `SelectPicker` in the editor
+`FolderPicker` (`src/ui/NoteEditor.tsx`) is a compact `SelectPicker` in the editor
 header (shown only when folders exist) listing "No folder" plus every folder —
 the cross-platform way to file the open note, since it works on touch where
 drag-and-drop doesn't. Choosing an entry calls `moveNote` for the open note.
