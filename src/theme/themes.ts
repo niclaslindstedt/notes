@@ -286,21 +286,16 @@ export function isFolderPlacement(v: unknown): v is FolderPlacement {
   return v === "top" || v === "mixed";
 }
 
-// What the side menu sorts notes (and, under `mixed` placement, folders) by.
-// `modified` keeps the most-recently-edited first (the historical order);
-// `name` sorts alphabetically by title. A side-menu layout preference that
-// rides alongside the appearance settings.
-export type NoteSortKey = "modified" | "name";
-
-export const NOTE_SORT_KEYS: readonly NoteSortKey[] = ["modified", "name"];
-
-// Last-modified is the default — the drawer has always led with what you
-// touched most recently.
-export const DEFAULT_NOTE_SORT_KEY: NoteSortKey = "modified";
-
-export function isNoteSortKey(v: unknown): v is NoteSortKey {
-  return v === "modified" || v === "name";
-}
+// The side-menu sort preference lives in `domain/note.ts` next to the pure
+// sort helpers that consume it (and its sibling preference types `CopyScope` /
+// `DefaultTitleScheme`); re-exported here so the appearance store and its
+// settings UI keep importing it from the theme layer.
+export {
+  type NoteSortKey,
+  NOTE_SORT_KEYS,
+  DEFAULT_NOTE_SORT_KEY,
+  isNoteSortKey,
+} from "../domain/note.ts";
 
 export type RadiusPreset = "none" | "sm" | "md" | "lg";
 export type DensityPreset = "compact" | "comfortable" | "spacious";

@@ -115,23 +115,19 @@ backend touched if any (Dropbox / Google Drive have no Vitest reach).
 Pin the round-trip behaviour with a serialize/migrate test against the
 local adapter before moving anything. **Severity: 8.**
 
-#### `src/ui/SideMenu.tsx` — 1561 lines, sort helpers + container + eight sub-components
+#### `src/ui/SideMenu.tsx` — 1489 lines, container + eight sub-components
 
-**Smell.** 561 lines over the cap. Mixes pure note/folder **sort helpers**
-(`sortNotesBy`, `folderModifiedAt`, `sortFoldersBy`, `mixTopLevel`,
-lines ~123–197) with the SideMenu container and eight presentational
-sub-components (SectionHeader, FolderRow, FolderEditRow, NavItem,
-BarButton, SwipeToRemove, MenuButton, MenuLink). The sort helpers are pure
-note-model logic sitting in a UI file. Re-verify with `wc -l src/ui/SideMenu.tsx`.
+**Smell.** 489 lines over the cap. The SideMenu container plus eight
+presentational sub-components (SectionHeader, FolderRow, FolderEditRow,
+NavItem, BarButton, SwipeToRemove, MenuButton, MenuLink). The pure sort
+helpers that previously lived here (step 1) have been relocated to
+`src/domain/note.ts`; the remaining concern is splitting the presentational
+sub-components out of the container. Re-verify with `wc -l src/ui/SideMenu.tsx`.
 
 **Plan (multi-PR).**
 
-1. **Easy win first:** the sort/grouping helpers are pure functions over
-   the note model — relocate them to `src/domain/` (or a
-   `src/domain/note-sort.ts`) where they belong and are trivially
-   unit-testable, importing back into SideMenu. This is the highest-value
-   slice: it both shrinks the file and corrects a layering smell. Add
-   domain tests for each helper in the same PR (~60 lines moved).
+1. ~~**Easy win first:** relocate the pure sort/grouping helpers to
+   `src/domain/`.~~ **Done 2026-06** — see Landed.
 2. **Footer** → `src/ui/SideMenuFooter.tsx` (~85 lines, self-contained,
    zero shared state).
 3. **Action bar** → `src/ui/SideMenuActionBar.tsx` (~65 lines, the
@@ -143,10 +139,9 @@ note-model logic sitting in a UI file. Re-verify with `wc -l src/ui/SideMenu.tsx
 
 **Risk.** The list extraction (Seam 4) carries the drag/expand/rename
 state coupling; the namespace-switcher/footer floating-panel anchor must
-move together or stay together. The sort-helper relocation (step 1) is the
-safe, high-leverage starting point and is partially an **easy win** —
-pure-function move with new domain tests. No storage hot-path. **Severity: 6**
-(with a 3-rated easy-win slice inside it — step 1).
+move together or stay together. The footer and action-bar extractions
+(steps 2–3) are the safe next slices — self-contained presentational islands.
+No storage hot-path. **Severity: 6.**
 
 ### Severity 5–6 — friction
 
@@ -189,15 +184,31 @@ testability. **Severity: 6.**
 
 ### Easy wins
 
-- **Relocate SideMenu's pure sort/grouping helpers to `src/domain/`** — see
-  the SideMenu entry, step 1. Pure-function move with N≥1 call site today,
-  corrects a domain-logic-in-UI layering smell, and unlocks cheap domain
-  tests. **Severity: 3.**
+_(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ---
 
 ## Landed
 
+- **2026-06 — `SideMenu.tsx` Seam 1 (easy win): pure sort/grouping helpers
+  relocated to `src/domain/`.** Moved `sortNotesBy`, `folderModifiedAt`,
+  `sortFoldersBy`, `mixTopLevel`, and the `TopLevelItem` type out of the UI
+  file into `src/domain/note.ts` (next to the existing `sortByUpdated` /
+  `sortFoldersByCreated`), correcting a domain-logic-in-UI layering smell.
+  To keep the relocated helpers framework-free, also moved the `NoteSortKey`
+  preference type (+ `NOTE_SORT_KEYS`, `DEFAULT_NOTE_SORT_KEY`, `isNoteSortKey`)
+  from `src/theme/themes.ts` into `src/domain/note.ts` beside its sibling
+  preference types `CopyScope` / `DefaultTitleScheme`; `themes.ts` now
+  re-exports them so the appearance store and settings UI import paths are
+  unchanged. Adding them to `note.ts` (rather than a new `note-sort.ts`
+  importing `NoteSortKey` back from `theme/`) avoids both a `note.ts ↔
+  themes.ts` import cycle and a new `domain → theme` inversion. Pure
+  relocation, no behaviour change; exposed the previously-untestable helpers
+  to unit tests (added `tests/domain/note-sort.test.ts`, +13 tests covering
+  both sort keys, the case-insensitive ordering, the empty-folder modified-time
+  fallback, no-mutation, and the `mixed`-placement interleave). SideMenu
+  1561 → 1489 lines; `note.ts` 406 → 502. Steps 2–4 (footer, action bar, list /
+  namespace switcher) remain in Pending.
 - **2026-06 — `App.tsx` Seam 3 (final): note-list overview extracted —
   decomposition complete.** Moved `NoteList`, `OverviewFolderHeader`, and
   `FolderRenameRow` (plus the `NOTE_DND_TYPE` / `FOLDER_ACTION_W` module
