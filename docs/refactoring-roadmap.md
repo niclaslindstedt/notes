@@ -69,35 +69,38 @@ _(none)_
 
 ### Severity 7–8 — multipliers
 
-#### `src/storage/directory-adapter.ts` — 1811 lines, the shared base every file/cloud backend threads through
+#### `src/storage/directory-adapter.ts` — 1766 lines, the shared base every file/cloud backend threads through
 
-**Smell.** 811 lines over the cap, no opt-out — the shared `StorageAdapter`
+**Smell.** 766 lines over the cap, no opt-out — the shared `StorageAdapter`
 base for the folder, Dropbox, and Google-Drive backends. One file tangles
-six concerns: the markdown/path codec glue and types (1–403), the adapter
-closure state (revision tracking, folder registry, encryption caches,
-404–642), the load path (643–1082), attachment reconcile
-(plaintext + encrypted, 1083–1221), the save/conflict path (1224–1512),
-and the atomic plain↔encrypted migration converters (1517–1811). Because
-**every** file/cloud backend runs through it, it is the highest-multiplier
-file in the storage layer. Re-verify with `wc -l src/storage/directory-adapter.ts`.
+several concerns: the markdown/path codec glue and types, the adapter
+closure state (revision tracking, folder registry), the load path,
+attachment reconcile (plaintext + encrypted), the save/conflict path, and
+the atomic plain↔encrypted migration converters. Because **every**
+file/cloud backend runs through it, it is the highest-multiplier file in the
+storage layer. Re-verify with `wc -l src/storage/directory-adapter.ts`.
 
 **Plan (multi-PR, one seam per PR, lowest-coupling first).** All seams are
 pure relocations of sibling helpers out of the closure — the
 `StorageAdapter` contract is unchanged and stays interchangeable:
 
-1. **Crypto session** → `src/storage/crypto-session.ts` (~80 lines:
-   `ensureKeys()`, `cachedRef()`, key/ref/note caches). Lowest coupling,
-   self-contained cache management.
+1. ~~**Crypto session** → `src/storage/crypto-session.ts`
+   (`ensureKeys()`, `cachedRef()`, key/ref/note caches).~~ **Done 2026-06** —
+   see Landed. The adapter destructures `{ ensureKeys, cachedRef,
+   encNoteCache }` from `createCryptoSession`, so the load/save/migration call
+   sites are unchanged; `lastLoad` stays in the adapter and is cleared via the
+   session's `onKeysInvalidated` callback.
 2. **Folder registry** → `src/storage/folder-registry.ts` (~140 lines:
    `readFolders()` + retry, `injectFolders()`, `persistFolders()` and its
-   state). Orthogonal to crypto/tracking.
+   state). Orthogonal to crypto/tracking. **Next — lowest remaining coupling.**
 3. **Attachment reconcile** → `src/storage/attachment-reconcile.ts`
    (~150 lines: the plaintext + encrypted write/remove helpers).
 4. **Migration converters** → `src/storage/migration-converters.ts`
    (~180 lines: `migrateNote()`, `demigrateNote()`, `splitLegacyBlob()`).
-   Highest coupling — depends on seams 1 & 3 — do last.
+   Highest coupling — depends on seam 3 and the crypto session — do last.
 
-Extracting ~550 lines leaves the adapter around ~750, under the cap.
+Each remaining seam shaves the adapter toward the cap; the three together
+leave it around ~750 lines.
 
 **Risk — HIGH, and there is no automated cloud coverage.** This is the most
 dangerous file in the tree to refactor: several seams carry silent
@@ -182,6 +185,33 @@ and the lockstep `applyPassword` state+ref update must be preserved exactly.
 Start with encryption (step 1) where the seam is cleanest and adds
 testability. **Severity: 6.**
 
+#### `src/storage/directory-adapter.ts` — `DEFERRED_SOURCE` embeds NUL bytes, so git reads the file as binary
+
+**Smell.** The deferred-note tracked-source sentinel is declared as
+`const DEFERRED_SOURCE = "\0deferred\0"` — the two delimiters around `deferred`
+are literal NUL (`\x00`) bytes, not spaces. A single NUL anywhere makes git
+classify the **entire** 1766-line file as binary, so `git diff` / `git blame`
+/ the review UI all show "Binary files differ" instead of a textual diff. That
+directly taxes the multi-PR split above (Seams 2–4): the highest-multiplier
+storage file can't be reviewed as a diff. Re-verify with
+`sed -n '/DEFERRED_SOURCE/p' src/storage/directory-adapter.ts | od -c`.
+
+**Plan.** Replace the NUL delimiters with a printable sentinel that still
+can't collide with a real note's plaintext source — e.g. a control-free marker
+like `" "`-free `"·deferred·"` won't do (still risks collision); prefer a
+prefix a serialized note can never start with, such as the existing
+markdown-frontmatter shape inverted, or simply a sufficiently improbable ASCII
+string documented as "must never equal a real note source". Confirm the
+sentinel is only ever hashed/compared in-memory (it is — `track()` hashes it
+and it is never persisted) so the value is free to change, then pin the
+deferred-note round-trip with a test before swapping it.
+
+**Risk.** Low-to-medium. The NUL is **likely deliberate** collision-proofing
+(no real markdown body contains a NUL), so the change must keep the
+collision-proof property; verify against the encrypted index/deferred-load
+tests in `directory-adapter-encrypted.test.ts`. No on-disk format changes.
+**Severity: 5.**
+
 ### Easy wins
 
 _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
@@ -190,6 +220,30 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `directory-adapter.ts` Seam 1: crypto session extracted.**
+  Moved the per-session encryption state and helpers — `keyCache`, `refCache`,
+  `encNoteCache`, `lastPassword`, `ensureKeys()`, `cachedRef()`, and the
+  `KEY_PARAMS_FILE` salts-file constant — out of the `createDirectoryAdapter`
+  closure into a `createCryptoSession` factory in
+  `src/storage/crypto-session.ts` (112 lines). The adapter destructures
+  `{ ensureKeys, cachedRef, encNoteCache }` from the session, so every
+  load/save/migration call site is unchanged; the plaintext-safe `lastLoad`
+  load memo stays in the adapter and is cleared via the session's
+  `onKeysInvalidated` callback (preserving the "drop every key-derived cache
+  exactly once per passphrase transition" behaviour verbatim). To avoid a
+  circular import the session takes only `passwordRef` (not the whole
+  `DirectoryCrypto`), and `KEY_PARAMS_FILE` is re-exported from
+  `directory-adapter.ts` so the test's import path is unchanged. Pure
+  relocation, no behaviour change — the contract that `save`, `attBlobPath`,
+  and `migrateNote` all derive refs from the *same* session keys is now
+  structurally enforced by there being a single session instance. Exposed the
+  previously-closure-bound cache logic to direct unit tests (added
+  `tests/storage/crypto-session.test.ts`, +7 tests covering the no-passphrase
+  null path, first-unlock key-params creation, key caching, params reuse, ref
+  memoisation, and the once-per-transition cache-drop + `onKeysInvalidated`
+  invariant). All 159 storage tests stay green; `directory-adapter.ts` holds
+  95% line coverage. directory-adapter 1811 → 1766 lines. Seams 2–4 (folder
+  registry, attachment reconcile, migration converters) remain in Pending.
 - **2026-06 — `SideMenu.tsx` Seam 1 (easy win): pure sort/grouping helpers
   relocated to `src/domain/`.** Moved `sortNotesBy`, `folderModifiedAt`,
   `sortFoldersBy`, `mixTopLevel`, and the `TopLevelItem` type out of the UI
