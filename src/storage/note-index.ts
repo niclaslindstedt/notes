@@ -4,8 +4,8 @@
 // **not** the note bodies. It exists so unlocking a large encrypted vault is one
 // read + one decrypt (render the whole list instantly) instead of reading and
 // decrypting every per-note `.enc` file up front; each note's body is then
-// decrypted lazily when the note is opened (and warmed in the background for
-// offline use). See `docs/overview.md#encryption`.
+// decrypted lazily (and cached for offline reopen) when the note is opened. See
+// `docs/overview.md#encryption`.
 //
 // The index is a pure **optimisation**, never the source of truth: the per-note
 // `.enc` files and the directory listing remain authoritative. On load the

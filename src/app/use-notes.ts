@@ -7,7 +7,7 @@
 // the sync state back up for the header indicator and the unlock / conflict
 // surfaces.
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
 import { unlock } from "../achievements/index.ts";
 import { type Attachment, withAttachment } from "../domain/attachment.ts";
@@ -32,12 +32,6 @@ import { importedNote } from "../domain/import.ts";
 import type { StorageAdapter } from "../storage/adapter.ts";
 import { useNotesSync, type NotesSync } from "./use-notes-sync.ts";
 import { useUndoRedo } from "./use-undo-redo.ts";
-
-// Pause between background-warm decryptions. Long enough to keep the warm pass
-// low-priority — it never bursts the cloud API or competes with the user's
-// typing — short enough that a modest vault finishes warming within seconds of
-// unlock so offline access is ready quickly.
-const WARM_DELAY_MS = 40;
 
 export type NotesStore = {
   // Most-recently-edited first, with blank (never-typed) notes hidden — the
@@ -206,8 +200,8 @@ export function useNotes(
   // first when it's deferred. The encrypted save never rewrites a deferred note
   // (its body isn't in memory to seal), so a metadata edit — retitle, archive,
   // move — must promote the note to loaded first, or the change wouldn't reach
-  // its `.enc` file. Runs synchronously when the body is already loaded (the
-  // common case once the background warm has run), so it adds no latency then.
+  // its `.enc` file. Runs synchronously when the body is already loaded (an
+  // already-open note), so it adds no latency in that case.
   const withBody = useCallback(
     (id: string, run: () => void): void => {
       const note = docRef.current.notes.find((n) => n.id === id);
@@ -418,47 +412,6 @@ export function useNotes(
     },
     [commitSnapshot, ensureBody],
   );
-
-  // Background warm: after the list renders from the index, quietly decrypt the
-  // remaining deferred bodies so they're cached for offline use (and instant to
-  // open) — the "lazy, but warm in the background" half of fast unlock. Low
-  // priority: one note at a time with a short yield between, so it never bursts
-  // the cloud API or janks the UI, and it picks up notes lazily so a vault that
-  // grows mid-warm is still covered. Opening a note still fetches on demand, so
-  // anything not yet warmed is never blocked on this loop. No-op on backends
-  // that don't defer bodies (`fetchNoteBody` absent, or no deferred notes).
-  const notesRef = useRef(notes);
-  notesRef.current = notes;
-  const warmedIds = useRef<Set<string>>(new Set());
-  // A new backend / namespace is a fresh vault — forget what we warmed.
-  useEffect(() => {
-    warmedIds.current = new Set();
-  }, [adapter]);
-  useEffect(() => {
-    if (!sync.loaded || !adapter.fetchNoteBody) return;
-    let cancelled = false;
-    void (async () => {
-      for (;;) {
-        if (cancelled) return;
-        const next = notesRef.current.find(
-          (n) => n.body === undefined && !warmedIds.current.has(n.id),
-        );
-        if (!next) return;
-        warmedIds.current.add(next.id);
-        try {
-          await adapter.fetchNoteBody!(next);
-        } catch {
-          // Offline or gone — leave it for an on-open fetch to retry.
-        }
-        await new Promise<void>((resolve) =>
-          setTimeout(resolve, WARM_DELAY_MS),
-        );
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [sync.loaded, adapter]);
 
   const undo = useCallback(() => {
     undoTimeline();

@@ -110,7 +110,7 @@ export type StorageAdapter = {
   // Optional on-demand fetch of one note's body, the lazy counterpart of the
   // encrypted index load: an encrypted vault unlocks by rendering the list from
   // a small encrypted index with every body deferred, then this decrypts a
-  // single note's `.enc` when it is opened (or warmed in the background). Returns
+  // single note's `.enc` when it is opened. Returns
   // the body text, or null when the backend doesn't defer bodies (the body is
   // already loaded) or the note file is missing. Only the encrypted file
   // backends implement it.

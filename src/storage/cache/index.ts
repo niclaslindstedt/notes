@@ -48,9 +48,9 @@ const log = createLogger("cache");
 const LOAD_OFFLINE_RETRIES = 2;
 
 // Debounce before the per-note body mirror is sealed + written. Long enough
-// that a whole-vault background warm (one body every few tens of ms) coalesces
-// into a single seal once it settles, rather than re-sealing per note — the
-// seal is a deliberately slow whole-document PBKDF2 envelope.
+// that a burst of note-opens coalesces into a single seal once it settles,
+// rather than re-sealing per note — the seal is a deliberately slow
+// whole-document PBKDF2 envelope.
 const BODY_FLUSH_DEBOUNCE_MS = 1000;
 
 const defaultSleep = (ms: number): Promise<void> =>
@@ -182,11 +182,12 @@ export function withLocalCache(
   //
   // On the encrypted file/cloud backends the main mirror holds the *deferred*
   // document — metadata + previews, no note bodies — so it alone can't open a
-  // note offline. The background warm pass (and each note-open) fetches bodies
-  // through this wrapper; we mirror them here, in one sealed blob keyed by note
-  // id, so an offline reopen (even after an app restart) can serve them. The map
-  // is sealed/written debounced — once per warm burst — so a whole-vault warm
-  // pays the (deliberately slow) seal once, not per note.
+  // note offline. Each note-open fetches its body through this wrapper; we
+  // mirror the body here, in one sealed blob keyed by note id, so a note you've
+  // opened stays available offline (even after an app restart). Progressive: a
+  // note becomes offline-readable once opened; never-opened notes need a
+  // connection the first time. The map is sealed/written debounced so a burst of
+  // opens pays the (deliberately slow) seal once, not per note.
   const bodiesKey = `${key}:bodies`;
   let bodyMap: Map<string, string> | null = null;
   let bodyFlushTimer: ReturnType<typeof setTimeout> | null = null;

@@ -1266,8 +1266,9 @@ from `""`), and the in-memory `preview` carries the list text meanwhile. Opening
 a note calls `fetchNoteBody` (the body's counterpart to `fetchAttachment`),
 which decrypts just that note's `.enc`; the editor shows a "Decrypting…"
 placeholder and withholds editing until it lands, so a keystroke can't overwrite
-the unloaded body. A low-priority **background warm** (`use-notes.ts`) then
-quietly decrypts the rest so they're cached for offline use and instant to open.
+the unloaded body. Offline is **progressive**: a note becomes readable offline
+once it has been opened (its body is cached on first open); a note never opened
+needs a connection the first time.
 The index is a pure **optimisation, never the source of truth**: the per-note
 files + the listing stay authoritative, so it's written best-effort (last-writer-
 wins, *never* conflict-checked — which is what keeps per-file sync working), and
@@ -1277,9 +1278,10 @@ Because a deferred note's body isn't in memory, the save planner **skips** it
 (never re-writing it body-less, never removing it as an orphan) and attachment
 reconciliation keeps all of its declared blobs; a metadata edit (retitle /
 archive / move) loads the body first so the `.enc` is rewritten faithfully.
-Offline bodies ride a second sealed mirror in `withLocalCache` (`<key>:bodies`),
-written debounced — once per warm burst — so a whole-vault warm pays the
-deliberately-slow seal once rather than per note.
+Bodies you've opened ride a second sealed mirror in `withLocalCache`
+(`<key>:bodies`), written debounced so a burst of opens pays the deliberately-
+slow seal once rather than per note — which is what makes an opened note
+reopenable offline.
 
 The encrypted load is also **cached** so the same notes are never decrypted
 twice needlessly. Every `load()` still runs a fresh `store.list()` (so it can
@@ -1287,8 +1289,8 @@ never serve data staler than the backend), but keys two in-memory caches off the
 revisions that listing reports: a **load memo** returns the previously-built
 snapshot whole when the entire listing is byte-identical, and a **per-note
 cache** (`encNoteCache`, keyed by `<path>@<rev>`) reuses each note's already-
-unsealed JSON (so an opened or warmed body stays loaded across reloads, and a
-one-note remote edit re-decrypts one note). Both caches are dropped whenever the
+unsealed JSON (so an opened body stays loaded across reloads, and a one-note
+remote edit re-decrypts one note). Both caches are dropped whenever the
 keys change (lock / unlock / passphrase switch). A fully-migrated vault also
 skips the attachment listing on load entirely (each encrypted note already
 carries its attachment metadata in its own JSON, as does the index), walking it

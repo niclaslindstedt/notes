@@ -170,9 +170,9 @@ export function HomePage() {
               A green lock fills in note-by-note as the app seals them.
               Unlocking is instant however many notes you have — the list opens
               from a small encrypted index, and each note&apos;s text is
-              decrypted the moment you open it (and quietly warmed in the
-              background for offline use), so an opened note downloads only its
-              own body and attachments.
+              decrypted the moment you open it, so an opened note downloads only
+              its own body and attachments and stays readable offline once
+              you&apos;ve opened it.
             </li>
           </ul>
         </Section>
