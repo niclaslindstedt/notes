@@ -127,7 +127,8 @@ export function HomePage() {
             <li>
               Organise the notes within a namespace into <em>folders</em> — make
               one from the side menu, then drag notes into it or create new ones
-              straight inside it.
+              straight inside it. Drag a whole folder onto another namespace to
+              move it there with everything in it.
             </li>
             <li>
               Pick a theme and appearance that suits you — including whether the

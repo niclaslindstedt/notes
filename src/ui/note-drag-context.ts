@@ -22,9 +22,12 @@ import {
 // resolves it to an action:
 //   - `NOTE_DROP_ROOT`    — the "ungrouped" zone (take the note out of its folder)
 //   - `NOTE_DROP_ARCHIVE` — the Archive row (archive the note)
-//   - `ns:<slug>`         — a namespace row (move the note to that namespace)
+//   - `ns:<slug>`         — a namespace row (move the dragged item to that namespace)
 //   - anything else       — a folder id (file the note into that folder)
-// The namespace/archive targets live in the side menu only.
+// The namespace/archive targets live in the side menu only. A dragged item is
+// either a single **note** or a whole **folder** (`DragItem.kind`); a folder
+// only resolves against a namespace target — it's moved there with all the
+// notes filed in it.
 export const NOTE_DROP_ROOT = "__root__";
 export const NOTE_DROP_ARCHIVE = "__archive__";
 export const NOTE_DROP_NS_PREFIX = "ns:";
@@ -35,13 +38,19 @@ export function noteDropNamespaceKey(slug: string): string {
   return `${NOTE_DROP_NS_PREFIX}${slug}`;
 }
 
+/** What the user picked up: a single note, or a whole folder (move-all). */
+export type DragKind = "note" | "folder";
+
+/** The thing being dragged — a note or a folder — plus the label the ghost shows. */
+export type DragItem = { kind: DragKind; id: string; title: string };
+
 // Hold this long without moving to pick a note up; abort the press if the
 // finger travels more than this many px first (it's a scroll or a swipe).
 const LONG_PRESS_MS = 320;
 const MOVE_SLOP = 10;
 
 export type DragActions = {
-  begin: (noteId: string, title: string, x: number, y: number) => void;
+  begin: (item: DragItem, x: number, y: number) => void;
   hover: (key: string | null, x: number, y: number) => void;
   commit: () => void;
   cancel: () => void;
@@ -52,6 +61,11 @@ export type DragActions = {
 // targets, which read the key, do.
 export const ActionsContext = createContext<DragActions | null>(null);
 export const DropKeyContext = createContext<string | null>(null);
+// The kind of the item currently lifted (or null when nothing is). Drop targets
+// read it so a notes-only target (a folder, the root zone, the Archive row)
+// doesn't paint a highlight while a *folder* is being dragged over it — only
+// namespace rows accept a folder.
+export const DragKindContext = createContext<DragKind | null>(null);
 // A monotonically increasing "abort" signal the app bumps to tear down any
 // in-flight drag from outside the gesture — e.g. a sync-conflict modal has
 // surfaced over the list and seized the screen. The provider raises it; the
@@ -66,6 +80,11 @@ export function useNoteDropKey(): string | null {
   return useContext(DropKeyContext);
 }
 
+/** The kind of item being touch-dragged right now (or null when idle). */
+export function useNoteDragKind(): DragKind | null {
+  return useContext(DragKindContext);
+}
+
 /** The current drag-abort generation; changes when the app aborts in-flight
  * drags (a sync conflict, a background reload). Native HTML5 drop zones watch
  * it to clear a lift that `dragend` would otherwise never resolve. */
@@ -78,13 +97,14 @@ export type TouchDragHandlers = Partial<{
   onClickCapture: (e: ReactMouseEvent) => void;
 }>;
 
-// Pointer (touch/pen) long-press drag for one note. Returns handlers to spread
-// on the row wrapper and a `dragging` flag for the caller's lift styling. A
-// no-op (handlers omitted) when `enabled` is false — the desktop HTML5 path
-// owns the gesture there.
+// Pointer (touch/pen) long-press drag for one item (a note or a folder).
+// Returns handlers to spread on the row wrapper and a `dragging` flag for the
+// caller's lift styling. A no-op (handlers omitted) when `enabled` is false —
+// the desktop HTML5 path owns the gesture there.
 export function useTouchNoteDrag(
-  noteId: string,
+  id: string,
   title: string,
+  kind: DragKind,
   enabled: boolean,
 ): { handlers: TouchDragHandlers; dragging: boolean } {
   const actions = useContext(ActionsContext);
@@ -171,10 +191,10 @@ export function useTouchNoteDrag(
         passive: false,
       });
       navigator.vibrate?.(8);
-      actions?.begin(noteId, title, x, y);
+      actions?.begin({ kind, id, title }, x, y);
       hitTest(x, y);
     },
-    [actions, hitTest, noteId, title],
+    [actions, hitTest, id, title, kind],
   );
 
   // Move / up / cancel run off `window` for the gesture's lifetime, not the
