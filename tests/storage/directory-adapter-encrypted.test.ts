@@ -229,6 +229,38 @@ describe("directory adapter — encrypted per-file", () => {
     expect(seen.map((s) => s.index).sort()).toEqual([1, 2]);
   });
 
+  it("self-heals the index on a no-index unlock so the next is fast", async () => {
+    // The user's case: the index was removed from the remote (e.g. deleted in
+    // Dropbox). The first unlock should fall back to per-note decryption AND
+    // write a fresh index, so the *next* unlock is index-fast again.
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const notes: Note[] = [
+      { ...createNote(1), title: "Groceries", body: "milk" },
+      { ...createNote(2), title: "Trip", body: "pack" },
+    ];
+    await encAdapter(store, att, { current: "pw" }).save(serialize({ notes }));
+    store.files.delete(INDEX_FILE_NAME);
+
+    const seen1: Array<unknown> = [];
+    const a = createDirectoryAdapter(store, { id: "folder", label: "T" }, att, {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (i) => seen1.push(i) },
+    });
+    await a.load();
+    expect(seen1).toHaveLength(2); // fell back this once
+    expect(store.files.has(INDEX_FILE_NAME)).toBe(true); // self-healed
+
+    const seen2: Array<unknown> = [];
+    const b = createDirectoryAdapter(store, { id: "folder", label: "T" }, att, {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (i) => seen2.push(i) },
+    });
+    const restored = parse((await b.load())!.text).notes;
+    expect(seen2).toHaveLength(0); // index-fast: nothing decrypted up front
+    expect(restored.every((n) => n.body === undefined)).toBe(true);
+  });
+
   it("recovers folders on unlock when the listing lags but the sidecar reads", async () => {
     // The Dropbox cold-start / upgrade-reload bug: `list_folder` is eventually
     // consistent and can omit `folders.json` right after startup, so a note's
