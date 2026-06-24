@@ -7,7 +7,7 @@
 // the sync state back up for the header indicator and the unlock / conflict
 // surfaces.
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { unlock } from "../achievements/index.ts";
 import { type Attachment, withAttachment } from "../domain/attachment.ts";
@@ -32,6 +32,12 @@ import { importedNote } from "../domain/import.ts";
 import type { StorageAdapter } from "../storage/adapter.ts";
 import { useNotesSync, type NotesSync } from "./use-notes-sync.ts";
 import { useUndoRedo } from "./use-undo-redo.ts";
+
+// Pause between background-warm decryptions. Long enough to keep the warm pass
+// low-priority — it never bursts the cloud API or competes with the user's
+// typing — short enough that a modest vault finishes warming within seconds of
+// unlock so offline access is ready quickly.
+const WARM_DELAY_MS = 40;
 
 export type NotesStore = {
   // Most-recently-edited first, with blank (never-typed) notes hidden — the
@@ -69,6 +75,12 @@ export type NotesStore = {
   renameFolder: (id: string, name: string) => void;
   /** Delete a folder; its notes survive and fall back to ungrouped. */
   removeFolder: (id: string) => void;
+  // Decrypt and load a deferred note's body (the encrypted file/cloud backends
+  // render the list from an index with bodies left unloaded). Resolves once the
+  // body is in the in-memory document, or immediately when it's already loaded
+  // or the backend doesn't defer bodies. The editor calls this when a note is
+  // opened so it shows the real text rather than an empty body.
+  ensureBody: (id: string) => Promise<void>;
   /** Revert the most recent recorded edit (create / delete / edit session). */
   undo: () => void;
   /** Re-apply the most recently undone edit. */
@@ -158,6 +170,53 @@ export function useNotes(
     [commitSnapshot],
   );
 
+  // Merge a freshly-decrypted body into the on-screen document without bumping
+  // `updatedAt` or scheduling a save — loading a body to read it is not an edit.
+  // Only fills a note that's still deferred, so it can't stomp a concurrent
+  // edit that already put a real body there.
+  const mergeBody = useCallback(
+    (id: string, body: string): void => {
+      const cur = docRef.current;
+      const target = cur.notes.find((n) => n.id === id);
+      if (!target || target.body !== undefined) return;
+      const next: Snapshot = {
+        ...cur,
+        notes: cur.notes.map((n) =>
+          n.id === id ? { ...n, body, preview: undefined } : n,
+        ),
+      };
+      docRef.current = next;
+      sync.setDoc(next);
+    },
+    [sync],
+  );
+
+  const ensureBody = useCallback(
+    async (id: string): Promise<void> => {
+      const note = docRef.current.notes.find((n) => n.id === id);
+      if (!note || note.body !== undefined) return;
+      if (!adapter.fetchNoteBody) return;
+      const body = await adapter.fetchNoteBody(note);
+      if (body !== null) mergeBody(id, body);
+    },
+    [adapter, mergeBody],
+  );
+
+  // Run a mutation that rewrites a note's stored form, loading the note's body
+  // first when it's deferred. The encrypted save never rewrites a deferred note
+  // (its body isn't in memory to seal), so a metadata edit — retitle, archive,
+  // move — must promote the note to loaded first, or the change wouldn't reach
+  // its `.enc` file. Runs synchronously when the body is already loaded (the
+  // common case once the background warm has run), so it adds no latency then.
+  const withBody = useCallback(
+    (id: string, run: () => void): void => {
+      const note = docRef.current.notes.find((n) => n.id === id);
+      if (note && note.body === undefined) void ensureBody(id).then(run);
+      else run();
+    },
+    [ensureBody],
+  );
+
   // A new note opens with the title the caller supplies — the default-title
   // scheme stamps one in (date & time, or the next "Note N"); an empty title
   // leaves the note blank until it's typed into.
@@ -230,13 +289,15 @@ export function useNotes(
 
   const retitle = useCallback(
     (id: string, title: string): void => {
-      commit(
-        (prev) => prev.map((n) => (n.id === id ? retitleNote(n, title) : n)),
-        `Renamed note “${title.trim() || "Untitled note"}”`,
-        `retitle:${id}`,
+      withBody(id, () =>
+        commit(
+          (prev) => prev.map((n) => (n.id === id ? retitleNote(n, title) : n)),
+          `Renamed note “${title.trim() || "Untitled note"}”`,
+          `retitle:${id}`,
+        ),
       );
     },
-    [commit],
+    [commit, withBody],
   );
 
   const remove = useCallback(
@@ -255,24 +316,28 @@ export function useNotes(
     (id: string): void => {
       const target = docRef.current.notes.find((n) => n.id === id);
       const title = target ? noteTitle(target) : "note";
-      commit(
-        (prev) => prev.map((n) => (n.id === id ? setArchived(n, true) : n)),
-        `Archived note “${title}”`,
+      withBody(id, () =>
+        commit(
+          (prev) => prev.map((n) => (n.id === id ? setArchived(n, true) : n)),
+          `Archived note “${title}”`,
+        ),
       );
     },
-    [commit],
+    [commit, withBody],
   );
 
   const restore = useCallback(
     (id: string): void => {
       const target = docRef.current.notes.find((n) => n.id === id);
       const title = target ? noteTitle(target) : "note";
-      commit(
-        (prev) => prev.map((n) => (n.id === id ? setArchived(n, false) : n)),
-        `Restored note “${title}”`,
+      withBody(id, () =>
+        commit(
+          (prev) => prev.map((n) => (n.id === id ? setArchived(n, false) : n)),
+          `Restored note “${title}”`,
+        ),
       );
     },
-    [commit],
+    [commit, withBody],
   );
 
   // Move a note into a folder (or out of every folder when `folderId` is null).
@@ -283,15 +348,17 @@ export function useNotes(
       if (!target) return;
       if ((target.folderId ?? null) === folderId) return;
       const title = noteTitle(target);
-      commit(
-        (prev) =>
-          prev.map((n) => (n.id === id ? setNoteFolder(n, folderId) : n)),
-        folderId
-          ? `Moved note “${title}” to a folder`
-          : `Moved note “${title}” out of its folder`,
+      withBody(id, () =>
+        commit(
+          (prev) =>
+            prev.map((n) => (n.id === id ? setNoteFolder(n, folderId) : n)),
+          folderId
+            ? `Moved note “${title}” to a folder`
+            : `Moved note “${title}” out of its folder`,
+        ),
       );
     },
-    [commit],
+    [commit, withBody],
   );
 
   const createFolder = useCallback(
@@ -330,19 +397,68 @@ export function useNotes(
     (id: string): void => {
       const target = docRef.current.folders?.find((f) => f.id === id);
       const name = target ? target.name : "folder";
-      commitSnapshot(
-        (prev) => ({
-          ...prev,
-          folders: (prev.folders ?? []).filter((f) => f.id !== id),
-          notes: prev.notes.map((n) =>
-            n.folderId === id ? setNoteFolder(n, null) : n,
-          ),
-        }),
-        `Deleted folder “${name}”`,
-      );
+      const run = (): void =>
+        commitSnapshot(
+          (prev) => ({
+            ...prev,
+            folders: (prev.folders ?? []).filter((f) => f.id !== id),
+            notes: prev.notes.map((n) =>
+              n.folderId === id ? setNoteFolder(n, null) : n,
+            ),
+          }),
+          `Deleted folder “${name}”`,
+        );
+      // Clearing the folder rewrites every note that was in it; load any
+      // deferred ones first so the change reaches their `.enc` files.
+      const affected = docRef.current.notes
+        .filter((n) => n.folderId === id && n.body === undefined)
+        .map((n) => n.id);
+      if (affected.length === 0) run();
+      else void Promise.all(affected.map(ensureBody)).then(run);
     },
-    [commitSnapshot],
+    [commitSnapshot, ensureBody],
   );
+
+  // Background warm: after the list renders from the index, quietly decrypt the
+  // remaining deferred bodies so they're cached for offline use (and instant to
+  // open) — the "lazy, but warm in the background" half of fast unlock. Low
+  // priority: one note at a time with a short yield between, so it never bursts
+  // the cloud API or janks the UI, and it picks up notes lazily so a vault that
+  // grows mid-warm is still covered. Opening a note still fetches on demand, so
+  // anything not yet warmed is never blocked on this loop. No-op on backends
+  // that don't defer bodies (`fetchNoteBody` absent, or no deferred notes).
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const warmedIds = useRef<Set<string>>(new Set());
+  // A new backend / namespace is a fresh vault — forget what we warmed.
+  useEffect(() => {
+    warmedIds.current = new Set();
+  }, [adapter]);
+  useEffect(() => {
+    if (!sync.loaded || !adapter.fetchNoteBody) return;
+    let cancelled = false;
+    void (async () => {
+      for (;;) {
+        if (cancelled) return;
+        const next = notesRef.current.find(
+          (n) => n.body === undefined && !warmedIds.current.has(n.id),
+        );
+        if (!next) return;
+        warmedIds.current.add(next.id);
+        try {
+          await adapter.fetchNoteBody!(next);
+        } catch {
+          // Offline or gone — leave it for an on-open fetch to retry.
+        }
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, WARM_DELAY_MS),
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sync.loaded, adapter]);
 
   const undo = useCallback(() => {
     undoTimeline();
@@ -393,6 +509,7 @@ export function useNotes(
     createFolder,
     renameFolder,
     removeFolder,
+    ensureBody,
     undo,
     redo,
     canUndo,

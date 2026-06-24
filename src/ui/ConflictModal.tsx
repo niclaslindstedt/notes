@@ -26,7 +26,10 @@ type Props = {
 function summarise(doc: Snapshot): { notes: number; words: number } {
   let words = 0;
   for (const note of doc.notes) {
-    const trimmed = note.body.trim();
+    // A deferred note (body not loaded) contributes no word count — the figure
+    // is an at-a-glance "which side has more" hint, not an exact total, and the
+    // background warm pass fills bodies in shortly after unlock anyway.
+    const trimmed = (note.body ?? "").trim();
     if (trimmed.length > 0) words += trimmed.split(/\s+/).length;
   }
   return { notes: doc.notes.length, words };

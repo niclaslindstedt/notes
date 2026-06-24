@@ -169,6 +169,7 @@ export function App() {
     createFolder,
     renameFolder,
     removeFolder,
+    ensureBody,
     undo,
     redo,
     canUndo,
@@ -303,6 +304,19 @@ export function App() {
     ? (allNotes.find((n) => n.id === readingId) ?? null)
     : null;
 
+  // Opening a note on a lazy encrypted backend finds its body deferred — decrypt
+  // it on demand so the editor / reader shows real text. Until it resolves the
+  // surface renders a "Decrypting…" placeholder (see below) rather than an empty
+  // editable body, so a keystroke can't overwrite the not-yet-loaded body.
+  const editingDeferred = editing != null && editing.body === undefined;
+  const readingDeferred = reading != null && reading.body === undefined;
+  useEffect(() => {
+    if (editingId && editingDeferred) void ensureBody(editingId);
+  }, [editingId, editingDeferred, ensureBody]);
+  useEffect(() => {
+    if (readingId && readingDeferred) void ensureBody(readingId);
+  }, [readingId, readingDeferred, ensureBody]);
+
   // A note the user never committed to — empty body and either no title or the
   // still-untouched auto-assigned default — is dropped when we leave it, so
   // abandoned "new note" taps (and their throwaway default titles) don't pile
@@ -312,6 +326,9 @@ export function App() {
   const pristineNew = useRef<{ id: string; title: string } | null>(null);
 
   function discardable(note: Note): boolean {
+    // A deferred note (body not loaded) is a real persisted note, never a
+    // pristine scratch note that can be silently discarded.
+    if (note.body === undefined) return false;
     if (note.body.trim() !== "") return false;
     if (note.title.trim() === "") return true;
     return (
@@ -555,6 +572,7 @@ export function App() {
                     onTitleSettle={sync.releaseSaves}
                     syncSlot={syncSlot}
                     uploading={uploadingIds.has(editing.id)}
+                    loading={editingDeferred}
                     canAttach={storage.adapter.capabilities.has("attachments")}
                     onAttach={(attachment) => attach(editing.id, attachment)}
                   />
@@ -1449,16 +1467,19 @@ function ReadOnlyNote({
   const widthStyle =
     maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" };
   const title = note.title.trim();
+  // The body is fetched on open, but guard against a deferred note that hasn't
+  // resolved yet so the reader renders empty rather than crashing.
+  const body = note.body ?? "";
   // Respect the Markdown-rendering preference: formatted lines when on, the
   // raw source otherwise — matching how the same note reads in the editor.
-  const blocks = editor.renderMarkdown ? classifyLines(note.body) : null;
+  const blocks = editor.renderMarkdown ? classifyLines(body) : null;
   const placement = {
     imagesAtEnd: editor.imagesAtEnd,
     filesAtEnd: editor.filesAtEnd,
   };
   // Lines whose attachment renders in the collected end block instead.
   const hidden = blocks
-    ? hiddenAttachmentLines(note.body, placement)
+    ? hiddenAttachmentLines(body, placement)
     : new Set<number>();
 
   return (
@@ -1546,6 +1567,7 @@ function Editor({
   onTitleSettle,
   syncSlot,
   uploading = false,
+  loading = false,
   canAttach,
   onAttach,
 }: {
@@ -1563,6 +1585,9 @@ function Editor({
   syncSlot: ReactNode;
   /** The open note's file is being uploaded — swap the glyph for a spinner. */
   uploading?: boolean;
+  /** The note's body is still being decrypted (lazy encrypted backend) — show a
+   *  placeholder and withhold the editor so a keystroke can't overwrite it. */
+  loading?: boolean;
   canAttach: boolean;
   onAttach: (attachment: Attachment) => void;
 }) {
@@ -1650,10 +1675,15 @@ function Editor({
       </header>
 
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">
-        {editor.renderMarkdown ? (
+        {loading ? (
+          <div className="flex flex-1 items-center justify-center gap-2 p-8 text-sm text-muted">
+            <SpinnerIcon className="h-5 w-5 animate-spin" />
+            {t("app.decrypting")}
+          </div>
+        ) : editor.renderMarkdown ? (
           <MarkdownEditor
             ref={markdownEditorRef}
-            body={note.body}
+            body={note.body ?? ""}
             onChange={onChange}
             wordWrap={editor.wordWrap}
             disableSpellcheck={editor.disableSpellcheck}
@@ -1672,7 +1702,7 @@ function Editor({
           />
         ) : (
           <PlainEditor
-            body={note.body}
+            body={note.body ?? ""}
             onChange={onChange}
             wordWrap={editor.wordWrap}
             disableSpellcheck={editor.disableSpellcheck}

@@ -16,6 +16,38 @@ describe("storage serialize", () => {
     expect(JSON.parse(text).version).toBe(LATEST_VERSION);
   });
 
+  it("round-trips a deferred note (no body, preview marker) without loading a body", () => {
+    const deferred = {
+      ...createNote(1),
+      title: "Deferred",
+      body: undefined,
+      preview: "a preview snippet",
+    };
+    const text = serialize({ notes: [deferred] });
+    // The stored note carries the deferred marker + preview, never a body.
+    const raw = JSON.parse(text).notes[0];
+    expect(raw.deferred).toBe(true);
+    expect("body" in raw).toBe(false);
+    expect(raw.preview).toBe("a preview snippet");
+    // Parsing restores it as deferred (body undefined) — never as an empty
+    // string, which a later save would persist over the real ciphertext.
+    const restored = parse(text).notes[0]!;
+    expect(restored.body).toBeUndefined();
+    expect(restored.preview).toBe("a preview snippet");
+  });
+
+  it("strips the transient preview / deferred hints from a loaded note", () => {
+    const loaded = {
+      ...createNote(1),
+      body: "real body",
+      preview: "stale preview that should be dropped",
+    };
+    const raw = JSON.parse(serialize({ notes: [loaded] })).notes[0];
+    expect(raw.body).toBe("real body");
+    expect("preview" in raw).toBe(false);
+    expect("deferred" in raw).toBe(false);
+  });
+
   it("falls back to an empty document for null / corrupt bytes", () => {
     expect(parse(null).notes).toEqual([]);
     expect(parse("not json").notes).toEqual([]);

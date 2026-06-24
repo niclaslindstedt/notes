@@ -23,20 +23,47 @@ const log = createLogger("serialize");
 
 /** Produce the canonical stored text for a document (trailing newline). */
 export function serialize(snapshot: Snapshot): string {
-  return (
-    JSON.stringify({ version: LATEST_VERSION, ...snapshot }, null, 2) + "\n"
-  );
+  const doc = {
+    version: LATEST_VERSION,
+    ...snapshot,
+    notes: snapshot.notes.map(serializeNote),
+  };
+  return JSON.stringify(doc, null, 2) + "\n";
+}
+
+// Normalise one note for storage. A **deferred** note (body not loaded — the
+// lazy encrypted backends carry only metadata + a preview until a note is
+// opened) is written with a `deferred` marker and its `preview`, but no `body`,
+// so a re-parse round-trips it as deferred rather than as a real note with an
+// empty body (which would later be saved over the ciphertext). A loaded note is
+// written with its `body` and without the transient `preview`/`deferred` hints,
+// which are recomputed from the body when needed.
+function serializeNote(note: Note): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...note };
+  if (note.body === undefined) {
+    delete out.body;
+    out.deferred = true;
+    if (note.preview === undefined) delete out.preview;
+  } else {
+    delete out.preview;
+    delete out.deferred;
+  }
+  return out;
 }
 
 // `title` is intentionally not required here: the v1 → v2 migration adds it,
 // but tolerating its absence (defaulting it in `parse`) keeps a hand-edited or
-// partially-written note loadable rather than silently dropped.
+// partially-written note loadable rather than silently dropped. `body` is
+// likewise tolerated as absent when the note is explicitly `deferred` (a lazy
+// encrypted backend's metadata-only note); a non-deferred note still requires a
+// string body.
 function isNote(value: unknown): value is Omit<Note, "title"> {
   if (!value || typeof value !== "object") return false;
   const n = value as Record<string, unknown>;
+  const bodyOk = typeof n.body === "string" || n.deferred === true;
   return (
     typeof n.id === "string" &&
-    typeof n.body === "string" &&
+    bodyOk &&
     typeof n.createdAt === "number" &&
     typeof n.updatedAt === "number"
   );
@@ -75,6 +102,21 @@ export function parse(text: string | null | undefined): Snapshot {
           ...n,
           title: typeof title === "string" ? title : "",
         };
+        // A deferred note carries no `body` (it lives in its own .enc) — keep
+        // it `undefined` and restore the preview snippet. The `deferred` marker
+        // is a storage detail, never a domain field, so drop it from the note.
+        const deferred =
+          (n as { deferred?: unknown }).deferred === true &&
+          typeof (n as { body?: unknown }).body !== "string";
+        delete (note as { deferred?: unknown }).deferred;
+        if (deferred) {
+          delete note.body;
+          const preview = (n as { preview?: unknown }).preview;
+          if (typeof preview === "string") note.preview = preview;
+          else delete note.preview;
+        } else {
+          delete note.preview;
+        }
         if (attachments.length > 0) note.attachments = attachments;
         else delete note.attachments;
         // Keep a folder reference only when it's a non-empty string; a junk

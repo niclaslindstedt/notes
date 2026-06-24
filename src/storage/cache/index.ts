@@ -47,6 +47,12 @@ const log = createLogger("cache");
 // only.
 const LOAD_OFFLINE_RETRIES = 2;
 
+// Debounce before the per-note body mirror is sealed + written. Long enough
+// that a whole-vault background warm (one body every few tens of ms) coalesces
+// into a single seal once it settles, rather than re-sealing per note — the
+// seal is a deliberately slow whole-document PBKDF2 envelope.
+const BODY_FLUSH_DEBOUNCE_MS = 1000;
+
 const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -165,9 +171,59 @@ export function withLocalCache(
   function clearCache(): void {
     try {
       storage.removeItem(key);
+      storage.removeItem(bodiesKey);
     } catch (err) {
       log.warn("clearCache failed", err);
     }
+    bodyMap = null;
+  }
+
+  // -- Per-note body cache (offline support for lazy bodies) -----------------
+  //
+  // On the encrypted file/cloud backends the main mirror holds the *deferred*
+  // document — metadata + previews, no note bodies — so it alone can't open a
+  // note offline. The background warm pass (and each note-open) fetches bodies
+  // through this wrapper; we mirror them here, in one sealed blob keyed by note
+  // id, so an offline reopen (even after an app restart) can serve them. The map
+  // is sealed/written debounced — once per warm burst — so a whole-vault warm
+  // pays the (deliberately slow) seal once, not per note.
+  const bodiesKey = `${key}:bodies`;
+  let bodyMap: Map<string, string> | null = null;
+  let bodyFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async function loadBodyMap(): Promise<Map<string, string>> {
+    if (bodyMap !== null) return bodyMap;
+    const map = new Map<string, string>();
+    try {
+      const raw = storage.getItem(bodiesKey);
+      if (raw !== null) {
+        const json = await unsealFromCache(raw);
+        const obj = JSON.parse(json) as Record<string, unknown>;
+        for (const [id, body] of Object.entries(obj)) {
+          if (typeof body === "string") map.set(id, body);
+        }
+      }
+    } catch (err) {
+      log.warn("loadBodyMap failed — starting empty", err);
+    }
+    bodyMap = map;
+    return map;
+  }
+
+  function scheduleBodyFlush(): void {
+    if (bodyFlushTimer !== null) clearTimeout(bodyFlushTimer);
+    bodyFlushTimer = setTimeout(() => {
+      bodyFlushTimer = null;
+      void (async () => {
+        if (!bodyMap) return;
+        try {
+          const json = JSON.stringify(Object.fromEntries(bodyMap));
+          storage.setItem(bodiesKey, await sealForCache(json));
+        } catch (err) {
+          log.warn("body cache flush failed — skipping", err);
+        }
+      })();
+    }, BODY_FLUSH_DEBOUNCE_MS);
   }
 
   // Forward the inner capabilities and add `loadSync`: the mirror lets a cloud
@@ -306,6 +362,30 @@ export function withLocalCache(
 
     fetchAttachment: inner.fetchAttachment
       ? (note, filename) => inner.fetchAttachment!(note, filename)
+      : undefined,
+
+    fetchNoteBody: inner.fetchNoteBody
+      ? async (note) => {
+          try {
+            const body = await inner.fetchNoteBody!(note);
+            if (body !== null) {
+              const map = await loadBodyMap();
+              if (map.get(note.id) !== body) {
+                map.set(note.id, body);
+                scheduleBodyFlush();
+              }
+            }
+            return body;
+          } catch (err) {
+            // Offline: serve the body from the local mirror if we cached it
+            // (warmed or opened earlier). Otherwise let the error surface.
+            if (isOfflineError(err)) {
+              const cached = (await loadBodyMap()).get(note.id);
+              if (cached !== undefined) return cached;
+            }
+            throw err;
+          }
+        }
       : undefined,
 
     getEncryptionStatus: inner.getEncryptionStatus

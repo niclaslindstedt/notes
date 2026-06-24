@@ -11,11 +11,14 @@ import type { CopyScope, Note } from "../domain/note.ts";
 import { noteToMarkdown } from "../storage/markdown/codec.ts";
 
 export function buildCopyText(note: Note, scope: CopyScope): string {
+  // Copy acts on the open note, whose body is loaded; the `?? ""` only guards a
+  // deferred note that hasn't resolved yet.
+  const body = note.body ?? "";
   if (scope === "frontMatter") return noteToMarkdown(note);
   if (scope === "titleBody") {
     const title = note.title.trim();
-    if (!title) return note.body;
-    return note.body ? `# ${title}\n\n${note.body}` : `# ${title}`;
+    if (!title) return body;
+    return body ? `# ${title}\n\n${body}` : `# ${title}`;
   }
-  return note.body;
+  return body;
 }

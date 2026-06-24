@@ -175,9 +175,13 @@ export function PrivacyPage() {
             note becomes its own encrypted file and every attachment its own
             encrypted blob, stored under opaque names so the title, filename,
             and which attachments belong to which note are not visible in the
-            folder or cloud. The bytes stored remotely, and in the offline
-            mirror, are ciphertext. The passphrase stays on your device and is
-            never sent anywhere; if you lose it, the notes cannot be recovered.
+            folder or cloud. A small index of note titles and previews is stored
+            the same way — encrypted, under an opaque name — so the app can list
+            your notes quickly without decrypting every one; each note&apos;s
+            body is decrypted only when you open it. The bytes stored remotely,
+            and in the offline mirror, are ciphertext. The passphrase stays on
+            your device and is never sent anywhere; if you lose it, the notes
+            cannot be recovered.
           </p>
         </Section>
 

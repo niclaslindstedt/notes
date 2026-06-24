@@ -11,6 +11,7 @@ import {
   type AttachmentStore,
 } from "../../src/storage/attachment-store.ts";
 import {
+  INDEX_FILE_NAME,
   KEY_PARAMS_FILE,
   createDirectoryAdapter,
   type DirectoryCrypto,
@@ -169,33 +170,45 @@ describe("directory adapter — encrypted per-file", () => {
       serialize({ notes: [note] }),
     );
 
-    // A cold adapter with the same passphrase reconstructs the note + the
-    // attachment metadata, but not the attachment bytes.
+    // A cold adapter with the same passphrase renders the note from the index:
+    // title + a preview snippet + attachment metadata, but the body stays
+    // deferred (not decrypted) until the note is opened.
     const b = encAdapter(store, att, { current: "pw" });
     const loaded = await b.load();
     const restored = parse(loaded?.text).notes;
     expect(restored).toHaveLength(1);
     expect(restored[0]!.title).toBe("My Secret Title");
-    expect(restored[0]!.body).toContain(SECRET_BODY);
+    expect(restored[0]!.body).toBeUndefined();
+    expect(restored[0]!.preview).toContain(SECRET_BODY);
     expect(restored[0]!.attachments).toEqual([
       { filename: "abcd1234-pic.png", mime: "image/png" },
     ]);
 
-    // Opening the note fetches + decrypts the bytes on demand.
+    // Opening the note decrypts its body on demand.
+    const body = await b.fetchNoteBody!(restored[0]!);
+    expect(body).toContain(SECRET_BODY);
+
+    // And fetches the attachment bytes on demand.
     const got = await b.fetchAttachment!(restored[0]!, "abcd1234-pic.png");
     expect(got).not.toBeNull();
     expect(got!.mime).toBe("image/png");
     expect([...got!.bytes]).toEqual([72, 101, 108, 108, 111]); // "Hello"
   });
 
-  it("reports each note to onDecryptNote as it unseals them", async () => {
+  it("reports each note to onDecryptNote in the no-index fallback", async () => {
+    // With the index present an unlock decrypts nothing up front (bodies are
+    // deferred). When the index is missing — a vault from before the index
+    // existed, or a dropped index — the load falls back to decrypting each
+    // note file, and that path drives the unlock gate's per-note progress line.
     const store = memoryStore();
     const att = memoryAttachments();
     const notes: Note[] = [
-      { ...createNote(1), title: "Groceries" },
-      { ...createNote(2), title: "Trip" },
+      { ...createNote(1), title: "Groceries", body: "milk" },
+      { ...createNote(2), title: "Trip", body: "pack" },
     ];
     await encAdapter(store, att, { current: "pw" }).save(serialize({ notes }));
+    // Drop the index → force the per-note fallback.
+    store.files.delete(INDEX_FILE_NAME);
 
     const seen: Array<{ title: string; index: number; total: number }> = [];
     const crypto: DirectoryCrypto = {
@@ -321,18 +334,20 @@ describe("directory adapter — encrypted per-file", () => {
     expect(encWrites).toBe(1);
   });
 
-  it("a second load of unchanged bytes re-decrypts nothing (load memo)", async () => {
-    // The unlock flow loads twice over identical bytes — the gate verifies the
-    // passphrase with one load, then the adapter swap triggers another. Count
-    // `.enc` reads to prove the second load reuses the first's decrypted
-    // snapshot instead of re-reading + re-decrypting every note.
+  it("an index-fast unlock decrypts no bodies, and a second load reuses the memo", async () => {
+    // The unlock renders the list from the index: one index read, zero per-note
+    // decryptions, every body deferred. The unlock flow then loads a second time
+    // (gate verify, then adapter swap) over identical bytes — the memo returns
+    // the same snapshot without even re-reading the index.
     const store = memoryStore();
     const att = memoryAttachments();
     let encReads = 0;
+    let indexReads = 0;
     const counting: FileStore = {
       list: () => store.list(),
       read: (p) => {
         if (p.endsWith(".enc")) encReads += 1;
+        if (p === INDEX_FILE_NAME) indexReads += 1;
         return store.read(p);
       },
       write: (p, t) => store.write(p, t),
@@ -348,18 +363,29 @@ describe("directory adapter — encrypted per-file", () => {
     const b = encAdapter(counting, att, { current: "pw" });
     const first = parse((await b.load())!.text).notes;
     expect(first).toHaveLength(5);
-    expect(encReads).toBe(5);
+    // Index-fast: no body was decrypted, the list comes from the index alone.
+    expect(encReads).toBe(0);
+    expect(indexReads).toBe(1);
+    expect(first.every((n) => n.body === undefined)).toBe(true);
+    expect(first.map((n) => n.preview).sort()).toEqual(
+      notes.map((n) => n.body).sort(),
+    );
 
-    // Second load — nothing changed on disk → zero further reads, same content.
+    // Second load — nothing changed on disk → the memo serves it, no reads.
     encReads = 0;
+    indexReads = 0;
     const second = parse((await b.load())!.text).notes;
     expect(encReads).toBe(0);
-    expect(second.map((n) => n.body).sort()).toEqual(
-      first.map((n) => n.body).sort(),
-    );
+    expect(indexReads).toBe(0);
+    expect(second).toHaveLength(5);
+
+    // Opening one note decrypts exactly that note's file.
+    const body = await b.fetchNoteBody!(first[0]!);
+    expect(body).toBe(notes.find((n) => n.id === first[0]!.id)!.body);
+    expect(encReads).toBe(1);
   });
 
-  it("re-decrypts only the note whose file changed (incremental reuse)", async () => {
+  it("reflects a remotely-changed note via the index without eager decryption", async () => {
     const store = memoryStore();
     const att = memoryAttachments();
     let encReads = 0;
@@ -380,11 +406,11 @@ describe("directory adapter — encrypted per-file", () => {
     const writer = encAdapter(counting, att, { current: "pw" });
     const s1 = await writer.save(serialize({ notes }));
 
-    // Prime the reader's cache with a full load.
     const reader = encAdapter(counting, att, { current: "pw" });
     await reader.load();
 
-    // A different device edits one note; the reader pulls again.
+    // A different device edits one note (rewriting its `.enc` and the index);
+    // the reader pulls again.
     encReads = 0;
     const edited = notes.map((n, i) =>
       i === 2 ? { ...n, body: "changed" } : n,
@@ -392,10 +418,14 @@ describe("directory adapter — encrypted per-file", () => {
     await writer.save(serialize({ notes: edited }), s1.revision);
     const reloaded = parse((await reader.load())!.text).notes;
 
-    // Exactly one `.enc` re-read: the changed note. The other five are reused.
-    expect(encReads).toBe(1);
-    expect(reloaded.find((n) => n.body === "changed")).toBeTruthy();
+    // The index covers every note, so the reload decrypts nothing up front; the
+    // changed note's new preview comes straight from the refreshed index.
+    expect(encReads).toBe(0);
     expect(reloaded).toHaveLength(6);
+    const changed = reloaded.find((n) => n.preview === "changed");
+    expect(changed).toBeTruthy();
+    // Its body is fetched on demand and reflects the edit.
+    expect(await reader.fetchNoteBody!(changed!)).toBe("changed");
   });
 
   it("skips the attachment listing once notes are fully migrated", async () => {
@@ -435,7 +465,7 @@ describe("directory adapter — encrypted per-file", () => {
     expect([...got!.bytes]).toEqual([72, 101, 108, 108, 111]);
   });
 
-  it("decrypts every note on load with a bounded pool of many notes", async () => {
+  it("defers every body on an index-fast unlock of many notes (no reports)", async () => {
     const store = memoryStore();
     const att = memoryAttachments();
     const notes: Note[] = Array.from({ length: 25 }, (_, i) => ({
@@ -458,16 +488,76 @@ describe("directory adapter — encrypted per-file", () => {
     );
     const loaded = parse((await b.load())!.text).notes;
     expect(loaded).toHaveLength(25);
-    expect(loaded.map((n) => n.body).sort()).toEqual(
+    // Every body is deferred, the previews come from the index, and — since the
+    // index covers everything — nothing is decrypted up front, so the gate's
+    // per-note reporter never fires.
+    expect(loaded.every((n) => n.body === undefined)).toBe(true);
+    expect(loaded.map((n) => n.preview).sort()).toEqual(
       notes.map((n) => n.body).sort(),
     );
-    // Every note is reported, totals are consistent, and the completion counter
-    // covers 1..25 exactly once (parallel completion order, hence the sort).
-    expect(seen).toHaveLength(25);
-    expect(seen.every((s) => s.total === 25)).toBe(true);
-    expect(seen.map((s) => s.index).sort((x, y) => x - y)).toEqual(
-      Array.from({ length: 25 }, (_, i) => i + 1),
+    expect(seen).toHaveLength(0);
+
+    // Any note's body is available on demand.
+    const some = loaded[7]!;
+    expect(await b.fetchNoteBody!(some)).toBe(
+      notes.find((n) => n.id === some.id)!.body,
     );
+  });
+
+  it("does not write or remove a deferred note on save", async () => {
+    // Editing one note must not touch the `.enc` files of notes whose bodies
+    // were never loaded — nor delete them as orphans.
+    const store = memoryStore();
+    const att = memoryAttachments();
+    let encWrites = 0;
+    let encRemoves = 0;
+    const counting: FileStore = {
+      list: () => store.list(),
+      read: (p) => store.read(p),
+      write: (p, t) => {
+        if (p.endsWith(".enc")) encWrites += 1;
+        return store.write(p, t);
+      },
+      remove: (p) => {
+        if (p.endsWith(".enc")) encRemoves += 1;
+        return store.remove(p);
+      },
+    };
+    const notes: Note[] = Array.from({ length: 3 }, (_, i) => ({
+      ...createNote(i + 1),
+      title: `Note ${i}`,
+      body: `body ${i}`,
+    }));
+    const a = encAdapter(counting, att, { current: "pw" });
+    const s1 = await a.save(serialize({ notes }));
+
+    // Fresh adapter: load (bodies deferred), open + edit one note, save back
+    // with the other two still deferred.
+    const b = encAdapter(counting, att, { current: "pw" });
+    const loaded = parse((await b.load())!.text).notes;
+    const encPathsBefore = (await store.list())
+      .filter((e) => e.path.endsWith(".enc"))
+      .map((e) => e.path)
+      .sort();
+
+    const opened = loaded.find((n) => n.title === "Note 0")!;
+    const body = await b.fetchNoteBody!(opened);
+    const next = loaded.map((n) =>
+      n.id === opened.id ? { ...n, body: `${body} edited` } : n,
+    );
+    encWrites = 0;
+    encRemoves = 0;
+    await b.save(serialize({ notes: next }), s1.revision);
+
+    // Only the edited note's file was written; the two deferred notes were left
+    // untouched and none were removed.
+    expect(encWrites).toBe(1);
+    expect(encRemoves).toBe(0);
+    const encPathsAfter = (await store.list())
+      .filter((e) => e.path.endsWith(".enc"))
+      .map((e) => e.path)
+      .sort();
+    expect(encPathsAfter).toEqual(encPathsBefore);
   });
 });
 
@@ -746,11 +836,14 @@ describe("directory adapter — legacy notes.json split", () => {
     expect(paths.filter((p) => p.endsWith(".enc"))).toHaveLength(1);
     expect([...att.files.keys()][0]).not.toContain("/"); // opaque blob
 
-    // A cold adapter reads the per-file form, and the bytes still decrypt.
+    // A cold adapter reads the per-file form: the list renders from the index
+    // (body deferred, preview present) and the body + bytes decrypt on demand.
     const b = encAdapter(store, att, ref);
     const reloaded = parse((await b.load())!.text).notes[0]!;
-    expect(reloaded.body).toContain(SECRET_BODY);
+    expect(reloaded.body).toBeUndefined();
+    expect(reloaded.preview).toContain(SECRET_BODY);
     expect(b.getEncryptionStatus!().get(reloaded.id)).toBe("encrypted");
+    expect(await b.fetchNoteBody!(reloaded)).toContain(SECRET_BODY);
     const got = await b.fetchAttachment!(reloaded, "abcd1234-pic.png");
     expect([...got!.bytes]).toEqual([72, 101, 108, 108, 111]);
 
