@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -937,5 +939,21 @@ describe("directory adapter — legacy notes.json split", () => {
 
     // Idempotent — nothing to split now.
     expect(await b.splitLegacyBlob!()).toBe(false);
+  });
+});
+
+describe("directory adapter — source stays textual", () => {
+  it("contains no NUL byte (the deferred sentinel must keep git treating the file as text)", () => {
+    // The deferred-note tracked-source sentinel was once delimited with literal
+    // NUL bytes; a single NUL makes git classify the whole 1700-line file as
+    // binary, so `git diff`/`blame`/the review UI show "Binary files differ"
+    // — taxing every future review of this high-multiplier storage file. Guard
+    // against any sentinel (or other constant) reintroducing a NUL.
+    const url = new URL(
+      "../../src/storage/directory-adapter.ts",
+      import.meta.url,
+    );
+    const bytes = readFileSync(url);
+    expect(bytes.includes(0)).toBe(false);
   });
 });

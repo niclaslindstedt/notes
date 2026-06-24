@@ -185,33 +185,6 @@ and the lockstep `applyPassword` state+ref update must be preserved exactly.
 Start with encryption (step 1) where the seam is cleanest and adds
 testability. **Severity: 6.**
 
-#### `src/storage/directory-adapter.ts` — `DEFERRED_SOURCE` embeds NUL bytes, so git reads the file as binary
-
-**Smell.** The deferred-note tracked-source sentinel is declared as
-`const DEFERRED_SOURCE = "\0deferred\0"` — the two delimiters around `deferred`
-are literal NUL (`\x00`) bytes, not spaces. A single NUL anywhere makes git
-classify the **entire** 1766-line file as binary, so `git diff` / `git blame`
-/ the review UI all show "Binary files differ" instead of a textual diff. That
-directly taxes the multi-PR split above (Seams 2–4): the highest-multiplier
-storage file can't be reviewed as a diff. Re-verify with
-`sed -n '/DEFERRED_SOURCE/p' src/storage/directory-adapter.ts | od -c`.
-
-**Plan.** Replace the NUL delimiters with a printable sentinel that still
-can't collide with a real note's plaintext source — e.g. a control-free marker
-like `" "`-free `"·deferred·"` won't do (still risks collision); prefer a
-prefix a serialized note can never start with, such as the existing
-markdown-frontmatter shape inverted, or simply a sufficiently improbable ASCII
-string documented as "must never equal a real note source". Confirm the
-sentinel is only ever hashed/compared in-memory (it is — `track()` hashes it
-and it is never persisted) so the value is free to change, then pin the
-deferred-note round-trip with a test before swapping it.
-
-**Risk.** Low-to-medium. The NUL is **likely deliberate** collision-proofing
-(no real markdown body contains a NUL), so the change must keep the
-collision-proof property; verify against the encrypted index/deferred-load
-tests in `directory-adapter-encrypted.test.ts`. No on-disk format changes.
-**Severity: 5.**
-
 ### Easy wins
 
 _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
@@ -220,6 +193,27 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `directory-adapter.ts`: `DEFERRED_SOURCE` NUL bytes removed —
+  file is textual to git again.** The deferred-note tracked-source sentinel was
+  `"\0deferred\0"` (literal NUL delimiters); a single NUL made git classify the
+  whole 1766-line file as binary, so `git diff`/`blame`/the review UI showed
+  "Binary files differ" — taxing every future review of the highest-multiplier
+  storage file (the prerequisite for reviewing Seams 2–4 as diffs). Replaced it
+  with the printable, non-control sentinel `"<<deferred-note: body not
+  loaded>>"`. Confirmed safe: the sentinel is only ever `hashText()`-ed in
+  `track()` (never persisted), and the only live comparison is against a real
+  note's `noteToEncJson()` output — always a JSON object string starting with
+  `{"id":` — so a non-`{` marker can never collide; documented that invariant
+  at the declaration. The collision-proof property is pinned end-to-end by the
+  existing "does not write or remove a deferred note on save" test (load
+  deferred → fetch+edit one → save: asserts the edited note IS written and the
+  deferred ones are NOT), which stays green. Added a regression guard asserting
+  the source file contains no NUL byte
+  (`tests/storage/directory-adapter-encrypted.test.ts`, +1 test). Pure value
+  change, no behaviour change, no on-disk format change; all 493 tests green,
+  directory-adapter holds 95% line coverage. The working tree is now textual;
+  the diff against the pre-fix commit still shows binary (the old blob has the
+  NUL), but every diff after this lands renders as text.
 - **2026-06 — `directory-adapter.ts` Seam 1: crypto session extracted.**
   Moved the per-session encryption state and helpers — `keyCache`, `refCache`,
   `encNoteCache`, `lastPassword`, `ensureKeys()`, `cachedRef()`, and the
