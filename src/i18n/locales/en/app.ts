@@ -36,9 +36,12 @@ const app = {
     label: "Copy note",
     copied: "Copied",
   },
-  // Screen-reader label for the green lock shown on a note whose document and
-  // every attachment are encrypted at rest.
+  // Screen-reader label for the gray lock shown on a note that is encrypted at
+  // rest but whose body hasn't been decrypted/loaded yet this session.
   encryptedNote: "Encrypted at rest",
+  // Screen-reader label for the green lock shown on a note that is encrypted at
+  // rest and whose body has been decrypted and loaded this session.
+  encryptedNoteLoaded: "Encrypted at rest, decrypted",
   // Screen-reader label for the spinner shown on a note whose file is being
   // uploaded to the backend right now.
   uploadingNote: "Syncing…",

@@ -393,6 +393,10 @@ export function withLocalCache(
       ? () => inner.getEncryptionStatus!()
       : undefined,
 
+    refreshIndex: inner.refreshIndex
+      ? (notes) => inner.refreshIndex!(notes)
+      : undefined,
+
     migrateNote: inner.migrateNote
       ? (note, onStep) => inner.migrateNote!(note, onStep)
       : undefined,

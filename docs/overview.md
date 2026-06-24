@@ -66,11 +66,16 @@ document lands.
 ### Note card
 
 `NoteCard` / `SwipeableNoteCard` in `src/app/App.tsx` — one note in the
-overview. Shows the note's title (`noteTitle`), plus a green **lock**
-(`LockIcon`, theme `--accent`) when the note and all its attachments are
-encrypted at rest (the per-note status from the
+overview. Shows the note's title (`noteTitle`), plus a **lock** (`LockIcon`,
+rendered by the local `NoteLock` helper) when the note and all its attachments
+are encrypted at rest (the per-note status from the
 [encryption migration](#encryption-migration); the side-menu note rows show the
-same). `SwipeableNoteCard` wraps it in `useRowSwipe`: a right-swipe archives the
+same). The lock's **colour** reports whether the body has been decrypted this
+session: green (theme `--accent`) once it's loaded/warmed (`note.body !==
+undefined`, after the lazy [`ensureBody`](#encryption) fetch on open), gray
+(`--muted`) while it's still sealed-but-deferred and would decrypt on open — so
+a glance tells which notes open instantly. `SwipeableNoteCard` wraps it in
+`useRowSwipe`: a right-swipe archives the
 note, a left-swipe latches a trash button that needs a second tap to delete
 (both undoable).
 
@@ -1274,6 +1279,14 @@ files + the listing stay authoritative, so it's written best-effort (last-writer
 wins, *never* conflict-checked — which is what keeps per-file sync working), and
 on load any `.enc` the index doesn't cover at the current revision (a stale index,
 or a note another device just changed) is decrypted individually as the fallback.
+Two things keep an index in place so the fallback stays rare: every encrypted
+`save` rewrites it, and the [encryption migration](#encryption-migration) calls
+`refreshIndex` the moment it finishes sealing a freshly-encrypted vault (the
+paced `migrateNote` writes `.enc` files but never the index, so this is what
+makes the very first unlock after enabling encryption index-fast rather than a
+full per-note decrypt). A load that still finds encrypted notes but no index —
+a vault from before the index existed — self-heals by writing one after the
+fallback decrypt, so it pays that cost only once.
 Because a deferred note's body isn't in memory, the save planner **skips** it
 (never re-writing it body-less, never removing it as an orphan) and attachment
 reconciliation keeps all of its declared blobs; a metadata edit (retitle /
@@ -1323,11 +1336,17 @@ where it left off). Existing users on a legacy whole-document `notes.json` are
 upgraded first by `splitLegacyBlob` (forward only). Each converter reports fine-grained steps (each attachment, then the note
 file) so the [storage settings](#storage-settings) can flash what it's on, and
 the hook returns both the per-note `encrypted` / `pending` status map
-(`getEncryptionStatus`, drives the green [lock](#note-card) in the overview and
-side menu) and a live `conversion` snapshot (`EncryptionConversionState` — which
+(`getEncryptionStatus`, drives the [lock](#note-card) in the overview and side
+menu) and a live `conversion` snapshot (`EncryptionConversionState` — which
 note/attachment, how far along, any error, a capped log). When every note is
-sealed it fires the **Fort Knox** achievement; when every note is back to
-plaintext it calls `onDisableComplete` to finalise the turn-off.
+sealed it **seals the [note index](#encryption)** from the in-memory snapshot
+(`refreshIndex`) and fires the **Fort Knox** achievement; when every note is
+back to plaintext it calls `onDisableComplete` to finalise the turn-off. The
+index refresh matters because the per-note `migrateNote` never touches the
+index, so without it the index would stay absent until the next regular save —
+and the *first* unlock after enabling encryption would fall back to decrypting
+every note (the slow path lazy decryption exists to avoid) instead of rendering
+instantly from the index.
 
 ### Offline cache
 

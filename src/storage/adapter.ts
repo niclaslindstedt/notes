@@ -122,6 +122,15 @@ export type StorageAdapter = {
   // when encryption is off.
   getEncryptionStatus?(): Map<string, "encrypted" | "pending">;
 
+  // Rebuild + seal the encrypted note index from the given snapshot, best-effort.
+  // Called once the background encryption migration finishes so the first unlock
+  // afterwards renders from the index instead of decrypting every note in the
+  // per-file fallback — the migration seals notes one at a time without touching
+  // the index, so it would otherwise stay absent until the next regular save. A
+  // no-op when the backend doesn't keep an index or encryption is off. Only the
+  // encrypted file backends implement it.
+  refreshIndex?(notes: readonly Note[]): Promise<void>;
+
   // Convert one note from plaintext to its encrypted per-file form, atomically
   // and idempotently. The paced migration queue calls this per note so a large
   // conversion doesn't burst the cloud API. `onStep` fires as each of the note's

@@ -141,6 +141,8 @@ export interface UseStorageBackend {
   fetchAttachment: (note: Note, filename: string) => Promise<string | null>;
   /** The active adapter's per-note at-rest encryption status, if it tracks it. */
   getEncryptionStatus?: () => Map<string, "encrypted" | "pending">;
+  /** Rebuild + seal the note index from the snapshot, if the backend keeps one. */
+  refreshIndex?: (notes: readonly Note[]) => Promise<void>;
   /** Convert one note to encrypted at rest (idempotent), if supported. */
   migrateNote?: (
     note: Note,
@@ -674,6 +676,10 @@ export function useStorageBackend(): UseStorageBackend {
     () => adapter.getEncryptionStatus?.bind(adapter),
     [adapter],
   );
+  const refreshIndex = useMemo(
+    () => adapter.refreshIndex?.bind(adapter),
+    [adapter],
+  );
   const migrateNote = useMemo(
     () => adapter.migrateNote?.bind(adapter),
     [adapter],
@@ -1108,6 +1114,7 @@ export function useStorageBackend(): UseStorageBackend {
     adapter,
     fetchAttachment,
     getEncryptionStatus,
+    refreshIndex,
     migrateNote,
     demigrateNote,
     splitLegacyBlob,

@@ -216,6 +216,7 @@ export function App() {
       migrateNote: storage.migrateNote,
       demigrateNote: storage.demigrateNote,
       splitLegacyBlob: storage.splitLegacyBlob,
+      refreshIndex: storage.refreshIndex,
       onDisableComplete: storage.finishDisableEncryption,
     });
 
@@ -1164,6 +1165,24 @@ function FolderRenameRow({
   );
 }
 
+// The per-note encryption lock. Green (accent) once the body is decrypted and
+// loaded this session, gray (muted) while it's still sealed-but-deferred — so a
+// glance at the list tells which notes are warm (open instantly) and which would
+// decrypt on open. See `App`'s lazy-body fetch (`ensureBody`).
+function NoteLock({ loaded }: { loaded: boolean }) {
+  const t = useT();
+  return (
+    <>
+      <LockIcon
+        className={`h-3.5 w-3.5 shrink-0 ${loaded ? "text-accent" : "text-muted"}`}
+      />
+      <span className="sr-only">
+        {t(loaded ? "app.encryptedNoteLoaded" : "app.encryptedNote")}
+      </span>
+    </>
+  );
+}
+
 function NoteCard({
   note,
   onOpen,
@@ -1172,7 +1191,8 @@ function NoteCard({
 }: {
   note: Note;
   onOpen: () => void;
-  /** Show the green lock — the note + all its attachments are encrypted at rest. */
+  /** Show the lock — the note + all its attachments are encrypted at rest (green
+   * once the body is loaded, gray while still deferred). */
   encrypted?: boolean;
   /** Show the sync spinner — the note's file is being uploaded right now. */
   uploading?: boolean;
@@ -1185,6 +1205,13 @@ function NoteCard({
   const layout = useAppearance().listLayout;
   const cards = layout === "cards";
   const list = layout === "list";
+
+  // The lock glyph for an encrypted note. With lazy decryption every note is
+  // sealed at rest, so the lock's *colour* reports whether its body has been
+  // decrypted this session: green (accent) once it's been opened/warmed (body
+  // loaded), gray (muted) while it's still deferred and would need decrypting on
+  // open. `note.body === undefined` is the deferred marker (distinct from "").
+  const lock = encrypted ? <NoteLock loaded={note.body !== undefined} /> : null;
 
   // The file-explorer listing: just a document glyph and the title, dense and
   // chrome-free so a folder's notes read like files in a tree. No excerpt, and
@@ -1204,12 +1231,7 @@ function NoteCard({
             <span className="sr-only">{t("app.uploadingNote")}</span>
           </>
         ) : (
-          encrypted && (
-            <>
-              <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
-              <span className="sr-only">{t("app.encryptedNote")}</span>
-            </>
-          )
+          lock
         )}
       </button>
     );
@@ -1241,12 +1263,7 @@ function NoteCard({
             <span className="sr-only">{t("app.uploadingNote")}</span>
           </>
         ) : (
-          encrypted && (
-            <>
-              <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
-              <span className="sr-only">{t("app.encryptedNote")}</span>
-            </>
-          )
+          lock
         )}
       </p>
       {preview &&
@@ -1299,7 +1316,8 @@ function SwipeableNoteCard({
   primaryLabel: string;
   /** Backdrop icon revealed by the swipe-right gesture. */
   primaryIcon: ReactNode;
-  /** Show the green lock — the note is encrypted at rest. */
+  /** Show the lock — the note is encrypted at rest (green once its body is
+   * loaded, gray while still deferred). */
   encrypted?: boolean;
   /** Show the sync spinner — the note's file is being uploaded right now. */
   uploading?: boolean;

@@ -229,6 +229,38 @@ describe("directory adapter — encrypted per-file", () => {
     expect(seen.map((s) => s.index).sort()).toEqual([1, 2]);
   });
 
+  it("self-heals the index on a no-index unlock so the next is fast", async () => {
+    // The user's case: the index was removed from the remote (e.g. deleted in
+    // Dropbox). The first unlock should fall back to per-note decryption AND
+    // write a fresh index, so the *next* unlock is index-fast again.
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const notes: Note[] = [
+      { ...createNote(1), title: "Groceries", body: "milk" },
+      { ...createNote(2), title: "Trip", body: "pack" },
+    ];
+    await encAdapter(store, att, { current: "pw" }).save(serialize({ notes }));
+    store.files.delete(INDEX_FILE_NAME);
+
+    const seen1: Array<unknown> = [];
+    const a = createDirectoryAdapter(store, { id: "folder", label: "T" }, att, {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (i) => seen1.push(i) },
+    });
+    await a.load();
+    expect(seen1).toHaveLength(2); // fell back this once
+    expect(store.files.has(INDEX_FILE_NAME)).toBe(true); // self-healed
+
+    const seen2: Array<unknown> = [];
+    const b = createDirectoryAdapter(store, { id: "folder", label: "T" }, att, {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (i) => seen2.push(i) },
+    });
+    const restored = parse((await b.load())!.text).notes;
+    expect(seen2).toHaveLength(0); // index-fast: nothing decrypted up front
+    expect(restored.every((n) => n.body === undefined)).toBe(true);
+  });
+
   it("recovers folders on unlock when the listing lags but the sidecar reads", async () => {
     // The Dropbox cold-start / upgrade-reload bug: `list_folder` is eventually
     // consistent and can omit `folders.json` right after startup, so a note's
@@ -742,6 +774,62 @@ describe("directory adapter — paced per-note migration", () => {
 
     // Migrating again is an idempotent no-op.
     expect(await after.migrateNote!(reloaded)).toBe(false);
+  });
+
+  it("refreshIndex after migration makes the next unlock index-fast", async () => {
+    // The gap lazy decryption left: the paced queue seals each note via
+    // `migrateNote`, which never touches the index, so without a follow-up the
+    // index stays absent until the next regular save — and the first unlock
+    // after enabling encryption falls back to decrypting every note. Calling
+    // `refreshIndex` once the conversion finishes closes that gap.
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const ref = { current: null as string | null };
+    const notes: Note[] = [
+      { ...createNote(1), title: "Groceries", body: "milk and eggs" },
+      { ...createNote(2), title: "Trip", body: "pack the bags" },
+      { ...createNote(3), title: "Ideas", body: "ship it" },
+    ];
+    await encAdapter(store, att, ref).save(serialize({ notes }));
+
+    // Enable encryption and convert note-by-note, exactly as the background
+    // queue does — no intervening full load that could self-heal the index.
+    ref.current = "pw";
+    const a = encAdapter(store, att, ref);
+    const loaded = parse((await a.load())!.text).notes;
+    for (const note of loaded) await a.migrateNote!(note);
+
+    // migrateNote alone leaves no index → a cold unlock would decrypt every
+    // note. refreshIndex seals the complete index from the in-memory snapshot.
+    expect(store.files.has(INDEX_FILE_NAME)).toBe(false);
+    await a.refreshIndex!(loaded);
+    expect(store.files.has(INDEX_FILE_NAME)).toBe(true);
+
+    // Cold unlock with the freshly-sealed index: nothing is decrypted up front
+    // (no per-note reports), every body is deferred, previews come from the
+    // index — and a body still decrypts on open.
+    const seen: Array<{ title: string }> = [];
+    const crypto: DirectoryCrypto = {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (info) => seen.push(info) },
+    };
+    const b = createDirectoryAdapter(
+      store,
+      { id: "folder", label: "T" },
+      att,
+      crypto,
+    );
+    const restored = parse((await b.load())!.text).notes;
+    expect(seen).toHaveLength(0);
+    expect(restored).toHaveLength(3);
+    expect(restored.every((n) => n.body === undefined)).toBe(true);
+    expect(restored.map((n) => n.title).sort()).toEqual([
+      "Groceries",
+      "Ideas",
+      "Trip",
+    ]);
+    const groceries = restored.find((n) => n.title === "Groceries")!;
+    expect(await b.fetchNoteBody!(groceries)).toContain("milk and eggs");
   });
 
   it("demigrateNote reverses one note back to plaintext and flips its status", async () => {
