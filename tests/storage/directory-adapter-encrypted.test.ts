@@ -744,6 +744,62 @@ describe("directory adapter — paced per-note migration", () => {
     expect(await after.migrateNote!(reloaded)).toBe(false);
   });
 
+  it("refreshIndex after migration makes the next unlock index-fast", async () => {
+    // The gap lazy decryption left: the paced queue seals each note via
+    // `migrateNote`, which never touches the index, so without a follow-up the
+    // index stays absent until the next regular save — and the first unlock
+    // after enabling encryption falls back to decrypting every note. Calling
+    // `refreshIndex` once the conversion finishes closes that gap.
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const ref = { current: null as string | null };
+    const notes: Note[] = [
+      { ...createNote(1), title: "Groceries", body: "milk and eggs" },
+      { ...createNote(2), title: "Trip", body: "pack the bags" },
+      { ...createNote(3), title: "Ideas", body: "ship it" },
+    ];
+    await encAdapter(store, att, ref).save(serialize({ notes }));
+
+    // Enable encryption and convert note-by-note, exactly as the background
+    // queue does — no intervening full load that could self-heal the index.
+    ref.current = "pw";
+    const a = encAdapter(store, att, ref);
+    const loaded = parse((await a.load())!.text).notes;
+    for (const note of loaded) await a.migrateNote!(note);
+
+    // migrateNote alone leaves no index → a cold unlock would decrypt every
+    // note. refreshIndex seals the complete index from the in-memory snapshot.
+    expect(store.files.has(INDEX_FILE_NAME)).toBe(false);
+    await a.refreshIndex!(loaded);
+    expect(store.files.has(INDEX_FILE_NAME)).toBe(true);
+
+    // Cold unlock with the freshly-sealed index: nothing is decrypted up front
+    // (no per-note reports), every body is deferred, previews come from the
+    // index — and a body still decrypts on open.
+    const seen: Array<{ title: string }> = [];
+    const crypto: DirectoryCrypto = {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (info) => seen.push(info) },
+    };
+    const b = createDirectoryAdapter(
+      store,
+      { id: "folder", label: "T" },
+      att,
+      crypto,
+    );
+    const restored = parse((await b.load())!.text).notes;
+    expect(seen).toHaveLength(0);
+    expect(restored).toHaveLength(3);
+    expect(restored.every((n) => n.body === undefined)).toBe(true);
+    expect(restored.map((n) => n.title).sort()).toEqual([
+      "Groceries",
+      "Ideas",
+      "Trip",
+    ]);
+    const groceries = restored.find((n) => n.title === "Groceries")!;
+    expect(await b.fetchNoteBody!(groceries)).toContain("milk and eggs");
+  });
+
   it("demigrateNote reverses one note back to plaintext and flips its status", async () => {
     const store = memoryStore();
     const att = memoryAttachments();

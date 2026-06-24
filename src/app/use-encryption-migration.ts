@@ -71,6 +71,13 @@ type Options = {
   ) => Promise<boolean>;
   /** Upgrade a legacy whole-document blob to per-file form (one-time). */
   splitLegacyBlob?: () => Promise<boolean>;
+  /**
+   * Rebuild + seal the note index from the current snapshot. Called once the
+   * forward (encrypt) conversion finishes so the next unlock renders from the
+   * index instead of decrypting every note — the per-note `migrateNote` doesn't
+   * touch the index, so without this it stays absent until the next save.
+   */
+  refreshIndex?: (notes: readonly Note[]) => Promise<void>;
   /** Fired once the reverse conversion has finished, to drop the passphrase. */
   onDisableComplete?: () => void;
 };
@@ -89,6 +96,7 @@ export function useEncryptionMigration({
   migrateNote,
   demigrateNote,
   splitLegacyBlob,
+  refreshIndex,
   onDisableComplete,
 }: Options): UseEncryptionMigration {
   const t = useT();
@@ -104,6 +112,10 @@ export function useEncryptionMigration({
   tRef.current = t;
   const onDoneRef = useRef(onDisableComplete);
   onDoneRef.current = onDisableComplete;
+  // Read at completion time so a fresh `.bind()` identity doesn't restart the
+  // conversion mid-flight (same reason as `onDoneRef`).
+  const refreshIndexRef = useRef(refreshIndex);
+  refreshIndexRef.current = refreshIndex;
 
   // A stable signature so the effect re-runs when the note set changes (a new
   // note to convert) but not on every render.
@@ -239,6 +251,17 @@ export function useEncryptionMigration({
             finalStatus &&
             notes.every((n) => finalStatus.get(n.id) === "encrypted")
           ) {
+            // Seal the note index now that every note is encrypted, so the next
+            // unlock renders from it in one read + decrypt instead of falling
+            // back to decrypting each note. `migrateNote` doesn't touch the
+            // index, so this is the first chance to write a complete one.
+            // Best-effort: a failure just means the next save (or a self-healing
+            // load) writes it instead, so don't let it abort the conversion.
+            try {
+              await refreshIndexRef.current?.(notes);
+            } catch (err) {
+              log.warn("index refresh after migration failed", err);
+            }
             unlock("fortKnox");
           }
           setConversion(IDLE);

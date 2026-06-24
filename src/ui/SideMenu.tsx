@@ -457,11 +457,15 @@ export function SideMenu({
         indent={indent}
         trailing={
           // The upload spinner wins over the lock: a note being written isn't
-          // settled at rest yet (see the overview card).
+          // settled at rest yet (see the overview card). The lock is green once
+          // the note's body is decrypted/loaded this session, gray while it's
+          // still sealed-but-deferred (would decrypt on open).
           uploadingIds?.has(note.id) ? (
             <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" />
           ) : encStatus?.get(note.id) === "encrypted" ? (
-            <LockIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
+            <LockIcon
+              className={`h-3.5 w-3.5 shrink-0 ${note.body !== undefined ? "text-accent" : "text-muted"}`}
+            />
           ) : undefined
         }
         onClick={() => {

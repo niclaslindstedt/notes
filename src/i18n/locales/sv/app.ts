@@ -22,6 +22,7 @@ const app: AppCatalog = {
     copied: "Kopierat",
   },
   encryptedNote: "Krypterad i vila",
+  encryptedNoteLoaded: "Krypterad i vila, dekrypterad",
   uploadingNote: "Synkar…",
   decrypting: "Dekrypterar…",
 };
