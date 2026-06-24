@@ -13,6 +13,17 @@ predate the pipeline.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-24
+
+### Changed
+
+- **Instant unlock for encrypted notes** — Unlocking an encrypted vault now renders the whole list at once from a small encrypted index and decrypts each note's body only when you open it, so a large vault opens instantly instead of decrypting every note up front. [Learn more](feature:per-note-encryption)
+- **Lock glyph shows decrypt state** — The encryption lock on each note is now green once its body has been decrypted and loaded this session and gray while it's still sealed-but-deferred, so a glance at the list tells which notes open instantly.
+
+### Fixed
+
+- **Fast unlock right after enabling encryption** — The first unlock after turning on encryption now renders instantly from the note index instead of decrypting every note one by one — the background conversion seals the index as soon as it finishes.
+
 ## [1.1.0] - 2026-06-23
 
 ### Changed
