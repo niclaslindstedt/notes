@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 
 import { attachmentFilenameFromHref } from "../domain/attachment.ts";
 import {
@@ -173,7 +173,7 @@ function inlineContent(block: LineBlock, shortenLinkChars: number): ReactNode {
 }
 
 /** Render one source line as its formatted Markdown. */
-export function RenderedLine({
+function RenderedLineImpl({
   block,
   shortenLinkChars = 0,
 }: {
@@ -244,3 +244,23 @@ export function RenderedLine({
       return <div>{inlineContent(block, shortenLinkChars)}</div>;
   }
 }
+
+// The live editor re-derives `classifyLines(body)` on *every keystroke*, handing
+// each rendered line a brand-new `LineBlock` object — so reference equality never
+// holds and an un-memoized line would re-run `parseInline` and rebuild its whole
+// subtree on every character, for every line in the note. Only the caret's line
+// actually changes per keystroke (and it renders as a raw textarea, not here), so
+// comparing the block's primitive fields lets every untouched line bail out of the
+// re-render: the per-keystroke cost drops from O(lines) to O(1). Attachment changes
+// still flow in through `useAttachmentsContext` (memo doesn't block context).
+export const RenderedLine = memo(
+  RenderedLineImpl,
+  (a, b) =>
+    a.shortenLinkChars === b.shortenLinkChars &&
+    a.block.kind === b.block.kind &&
+    a.block.raw === b.block.raw &&
+    a.block.content === b.block.content &&
+    a.block.contentStart === b.block.contentStart &&
+    a.block.level === b.block.level &&
+    a.block.ordinal === b.block.ordinal,
+);
