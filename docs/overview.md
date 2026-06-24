@@ -1480,8 +1480,10 @@ How the folders and loose notes are ordered is two appearance preferences (see
 **`noteSortKey`** is `modified` (most-recently-edited first) or `name`
 (alphabetical); `sortNotesBy` orders the notes and a folder's contents, and
 `sortFoldersBy` orders the folders — by name, or by their newest note's
-timestamp (`folderModifiedAt`). The loose notes are still capped at
-`MAX_RECENT_NOTES`. Both are set in **Appearance → Sidebar**.
+timestamp (`folderModifiedAt`). These ordering helpers (and `mixTopLevel`,
+and the `NoteSortKey` type itself) are pure functions over the note model in
+`src/domain/note.ts` — `SideMenu` only consumes them. The loose notes are
+still capped at `MAX_RECENT_NOTES`. Both are set in **Appearance → Sidebar**.
 
 The **button island** is one bordered block (`BarButton`) pinned to the foot of
 the list (`mt-auto`), instead of full-width rows, to save vertical space: a top

@@ -8,11 +8,17 @@ import {
 } from "react";
 
 import { BUILD_LABEL } from "../build-env.ts";
-import { noteTitle, type Folder, type Note } from "../domain/note.ts";
+import {
+  mixTopLevel,
+  noteTitle,
+  sortFoldersBy,
+  sortNotesBy,
+  type Folder,
+  type Note,
+} from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import type { Namespace } from "../storage/namespaces.ts";
 import { useAppearance } from "../theme/useTheme.ts";
-import type { NoteSortKey } from "../theme/themes.ts";
 import { APP_VIEWPORT_RECT } from "./appViewportRect.ts";
 import { useNav } from "./nav-context.ts";
 import { useDraggableMenuButton } from "./hooks/useDraggableMenuButton.ts";
@@ -117,84 +123,6 @@ const MAX_RECENT_NOTES = 6;
 // desktop HTML5 path. The touch path and the ungrouped-zone sentinel
 // (`NOTE_DROP_ROOT`) are shared from `note-drag.tsx`.
 const NOTE_DND_TYPE = "application/x-notes-note-id";
-
-// Sort notes for the drawer by the active key: most-recently-edited first, or
-// alphabetically by title (case-insensitive). Never mutates the input.
-function sortNotesBy(notes: readonly Note[], key: NoteSortKey): Note[] {
-  if (key === "name") {
-    return [...notes].sort((a, b) =>
-      noteTitle(a).localeCompare(noteTitle(b), undefined, {
-        sensitivity: "base",
-      }),
-    );
-  }
-  return [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
-}
-
-// A folder's effective "modified" time: the newest `updatedAt` among the notes
-// filed in it, falling back to its own creation time when it's empty. Lets a
-// folder sort by recency against loose notes under `mixed` placement.
-function folderModifiedAt(folder: Folder, notes: readonly Note[]): number {
-  let max = folder.createdAt;
-  for (const n of notes) {
-    if (n.folderId === folder.id && n.updatedAt > max) max = n.updatedAt;
-  }
-  return max;
-}
-
-// Folders ordered by the active key — alphabetically by name, or by their
-// most-recently-edited note. Never mutates the input.
-function sortFoldersBy(
-  folders: readonly Folder[],
-  notes: readonly Note[],
-  key: NoteSortKey,
-): Folder[] {
-  if (key === "name") {
-    return [...folders].sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-    );
-  }
-  return [...folders].sort(
-    (a, b) => folderModifiedAt(b, notes) - folderModifiedAt(a, notes),
-  );
-}
-
-// `mixed` placement: one interleaved run of folders and loose notes, sorted by
-// the active key so a folder sits among the notes by its name or its newest
-// note. `allNotes` is the full note set (used for a folder's modified time);
-// `folders` and `loose` are the already-filtered, display-ordered inputs.
-type TopLevelItem =
-  | { kind: "folder"; folder: Folder }
-  | { kind: "note"; note: Note };
-
-function mixTopLevel(
-  folders: readonly Folder[],
-  loose: readonly Note[],
-  allNotes: readonly Note[],
-  key: NoteSortKey,
-): TopLevelItem[] {
-  const items: TopLevelItem[] = [
-    ...folders.map((folder) => ({ kind: "folder" as const, folder })),
-    ...loose.map((note) => ({ kind: "note" as const, note })),
-  ];
-  items.sort((a, b) => {
-    if (key === "name") {
-      const an = a.kind === "folder" ? a.folder.name : noteTitle(a.note);
-      const bn = b.kind === "folder" ? b.folder.name : noteTitle(b.note);
-      return an.localeCompare(bn, undefined, { sensitivity: "base" });
-    }
-    const am =
-      a.kind === "folder"
-        ? folderModifiedAt(a.folder, allNotes)
-        : a.note.updatedAt;
-    const bm =
-      b.kind === "folder"
-        ? folderModifiedAt(b.folder, allNotes)
-        : b.note.updatedAt;
-    return bm - am;
-  });
-  return items;
-}
 
 type Props = {
   /** Notes to list, in display order (most-recently-edited first). */
