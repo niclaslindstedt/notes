@@ -710,7 +710,11 @@ gestures untouched.
 `PullToRefreshIndicator` (`src/ui/PullToRefreshIndicator.tsx`) — touch-only on
 the overview: a downward drag from the top past ~70px (with rubber-band
 resistance) triggers `refresh` on release, showing an arrow then a spinner.
-Disabled when a modal is open or a scroll ancestor isn't at its top.
+Disabled when a modal is open or a scroll ancestor isn't at its top, and while a
+note is being drag-filed into a folder — that gesture reports itself through
+`ReportDragActivityContext` (`src/ui/drag-activity.ts`) so a note dragged
+downward can't arm a refresh at the same time (see
+[note drag](#note-drag-touch--pointer)).
 
 ### Pinned sidebar
 
@@ -1546,6 +1550,21 @@ wrapper that wires the desktop HTML5 props and the touch handlers together; drop
 targets read the hovered key via `useNoteDropKey` to paint their highlight. The
 side menu and the overview both carry `select-none` so a drag never paints a
 text selection across the rows it crosses.
+
+A drag is only ever ended by the pointerup/cancel (touch) or `dragend` (desktop)
+that lands on the dragged row — so if something seizes the screen mid-drag and
+unmounts that row, neither fires and the lifted note would be stranded: the
+floating chip frozen in mid-air with its pointer still captured, or the desktop
+row stuck dimmed. The concrete trigger is a background save colliding with
+another device, which raises the non-dismissable conflict modal over the list.
+To cover it, `App` hands `NoteDragProvider` an `aborted` prop
+(`sync.conflict !== null`); on its rising edge the provider clears the chip and
+bumps `DragAbortContext`. Each active row's `useTouchNoteDrag` watches that
+generation and releases its pointer capture (and the scroll blocker); the
+native HTML5 drop zones in the overview and side menu watch `useNoteDragAbort`
+and clear their lift styling. The drag-to-folder gesture also reports itself
+through `ReportDragActivityContext` (`src/ui/drag-activity.ts`) so
+pull-to-refresh stands down for its duration — see [pull to refresh](#pull-to-refresh).
 
 The drop-target keys (see `note-drag-context.ts`) span four kinds of target:
 

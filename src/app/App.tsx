@@ -73,12 +73,14 @@ import {
   TrashIcon,
 } from "../ui/icons.tsx";
 import { CopyNoteButton } from "../ui/CopyNoteButton.tsx";
+import { ReportDragActivityContext } from "../ui/drag-activity.ts";
 import { NoteDragItem, NoteDragProvider } from "../ui/note-drag.tsx";
 import {
   NOTE_DROP_ARCHIVE,
   NOTE_DROP_ATTR,
   NOTE_DROP_NS_PREFIX,
   NOTE_DROP_ROOT,
+  useNoteDragAbort,
   useNoteDropKey,
 } from "../ui/note-drag-context.ts";
 import { SelectPicker } from "../ui/form/SelectPicker.tsx";
@@ -198,6 +200,10 @@ export function App() {
   // the read-only one.
   const [readingId, setReadingId] = useState<string | null>(null);
   const nav = useNavState();
+  // True while a note is being picked up and dragged (the touch/pointer path),
+  // reported up from `NoteDragProvider` so pull-to-refresh stands down for its
+  // duration — dragging a note downward would otherwise arm a refresh too.
+  const [dragActive, setDragActive] = useState(false);
 
   // Background encryption migration + per-note status for the green lock. When
   // encryption is on (file/cloud backend, unlocked), this seals each note's
@@ -353,7 +359,11 @@ export function App() {
     },
     {
       enabled:
-        !editing && !reading && !nav.open && storage.backend !== "browser",
+        !editing &&
+        !reading &&
+        !nav.open &&
+        !dragActive &&
+        storage.backend !== "browser",
     },
   );
 
@@ -518,10 +528,11 @@ export function App() {
   );
 
   return (
-    <AttachmentFetchContext.Provider value={storage.fetchAttachment}>
-      <NavContext.Provider value={nav}>
-        <ModalBusProvider>
-          {/* Pin the whole shell to the *visual* viewport (the band actually on
+    <ReportDragActivityContext.Provider value={setDragActive}>
+      <AttachmentFetchContext.Provider value={storage.fetchAttachment}>
+        <NavContext.Provider value={nav}>
+          <ModalBusProvider>
+            {/* Pin the whole shell to the *visual* viewport (the band actually on
             screen) rather than the layout viewport (`h-dvh`). On iOS the soft
             keyboard shrinks the visual viewport and scrolls the layout viewport
             up to keep the caret in view — with an `h-dvh` shell that drag
@@ -529,110 +540,121 @@ export function App() {
             appears to scroll away with the note. Sizing the shell to
             `--app-height`/`--app-top` (the vars `useViewportHeight` mirrors)
             keeps it filling the visible band, so the header stays frozen. */}
-          <div className="fixed flex overflow-hidden" style={APP_VIEWPORT_RECT}>
-            <NoteDragProvider onDrop={handleNoteDrop}>
-              <SideMenu
-                notes={notes}
-                loading={notesLoading}
-                activeNoteId={editingId}
-                onSelectNote={(id) => switchTo(id)}
-                onShowAll={showAll}
-                showAllActive={view === "notes" && !editing && !reading}
-                onAddNote={openNew}
-                onRemoveNote={removeNote}
-                onArchiveNote={archiveNote}
-                archivedCount={archived.length}
-                onOpenArchive={openArchive}
-                archiveActive={view === "archive" && !editing}
-                onUndo={undo}
-                onRedo={redo}
-                canUndo={canUndo}
-                canRedo={canRedo}
-                folders={folders}
-                onMoveNote={moveNote}
-                onMoveNoteToNamespace={moveToNamespace}
-                onCreateFolder={createFolder}
-                onRenameFolder={renameFolder}
-                onRemoveFolder={removeFolder}
-                namespaces={storage.namespaces}
-                activeNamespace={storage.activeNamespace}
-                onSwitchNamespace={switchNamespace}
-                encStatus={encStatus}
-                uploadingIds={uploadingIds}
-              />
-              <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-                {editing ? (
-                  <Editor
-                    key={editing.id}
-                    note={editing}
-                    editor={editor}
-                    folders={folders}
-                    onBack={showAll}
-                    onMoveFolder={(folderId) => moveNote(editing.id, folderId)}
-                    onChange={(body) => update(editing.id, body)}
-                    onTitleChange={(title) => retitle(editing.id, title)}
-                    onTitleSettle={sync.releaseSaves}
-                    syncSlot={syncSlot}
-                    uploading={uploadingIds.has(editing.id)}
-                    loading={editingDeferred}
-                    canAttach={storage.adapter.capabilities.has("attachments")}
-                    onAttach={(attachment) => attach(editing.id, attachment)}
-                  />
-                ) : reading ? (
-                  <ReadOnlyNote
-                    key={reading.id}
-                    note={reading}
-                    editor={editor}
-                    onBack={() => setReadingId(null)}
-                    onRestore={() => restoreAndEdit(reading.id)}
-                    onDelete={() => removeNote(reading.id)}
-                    syncSlot={syncSlot}
-                  />
-                ) : view === "archive" ? (
-                  <ArchiveList
-                    notes={archived}
-                    onOpen={openRead}
-                    onRestore={restoreNote}
-                    onDelete={removeNote}
-                    onBack={() => setView("notes")}
-                    syncSlot={syncSlot}
-                  />
-                ) : (
-                  <NoteList
-                    notes={notes}
-                    loading={notesLoading}
-                    folders={folders}
-                    onOpen={(id) => switchTo(id)}
-                    onNew={openNew}
-                    onArchive={archiveNote}
-                    onDelete={removeNote}
-                    onMoveNote={moveNote}
-                    onRenameFolder={renameFolder}
-                    onRemoveFolder={removeFolder}
-                    syncSlot={syncSlot}
-                    encStatus={encStatus}
-                    uploadingIds={uploadingIds}
-                  />
-                )}
-              </main>
-            </NoteDragProvider>
-          </div>
+            <div
+              className="fixed flex overflow-hidden"
+              style={APP_VIEWPORT_RECT}
+            >
+              <NoteDragProvider
+                onDrop={handleNoteDrop}
+                aborted={sync.conflict !== null}
+              >
+                <SideMenu
+                  notes={notes}
+                  loading={notesLoading}
+                  activeNoteId={editingId}
+                  onSelectNote={(id) => switchTo(id)}
+                  onShowAll={showAll}
+                  showAllActive={view === "notes" && !editing && !reading}
+                  onAddNote={openNew}
+                  onRemoveNote={removeNote}
+                  onArchiveNote={archiveNote}
+                  archivedCount={archived.length}
+                  onOpenArchive={openArchive}
+                  archiveActive={view === "archive" && !editing}
+                  onUndo={undo}
+                  onRedo={redo}
+                  canUndo={canUndo}
+                  canRedo={canRedo}
+                  folders={folders}
+                  onMoveNote={moveNote}
+                  onMoveNoteToNamespace={moveToNamespace}
+                  onCreateFolder={createFolder}
+                  onRenameFolder={renameFolder}
+                  onRemoveFolder={removeFolder}
+                  namespaces={storage.namespaces}
+                  activeNamespace={storage.activeNamespace}
+                  onSwitchNamespace={switchNamespace}
+                  encStatus={encStatus}
+                  uploadingIds={uploadingIds}
+                />
+                <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+                  {editing ? (
+                    <Editor
+                      key={editing.id}
+                      note={editing}
+                      editor={editor}
+                      folders={folders}
+                      onBack={showAll}
+                      onMoveFolder={(folderId) =>
+                        moveNote(editing.id, folderId)
+                      }
+                      onChange={(body) => update(editing.id, body)}
+                      onTitleChange={(title) => retitle(editing.id, title)}
+                      onTitleSettle={sync.releaseSaves}
+                      syncSlot={syncSlot}
+                      uploading={uploadingIds.has(editing.id)}
+                      loading={editingDeferred}
+                      canAttach={storage.adapter.capabilities.has(
+                        "attachments",
+                      )}
+                      onAttach={(attachment) => attach(editing.id, attachment)}
+                    />
+                  ) : reading ? (
+                    <ReadOnlyNote
+                      key={reading.id}
+                      note={reading}
+                      editor={editor}
+                      onBack={() => setReadingId(null)}
+                      onRestore={() => restoreAndEdit(reading.id)}
+                      onDelete={() => removeNote(reading.id)}
+                      syncSlot={syncSlot}
+                    />
+                  ) : view === "archive" ? (
+                    <ArchiveList
+                      notes={archived}
+                      onOpen={openRead}
+                      onRestore={restoreNote}
+                      onDelete={removeNote}
+                      onBack={() => setView("notes")}
+                      syncSlot={syncSlot}
+                    />
+                  ) : (
+                    <NoteList
+                      notes={notes}
+                      loading={notesLoading}
+                      folders={folders}
+                      onOpen={(id) => switchTo(id)}
+                      onNew={openNew}
+                      onArchive={archiveNote}
+                      onDelete={removeNote}
+                      onMoveNote={moveNote}
+                      onRenameFolder={renameFolder}
+                      onRemoveFolder={removeFolder}
+                      syncSlot={syncSlot}
+                      encStatus={encStatus}
+                      uploadingIds={uploadingIds}
+                    />
+                  )}
+                </main>
+              </NoteDragProvider>
+            </div>
 
-          <SettingsModalHost storage={storage} conversion={encConversion} />
-          <NamespacesModalHost storage={storage} />
-          <ChangelogModalHost />
-          <AchievementsModalHost />
-          <AchievementsUnlockModalHost />
-          <ConflictModal sync={sync} />
-          <PullToRefreshIndicator
-            state={ptr.state}
-            pullDistance={ptr.pullDistance}
-          />
-          <DropOverlay visible={drop.dragging} />
-          <UpdateToast />
-        </ModalBusProvider>
-      </NavContext.Provider>
-    </AttachmentFetchContext.Provider>
+            <SettingsModalHost storage={storage} conversion={encConversion} />
+            <NamespacesModalHost storage={storage} />
+            <ChangelogModalHost />
+            <AchievementsModalHost />
+            <AchievementsUnlockModalHost />
+            <ConflictModal sync={sync} />
+            <PullToRefreshIndicator
+              state={ptr.state}
+              pullDistance={ptr.pullDistance}
+            />
+            <DropOverlay visible={drop.dragging} />
+            <UpdateToast />
+          </ModalBusProvider>
+        </NavContext.Provider>
+      </AttachmentFetchContext.Provider>
+    </ReportDragActivityContext.Provider>
   );
 }
 
@@ -729,6 +751,7 @@ function NoteList({
   // The folder under the finger during a touch long-press drag (the desktop
   // path uses `dropTarget` below); either lights up the matching section.
   const activeDropKey = useNoteDropKey();
+  const dragAbort = useNoteDragAbort();
   // Collapsed folders (default expanded) and the desktop drag-to-file state —
   // mirrors the side menu, so a note can be dropped onto a folder here too.
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
@@ -737,6 +760,16 @@ function NoteList({
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [draggingNote, setDraggingNote] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  // The desktop HTML5 path leans on `dragend` to clear the lift, but the
+  // browser skips `dragend` when the dragged row unmounts mid-drag (a sync
+  // conflict surfacing, a background reload swapping the list) — which would
+  // strand the row dimmed. The abort signal (bumped by `NoteDragProvider`)
+  // clears it instead. Idle on mount and whenever nothing is lifted.
+  useEffect(() => {
+    setDraggingNote(null);
+    setDropTarget(null);
+  }, [dragAbort]);
 
   function toggleFolder(id: string) {
     setCollapsed((prev) => {

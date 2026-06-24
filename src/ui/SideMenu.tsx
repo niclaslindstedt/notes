@@ -50,6 +50,7 @@ import {
   NOTE_DROP_ATTR,
   NOTE_DROP_ROOT,
   noteDropNamespaceKey,
+  useNoteDragAbort,
   useNoteDropKey,
 } from "./note-drag-context.ts";
 import { AchievementsMenuItem } from "./achievements/AchievementsMenuItem.tsx";
@@ -322,6 +323,16 @@ export function SideMenu({
   const [draggingNote, setDraggingNote] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const activeDropKey = useNoteDropKey();
+  const dragAbort = useNoteDragAbort();
+
+  // Clear the desktop drag's lift if the app aborts mid-drag (a sync conflict,
+  // a background reload) — the row may unmount before `dragend` fires, which
+  // would otherwise leave it stranded dimmed. See the overview's note on
+  // `DragAbortContext`. Idle on mount and whenever nothing is lifted.
+  useEffect(() => {
+    setDraggingNote(null);
+    setDropTarget(null);
+  }, [dragAbort]);
 
   function toggleFolder(id: string) {
     setExpandedFolders((prev) => {

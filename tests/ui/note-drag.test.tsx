@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ReportDragActivityContext } from "../../src/ui/drag-activity.ts";
 import { NoteDragItem, NoteDragProvider } from "../../src/ui/note-drag.tsx";
 import {
   NOTE_DROP_ARCHIVE,
@@ -142,5 +143,73 @@ describe("note long-press drag", () => {
     fireEvent.pointerUp(wrapper, { pointerId: 1 });
 
     expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  // A background save can collide with another device mid-drag, raising the
+  // conflict modal over the list. The lifted note must be torn down — otherwise
+  // its floating chip stays frozen in mid-air and its captured pointer keeps
+  // swallowing input meant for the modal. The app signals this via `aborted`.
+  it("tears the drag down when the app aborts mid-drag (a sync conflict)", () => {
+    const onDrop = vi.fn();
+    function Tree({ aborted }: { aborted: boolean }) {
+      return (
+        <NoteDragProvider onDrop={onDrop} aborted={aborted}>
+          <NoteDragItem noteId="n1" title="My note" enabled>
+            <button data-testid="note">My note</button>
+          </NoteDragItem>
+          <div data-testid="folder" {...{ [NOTE_DROP_ATTR]: "f1" }}>
+            Folder
+          </div>
+        </NoteDragProvider>
+      );
+    }
+    const { getByTestId, container, rerender } = render(
+      <Tree aborted={false} />,
+    );
+    const wrapper = getByTestId("note").parentElement!;
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(
+      getByTestId("folder"),
+    );
+
+    fireEvent.pointerDown(wrapper, touch);
+    act(() => void vi.advanceTimersByTime(400));
+    // The note is picked up — the floating chip is mounted.
+    expect(container.querySelector("[aria-hidden]")).not.toBeNull();
+
+    // A sync conflict surfaces: the app raises `aborted`.
+    act(() => rerender(<Tree aborted={true} />));
+
+    // The chip is gone, and a trailing release commits no move.
+    expect(container.querySelector("[aria-hidden]")).toBeNull();
+    fireEvent.pointerUp(wrapper, { pointerId: 1 });
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  // While a note is held the drag reports itself so the document-level
+  // pull-to-refresh stands down — dragging downward to a lower folder / the
+  // archive would otherwise arm a refresh at the same time.
+  it("reports drag activity while a note is held, and clears it on drop", () => {
+    const report = vi.fn();
+    const { getByTestId } = render(
+      <ReportDragActivityContext.Provider value={report}>
+        <NoteDragProvider onDrop={() => {}}>
+          <NoteDragItem noteId="n1" title="My note" enabled>
+            <button data-testid="note">My note</button>
+          </NoteDragItem>
+          <div data-testid="root" {...{ [NOTE_DROP_ATTR]: NOTE_DROP_ROOT }}>
+            Ungrouped
+          </div>
+        </NoteDragProvider>
+      </ReportDragActivityContext.Provider>,
+    );
+    const wrapper = getByTestId("note").parentElement!;
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(getByTestId("root"));
+
+    fireEvent.pointerDown(wrapper, touch);
+    act(() => void vi.advanceTimersByTime(400));
+    expect(report).toHaveBeenLastCalledWith(true);
+
+    act(() => fireEvent.pointerUp(wrapper, { pointerId: 1 }));
+    expect(report).toHaveBeenLastCalledWith(false);
   });
 });

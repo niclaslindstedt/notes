@@ -10,6 +10,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
@@ -51,10 +52,25 @@ export type DragActions = {
 // targets, which read the key, do.
 export const ActionsContext = createContext<DragActions | null>(null);
 export const DropKeyContext = createContext<string | null>(null);
+// A monotonically increasing "abort" signal the app bumps to tear down any
+// in-flight drag from outside the gesture — e.g. a sync-conflict modal has
+// surfaced over the list and seized the screen. The provider raises it; the
+// active row releases its pointer capture and stops blocking scroll, and the
+// native HTML5 drop zones drop their lift styling, even though no
+// pointerup/cancel (or `dragend`) will arrive on a row the interruption
+// unmounted.
+export const DragAbortContext = createContext<number>(0);
 
 /** The drop target currently under the finger (its `data-note-drop` value). */
 export function useNoteDropKey(): string | null {
   return useContext(DropKeyContext);
+}
+
+/** The current drag-abort generation; changes when the app aborts in-flight
+ * drags (a sync conflict, a background reload). Native HTML5 drop zones watch
+ * it to clear a lift that `dragend` would otherwise never resolve. */
+export function useNoteDragAbort(): number {
+  return useContext(DragAbortContext);
 }
 
 export type TouchDragHandlers = Partial<{
@@ -75,6 +91,7 @@ export function useTouchNoteDrag(
   enabled: boolean,
 ): { handlers: TouchDragHandlers; dragging: boolean } {
   const actions = useContext(ActionsContext);
+  const abortGen = useContext(DragAbortContext);
   const [dragging, setDragging] = useState(false);
 
   const timer = useRef<number | null>(null);
@@ -119,6 +136,16 @@ export function useTouchNoteDrag(
     pointerId.current = null;
     setDragging(false);
   }, [clearTimer]);
+
+  // Tear the gesture down when the app aborts mid-drag (a sync-conflict modal
+  // took over, a background reload swapped the list). The row may have
+  // unmounted, so no pointerup/cancel will reach these handlers — release the
+  // captured pointer and stop blocking scroll here instead, so nothing is left
+  // latched. `active` is false on mount and whenever idle, so the initial run
+  // (and runs while no drag is live) are no-ops.
+  useEffect(() => {
+    if (active.current) cleanup();
+  }, [abortGen, cleanup]);
 
   const engage = useCallback(
     (x: number, y: number) => {
