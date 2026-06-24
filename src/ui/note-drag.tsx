@@ -38,13 +38,16 @@ import {
 } from "react";
 
 import { useReportDragActivity } from "./drag-activity.ts";
-import { NoteIcon } from "./icons.tsx";
+import { FolderIcon, NoteIcon } from "./icons.tsx";
 import {
   ActionsContext,
   DragAbortContext,
+  DragKindContext,
   DropKeyContext,
   useTouchNoteDrag,
   type DragActions,
+  type DragItem,
+  type DragKind,
 } from "./note-drag-context.ts";
 
 export function NoteDragProvider({
@@ -52,17 +55,21 @@ export function NoteDragProvider({
   aborted = false,
   children,
 }: {
-  // Fired when a note is released over a drop target. `key` is the target's
-  // `data-note-drop` value (folder id / `NOTE_DROP_ROOT` / `NOTE_DROP_ARCHIVE`
-  // / `ns:<slug>`); the caller resolves it to the right action.
-  onDrop: (noteId: string, key: string) => void;
+  // Fired when an item (a note or a folder) is released over a drop target.
+  // `key` is the target's `data-note-drop` value (folder id / `NOTE_DROP_ROOT`
+  // / `NOTE_DROP_ARCHIVE` / `ns:<slug>`); the caller resolves the `(item, key)`
+  // pair to the right action (a folder only acts on a namespace target).
+  onDrop: (item: DragItem, key: string) => void;
   // When true, any in-flight drag is torn down: a sync-conflict modal (or a
   // background reload) has seized the screen, so the lifted note must not stay
   // frozen on top of it waiting for a pointerup/`dragend` that won't come.
   aborted?: boolean;
   children: ReactNode;
 }) {
-  const [dragging, setDragging] = useState<{ title: string } | null>(null);
+  const [dragging, setDragging] = useState<{
+    kind: DragKind;
+    title: string;
+  } | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);
   // Bumped to tell every active row (and the native drop zones) to tear their
   // drag down when `aborted` rises — see `DragAbortContext`.
@@ -73,7 +80,7 @@ export function NoteDragProvider({
   const ghostPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   // Live mirrors so the memoised actions read current values without being
   // rebuilt (which would re-fire the touch handlers' closures).
-  const noteIdRef = useRef<string | null>(null);
+  const itemRef = useRef<DragItem | null>(null);
   const dropKeyRef = useRef<string | null>(null);
 
   // Sit the chip just above the fingertip, horizontally centred on it.
@@ -105,7 +112,7 @@ export function NoteDragProvider({
   // Drop the floating chip and forget the in-flight drag without committing a
   // move. Shared by the `cancel` action (a pointercancel) and the abort effect.
   const cancelDrag = useCallback(() => {
-    noteIdRef.current = null;
+    itemRef.current = null;
     dropKeyRef.current = null;
     setDragging(null);
     setDropKey(null);
@@ -135,13 +142,13 @@ export function NoteDragProvider({
 
   const actions = useMemo<DragActions>(
     () => ({
-      begin(noteId, title, x, y) {
-        noteIdRef.current = noteId;
+      begin(item, x, y) {
+        itemRef.current = item;
         dropKeyRef.current = null;
         // Record the pickup point so the chip's callback ref can place it the
         // moment it mounts, rather than flashing at the top-left default.
         positionGhost(x, y);
-        setDragging({ title });
+        setDragging({ kind: item.kind, title: item.title });
         setDropKey(null);
       },
       hover(key, x, y) {
@@ -152,10 +159,10 @@ export function NoteDragProvider({
         }
       },
       commit() {
-        const noteId = noteIdRef.current;
+        const item = itemRef.current;
         const key = dropKeyRef.current;
-        if (noteId && key !== null) onDrop(noteId, key);
-        noteIdRef.current = null;
+        if (item && key !== null) onDrop(item, key);
+        itemRef.current = null;
         dropKeyRef.current = null;
         setDragging(null);
         setDropKey(null);
@@ -168,30 +175,37 @@ export function NoteDragProvider({
   return (
     <ActionsContext.Provider value={actions}>
       <DragAbortContext.Provider value={abortGen}>
-        <DropKeyContext.Provider value={dropKey}>
-          {children}
-          {dragging && (
-            <div
-              ref={setGhostRef}
-              aria-hidden
-              className="pointer-events-none fixed top-0 left-0 z-[100] flex max-w-[70vw] items-center gap-2 rounded-[var(--radius)] border border-accent/40 bg-surface-2 px-3 py-1.5 text-sm text-fg-bright shadow-lg"
-            >
-              <NoteIcon className="h-4 w-4 shrink-0 text-accent" />
-              <span className="truncate">{dragging.title || "Untitled"}</span>
-            </div>
-          )}
-        </DropKeyContext.Provider>
+        <DragKindContext.Provider value={dragging?.kind ?? null}>
+          <DropKeyContext.Provider value={dropKey}>
+            {children}
+            {dragging && (
+              <div
+                ref={setGhostRef}
+                aria-hidden
+                className="pointer-events-none fixed top-0 left-0 z-[100] flex max-w-[70vw] items-center gap-2 rounded-[var(--radius)] border border-accent/40 bg-surface-2 px-3 py-1.5 text-sm text-fg-bright shadow-lg"
+              >
+                {dragging.kind === "folder" ? (
+                  <FolderIcon className="h-4 w-4 shrink-0 text-accent" />
+                ) : (
+                  <NoteIcon className="h-4 w-4 shrink-0 text-accent" />
+                )}
+                <span className="truncate">{dragging.title || "Untitled"}</span>
+              </div>
+            )}
+          </DropKeyContext.Provider>
+        </DragKindContext.Provider>
       </DragAbortContext.Provider>
     </ActionsContext.Provider>
   );
 }
 
-// The wrapper a draggable note row renders through: it carries the desktop
-// HTML5 drag props (when `draggable`) and the touch long-press handlers (when
-// `enabled`), and dims itself while it's the one being dragged.
+// The wrapper a draggable note (or folder) row renders through: it carries the
+// desktop HTML5 drag props (when `draggable`) and the touch long-press handlers
+// (when `enabled`), and dims itself while it's the one being dragged.
 export function NoteDragItem({
   noteId,
   title,
+  kind = "note",
   enabled,
   draggable,
   dragging: desktopDragging,
@@ -202,6 +216,8 @@ export function NoteDragItem({
 }: {
   noteId: string;
   title: string;
+  /** What this row represents — a single note (default) or a whole folder. */
+  kind?: DragKind;
   /** Touch long-press drag is wired (coarse pointer). */
   enabled: boolean;
   /** Desktop HTML5 drag is wired (fine pointer). */
@@ -216,6 +232,7 @@ export function NoteDragItem({
   const { handlers, dragging: touchDragging } = useTouchNoteDrag(
     noteId,
     title,
+    kind,
     enabled,
   );
   const isDragging = enabled ? touchDragging : Boolean(desktopDragging);

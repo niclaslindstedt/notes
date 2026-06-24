@@ -1546,9 +1546,10 @@ elapses is left to the existing swipe/scroll. Once engaged it captures the
 pointer (so the inner swipe element stops seeing moves) and blocks page scroll,
 and it hit-tests with `elementFromPoint` against any element carrying the
 `data-note-drop` attribute. `NoteDragProvider` (mounted once around the shell in
-`App`) renders the ghost and reports a drop as `onDrop(noteId, key)` — the raw
-target key, which `App` resolves to an action. `NoteDragItem` is the per-row
-wrapper that wires the desktop HTML5 props and the touch handlers together; drop
+`App`) renders the ghost and reports a drop as `onDrop(item, key)` — the dragged
+item (a note or a folder) and the raw target key, which `App` resolves to an
+action. `NoteDragItem` is the per-row wrapper that wires the desktop HTML5 props
+and the touch handlers together (a `kind` prop marks a folder row); drop
 targets read the hovered key via `useNoteDropKey` to paint their highlight. The
 side menu and the overview both carry `select-none` so a drag never paints a
 text selection across the rows it crosses.
@@ -1582,7 +1583,16 @@ The drop-target keys (see `note-drag-context.ts`) span four kinds of target:
   it out of every folder (both surfaces);
 - `NOTE_DROP_ARCHIVE` — the side menu's **Archive** row, which archives the note;
 - `ns:<slug>` (`noteDropNamespaceKey`) — a side-menu **namespace** row, which
-  moves the note into that namespace.
+  moves the dragged item into that namespace.
+
+A dragged item is either a single **note** or a whole **folder**
+(`DragItem.kind`, reported via `onDrop(item, key)` and — for the touch path's
+highlight gating — `useNoteDragKind`). A folder header is a drag source too: on
+a backend with more than one namespace its row becomes draggable (HTML5 on
+desktop with a distinct `FOLDER_DND_TYPE` MIME, the long-press gesture on
+touch), and the only target it resolves against is a namespace row — every
+notes-only target (a folder, the root zone, the Archive row) ignores a folder
+drag and withholds its highlight (`noteDropActive`).
 
 The archive and namespace targets are **side-menu only**. Moving a note across
 namespaces is a cross-document write: `useStorageBackend.moveNoteToNamespace`
@@ -1593,6 +1603,16 @@ source namespace. The source folder link is dropped (the target has its own
 folders). It's best-effort — if the target write fails (offline cloud) the note
 is left in place — and undo restores the source copy (which can leave a copy in
 both namespaces, the one rough edge of the cross-document move).
+
+Moving a **folder** across namespaces moves all of its contents:
+`useStorageBackend.moveFolderToNamespace` hydrates each filed note's body and
+attachment bytes (the encrypted backends keep both deferred in the list),
+writes the folder record **and** its notes into the target document — each note
+keeps its `folderId`, so it stays filed under the folder there — and saves;
+`App` then clears the folder and its notes from the source in one undoable step
+(`removeFolderWithNotes`). Same best-effort contract as the per-note move (a
+failed target write leaves the source untouched). If the open note belonged to
+the moved folder, `App` leaves the editor since it's gone from this namespace.
 
 ### Folder picker
 

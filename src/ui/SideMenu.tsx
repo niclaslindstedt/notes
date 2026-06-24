@@ -57,6 +57,7 @@ import {
   NOTE_DROP_ROOT,
   noteDropNamespaceKey,
   useNoteDragAbort,
+  useNoteDragKind,
   useNoteDropKey,
 } from "./note-drag-context.ts";
 import { AchievementsMenuItem } from "./achievements/AchievementsMenuItem.tsx";
@@ -123,6 +124,10 @@ const MAX_RECENT_NOTES = 6;
 // desktop HTML5 path. The touch path and the ungrouped-zone sentinel
 // (`NOTE_DROP_ROOT`) are shared from `note-drag.tsx`.
 const NOTE_DND_TYPE = "application/x-notes-note-id";
+// The sibling MIME for dragging a whole folder (onto a namespace row, to move
+// it with all its notes). A distinct type so a namespace drop can tell a folder
+// drag from a note drag.
+const FOLDER_DND_TYPE = "application/x-notes-folder-id";
 
 type Props = {
   /** Notes to list, in display order (most-recently-edited first). */
@@ -166,6 +171,8 @@ type Props = {
   onMoveNote: (id: string, folderId: string | null) => void;
   /** Move a note into another namespace (drop onto its row). */
   onMoveNoteToNamespace: (id: string, slug: string) => void;
+  /** Move a folder — with every note in it — into another namespace (drop onto its row). */
+  onMoveFolderToNamespace: (folderId: string, slug: string) => void;
   /** Create a folder; returns its id so the new folder can auto-expand. */
   onCreateFolder: (name: string) => string;
   /** Rename a folder. */
@@ -204,6 +211,7 @@ export function SideMenu({
   folders,
   onMoveNote,
   onMoveNoteToNamespace,
+  onMoveFolderToNamespace,
   onCreateFolder,
   onRenameFolder,
   onRemoveFolder,
@@ -243,22 +251,32 @@ export function SideMenu({
   const [aboutOpen, setAboutOpen] = useState(false);
   const aboutRef = useRef<HTMLButtonElement>(null);
 
-  // Desktop HTML5 drag-to-file state. `draggingNote` gates the drop targets (so
-  // a stray dragover from outside doesn't light them up) and `dropTarget`
-  // drives the hover highlight — a folder id, or `NOTE_DROP_ROOT` for "out of
-  // any folder". The touch long-press path reports its target via
-  // `activeDropKey`.
-  const [draggingNote, setDraggingNote] = useState<string | null>(null);
+  // Desktop HTML5 drag state. `dragItem` gates the drop targets (so a stray
+  // dragover from outside doesn't light them up) and records what's being
+  // dragged — a single note, or a whole folder (which only a namespace row
+  // accepts). `dropTarget` drives the hover highlight. The touch long-press
+  // path reports its target via `activeDropKey` and its kind via `touchDragKind`.
+  const [dragItem, setDragItem] = useState<{
+    kind: "note" | "folder";
+    id: string;
+  } | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const activeDropKey = useNoteDropKey();
+  const touchDragKind = useNoteDragKind();
   const dragAbort = useNoteDragAbort();
+  // Whether a notes-only target (a folder, the ungrouped root, the Archive row)
+  // should paint its highlight: it must not while a *folder* is being dragged,
+  // since a folder only drops onto a namespace. Desktop already gates that in
+  // `allowDropOn`; this also covers the touch path's `activeDropKey`.
+  const noteDropActive = (key: string): boolean =>
+    dropTarget === key || (activeDropKey === key && touchDragKind !== "folder");
 
   // Clear the desktop drag's lift if the app aborts mid-drag (a sync conflict,
   // a background reload) — the row may unmount before `dragend` fires, which
   // would otherwise leave it stranded dimmed. See the overview's note on
   // `DragAbortContext`. Idle on mount and whenever nothing is lifted.
   useEffect(() => {
-    setDraggingNote(null);
+    setDragItem(null);
     setDropTarget(null);
   }, [dragAbort]);
 
@@ -274,14 +292,23 @@ export function SideMenu({
   function startNoteDrag(e: ReactDragEvent, id: string) {
     e.dataTransfer.setData(NOTE_DND_TYPE, id);
     e.dataTransfer.effectAllowed = "move";
-    setDraggingNote(id);
+    setDragItem({ kind: "note", id });
   }
-  function endNoteDrag() {
-    setDraggingNote(null);
+  function startFolderDrag(e: ReactDragEvent, id: string) {
+    e.dataTransfer.setData(FOLDER_DND_TYPE, id);
+    e.dataTransfer.effectAllowed = "move";
+    setDragItem({ kind: "folder", id });
+  }
+  function endDrag() {
+    setDragItem(null);
     setDropTarget(null);
   }
-  function allowDropOn(e: ReactDragEvent, key: string) {
-    if (!draggingNote) return;
+  // `acceptFolder` marks the rare target (a namespace row) that also takes a
+  // dragged folder; every other target accepts notes only, so a folder drag
+  // over it is left inert.
+  function allowDropOn(e: ReactDragEvent, key: string, acceptFolder = false) {
+    if (!dragItem) return;
+    if (dragItem.kind === "folder" && !acceptFolder) return;
     e.preventDefault();
     // Folders now nest inside the ungrouped root drop zone, so stop the
     // hover from bubbling up and lighting the root highlight at the same time.
@@ -294,20 +321,32 @@ export function SideMenu({
     // A drop on a folder must not also bubble to the root zone (which would
     // immediately move the note back out to the top level).
     e.stopPropagation();
-    const id = e.dataTransfer.getData(NOTE_DND_TYPE) || draggingNote;
-    endNoteDrag();
+    const id =
+      e.dataTransfer.getData(NOTE_DND_TYPE) ||
+      (dragItem?.kind === "note" ? dragItem.id : "");
+    endDrag();
     if (id) onMoveNote(id, folderId);
   }
   function dropOnNamespace(e: ReactDragEvent, slug: string) {
     e.preventDefault();
-    const id = e.dataTransfer.getData(NOTE_DND_TYPE) || draggingNote;
-    endNoteDrag();
-    if (id) onMoveNoteToNamespace(id, slug);
+    // A namespace row accepts either a note or a whole folder; the dataTransfer
+    // MIME (or the live drag item) says which.
+    const folderId =
+      e.dataTransfer.getData(FOLDER_DND_TYPE) ||
+      (dragItem?.kind === "folder" ? dragItem.id : "");
+    const noteId =
+      e.dataTransfer.getData(NOTE_DND_TYPE) ||
+      (dragItem?.kind === "note" ? dragItem.id : "");
+    endDrag();
+    if (folderId) onMoveFolderToNamespace(folderId, slug);
+    else if (noteId) onMoveNoteToNamespace(noteId, slug);
   }
   function dropOnArchive(e: ReactDragEvent) {
     e.preventDefault();
-    const id = e.dataTransfer.getData(NOTE_DND_TYPE) || draggingNote;
-    endNoteDrag();
+    const id =
+      e.dataTransfer.getData(NOTE_DND_TYPE) ||
+      (dragItem?.kind === "note" ? dragItem.id : "");
+    endDrag();
     if (id) onArchiveNote(id);
   }
   const {
@@ -366,6 +405,10 @@ export function SideMenu({
 
   const onRight = position.side === "right";
 
+  // A folder can only be dragged somewhere meaningful — onto another namespace
+  // row — so the drag affordance is only wired when a second namespace exists.
+  const canMoveFolderToNamespace = namespaces.length > 1;
+
   // Notes split into their folder buckets plus the ungrouped remainder. A note
   // whose `folderId` points at a folder the registry no longer has is treated
   // as ungrouped, so a stale link never hides the note.
@@ -420,9 +463,9 @@ export function SideMenu({
         title={noteTitle(note)}
         enabled={!isDesktop}
         draggable={isDesktop}
-        dragging={draggingNote === note.id}
+        dragging={dragItem?.kind === "note" && dragItem.id === note.id}
         onDragStart={isDesktop ? (e) => startNoteDrag(e, note.id) : undefined}
-        onDragEnd={isDesktop ? endNoteDrag : undefined}
+        onDragEnd={isDesktop ? endDrag : undefined}
       >
         <SwipeToRemove
           actionLabel={t("nav.deleteNote")}
@@ -463,26 +506,44 @@ export function SideMenu({
       activeNoteId != null && folderNotes.some((n) => n.id === activeNoteId);
     return (
       <div key={folder.id} {...{ [NOTE_DROP_ATTR]: folder.id }}>
-        <FolderRow
-          name={folder.name}
-          count={folderNotes.length}
-          expanded={expanded}
-          containsActiveNote={containsActiveNote}
-          isDropTarget={dropTarget === folder.id || activeDropKey === folder.id}
-          renameLabel={t("nav.renameFolder")}
-          deleteLabel={t("nav.deleteFolder")}
-          addNoteLabel={t("nav.newNote")}
-          onToggle={() => toggleFolder(folder.id)}
-          onRename={() => setRenamingFolderId(folder.id)}
-          onDelete={() => onRemoveFolder(folder.id)}
-          onAddNote={() => {
-            onAddNote(folder.id);
-            close();
-          }}
-          onDragOver={(e) => allowDropOn(e, folder.id)}
-          onDragLeave={() => setDropTarget(null)}
-          onDrop={(e) => dropOn(e, folder.id)}
-        />
+        {/* The header is both a drop target (a dragged note files into it) and,
+            when another namespace exists, a drag source — picking the folder up
+            moves it, with every note in it, onto a namespace row. */}
+        <NoteDragItem
+          noteId={folder.id}
+          title={folder.name}
+          kind="folder"
+          enabled={!isDesktop && canMoveFolderToNamespace}
+          draggable={isDesktop && canMoveFolderToNamespace}
+          dragging={dragItem?.kind === "folder" && dragItem.id === folder.id}
+          onDragStart={
+            isDesktop && canMoveFolderToNamespace
+              ? (e) => startFolderDrag(e, folder.id)
+              : undefined
+          }
+          onDragEnd={isDesktop ? endDrag : undefined}
+        >
+          <FolderRow
+            name={folder.name}
+            count={folderNotes.length}
+            expanded={expanded}
+            containsActiveNote={containsActiveNote}
+            isDropTarget={noteDropActive(folder.id)}
+            renameLabel={t("nav.renameFolder")}
+            deleteLabel={t("nav.deleteFolder")}
+            addNoteLabel={t("nav.newNote")}
+            onToggle={() => toggleFolder(folder.id)}
+            onRename={() => setRenamingFolderId(folder.id)}
+            onDelete={() => onRemoveFolder(folder.id)}
+            onAddNote={() => {
+              onAddNote(folder.id);
+              close();
+            }}
+            onDragOver={(e) => allowDropOn(e, folder.id)}
+            onDragLeave={() => setDropTarget(null)}
+            onDrop={(e) => dropOn(e, folder.id)}
+          />
+        </NoteDragItem>
         {expanded && (
           <div>{folderNotes.map((note) => renderNoteRow(note, true))}</div>
         )}
@@ -535,7 +596,7 @@ export function SideMenu({
           <NamespaceGlyph className="h-5 w-5" />
         );
         // Every namespace but the active one is a drop target: dropping a note
-        // onto it moves the note into that namespace.
+        // — or a whole folder — onto it moves it into that namespace.
         const droppable = ns.slug !== activeNamespace;
         const nsKey = noteDropNamespaceKey(ns.slug);
         return (
@@ -548,7 +609,9 @@ export function SideMenu({
             isDropTarget={
               droppable && (dropTarget === nsKey || activeDropKey === nsKey)
             }
-            onDragOver={droppable ? (e) => allowDropOn(e, nsKey) : undefined}
+            onDragOver={
+              droppable ? (e) => allowDropOn(e, nsKey, true) : undefined
+            }
             onDragLeave={droppable ? () => setDropTarget(null) : undefined}
             onDrop={droppable ? (e) => dropOnNamespace(e, ns.slug) : undefined}
             onClick={() => onSwitchNamespace(ns.slug)}
@@ -583,9 +646,7 @@ export function SideMenu({
         onDragLeave={() => setDropTarget(null)}
         onDrop={(e) => dropOn(e, null)}
         className={
-          dropTarget === NOTE_DROP_ROOT || activeDropKey === NOTE_DROP_ROOT
-            ? "rounded-sm bg-accent/10"
-            : undefined
+          noteDropActive(NOTE_DROP_ROOT) ? "rounded-sm bg-accent/10" : undefined
         }
       >
         {sortedFolders.length === 0 && recentUngrouped.length === 0 ? (
@@ -657,10 +718,7 @@ export function SideMenu({
               active={archiveActive}
               badge={archivedCount > 0 ? archivedCount : undefined}
               dropId={NOTE_DROP_ARCHIVE}
-              isDropTarget={
-                dropTarget === NOTE_DROP_ARCHIVE ||
-                activeDropKey === NOTE_DROP_ARCHIVE
-              }
+              isDropTarget={noteDropActive(NOTE_DROP_ARCHIVE)}
               onDragOver={(e) => allowDropOn(e, NOTE_DROP_ARCHIVE)}
               onDragLeave={() => setDropTarget(null)}
               onDrop={dropOnArchive}

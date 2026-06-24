@@ -69,6 +69,12 @@ export type NotesStore = {
   renameFolder: (id: string, name: string) => void;
   /** Delete a folder; its notes survive and fall back to ungrouped. */
   removeFolder: (id: string) => void;
+  /**
+   * Delete a folder *and* every note filed in it, in one undoable step. Used
+   * after the folder has been moved wholesale into another namespace, so the
+   * source copy is cleared.
+   */
+  removeFolderWithNotes: (id: string) => void;
   // Decrypt and load a deferred note's body (the encrypted file/cloud backends
   // render the list from an index with bodies left unloaded). Resolves once the
   // body is in the in-memory document, or immediately when it's already loaded
@@ -413,6 +419,26 @@ export function useNotes(
     [commitSnapshot, ensureBody],
   );
 
+  // Delete a folder along with every note filed in it (one undoable step). The
+  // counterpart to `removeFolder`, which keeps the notes; this is the source-
+  // side cleanup once the folder's contents have been written into another
+  // namespace, so they don't linger in both places.
+  const removeFolderWithNotes = useCallback(
+    (id: string): void => {
+      const target = docRef.current.folders?.find((f) => f.id === id);
+      const name = target ? target.name : "folder";
+      commitSnapshot(
+        (prev) => ({
+          ...prev,
+          folders: (prev.folders ?? []).filter((f) => f.id !== id),
+          notes: prev.notes.filter((n) => n.folderId !== id),
+        }),
+        `Moved folder “${name}” to another namespace`,
+      );
+    },
+    [commitSnapshot],
+  );
+
   const undo = useCallback(() => {
     undoTimeline();
     unlock("secondThoughts");
@@ -462,6 +488,7 @@ export function useNotes(
     createFolder,
     renameFolder,
     removeFolder,
+    removeFolderWithNotes,
     ensureBody,
     undo,
     redo,

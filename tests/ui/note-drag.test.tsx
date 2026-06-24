@@ -9,7 +9,11 @@ import {
   NOTE_DROP_ATTR,
   NOTE_DROP_ROOT,
   noteDropNamespaceKey,
+  type DragItem,
 } from "../../src/ui/note-drag-context.ts";
+
+// The note row under test reports itself as this item when picked up.
+const NOTE_ITEM: DragItem = { kind: "note", id: "n1", title: "My note" };
 
 // jsdom implements neither pointer capture nor hit-testing; stub both so the
 // long-press gesture can run. `elementFromPoint` is re-pointed per test.
@@ -30,7 +34,7 @@ afterEach(() => {
   cleanup();
 });
 
-function setup(onDrop: (id: string, key: string) => void) {
+function setup(onDrop: (item: DragItem, key: string) => void) {
   const utils = render(
     <NoteDragProvider onDrop={onDrop}>
       <NoteDragItem noteId="n1" title="My note" enabled>
@@ -74,28 +78,54 @@ describe("note long-press drag", () => {
     const onDrop = vi.fn();
     const { wrapper, getByTestId } = setup(onDrop);
     dragOnto(wrapper, getByTestId("folder"));
-    expect(onDrop).toHaveBeenCalledExactlyOnceWith("n1", "f1");
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith(NOTE_ITEM, "f1");
   });
 
   it("reports the root key when dropped on the ungrouped zone", () => {
     const onDrop = vi.fn();
     const { wrapper, getByTestId } = setup(onDrop);
     dragOnto(wrapper, getByTestId("root"));
-    expect(onDrop).toHaveBeenCalledExactlyOnceWith("n1", NOTE_DROP_ROOT);
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith(NOTE_ITEM, NOTE_DROP_ROOT);
   });
 
   it("reports the namespace key when dropped on a namespace row", () => {
     const onDrop = vi.fn();
     const { wrapper, getByTestId } = setup(onDrop);
     dragOnto(wrapper, getByTestId("ns"));
-    expect(onDrop).toHaveBeenCalledExactlyOnceWith("n1", "ns:work");
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith(NOTE_ITEM, "ns:work");
   });
 
   it("reports the archive key when dropped on the Archive row", () => {
     const onDrop = vi.fn();
     const { wrapper, getByTestId } = setup(onDrop);
     dragOnto(wrapper, getByTestId("archive"));
-    expect(onDrop).toHaveBeenCalledExactlyOnceWith("n1", NOTE_DROP_ARCHIVE);
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith(
+      NOTE_ITEM,
+      NOTE_DROP_ARCHIVE,
+    );
+  });
+
+  it("carries the folder kind when a folder row is dropped on a namespace", () => {
+    const onDrop = vi.fn();
+    const utils = render(
+      <NoteDragProvider onDrop={onDrop}>
+        <NoteDragItem noteId="f9" title="Recipes" kind="folder" enabled>
+          <button data-testid="folder-row">Recipes</button>
+        </NoteDragItem>
+        <div
+          data-testid="ns"
+          {...{ [NOTE_DROP_ATTR]: noteDropNamespaceKey("work") }}
+        >
+          Work
+        </div>
+      </NoteDragProvider>,
+    );
+    const wrapper = utils.getByTestId("folder-row").parentElement!;
+    dragOnto(wrapper, utils.getByTestId("ns"));
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith(
+      { kind: "folder", id: "f9", title: "Recipes" },
+      "ns:work",
+    );
   });
 
   it("positions the drag chip at the pickup point before the finger moves", () => {
@@ -163,7 +193,7 @@ describe("note long-press drag", () => {
     fireEvent.pointerMove(window, { ...touch, clientX: 50, clientY: 200 });
     fireEvent.pointerUp(document.body, { pointerId: 1 });
 
-    expect(onDrop).toHaveBeenCalledExactlyOnceWith("n1", "f1");
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith(NOTE_ITEM, "f1");
   });
 
   // A browser-initiated pointercancel (the UA seized the pointer) aborts the

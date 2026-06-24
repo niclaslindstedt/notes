@@ -30,6 +30,7 @@ import {
   NOTE_DROP_ARCHIVE,
   NOTE_DROP_NS_PREFIX,
   NOTE_DROP_ROOT,
+  type DragItem,
 } from "../ui/note-drag-context.ts";
 import { AttachmentFetchContext } from "../ui/attachments/fetch-context.ts";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
@@ -118,6 +119,7 @@ export function App() {
     createFolder,
     renameFolder,
     removeFolder,
+    removeFolderWithNotes,
     ensureBody,
     undo,
     redo,
@@ -423,20 +425,50 @@ export function App() {
     }
   }
 
-  // The sidebar drag layer reports a drop by its target key; resolve it to the
-  // right action. Routed through a ref so the provider's `onDrop` identity stays
-  // stable (it feeds a context every note row subscribes to) while still seeing
-  // the latest closures here.
-  const dropHandlerRef = useRef<(id: string, key: string) => void>(() => {});
-  dropHandlerRef.current = (id: string, key: string) => {
+  // Move a whole folder into another namespace (sidebar drag): write the folder
+  // and all the notes filed in it into the target's document, then clear both
+  // from this one. Best-effort, like the per-note move — if the target write
+  // fails (offline cloud) nothing is removed here. If the open note belonged to
+  // the folder, leave the editor since it's gone from this namespace.
+  async function moveFolderToNamespace(folderId: string, slug: string) {
+    const folder = folders.find((f) => f.id === folderId);
+    if (!folder) return;
+    const folderNotes = allNotes.filter((n) => n.folderId === folderId);
+    if (await storage.moveFolderToNamespace(folder, folderNotes, slug)) {
+      removeFolderWithNotes(folderId);
+      if (folderNotes.some((n) => n.id === editingId)) setEditingId(null);
+      if (folderNotes.some((n) => n.id === readingId)) setReadingId(null);
+    }
+  }
+
+  // The sidebar drag layer reports a drop by the dragged item and the target
+  // key; resolve the pair to the right action. A folder only acts on a
+  // namespace target (move it there with all its notes); every other key is
+  // meaningless for a folder and ignored. Routed through a ref so the
+  // provider's `onDrop` identity stays stable (it feeds a context every row
+  // subscribes to) while still seeing the latest closures here.
+  const dropHandlerRef = useRef<(item: DragItem, key: string) => void>(
+    () => {},
+  );
+  dropHandlerRef.current = (item: DragItem, key: string) => {
+    if (item.kind === "folder") {
+      if (key.startsWith(NOTE_DROP_NS_PREFIX)) {
+        void moveFolderToNamespace(
+          item.id,
+          key.slice(NOTE_DROP_NS_PREFIX.length),
+        );
+      }
+      return;
+    }
+    const id = item.id;
     if (key === NOTE_DROP_ROOT) moveNote(id, null);
     else if (key === NOTE_DROP_ARCHIVE) archiveNote(id);
     else if (key.startsWith(NOTE_DROP_NS_PREFIX)) {
       void moveToNamespace(id, key.slice(NOTE_DROP_NS_PREFIX.length));
     } else moveNote(id, key);
   };
-  const handleNoteDrop = useCallback((id: string, key: string) => {
-    dropHandlerRef.current(id, key);
+  const handleNoteDrop = useCallback((item: DragItem, key: string) => {
+    dropHandlerRef.current(item, key);
   }, []);
 
   // Restore from the archive page's swipe gesture: the note leaves the archive
@@ -514,6 +546,7 @@ export function App() {
                   folders={folders}
                   onMoveNote={moveNote}
                   onMoveNoteToNamespace={moveToNamespace}
+                  onMoveFolderToNamespace={moveFolderToNamespace}
                   onCreateFolder={createFolder}
                   onRenameFolder={renameFolder}
                   onRemoveFolder={removeFolder}
