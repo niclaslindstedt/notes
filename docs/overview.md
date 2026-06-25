@@ -1510,8 +1510,10 @@ and the `NoteSortKey` type itself) are pure functions over the note model in
 `src/domain/note.ts` — `SideMenu` only consumes them. The loose notes are
 still capped at `MAX_RECENT_NOTES`. Both are set in **Appearance → Sidebar**.
 
-The **button island** is one bordered block (`BarButton`) pinned to the foot of
-the list (`mt-auto`), instead of full-width rows, to save vertical space: a top
+The **button island** is one bordered block (`BarButton`), extracted as a
+self-contained `SideMenuActionBar` (`src/ui/SideMenuActionBar.tsx`) the drawer
+renders below the list, pinned to its foot (`mt-auto`) instead of full-width
+rows, to save vertical space: a top
 row of **New note / New folder / Show all / Archive** and a bottom row of
 **Undo / Redo**, split by a divider so the six icon buttons read as one coherent
 unit rather than competing widgets. The cells sit flush against one another (the
