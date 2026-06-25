@@ -165,9 +165,9 @@ export function SearchModal({ open, onClose, snapshot, onOpen }: Props) {
           type="button"
           onClick={onClose}
           aria-label={t("common.close")}
-          className="flex h-7 shrink-0 cursor-pointer items-center rounded px-2 text-sm text-muted hover:bg-surface-2 hover:text-fg-bright"
+          className="-mr-1 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg-bright"
         >
-          {t("common.close")}
+          <CloseIcon className="h-5 w-5" />
         </button>
       </header>
 
