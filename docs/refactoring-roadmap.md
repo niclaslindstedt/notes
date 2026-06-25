@@ -104,14 +104,14 @@ extraction must thread a wide prop surface (or lift the drag state into a hook
 first). No storage hot-path. **Severity: 5** (one cohesive seam left; the file
 is now ~1.3× the cap).
 
-#### `src/storage/useStorageBackend.ts` — 1053 lines, three backend concerns left in one hook
+#### `src/storage/useStorageBackend.ts` — 917 lines, two backend concerns left in one hook
 
-**Smell.** 53 lines over the cap. The hook wires backend **selection**,
-**OAuth** (Dropbox + Google Drive connect/disconnect + redirect
-completion), the **folder** FSA permission lifecycle, and the **namespace
-registry** (create/rename/remove + sync). The **encryption** state machine
-(step 1) has been relocated to `useEncryption.ts`. Re-verify with
-`wc -l src/storage/useStorageBackend.ts`.
+**Smell.** Now **under** the 1000-line cap. The hook wires backend
+**selection**, **OAuth** (Dropbox + Google Drive connect/disconnect +
+redirect completion), and the **folder** FSA permission lifecycle. The
+**encryption** state machine (step 1) and the **namespace registry** (step 2)
+have been relocated to `useEncryption.ts` / `useNamespaceRegistry.ts`.
+Re-verify with `wc -l src/storage/useStorageBackend.ts`.
 
 **Plan (multi-PR, extract one concern-hook per PR, lowest-coupling
 first).** Each seam becomes a focused hook the main hook composes:
@@ -120,8 +120,10 @@ first).** Each seam becomes a focused hook the main hook composes:
    machine; keep `passwordRef` / `decryptNoteRef` / `directoryCrypto` inside
    it and hand the stable ref bundle to the adapter factory.~~ **Done
    2026-06** — see Landed.
-2. **Namespace registry** → `src/storage/useNamespaceRegistry.ts`
-   (~140–180 lines). Must preserve the reconciliation effect's dep chain.
+2. ~~**Namespace registry** → `src/storage/useNamespaceRegistry.ts`.~~
+   **Done 2026-06** — see Landed. (Landed at 245 lines, taking the built
+   `namespaceStore` as a plain arg rather than building it inside; the memo
+   stayed in the orchestrator beside its symmetric `settingsStore` sibling.)
 3. **Folder backend** → `src/storage/useFolderBackend.ts` (~130–160). Tighter
    coupling to the adapter factory and active-encryption wrap on disconnect
    (the `wrapBrowserForActive` now lives in `useEncryption.ts`, so the folder
@@ -130,24 +132,27 @@ first).** Each seam becomes a focused hook the main hook composes:
    risk — OAuth redirect handling is fragile and has **zero automated
    coverage**.
 
-The `selection` memo, `makeInner` adapter factory, and the return object
-stay in the orchestrating hook.
+The `selection` memo, `makeInner` adapter factory, the `settingsStore` /
+`namespaceStore` root-store memos, the cross-namespace `moveNoteToNamespace` /
+`moveFolderToNamespace` (coupled to `makeInner` / `wrapBrowserForActive`), and
+the return object stay in the orchestrating hook.
 
 **Risk.** The OAuth/cloud and folder flows have **no automated coverage** —
 any extraction touching them must be smoke-tested by hand (browser default
 plus the cloud backend touched) before merge. The extraction order in the
 `selection` memo and the encryption wrapper asymmetry (browser =
 whole-document `withEncryption`; file/cloud = per-file `directoryCrypto`)
-must be preserved exactly. With encryption extracted, the file is only ~53
-over the cap; the remaining three seams are lower-leverage now. **Severity:
-5.**
+must be preserved exactly. With encryption and the namespace registry
+extracted, the file is now **under the cap**; the remaining two seams (folder,
+cloud OAuth) are lower-leverage, mechanical splits worth doing only when the
+file is touched again. **Severity: 4.**
 
 **Note for the next seam.** The encryption extraction broke a render-order
 cycle with an `innerRef` the verbs read at call time (the hook produces the
 `directoryCrypto` / `seal` / `unseal` that build the very adapter its verbs
-need). The namespace/folder/cloud seams don't have this cycle — they don't
-produce anything `makeInner` consumes — so they can take `inner` / `adapter`
-as plain args.
+need). The folder/cloud seams don't have this cycle — they don't produce
+anything `makeInner` consumes — so they can take `inner` / `adapter` as plain
+args, exactly as the namespace seam took the built `namespaceStore`.
 
 ### Easy wins
 
@@ -157,6 +162,48 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `useStorageBackend.ts` Seam 2: namespace registry extracted —
+  the orchestrating hook is now under the 1000-line cap.** Moved the entire
+  namespace-registry concern — the `namespaces` list + `activeNamespace` cursor
+  state, the `pushNamespaces` best-effort mirror, the reconcile-against-
+  `namespaces.json` effect, and the `switchNamespace` / `createNamespace` /
+  `renameNamespace` / `setNamespaceAppearance` / `removeNamespace` verbs — out
+  of `useStorageBackend` into a self-contained `useNamespaceRegistry` hook
+  (`src/storage/useNamespaceRegistry.ts`, 245 lines). The seam diverged from the
+  roadmap's original sketch in one deliberate way: rather than building the
+  `namespaceStore` *inside* the new hook (which would have needed the parent's
+  `BackendSelection` type, a parent↔child cycle), the orchestrator keeps the
+  `namespaceStore` memo beside its **symmetric sibling `settingsStore`** (both
+  are root stores derived purely from the same `selection`) and hands the built
+  store in as a plain arg — along with the live `backend` / `dropboxToken` /
+  `gdriveToken` / `folderHandle` the active-backend data-delete in
+  `removeNamespace` routes on. The hook produces `activeNamespace`, which
+  `makeInner` / `inner` key off, so it's called right after the `selection` /
+  `namespaceStore` memos and before the adapter factory; it has **no** render-
+  order cycle (unlike the encryption seam) because it produces nothing
+  `makeInner` consumes. The cross-namespace `moveNoteToNamespace` /
+  `moveFolderToNamespace` stayed in the orchestrator — they're coupled to
+  `makeInner` / `wrapBrowserForActive`, a separate "cross-namespace move"
+  concern, not registry CRUD. The reconcile effect's `[namespaceStore]` dep
+  chain is preserved verbatim. Pure relocation, no behaviour change, no on-disk
+  format change, no layering edge crossed (still `app → storage → domain`).
+  Exposed the previously closure-bound registry logic to direct unit tests
+  (added `tests/storage/use-namespace-registry.test.tsx`, +11 tests covering the
+  localStorage seed, create → switch + store mirror + `compartments` unlock, the
+  create-with-appearance, rename-keeps-slug, appearance apply/clear, the
+  `switchNamespace` persist + re-read, the default-namespace removal reject, the
+  browser removal that drops the entry + resets active + deletes the local
+  document, the cloud-backend data-delete routing, and the reconcile effect's
+  empty-backend seed + adopt-remote-and-push-local-only paths). All 582 tests
+  green; useNamespaceRegistry.ts holds 92.5% statement / 93.8% line coverage
+  (the uncovered lines are the folder / gdrive removal branches with no jsdom
+  reach — by design). useStorageBackend 1053 → 917 lines, now under the §20.5
+  cap. **NOTE: the folder + cloud (Dropbox / Google Drive) namespace data-delete
+  and the `namespaces.json` reconcile have no Vitest reach against a real
+  backend; hand-smoke-test a namespace create + remove and a two-device
+  reconcile on a folder + cloud backend before merging.** Seams 3 (folder) and 4
+  (cloud OAuth) remain in Pending, dropped to severity 4 as the file is now
+  under the cap.
 - **2026-06 — `useStorageBackend.ts` Seam 1: encryption state machine
   extracted.** Moved the entire at-rest encryption concern — the session
   passphrase (`password` state + `passwordRef`), the `encryption` mode and
