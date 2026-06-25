@@ -71,14 +71,14 @@ _(none)_
 
 #### `src/storage/directory-adapter.ts` — 1766 lines, the shared base every file/cloud backend threads through
 
-**Smell.** 766 lines over the cap, no opt-out — the shared `StorageAdapter`
+**Smell.** 656 lines over the cap, no opt-out — the shared `StorageAdapter`
 base for the folder, Dropbox, and Google-Drive backends. One file tangles
 several concerns: the markdown/path codec glue and types, the adapter
-closure state (revision tracking, folder registry), the load path,
-attachment reconcile (plaintext + encrypted), the save/conflict path, and
-the atomic plain↔encrypted migration converters. Because **every**
-file/cloud backend runs through it, it is the highest-multiplier file in the
-storage layer. Re-verify with `wc -l src/storage/directory-adapter.ts`.
+closure state (revision tracking), the load path, attachment reconcile
+(plaintext + encrypted), the save/conflict path, and the atomic
+plain↔encrypted migration converters. Because **every** file/cloud backend
+runs through it, it is the highest-multiplier file in the storage layer.
+Re-verify with `wc -l src/storage/directory-adapter.ts`.
 
 **Plan (multi-PR, one seam per PR, lowest-coupling first).** All seams are
 pure relocations of sibling helpers out of the closure — the
@@ -90,16 +90,21 @@ pure relocations of sibling helpers out of the closure — the
    encNoteCache }` from `createCryptoSession`, so the load/save/migration call
    sites are unchanged; `lastLoad` stays in the adapter and is cleared via the
    session's `onKeysInvalidated` callback.
-2. **Folder registry** → `src/storage/folder-registry.ts` (~140 lines:
-   `readFolders()` + retry, `injectFolders()`, `persistFolders()` and its
-   state). Orthogonal to crypto/tracking. **Next — lowest remaining coupling.**
+2. ~~**Folder registry** → `src/storage/folder-registry.ts` (`readFolders()`
+   + retry, `injectFolders()`, `persistFolders()` and its state).~~
+   **Done 2026-06** — see Landed. The adapter destructures
+   `{ readFolders, persistFolders, plaintextNotePath }` from
+   `createFolderRegistry` and reaches the two external-state touch points via
+   `folderRegistry.readOk()` (load memo gate) and
+   `folderRegistry.rememberFolders()` (save), so the call sites are unchanged.
 3. **Attachment reconcile** → `src/storage/attachment-reconcile.ts`
    (~150 lines: the plaintext + encrypted write/remove helpers).
+   **Next — lowest remaining coupling.**
 4. **Migration converters** → `src/storage/migration-converters.ts`
    (~180 lines: `migrateNote()`, `demigrateNote()`, `splitLegacyBlob()`).
    Highest coupling — depends on seam 3 and the crypto session — do last.
 
-Each remaining seam shaves the adapter toward the cap; the three together
+Each remaining seam shaves the adapter toward the cap; the two together
 leave it around ~750 lines.
 
 **Risk — HIGH, and there is no automated cloud coverage.** This is the most
@@ -193,6 +198,33 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `directory-adapter.ts` Seam 2: folder registry extracted.**
+  Moved the `folders.json` sidecar concern — the `lastFoldersJson` /
+  `lastFolders` / `foldersReadOk` closure state, the `readFolders()` retry
+  loop, `persistFolders()`, `plaintextNotePath()`, the `FOLDERS_FILE_NAME`
+  constant, and the `FOLDERS_READ_ATTEMPTS` / `FOLDERS_READ_BACKOFF_MS` /
+  `sleep` helpers — out of the `createDirectoryAdapter` closure into a
+  `createFolderRegistry` factory in `src/storage/folder-registry.ts`
+  (187 lines). The pure fold-into-snapshot helper `injectFolders()` is a
+  standalone named export of the same module (it carries no state) and is
+  imported directly. The adapter destructures
+  `{ readFolders, persistFolders, plaintextNotePath }` so those call sites are
+  unchanged; the two external-state touch points became method calls —
+  `folderRegistry.readOk()` (the load memo gate, was a bare `foldersReadOk`
+  read) and `folderRegistry.rememberFolders()` (the save's
+  `lastFolders = snapshot.folders ?? []`). `FOLDERS_FILE_NAME` is re-exported
+  from `directory-adapter.ts` so the encryption representation's path-set import
+  is unchanged. Pure relocation, no behaviour change, no on-disk format change.
+  Exposed the previously-closure-bound registry logic to direct unit tests
+  (added `tests/storage/folder-registry.test.ts`, +11 tests covering the
+  missing-sidecar / parse / transient-retry / all-fail-keeps-known /
+  malformed-JSON read paths, the persist change-detection + clear-to-`[]` +
+  null-snapshot paths, the folder-aware `plaintextNotePath` resolution, and the
+  pure `injectFolders` fold incl. the empty-folders and encrypted-envelope
+  no-ops). All 504 tests green; folder-registry.ts holds 100% line / 95% branch
+  coverage and directory-adapter.ts holds 95% line coverage.
+  directory-adapter 1772 → 1656 lines. Seams 3 (attachment reconcile) and 4
+  (migration converters) remain in Pending.
 - **2026-06 — `directory-adapter.ts`: `DEFERRED_SOURCE` NUL bytes removed —
   file is textual to git again.** The deferred-note tracked-source sentinel was
   `"\0deferred\0"` (literal NUL delimiters); a single NUL made git classify the
