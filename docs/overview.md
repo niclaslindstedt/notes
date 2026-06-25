@@ -642,7 +642,13 @@ hopped between in one go; opening a note (and the footer/modal actions) still
 closes it. The notes list shows a spinner + `nav.notesLoading` while the
 switched-to namespace's first load is still in flight with nothing seeded
 (`loading` — see [namespace loading](#namespaces)), so the drawer never reads as
-"No notes yet." for the seconds a folder/cloud fetch takes.
+"No notes yet." for the seconds a folder/cloud fetch takes. The drawer's
+presentational leaf components — the `SectionHeader` section label, the generic
+`NavItem` row, the `FolderRow` / `FolderEditRow` folder rows, and the
+`SwipeToRemove` note-row swipe wrapper — are extracted to a sibling
+`src/ui/SideMenuRows.tsx`: each takes everything via props and touches none of
+the container's drag / folder-expand / namespace state, so the `SideMenu` file
+holds only the stateful container that composes them.
 
 ### Floating menu button
 
