@@ -766,10 +766,11 @@ no prop threading.
 ### Modal hosts
 
 `src/app/modals/*Host.tsx` — `SettingsModalHost`, `NamespacesModalHost`,
-`ChangelogModalHost`, `AchievementsModalHost`, `AchievementsUnlockModalHost`.
-Each owns one modal's open state, reads its command off the [modal bus](#modal-bus),
-and threads the app state the modal needs (storage, appearance, sync). All five
-are mounted once at the `App` root.
+`SearchModalHost`, `ChangelogModalHost`, `AchievementsModalHost`,
+`AchievementsUnlockModalHost`. Each owns one modal's open state, reads its
+command off the [modal bus](#modal-bus), and threads the app state the modal
+needs (storage, appearance, sync, the document). All are mounted once at the
+`App` root.
 
 ### Settings modal
 
@@ -795,6 +796,41 @@ restyle namespaces. Each gets a name, optional glyph (`NamespaceGlyph` +
 `GlyphGrid`), and optional colour; the active one shows a checkmark. Deleting one
 removes it and its notes from the active backend (`removeNamespace` +
 backend-specific delete). See [namespaces](#namespaces).
+
+### Search
+
+`SearchModal` (`src/ui/SearchModal.tsx`) — find any note across the whole
+namespace at once. Opened from the magnifier on the [action bar](#folders-in-the-side-menu)
+(`SideMenuActionBar`, between New folder and Show all) via a `{ kind: "search" }`
+command on the [modal bus](#modal-bus); `SearchModalHost` owns its open state and
+is handed the live document (`sync.doc`) and `switchTo` from `App`. It is a plain
+`Modal`, so it fills the screen on mobile and centres on desktop.
+
+The engine is pure and lives in the domain layer (`src/domain/search.ts`, no
+DOM): `buildSearchIndex(snapshot)` flattens the document into a flat list of
+searchable entries — one per note title and one per note body — skipping archived
+notes since a result opens the note in the editor. `search(index, query)` parses
+the query and returns the hits grouped per note, each carrying the character
+`ranges` that matched so the modal can highlight them in place (`segmentMatches`
+splits the text into plain / matched runs, rendered as `<mark>`; a long body is
+clipped to a window around the first match). The query language is progressive: a
+`/pattern/flags` literal is a JavaScript regex (an invalid one is reported, not
+silently empty); a bare term with `*` / `?` is shell-style wildcards; anything
+else is a case-insensitive substring match that falls back to a fuzzy subsequence
+match (`grcl` → "Grocery list") when the substring finds nothing.
+
+**Lazy-encryption fit.** The body entry is built from `notePreviewBlock`, the
+same projection the encrypted [note index](#encryption) already carries per note.
+For a loaded note that is the body itself (whitespace-normalised, attachment
+markdown stripped); for a **deferred** note — one whose body is still sealed on a
+file/cloud backend and not yet decrypted — it is the `preview` the index stored
+at seal time, which is the full body text (the list view only clips it in CSS).
+So the index the file backends build to render the list **is** the search corpus:
+full-text search works across every note, encrypted or not, without decrypting a
+single body up front and without bloating the index. Picking a result calls
+`switchTo`, opening the note in the editor (which then decrypts its body on demand
+if it was deferred). Searching is what unlocks the **Seeker** achievement (manual
+`unlock("seeker")`).
 
 ### Changelog modal
 

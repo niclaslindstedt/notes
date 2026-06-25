@@ -52,6 +52,7 @@ import { AchievementsModalHost } from "./modals/AchievementsModalHost.tsx";
 import { AchievementsUnlockModalHost } from "./modals/AchievementsUnlockModalHost.tsx";
 import { ChangelogModalHost } from "./modals/ChangelogModalHost.tsx";
 import { NamespacesModalHost } from "./modals/NamespacesModalHost.tsx";
+import { SearchModalHost } from "./modals/SearchModalHost.tsx";
 import { SettingsModalHost } from "./modals/SettingsModalHost.tsx";
 import { useEncryptionMigration } from "./use-encryption-migration.ts";
 import { useNavState } from "./use-nav.ts";
@@ -620,6 +621,7 @@ export function App() {
 
             <SettingsModalHost storage={storage} conversion={encConversion} />
             <NamespacesModalHost storage={storage} />
+            <SearchModalHost snapshot={sync.doc} onOpen={switchTo} />
             <ChangelogModalHost />
             <AchievementsModalHost />
             <AchievementsUnlockModalHost />

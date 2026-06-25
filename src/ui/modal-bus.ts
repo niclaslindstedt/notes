@@ -16,6 +16,7 @@ import { createContext, useContext } from "react";
 export type ModalCommand =
   | { kind: "settings" }
   | { kind: "namespaces" }
+  | { kind: "search" }
   | { kind: "changelog" }
   | { kind: "achievements" }
   | { kind: "achievements-unlock" };

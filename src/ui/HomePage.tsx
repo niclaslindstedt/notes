@@ -131,6 +131,14 @@ export function HomePage() {
               move it there with everything in it.
             </li>
             <li>
+              <em>Search</em> every note from the magnifier on the side menu —
+              it matches both titles and body text, is forgiving by default (a
+              rough abbreviation still finds the note), and also understands
+              wildcards and regular expressions. The search runs entirely in
+              your browser, and finds your notes even when they're stored
+              encrypted, without sending anything anywhere.
+            </li>
+            <li>
               Pick a theme and appearance that suits you — including whether the
               overview lists notes as compact rows, roomier cards, or a bare
               file-explorer list of titles, and how the side menu orders your
