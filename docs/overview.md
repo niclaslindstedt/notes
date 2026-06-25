@@ -1507,13 +1507,17 @@ dim and go inert (`disabled`) at the ends of the timeline but keep the drawer
 open so a burst of reverts can be applied without reopening it.
 
 The drawer's **footer** — pinned below the island — is the relocated burger
-menu: an optional donate link, the trophy ([achievements](#achievements)), an
-**About** dropdown, and settings pinned last. The **About** row is a plain
-footer row (no chevron) that toggles a `FloatingPanel` of the project links —
-What's new ([changelog](#changelog--whats-new)), source (with the build label as
-a subtitle), and privacy. The panel flips **upward** (`ABOUT_PLACEMENT`,
-anchored left, viewport-spaced) because there is no room below it at the foot of
-the drawer.
+menu, extracted as a self-contained `SideMenuFooter`
+(`src/ui/SideMenuFooter.tsx`) the drawer renders with just an `onClose` prop: an
+optional donate link, the trophy ([achievements](#achievements)), an **About**
+dropdown, and settings pinned last, built from the footer-local `MenuButton` /
+`MenuLink` row primitives. The **About** row is a plain footer row (no chevron)
+that toggles a `FloatingPanel` of the project links — What's new
+([changelog](#changelog--whats-new)), source (with the build label as a
+subtitle), and privacy. The panel flips **upward** (`ABOUT_PLACEMENT`, anchored
+left, viewport-spaced) because there is no room below it at the foot of the
+drawer. The dropdown's open state (`aboutOpen` / `aboutRef`) lives inside
+`SideMenuFooter`, so nothing of the footer leaks back into the drawer container.
 
 A note row can be **dragged onto a folder** to file it, or onto the ungrouped
 root zone to take it out of one. On a pointer device this is native HTML5 drag

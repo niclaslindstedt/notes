@@ -7,7 +7,6 @@ import {
   type ReactNode,
 } from "react";
 
-import { BUILD_LABEL } from "../build-env.ts";
 import {
   mixTopLevel,
   noteTitle,
@@ -30,12 +29,9 @@ import {
   ArchiveIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  CodeIcon,
   CogIcon,
   FolderIcon,
   FolderOpenIcon,
-  HeartIcon,
-  HelpCircleIcon,
   ListIcon,
   LockIcon,
   MenuIcon,
@@ -43,8 +39,6 @@ import {
   PencilIcon,
   PlusIcon,
   RedoIcon,
-  ShieldIcon,
-  SparklesIcon,
   SpinnerIcon,
   TrashIcon,
   UndoIcon,
@@ -60,19 +54,8 @@ import {
   useNoteDragKind,
   useNoteDropKey,
 } from "./note-drag-context.ts";
-import { AchievementsMenuItem } from "./achievements/AchievementsMenuItem.tsx";
 import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
-import { FloatingPanel } from "./FloatingPanel.tsx";
-import type { FloatingPlacement } from "./hooks/useFloatingPosition.ts";
-
-// The footer "About" dropdown opens "up and to the left" of its trigger:
-// `useFloatingPosition` flips it above automatically (there is no room below
-// at the foot of the drawer), and it widens to at least the trigger.
-const ABOUT_PLACEMENT: FloatingPlacement = {
-  width: { kind: "min", minPx: 200 },
-  anchor: "left",
-  coordinateSpace: "viewport",
-};
+import { SideMenuFooter } from "./SideMenuFooter.tsx";
 
 // The navigation drawer. On viewports narrower than the smallest iPad it
 // collapses to a single floating button the user can drag to either side
@@ -110,9 +93,6 @@ const ABOUT_PLACEMENT: FloatingPlacement = {
 // button (see `useSwipeReveal`), and tapping it deletes straight away. The
 // deletion is recorded on the undo timeline (the Undo button at the foot of
 // the drawer brings it back), so no confirming second tap is needed.
-
-// notes is open source; the "source" link points at its repository.
-const SOURCE_URL = "https://github.com/niclaslindstedt/notes";
 
 // The drawer stays focused on what you're working on: it lists only the most
 // recently edited notes and hides the rest behind the "Show all" entry, which
@@ -246,11 +226,6 @@ export function SideMenu({
   // expands the full switcher. View-local, like the folder expand state.
   const [namespacesCollapsed, setNamespacesCollapsed] = useState(true);
 
-  // The footer "About" dropdown (What's new / source / privacy), opened against
-  // `aboutRef` and flipped upward by `FloatingPanel`.
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const aboutRef = useRef<HTMLButtonElement>(null);
-
   // Desktop HTML5 drag state. `dragItem` gates the drop targets (so a stray
   // dragover from outside doesn't light them up) and records what's being
   // dragged — a single note, or a whole folder (which only a namespace row
@@ -369,13 +344,6 @@ export function SideMenu({
   useEffect(() => {
     setDragging(drag.dragging);
   }, [drag.dragging, setDragging]);
-
-  // Build-time env (string | undefined). A blank value disables the donate
-  // entry entirely rather than linking nowhere.
-  const donateUrl = import.meta.env.VITE_DONATE_URL?.trim();
-  // BASE_URL carries the trailing slash, so this is `/privacy`,
-  // `/preview/privacy`, … depending on the deploy slot.
-  const privacyUrl = `${import.meta.env.BASE_URL}privacy`;
 
   // Footer actions open a modal, so close the drawer behind them.
   function pick(handler: () => void) {
@@ -748,77 +716,7 @@ export function SideMenu({
           the trophy (achievements), an "About" dropdown that folds away the
           project links (What's new / source / privacy), and Settings pinned
           last under the thumb. */}
-      <div className="flex flex-col border-t border-line [padding-top:calc(1.25rem_-_var(--density-row-py))]">
-        {donateUrl && (
-          <MenuLink
-            icon={<HeartIcon className="h-5 w-5 text-danger" />}
-            label={t("menu.donate")}
-            href={donateUrl}
-            external
-            onClick={close}
-          />
-        )}
-        <AchievementsMenuItem onClose={close} />
-        {/* About: a single row that reveals the project links in an upward-
-            flipping dropdown (there's no room below at the foot of the drawer).
-            It reads as a plain footer row — no chevron — and just toggles the
-            panel open and shut. */}
-        <button
-          ref={aboutRef}
-          type="button"
-          role="menuitem"
-          aria-haspopup="menu"
-          aria-expanded={aboutOpen}
-          onClick={() => setAboutOpen((v) => !v)}
-          className="flex w-full cursor-pointer items-center gap-3 px-5 py-[var(--density-row-py)] text-left text-sm text-fg hover:bg-surface-2 hover:text-fg-bright"
-        >
-          <span className="text-muted">
-            <HelpCircleIcon className="h-5 w-5" />
-          </span>
-          <span className="flex-1">{t("menu.about")}</span>
-        </button>
-        <MenuButton
-          icon={<CogIcon className="h-5 w-5" />}
-          label={t("menu.settings")}
-          onClick={() => pick(() => dispatch({ kind: "settings" }))}
-        />
-      </div>
-      <FloatingPanel
-        open={aboutOpen}
-        onClose={() => setAboutOpen(false)}
-        triggerRef={aboutRef}
-        placement={ABOUT_PLACEMENT}
-        className="py-1"
-      >
-        <MenuButton
-          icon={<SparklesIcon className="h-5 w-5" />}
-          label={t("menu.changelog")}
-          onClick={() => {
-            setAboutOpen(false);
-            pick(() => dispatch({ kind: "changelog" }));
-          }}
-        />
-        <MenuLink
-          icon={<CodeIcon className="h-5 w-5" />}
-          label={t("menu.source")}
-          href={SOURCE_URL}
-          external
-          sublabel={BUILD_LABEL}
-          onClick={() => {
-            setAboutOpen(false);
-            close();
-          }}
-        />
-        <MenuLink
-          icon={<ShieldIcon className="h-5 w-5" />}
-          label={t("menu.privacy")}
-          href={privacyUrl}
-          onClick={() => {
-            setAboutOpen(false);
-            close();
-          }}
-        />
-      </FloatingPanel>
+      <SideMenuFooter onClose={close} />
     </>
   );
 
@@ -1481,67 +1379,5 @@ function SwipeToRemove({
         {children}
       </div>
     </div>
-  );
-}
-
-// Footer rows reuse the NavItem geometry (px-5, the density vertical
-// padding, gap-3, h-5 icons) so the relocated burger menu reads as one
-// continuous list with the rows above it. A plain button for in-app
-// actions, an anchor for the links.
-function MenuButton({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className="flex w-full cursor-pointer items-center gap-3 px-5 py-[var(--density-row-py)] text-left text-sm text-fg hover:bg-surface-2 hover:text-fg-bright"
-    >
-      <span className="text-muted">{icon}</span>
-      <span className="flex-1">{label}</span>
-    </button>
-  );
-}
-
-function MenuLink({
-  icon,
-  label,
-  href,
-  external,
-  sublabel,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  href: string;
-  external?: boolean;
-  /** Secondary line beneath the label (e.g. the app version). */
-  sublabel?: string;
-  onClick?: () => void;
-}) {
-  return (
-    <a
-      role="menuitem"
-      href={href}
-      target={external ? "_blank" : undefined}
-      rel={external ? "noreferrer noopener" : undefined}
-      onClick={onClick}
-      className="flex w-full cursor-pointer items-center gap-3 px-5 py-[var(--density-row-py)] text-left text-sm text-fg hover:bg-surface-2 hover:text-fg-bright"
-    >
-      <span className="text-muted">{icon}</span>
-      <span className="flex flex-1 flex-col">
-        <span>{label}</span>
-        {sublabel && (
-          <span className="text-xs text-muted tabular-nums">{sublabel}</span>
-        )}
-      </span>
-    </a>
   );
 }

@@ -69,33 +69,35 @@ _(none)_
 
 ### Severity 7–8 — multipliers
 
-#### `src/ui/SideMenu.tsx` — 1489 lines, container + eight sub-components
+#### `src/ui/SideMenu.tsx` — 1384 lines, container + six sub-components
 
-**Smell.** 489 lines over the cap. The SideMenu container plus eight
+**Smell.** 384 lines over the cap. The SideMenu container plus six
 presentational sub-components (SectionHeader, FolderRow, FolderEditRow,
-NavItem, BarButton, SwipeToRemove, MenuButton, MenuLink). The pure sort
-helpers that previously lived here (step 1) have been relocated to
-`src/domain/note.ts`; the remaining concern is splitting the presentational
-sub-components out of the container. Re-verify with `wc -l src/ui/SideMenu.tsx`.
+NavItem, BarButton, SwipeToRemove). The pure sort helpers (step 1) and the
+footer (step 2, `MenuButton` / `MenuLink` / the About dropdown) have been
+relocated; the remaining concern is splitting the action bar and the
+note/folder list/namespace switcher out of the container. Re-verify with
+`wc -l src/ui/SideMenu.tsx`.
 
 **Plan (multi-PR).**
 
 1. ~~**Easy win first:** relocate the pure sort/grouping helpers to
    `src/domain/`.~~ **Done 2026-06** — see Landed.
-2. **Footer** → `src/ui/SideMenuFooter.tsx` (~85 lines, self-contained,
-   zero shared state).
+2. ~~**Footer** → `src/ui/SideMenuFooter.tsx` — the Donate / Achievements /
+   About-dropdown / Settings burger menu plus the `MenuButton` / `MenuLink`
+   primitives.~~ **Done 2026-06** — see Landed.
 3. **Action bar** → `src/ui/SideMenuActionBar.tsx` (~65 lines, the
-   New/Folder/Show-all/Archive/Undo/Redo island).
+   New/Folder/Show-all/Archive/Undo/Redo `BarButton` island). Self-contained
+   except for the Archive drop-target wiring (`noteDropActive` /
+   `allowDropOn` / `dropOnArchive`), which is threaded down as props.
 4. The note/folder list and namespace switcher are higher-risk (drag
-   state + folder expand/rename state scattered across the parent, and the
-   About floating-panel anchor ties the footer to the switcher) — defer or
+   state + folder expand/rename state scattered across the parent) — defer or
    do as a careful prop-drilled presenter extraction last.
 
 **Risk.** The list extraction (Seam 4) carries the drag/expand/rename
-state coupling; the namespace-switcher/footer floating-panel anchor must
-move together or stay together. The footer and action-bar extractions
-(steps 2–3) are the safe next slices — self-contained presentational islands.
-No storage hot-path. **Severity: 6.**
+state coupling. The action-bar extraction (step 3) is the safe next slice —
+a self-contained presentational island; its only coupling is the Archive
+row's drop-target props. No storage hot-path. **Severity: 6.**
 
 ### Severity 5–6 — friction
 
@@ -144,6 +146,31 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `SideMenu.tsx` Seam 2: sidebar footer extracted.** Moved the
+  drawer's footer — the relocated burger menu (Donate / Achievements / About
+  dropdown / Settings) plus its `FloatingPanel` of project links, the
+  footer-local `MenuButton` / `MenuLink` row primitives, the `ABOUT_PLACEMENT`
+  and `SOURCE_URL` consts, and the `donateUrl` / `privacyUrl` env reads — out of
+  `SideMenu.tsx` into a self-contained `SideMenuFooter` component
+  (`src/ui/SideMenuFooter.tsx`, 193 lines). The drawer now renders it with a
+  single `onClose` prop; the About dropdown's open state (`aboutOpen` /
+  `aboutRef`) moved into the new component, so nothing of the footer leaks back
+  into the container. The footer reaches `useT` / `useModalDispatch` directly
+  (same provider tree) rather than threading them as props, and recreates the
+  parent's `close()`-then-dispatch behaviour inline — the parent's `pick` helper
+  stays put, still used by the Namespaces section header. Pure presentational
+  extraction, no behaviour change, no layering edge crossed (`app → ui`), no
+  storage hot-path. Exposed the previously-untested footer (it was buried inside
+  an unrendered `SideMenu`) to direct unit tests (added
+  `tests/ui/side-menu-footer.test.tsx`, +8 tests covering the donate
+  show/hide + href + drawer-close, the Settings dispatch + close, the About
+  toggle revealing the project links, the source/privacy hrefs and
+  external-vs-same-origin targets, the changelog dispatch, the link-follow
+  collapse, and the achievements row). All 548 tests green; SideMenuFooter holds
+  87% statement / 100% branch coverage (was 0). SideMenu 1547 → 1384 lines.
+  Steps 3 (action bar) and 4 (note-list / namespace switcher) remain in Pending;
+  also updated the `dictionary.md` / `overview.md` About-dropdown pointers to
+  the new file.
 - **2026-06 — `directory-adapter.ts` Seam 4a: encrypted-note JSON codec
   extracted.** Moved the pure `noteToEncJson()` / `encJsonToNote()` functions
   and the `EncAttachmentMeta` type out of `directory-adapter.ts` into a
