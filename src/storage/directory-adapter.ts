@@ -49,7 +49,6 @@
 
 import type {
   AdapterCapability,
-  NoteConversionProgress,
   NoteEncStatus,
   StorageAdapter,
   StoredSnapshot,
@@ -69,12 +68,8 @@ import {
 import { createCryptoSession } from "./crypto-session.ts";
 import { encJsonToNote, noteToEncJson } from "./enc-note-codec.ts";
 import { createFolderRegistry, injectFolders } from "./folder-registry.ts";
-import {
-  openBytes,
-  openString,
-  sealBytes,
-  sealString,
-} from "./crypto-binary.ts";
+import { createMigrationConverters } from "./migration-converters.ts";
+import { openBytes, openString, sealString } from "./crypto-binary.ts";
 import {
   type IndexEntry,
   indexEntryToNote,
@@ -87,7 +82,6 @@ import {
   filesToSnapshot,
   noteFilePath,
   noteFileStem,
-  noteToMarkdown,
   snapshotToFiles,
 } from "./markdown/codec.ts";
 import { parse, serialize } from "./serialize.ts";
@@ -1152,191 +1146,32 @@ export function createDirectoryAdapter(
     await sealWriteIndex(keys, entries);
   }
 
-  // Convert ONE note from plaintext to its encrypted per-file form, atomically:
-  // seal each attachment's bytes into its opaque blob, write + verify the
-  // encrypted note file, then remove the superseded plaintext `.md` and
-  // attachment files. Idempotent — a note already migrated is a no-op. This is
-  // the unit the paced migration queue drives, so a large conversion never
-  // bursts the cloud API. `onStep` fires before each attachment and before the
-  // note file so the UI can flash what it's sealing. Returns true when this call
-  // did work.
-  async function migrateNote(
-    note: Note,
-    onStep?: NoteConversionProgress,
-  ): Promise<boolean> {
-    const keys = await ensureKeys();
-    if (!keys) return false;
-    const stem = noteFileStem(note);
-    // The plaintext note lives at its folder-aware path; tolerate a flat path
-    // too (a document written before folders became physical, or one a
-    // plaintext save hasn't re-placed yet) so enabling encryption never leaves
-    // a plaintext copy stranded on disk.
-    const folderPath = plaintextNotePath(note);
-    const flatPath = `${stem}.md`;
-    const mdPath =
-      (await store.read(folderPath)) !== null
-        ? folderPath
-        : (await store.read(flatPath)) !== null
-          ? flatPath
-          : null;
-    // Already migrated (no plaintext note file left)?
-    if (mdPath === null) {
-      encStatus.set(note.id, "encrypted");
-      return false;
-    }
-
-    // 1. Seal each attachment's bytes from its plaintext file into a blob.
-    if (attachments) {
-      for (const a of note.attachments ?? []) {
-        onStep?.({ phase: "attachment", filename: a.filename });
-        const blobPath = await attBlobPath(keys, note.id, a.filename);
-        if ((await attachments.read(blobPath)) !== null) continue;
-        const bytes = await attachments.read(attachmentPath(stem, a.filename));
-        if (!bytes) continue;
-        const blob = await sealBytes(keys.contentKey, bytes, {
-          mime: a.mime,
-          filename: a.filename,
-        });
-        await attachments.write(blobPath, blob, "application/octet-stream");
-      }
-    }
-
-    // 2. Write + verify the encrypted note file.
-    onStep?.({ phase: "note" });
-    const encPath = await encNotePath(keys, note.id);
-    const source = noteToEncJson(note);
-    const rev = await store.write(
-      encPath,
-      await sealString(keys.contentKey, source),
-    );
-    track(encPath, source, rev);
-    if (rev !== undefined) encNoteCache.set(encPath, { rev, json: source });
-    const readBack = await store.read(encPath);
-    if (readBack === null) throw new Error("migrate: enc note missing");
-    const opened = await openString(keys.contentKey, readBack);
-    if (new TextDecoder().decode(opened.bytes) !== source) {
-      throw new Error("migrate: verify mismatch");
-    }
-
-    // 3. Remove the superseded plaintext only after the ciphertext is proven.
-    await store.remove(mdPath);
-    tracked.delete(mdPath);
-    if (attachments) {
-      for (const a of note.attachments ?? []) {
-        await attachments
-          .remove(attachmentPath(stem, a.filename))
-          .catch(() => {});
-      }
-    }
-    encStatus.set(note.id, "encrypted");
-    return true;
-  }
-
-  // The exact reverse of `migrateNote`: convert ONE note from its encrypted
-  // per-file form back to plaintext, atomically — decrypt each attachment blob
-  // into its plaintext `<stem>/<filename>` file, write + verify the plaintext
-  // `.md` note, then remove the superseded `.enc` note and opaque attachment
-  // blobs. Same write-new → verify → delete-old ordering as the forward path, so
-  // an interruption leaves both representations for an idempotent resume rather
-  // than losing data. Idempotent — a note already plaintext is a no-op. This is
-  // the unit the paced de-encryption queue drives. Returns true when it worked.
-  async function demigrateNote(
-    note: Note,
-    onStep?: NoteConversionProgress,
-  ): Promise<boolean> {
-    const keys = await ensureKeys();
-    if (!keys) return false;
-    const encPath = await encNotePath(keys, note.id);
-    // Already demigrated (no encrypted note file left)?
-    const encText = await store.read(encPath);
-    if (encText === null) {
-      encStatus.delete(note.id);
-      return false;
-    }
-    // The `.enc` is authoritative for the body: the note handed in may be
-    // deferred (index metadata only, no body), so decrypt the file and write
-    // the plaintext from *that* — never from a possibly-empty in-memory body.
-    let full = note;
-    try {
-      const opened = await openString(keys.contentKey, encText);
-      const decoded = encJsonToNote(new TextDecoder().decode(opened.bytes));
-      if (decoded) full = decoded;
-    } catch (err) {
-      log.warn(`${options.id} demigrate: decrypt failed, using in-memory`, err);
-    }
-    const stem = noteFileStem(full);
-
-    // 1. Decrypt each attachment blob back into its plaintext file.
-    if (attachments) {
-      for (const a of full.attachments ?? []) {
-        onStep?.({ phase: "attachment", filename: a.filename });
-        const plainPath = attachmentPath(stem, a.filename);
-        if ((await attachments.read(plainPath)) !== null) continue;
-        const blob = await attachments.read(
-          await attBlobPath(keys, full.id, a.filename),
-        );
-        if (!blob) continue;
-        const opened = await openBytes(keys.contentKey, blob);
-        const mime = (opened.header.mime as string) ?? a.mime;
-        await attachments.write(plainPath, new Uint8Array(opened.bytes), mime);
-      }
-    }
-
-    // 2. Write + verify the plaintext markdown note file at its folder-aware
-    // path, so disabling encryption lands a grouped note back in its folder
-    // directory rather than flat at the notes root.
-    onStep?.({ phase: "note" });
-    const mdPath = plaintextNotePath(full);
-    const text = noteToMarkdown(full, mdPath.includes("/") ? 1 : 0);
-    const rev = await store.write(mdPath, text);
-    track(mdPath, text, rev);
-    const readBack = await store.read(mdPath);
-    if (readBack === null) throw new Error("demigrate: md note missing");
-    if (readBack !== text) throw new Error("demigrate: verify mismatch");
-
-    // 3. Remove the superseded ciphertext only after the plaintext is proven.
-    await store.remove(encPath);
-    tracked.delete(encPath);
-    encNoteCache.delete(encPath);
-    if (attachments) {
-      for (const a of full.attachments ?? []) {
-        await attachments
-          .remove(await attBlobPath(keys, full.id, a.filename))
-          .catch(() => {});
-      }
-    }
-    encStatus.delete(full.id);
-    return true;
-  }
-
-  // One-time upgrade for existing users: a legacy whole-document `notes.json`
-  // envelope is decrypted and re-saved as the per-file form, then the blob is
-  // removed (the save's representation-switch supersede handles that atomically:
-  // the per-file notes + attachment blobs are written and verified before the
-  // blob goes). The legacy blob folds attachment bytes inline, so the decrypted
-  // snapshot carries them and they land in their own encrypted blobs. Idempotent
-  // and a no-op once split. Returns true when it did the split.
-  async function splitLegacyBlob(): Promise<boolean> {
-    const keys = await ensureKeys();
-    if (!keys) return false;
-    const password = crypto?.passwordRef.current;
-    if (!password) return false;
-    const entries = await store.list();
-    if (!entries.some((e) => e.path === BLOB_FILE_NAME)) return false;
-    // Already split (per-file notes exist) — nothing to do.
-    if (entries.some((e) => isEncNotePath(e.path))) return false;
-    const blob = await store.read(BLOB_FILE_NAME);
-    if (!blob || !isEncryptedEnvelope(blob)) return false;
-    log.info(`${options.id}: splitting legacy notes.json into per-file form`);
-    const plaintext = await decryptEnvelope(blob, password);
-    // save() in encrypted mode writes per-file + reconciles attachment blobs
-    // from the inline data + supersedes (removes) notes.json after verifying.
-    await save(plaintext);
-    for (const note of parse(plaintext).notes) {
-      encStatus.set(note.id, "encrypted");
-    }
-    return true;
-  }
+  // The plain↔encrypted per-note migration converters
+  // (migrate/demigrate/splitLegacyBlob). Lifted into their own module; they
+  // reach back here only through the explicit deps below, so the byte-level
+  // behaviour is unchanged. `setEncStatus`/`deleteEncStatus` are callbacks (not
+  // the `encStatus` Map itself) because the load path reassigns its binding — a
+  // closure always sees the current map. Created after `save` because the legacy
+  // split reuses it for the representation switch.
+  const { migrateNote, demigrateNote, splitLegacyBlob } =
+    createMigrationConverters({
+      id: options.id,
+      store,
+      attachments,
+      passwordRef: crypto?.passwordRef,
+      ensureKeys,
+      encNotePath,
+      attBlobPath,
+      encNoteCache,
+      plaintextNotePath,
+      track,
+      untrack: (path) => tracked.delete(path),
+      setEncStatus: (noteId, status) => encStatus.set(noteId, status),
+      deleteEncStatus: (noteId) => encStatus.delete(noteId),
+      blobFileName: BLOB_FILE_NAME,
+      isEncNotePath,
+      save,
+    });
 
   const capabilities = new Set<AdapterCapability>();
   if (attachments) capabilities.add("attachments");
