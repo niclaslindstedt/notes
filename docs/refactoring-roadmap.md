@@ -73,55 +73,63 @@ _(none)_
 
 ### Severity 5–6 — friction
 
-#### `src/storage/useStorageBackend.ts` — 917 lines, two backend concerns left in one hook
+#### `src/storage/useStorageBackend.ts` — 817 lines, one backend concern left in one hook
 
-**Smell.** Now **under** the 1000-line cap. The hook wires backend
-**selection**, **OAuth** (Dropbox + Google Drive connect/disconnect +
-redirect completion), and the **folder** FSA permission lifecycle. The
-**encryption** state machine (step 1) and the **namespace registry** (step 2)
-have been relocated to `useEncryption.ts` / `useNamespaceRegistry.ts`.
-Re-verify with `wc -l src/storage/useStorageBackend.ts`.
+**Smell.** Well **under** the 1000-line cap. The hook still wires backend
+**selection** and **cloud OAuth** (Dropbox + Google Drive connect / disconnect
++ the Dropbox redirect completion) inline. The **encryption** state machine
+(step 1), the **namespace registry** (step 2), and the **folder** FSA
+permission lifecycle (step 3) have been relocated to `useEncryption.ts` /
+`useNamespaceRegistry.ts` / `useFolderBackend.ts`. Re-verify with
+`wc -l src/storage/useStorageBackend.ts`.
 
 **Plan (multi-PR, extract one concern-hook per PR, lowest-coupling
 first).** Each seam becomes a focused hook the main hook composes:
 
-1. ~~**Encryption** → `src/storage/useEncryption.ts`. Self-contained state
-   machine; keep `passwordRef` / `decryptNoteRef` / `directoryCrypto` inside
-   it and hand the stable ref bundle to the adapter factory.~~ **Done
-   2026-06** — see Landed.
+1. ~~**Encryption** → `src/storage/useEncryption.ts`.~~ **Done 2026-06** — see
+   Landed.
 2. ~~**Namespace registry** → `src/storage/useNamespaceRegistry.ts`.~~
    **Done 2026-06** — see Landed. (Landed at 245 lines, taking the built
-   `namespaceStore` as a plain arg rather than building it inside; the memo
-   stayed in the orchestrator beside its symmetric `settingsStore` sibling.)
-3. **Folder backend** → `src/storage/useFolderBackend.ts` (~130–160). Tighter
-   coupling to the adapter factory and active-encryption wrap on disconnect
-   (the `wrapBrowserForActive` now lives in `useEncryption.ts`, so the folder
-   hook would consume it as a passed-in dep).
-4. **Cloud OAuth** → `src/storage/useCloudBackend.ts` (~180–200). Highest
-   risk — OAuth redirect handling is fragile and has **zero automated
-   coverage**.
+   `namespaceStore` as a plain arg.)
+3. ~~**Folder backend** → `src/storage/useFolderBackend.ts`.~~ **Done
+   2026-06** — see Landed. (Landed at 247 lines. The roadmap predicted this
+   seam had *no* render-order cycle; it does — the hook produces `folderHandle`,
+   which the backend `selection`, and so the adapter, is built from, while its
+   connect / disconnect verbs need that late-built adapter. Broken with an
+   `activeRef` the verbs read at call time, exactly like the encryption seam's
+   `innerRef`.)
+4. **Cloud OAuth** → `src/storage/useCloudBackend.ts` (~120–160). The Dropbox /
+   Google Drive token state, the `connect*` / `disconnect*` verbs, and the
+   Dropbox boot-redirect effect (`completeDropboxAuth` + `cleanAuthParamsFromUrl`).
+   Highest risk — OAuth redirect handling is fragile and has **zero automated
+   coverage**. Like the folder seam, this hook produces the `dropboxToken` /
+   `gdriveToken` the `selection` memo keys off, so the parts the verbs need that
+   are built later (none beyond `selectBackend`) would thread through an
+   `activeRef` / plain-arg the same way; the boot-redirect effect produces token
+   state too, so it moves with the hook. **Severity: 4.**
 
 The `selection` memo, `makeInner` adapter factory, the `settingsStore` /
 `namespaceStore` root-store memos, the cross-namespace `moveNoteToNamespace` /
 `moveFolderToNamespace` (coupled to `makeInner` / `wrapBrowserForActive`), and
 the return object stay in the orchestrating hook.
 
-**Risk.** The OAuth/cloud and folder flows have **no automated coverage** —
-any extraction touching them must be smoke-tested by hand (browser default
-plus the cloud backend touched) before merge. The extraction order in the
-`selection` memo and the encryption wrapper asymmetry (browser =
-whole-document `withEncryption`; file/cloud = per-file `directoryCrypto`)
-must be preserved exactly. With encryption and the namespace registry
-extracted, the file is now **under the cap**; the remaining two seams (folder,
-cloud OAuth) are lower-leverage, mechanical splits worth doing only when the
-file is touched again. **Severity: 4.**
+**Risk.** The OAuth/cloud flow has **no automated coverage** — any extraction
+touching it must be smoke-tested by hand (browser default plus the cloud
+backend touched) before merge. The extraction order in the `selection` memo and
+the encryption wrapper asymmetry (browser = whole-document `withEncryption`;
+file/cloud = per-file `directoryCrypto`) must be preserved exactly. With
+encryption, the namespace registry, and the folder backend extracted, the file
+is now **well under the cap**; the remaining cloud-OAuth seam is a
+lower-leverage split worth doing only when the file is touched again.
 
-**Note for the next seam.** The encryption extraction broke a render-order
-cycle with an `innerRef` the verbs read at call time (the hook produces the
-`directoryCrypto` / `seal` / `unseal` that build the very adapter its verbs
-need). The folder/cloud seams don't have this cycle — they don't produce
-anything `makeInner` consumes — so they can take `inner` / `adapter` as plain
-args, exactly as the namespace seam took the built `namespaceStore`.
+**Note for the next seam.** Three of the four extracted seams hit a
+render-order cycle (encryption via `innerRef`; folder via `activeRef`) because
+each *produces* state the backend `selection` / adapter factory consumes while
+its verbs need the *late-built* adapter. Only the namespace seam was
+cycle-free (it consumes the already-built `namespaceStore` and produces nothing
+the factory reads). Expect the cloud seam to be in the cycle camp too — it
+produces `dropboxToken` / `gdriveToken` that `selection` keys off — so reach
+for the `activeRef`-read-at-call-time pattern, not plain args, by default.
 
 ### Easy wins
 
@@ -131,6 +139,49 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `useStorageBackend.ts` Seam 3: folder backend extracted.** Moved
+  the entire picked-folder (File System Access API) concern — the
+  `folderHandle` / `folderHandleLoaded` / `folderReconnectNeeded` state, the
+  `markFolderPermissionLost` callback, the boot-probe effect that rehydrates the
+  stored grant from IndexedDB (or surfaces the reconnect cue when the OS revoked
+  it), and the `connectFolder` / `reconnectFolder` / `disconnectFolder` verbs —
+  out of `useStorageBackend` into a self-contained `useFolderBackend` hook
+  (`src/storage/useFolderBackend.ts`, 247 lines). **The roadmap's original plan
+  was wrong about the coupling:** it predicted the folder seam had *no*
+  render-order cycle and could take `inner` / `adapter` as plain args. It does
+  have one — the hook *produces* `folderHandle` / `folderHandleLoaded` /
+  `markFolderPermissionLost`, which the backend `selection` memo (and therefore
+  the document adapter and the namespace / settings stores) is built *from*, so
+  it must run before them; but its connect / disconnect verbs need the active
+  document `adapter` (the encryption-wrapped one — a folder seed must read the
+  *decrypted* current document) and `activeNamespace`, both built *afterwards*.
+  Broken exactly like the encryption seam: the orchestrator passes a
+  `folderActiveRef` it assigns `{ adapter, activeNamespace }` right after the
+  adapter memo, and the verbs read it at call time (always well after first
+  paint). `directoryCrypto` and `wrapBrowserForActive` (from `useEncryption`,
+  built before the folder hook) pass as plain args; the backend switch threads
+  through a new `selectBackend(id)` callback (persist + `setBackendState`) so
+  the hook never imports `backend-preference` persistence directly. The
+  `createFolderAdapter` / `BrowserLocalStorageAdapter` imports stay in the
+  orchestrator too (still used by `makeInner`); `isFolderBackendAvailable` stays
+  for the `folderAvailable` return; the four handle-store I/O imports
+  (`load` / `save` / `clear` `DirectoryHandle`, `ensurePermission`) moved to the
+  hook. Pure relocation, no behaviour change, no on-disk format change, no
+  layering edge crossed (still `app → storage → domain`). Exposed the
+  previously closure-bound folder logic to direct unit tests (added
+  `tests/storage/use-folder-backend.test.tsx`, +11 tests covering the boot probe
+  — non-folder no-op, still-granted rehydrate, revoked-grant reconnect cue, and
+  no-stored-handle — `markFolderPermissionLost`, the connect empty-folder seed
+  vs. non-empty adopt-without-overwrite vs. picker-dismissed no-op, the
+  disconnect mirror-to-browser + switch, and the reconnect re-grant vs.
+  fall-through-to-picker paths). All 608 tests green; useFolderBackend.ts holds
+  91.9% statement / 91.9% line coverage (the uncovered lines are the three
+  `log.error` catch branches with no automated reach — by design).
+  useStorageBackend 917 → 817 lines. **NOTE: the folder backend has no Vitest
+  reach against a real File System Access grant; hand-smoke-test a folder
+  connect (empty + non-empty), a reconnect after a revoked grant, and a
+  disconnect mirror-to-browser — on a plaintext and an encrypted folder —
+  before merging.** Seam 4 (cloud OAuth) remains in Pending, the last seam.
 - **2026-06 — `SideMenu.tsx` Seam 4: row primitives extracted — the SideMenu
   split-by-concern candidate is now resolved.** Rather than the roadmap's
   original Seam-4 sketch (a stateful note/folder-list *presenter* extraction
