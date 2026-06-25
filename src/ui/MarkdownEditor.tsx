@@ -28,6 +28,7 @@ import {
   attachableFilesFrom,
   fileToAttachment,
 } from "./attachments/fromFile.ts";
+import { useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
 import {
@@ -114,6 +115,11 @@ export function MarkdownEditor({
   ref,
 }: Props) {
   const t = useT();
+  // True on phones / tablets — the devices that show a soft keyboard, and so
+  // the only ones where `autoCapitalize` does anything. Gates the manual
+  // sentence-start capitalization below so desktop (where the attribute is a
+  // no-op) keeps behaving exactly as before.
+  const coarsePointer = useMediaQuery("(pointer: coarse)");
   // Local source of truth, seeded from the note. App keys the editor by note
   // id, so a different note remounts rather than reconciling mid-edit.
   const [value, setValue] = useState(body);
@@ -382,9 +388,23 @@ export function MarkdownEditor({
     // Strip the sentinel back out so the source string never sees it, and
     // shift the queued caret to match the removed character.
     const hadSentinel = raw.startsWith(SENTINEL);
-    const text = hadSentinel ? raw.slice(SENTINEL.length) : raw;
+    let text = hadSentinel ? raw.slice(SENTINEL.length) : raw;
     if (hadSentinel) {
       pendingCaret.current = Math.max(0, ta.selectionStart - SENTINEL.length);
+      // The sentinel that seeds an empty continuation line sits in front of the
+      // caret, so the soft keyboard reads the field as mid-sentence and skips
+      // the capitalization `autoCapitalize="sentences"` would otherwise apply at
+      // the start of a new paragraph (the first line, which carries no sentinel,
+      // capitalizes natively). Restore it for the first character typed onto the
+      // line — but only on touch devices, mirroring where the attribute applies,
+      // and never when autocorrect is off (which also turns `autoCapitalize`
+      // off). Guard against a case-fold that changes length (e.g. ß → SS) so the
+      // queued caret stays put.
+      if (coarsePointer && !disableAutocorrect && text.length > 0) {
+        const first = text[0]!;
+        const upper = first.toLocaleUpperCase();
+        if (upper.length === first.length) text = upper + text.slice(1);
+      }
     }
     const next = [...lines];
     next[clampedActive] = text;

@@ -179,6 +179,17 @@ imperative `focus()` handle (`MarkdownEditorHandle`, consumed by `focusBody` in
 `App`) on Enter / Arrow-Down. A brand-new empty note shows the "Start writing"
 placeholder on the blank rendered line instead of a textarea.
 
+**Capitalizing a new line.** An empty continuation line is seeded with an
+invisible zero-width *sentinel* so a soft-keyboard Backspace has a character to
+delete (which the editor turns into a merge into the line above). That sentinel
+sits in front of the caret, so a phone keyboard reads the line as mid-sentence
+and skips the capital `autoCapitalize="sentences"` would put at the start of a
+new paragraph — the first line, which has no sentinel, capitalizes natively. On
+touch devices (a coarse pointer, mirroring where `autoCapitalize` applies) the
+editor restores that capital for the first character typed onto the line, so a
+new paragraph starts capitalized like the first line and the plain editor; it
+honours the autocorrect editor setting and never fires on desktop.
+
 Clicking the empty space below the note (`activateEnd`) always lands the caret
 on a blank line at the very bottom, **appending one when the document doesn't
 already end in a newline**. Without that trailing blank line the click would

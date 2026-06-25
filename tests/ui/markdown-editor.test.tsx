@@ -173,6 +173,87 @@ describe("MarkdownEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith("a\nx");
   });
 
+  // The sentinel sits before the caret on an empty continuation line, which
+  // makes a soft keyboard read the field as mid-sentence and suppress the
+  // capital `autoCapitalize="sentences"` would put at the start of a new
+  // paragraph. On touch devices the editor restores it for the first typed
+  // character so a new line starts with a capital like the first line does.
+  describe("capitalizing the start of a new line (touch)", () => {
+    function withCoarsePointer(coarse: boolean) {
+      const original = window.matchMedia;
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes("pointer: coarse") ? coarse : false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+      return () => {
+        window.matchMedia = original;
+      };
+    }
+
+    it("capitalizes the first character typed onto a new empty line", () => {
+      const restore = withCoarsePointer(true);
+      try {
+        const { onChange } = renderEditor("a\n");
+        const ta = activeTextarea();
+        fireEvent.change(ta, { target: { value: `${SENTINEL}x` } });
+        expect(onChange).toHaveBeenLastCalledWith("a\nX");
+      } finally {
+        restore();
+      }
+    });
+
+    it("leaves the rest of the line alone, only the first character", () => {
+      const restore = withCoarsePointer(true);
+      try {
+        const { onChange } = renderEditor("a\n");
+        const ta = activeTextarea();
+        // A predictive-text insertion can drop a whole word at once.
+        fireEvent.change(ta, { target: { value: `${SENTINEL}hello` } });
+        expect(onChange).toHaveBeenLastCalledWith("a\nHello");
+      } finally {
+        restore();
+      }
+    });
+
+    it("does not capitalize on a desktop (fine) pointer", () => {
+      const restore = withCoarsePointer(false);
+      try {
+        const { onChange } = renderEditor("a\n");
+        const ta = activeTextarea();
+        fireEvent.change(ta, { target: { value: `${SENTINEL}x` } });
+        expect(onChange).toHaveBeenLastCalledWith("a\nx");
+      } finally {
+        restore();
+      }
+    });
+
+    it("does not capitalize when autocorrect is disabled", () => {
+      const restore = withCoarsePointer(true);
+      try {
+        const onChange = vi.fn();
+        render(
+          <MarkdownEditor
+            body={"a\n"}
+            onChange={onChange}
+            {...editorProps}
+            disableAutocorrect
+          />,
+        );
+        const ta = activeTextarea();
+        fireEvent.change(ta, { target: { value: `${SENTINEL}x` } });
+        expect(onChange).toHaveBeenLastCalledWith("a\nx");
+      } finally {
+        restore();
+      }
+    });
+  });
+
   // A rendered link opens on click rather than rolling the editing textarea
   // onto its line: tapping it (even while another line is being edited) must
   // leave that line formatted so the anchor's own click fires and navigates.
