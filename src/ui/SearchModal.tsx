@@ -99,16 +99,13 @@ export function SearchModal({ open, onClose, snapshot, onOpen }: Props) {
   );
   const trimmed = query.trim();
 
-  // Reset and focus the field each time the modal opens, so it's ready to type
-  // into and never reopens onto a stale query. `Modal` moves focus to its card
-  // on open in a child effect (which runs before this one), so focusing on the
-  // next animation frame lands the caret in the search box *after* that — a
-  // frame is deterministic where the previous fixed timeout was a guess.
+  // Clear any stale query each time the modal opens, so it never reopens onto
+  // a previous search. Focus is owned by `Modal` via `initialFocusRef={inputRef}`
+  // below: it focuses the field in a layout effect, so when the open is
+  // dispatched inside `flushSync` from the tap (see `SideMenu`) the focus lands
+  // within that gesture and iOS raises the soft keyboard.
   useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    const raf = requestAnimationFrame(() => inputRef.current?.focus());
-    return () => cancelAnimationFrame(raf);
+    if (open) setQuery("");
   }, [open]);
 
   // Searching is the gesture the "Seeker" trophy watches for. The unlock bus
@@ -123,7 +120,12 @@ export function SearchModal({ open, onClose, snapshot, onOpen }: Props) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} labelledBy={headingId}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      labelledBy={headingId}
+      initialFocusRef={inputRef}
+    >
       <header className="flex shrink-0 items-center gap-2 border-b border-line bg-surface-3 px-3 py-2">
         <span className="pl-1 text-muted">
           <SearchIcon className="h-5 w-5" />

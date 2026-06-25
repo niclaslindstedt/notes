@@ -4,6 +4,7 @@ import {
   useState,
   type DragEvent as ReactDragEvent,
 } from "react";
+import { flushSync } from "react-dom";
 
 import {
   mixTopLevel,
@@ -645,7 +646,17 @@ export function SideMenu({
           close();
         }}
         onNewFolder={() => setCreatingFolder(true)}
-        onSearch={() => pick(() => dispatch({ kind: "search" }))}
+        onSearch={() => {
+          // Open synchronously *inside this tap* via flushSync, so the search
+          // field's focus (a layout effect in `Modal`) runs within the user
+          // gesture — the only context in which iOS raises the soft keyboard
+          // for a programmatic focus. A plain bus dispatch defers the focus to
+          // a later commit, outside the gesture, and the keyboard stays down.
+          // Open before closing the drawer so the field is focused while the
+          // tapped button is still mounted.
+          flushSync(() => dispatch({ kind: "search" }));
+          close();
+        }}
         onShowAll={() => {
           onShowAll();
           close();
