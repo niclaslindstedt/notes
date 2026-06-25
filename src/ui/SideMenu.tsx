@@ -32,16 +32,13 @@ import {
   CogIcon,
   FolderIcon,
   FolderOpenIcon,
-  ListIcon,
   LockIcon,
   MenuIcon,
   NoteIcon,
   PencilIcon,
   PlusIcon,
-  RedoIcon,
   SpinnerIcon,
   TrashIcon,
-  UndoIcon,
 } from "./icons.tsx";
 import { useModalDispatch } from "./modal-bus.ts";
 import { NoteDragItem } from "./note-drag.tsx";
@@ -55,6 +52,7 @@ import {
   useNoteDropKey,
 } from "./note-drag-context.ts";
 import { NamespaceGlyph } from "./NamespaceGlyph.tsx";
+import { SideMenuActionBar } from "./SideMenuActionBar.tsx";
 import { SideMenuFooter } from "./SideMenuFooter.tsx";
 
 // The navigation drawer. On viewports narrower than the smallest iPad it
@@ -642,76 +640,36 @@ export function SideMenu({
           </>
         )}
       </div>
-      {/* The button island: New note / New folder / Show all / Archive and
-          Undo / Redo share one bordered block pinned to the foot of the list
-          (mt-auto), so it falls under the thumb no matter how long the note
-          list is. A top row of create/navigate actions and a bottom row of
-          history actions are split by a divider, so the six icon buttons read
-          as one coherent unit rather than competing widgets. Each cell splits
-          its row's width evenly; the parent owns the border, rounding, and the
-          inner dividers. Show all and Archive light up (accent) when their view
-          is showing; Archive carries the archived-note count and accepts a
-          dragged note as a drop target. New folder drops the inline name input
-          into the list above. Undo / redo dim and go inert at the ends of the
-          timeline but keep the drawer open so a burst of reverts can be applied
-          without reopening it. */}
-      <div className="mt-auto px-3 pt-2 pb-3">
-        <div className="divide-y divide-line overflow-hidden rounded-md border border-line">
-          <div className="flex divide-x divide-line">
-            <BarButton
-              icon={<PlusIcon className="h-5 w-5" />}
-              label={t("nav.newNote")}
-              onClick={() => {
-                onAddNote();
-                close();
-              }}
-            />
-            <BarButton
-              icon={<FolderIcon className="h-5 w-5" />}
-              label={t("nav.newFolder")}
-              onClick={() => setCreatingFolder(true)}
-            />
-            <BarButton
-              icon={<ListIcon className="h-5 w-5" />}
-              label={t("nav.showAll")}
-              active={showAllActive}
-              onClick={() => {
-                onShowAll();
-                close();
-              }}
-            />
-            <BarButton
-              icon={<ArchiveIcon className="h-5 w-5" />}
-              label={t("nav.archive")}
-              active={archiveActive}
-              badge={archivedCount > 0 ? archivedCount : undefined}
-              dropId={NOTE_DROP_ARCHIVE}
-              isDropTarget={noteDropActive(NOTE_DROP_ARCHIVE)}
-              onDragOver={(e) => allowDropOn(e, NOTE_DROP_ARCHIVE)}
-              onDragLeave={() => setDropTarget(null)}
-              onDrop={dropOnArchive}
-              onClick={() => {
-                onOpenArchive();
-                close();
-              }}
-            />
-          </div>
-          <div className="flex divide-x divide-line">
-            <BarButton
-              icon={<UndoIcon className="h-5 w-5" />}
-              label={t("nav.undo")}
-              disabled={!canUndo}
-              onClick={onUndo}
-            />
-            <BarButton
-              icon={<RedoIcon className="h-5 w-5" />}
-              label={t("nav.redo")}
-              disabled={!canRedo}
-              onClick={onRedo}
-            />
-          </div>
-        </div>
-      </div>
+      {/* The button island below the list — see `SideMenuActionBar`. The drawer
+          owns the live drag state, so the Archive cell's drop-target wiring is
+          threaded down; every other action is a plain callback (the ones that
+          leave the drawer close it first). */}
+      <SideMenuActionBar
+        onNewNote={() => {
+          onAddNote();
+          close();
+        }}
+        onNewFolder={() => setCreatingFolder(true)}
+        onShowAll={() => {
+          onShowAll();
+          close();
+        }}
+        showAllActive={showAllActive}
+        onOpenArchive={() => {
+          onOpenArchive();
+          close();
+        }}
+        archiveActive={archiveActive}
+        archivedCount={archivedCount}
+        onUndo={onUndo}
+        onRedo={onRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        archiveIsDropTarget={noteDropActive(NOTE_DROP_ARCHIVE)}
+        onArchiveDragOver={(e) => allowDropOn(e, NOTE_DROP_ARCHIVE)}
+        onArchiveDragLeave={() => setDropTarget(null)}
+        onArchiveDrop={dropOnArchive}
+      />
       {/* The relocated burger menu, pinned to the foot of the drawer: Donate,
           the trophy (achievements), an "About" dropdown that folds away the
           project links (What's new / source / privacy), and Settings pinned
@@ -1204,72 +1162,6 @@ function NavItem({
       {trailing}
       {badge !== undefined && (
         <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-xs text-muted tabular-nums">
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-}
-
-// New note / New folder / Show all / Archive and Undo / Redo render as compact
-// segmented rows inside the button island instead of full-width rows, saving
-// vertical space. The cells sit flush against one another (the parent owns the
-// border, rounding, and inner `divide-x` / `divide-y` dividers) and split their
-// row's width evenly so each row reads symmetric. The buttons are icon-only (the
-// label rides on `aria-label` / `title`); the active view tints accent, the
-// Archive button doubles as a drop target with its count as a corner badge, and
-// undo / redo dim and go inert (`disabled`) at the ends of the timeline.
-function BarButton({
-  icon,
-  label,
-  active = false,
-  badge,
-  disabled = false,
-  onClick,
-  dropId,
-  isDropTarget = false,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-}: {
-  icon: ReactNode;
-  label: string;
-  active?: boolean;
-  badge?: number;
-  disabled?: boolean;
-  onClick: () => void;
-  dropId?: string;
-  isDropTarget?: boolean;
-  onDragOver?: (e: ReactDragEvent) => void;
-  onDragLeave?: (e: ReactDragEvent) => void;
-  onDrop?: (e: ReactDragEvent) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      aria-current={active ? "page" : undefined}
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-      {...(dropId !== undefined ? { [NOTE_DROP_ATTR]: dropId } : {})}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-      className={`relative flex flex-1 items-center justify-center py-2.5 ${
-        disabled
-          ? "cursor-not-allowed text-muted opacity-40"
-          : isDropTarget
-            ? "cursor-pointer bg-accent/15 text-fg-bright"
-            : active
-              ? "cursor-pointer bg-surface-2 text-fg-bright"
-              : "cursor-pointer text-fg hover:bg-surface-2 hover:text-fg-bright"
-      }`}
-    >
-      <span className={active ? "text-accent" : "text-muted"}>{icon}</span>
-      {badge !== undefined && (
-        <span className="absolute top-0.5 right-0.5 rounded-full bg-surface-3 px-1 py-0.5 text-[10px] leading-none text-muted tabular-nums">
           {badge}
         </span>
       )}

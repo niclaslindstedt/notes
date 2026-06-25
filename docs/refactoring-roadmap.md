@@ -69,15 +69,18 @@ _(none)_
 
 ### Severity 7–8 — multipliers
 
-#### `src/ui/SideMenu.tsx` — 1384 lines, container + six sub-components
+_(none)_
 
-**Smell.** 384 lines over the cap. The SideMenu container plus six
+### Severity 5–6 — friction
+
+#### `src/ui/SideMenu.tsx` — 1275 lines, container + five sub-components
+
+**Smell.** 275 lines over the cap. The SideMenu container plus five
 presentational sub-components (SectionHeader, FolderRow, FolderEditRow,
-NavItem, BarButton, SwipeToRemove). The pure sort helpers (step 1) and the
-footer (step 2, `MenuButton` / `MenuLink` / the About dropdown) have been
-relocated; the remaining concern is splitting the action bar and the
-note/folder list/namespace switcher out of the container. Re-verify with
-`wc -l src/ui/SideMenu.tsx`.
+NavItem, SwipeToRemove). The pure sort helpers (step 1), the footer (step 2),
+and the action-bar island (step 3, `BarButton`) have been relocated; the only
+remaining concern is splitting the note/folder list/namespace switcher out of
+the container. Re-verify with `wc -l src/ui/SideMenu.tsx`.
 
 **Plan (multi-PR).**
 
@@ -86,20 +89,20 @@ note/folder list/namespace switcher out of the container. Re-verify with
 2. ~~**Footer** → `src/ui/SideMenuFooter.tsx` — the Donate / Achievements /
    About-dropdown / Settings burger menu plus the `MenuButton` / `MenuLink`
    primitives.~~ **Done 2026-06** — see Landed.
-3. **Action bar** → `src/ui/SideMenuActionBar.tsx` (~65 lines, the
-   New/Folder/Show-all/Archive/Undo/Redo `BarButton` island). Self-contained
-   except for the Archive drop-target wiring (`noteDropActive` /
-   `allowDropOn` / `dropOnArchive`), which is threaded down as props.
+3. ~~**Action bar** → `src/ui/SideMenuActionBar.tsx` — the
+   New/Folder/Show-all/Archive/Undo/Redo `BarButton` island.~~ **Done
+   2026-06** — see Landed.
 4. The note/folder list and namespace switcher are higher-risk (drag
    state + folder expand/rename state scattered across the parent) — defer or
    do as a careful prop-drilled presenter extraction last.
 
 **Risk.** The list extraction (Seam 4) carries the drag/expand/rename
-state coupling. The action-bar extraction (step 3) is the safe next slice —
-a self-contained presentational island; its only coupling is the Archive
-row's drop-target props. No storage hot-path. **Severity: 6.**
-
-### Severity 5–6 — friction
+state coupling: the `dragItem` / `dropTarget` HTML5-drag state, the
+`expandedFolders` / `creatingFolder` / `renamingFolderId` view state, and the
+`renderNoteRow` / `renderFolder` closures all read parent state, so a presenter
+extraction must thread a wide prop surface (or lift the drag state into a hook
+first). No storage hot-path. **Severity: 5** (one cohesive seam left; the file
+is now ~1.3× the cap).
 
 #### `src/storage/useStorageBackend.ts` — 1154 lines, four backend concerns in one hook
 
@@ -146,6 +149,33 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `SideMenu.tsx` Seam 3: action-bar island extracted.** Moved the
+  bordered "button island" below the note list — the
+  New note / New folder / Show all / Archive top row and the Undo / Redo bottom
+  row — plus the `BarButton` segmented-cell primitive it is the only caller of,
+  out of `SideMenu.tsx` into a self-contained `SideMenuActionBar` component
+  (`src/ui/SideMenuActionBar.tsx`, 192 lines). The drawer now renders it with a
+  flat prop surface: each action is a plain callback (the New note / Show all /
+  Archive ones compose the parent's `close()` before the verb, exactly as the
+  inline handlers did), and the Archive cell's drop-target wiring
+  (`noteDropActive(NOTE_DROP_ARCHIVE)` / `allowDropOn` / `setDropTarget` /
+  `dropOnArchive`) is threaded down as the four `archive*` props because the
+  live HTML5-drag state still lives in `SideMenu`. The component reaches `useT`
+  directly (same provider tree) rather than threading `t` as a prop, and imports
+  `NOTE_DROP_ARCHIVE` / `NOTE_DROP_ATTR` from `note-drag-context.ts` itself; the
+  now-unused `ListIcon` / `RedoIcon` / `UndoIcon` imports were dropped from
+  `SideMenu.tsx`. Pure presentational extraction, no behaviour change, no
+  layering edge crossed (`app → ui`), no storage hot-path. Exposed the
+  previously-buried island (it only rendered inside an unmounted `SideMenu`) to
+  direct unit tests (added `tests/ui/side-menu-action-bar.test.tsx`, +5 tests
+  covering the four create/navigate callbacks, the `aria-current` active mark,
+  the archived-count badge show/hide at zero, the undo/redo disable-at-the-ends
+  gating + fire-when-enabled, and the Archive `data-note-drop` attr + dragover /
+  drop wiring). All 553 tests green; SideMenuActionBar holds 100% statement /
+  100% function / 94.7% branch coverage (was 0). SideMenu 1383 → 1275 lines.
+  Step 4 (note-list / folder / namespace switcher) is the last remaining seam;
+  the entry dropped to the 5–6 band. Also updated the `dictionary.md` button-
+  island pointer to the new file.
 - **2026-06 — `SideMenu.tsx` Seam 2: sidebar footer extracted.** Moved the
   drawer's footer — the relocated burger menu (Donate / Achievements / About
   dropdown / Settings) plus its `FloatingPanel` of project links, the
