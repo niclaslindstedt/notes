@@ -53,6 +53,11 @@ export type NoteConversionStep =
 
 export type NoteConversionProgress = (step: NoteConversionStep) => void;
 
+// Per-note at-rest encryption status from the last load: "encrypted" once a
+// note and all its attachments are sealed, "pending" while an in-progress
+// migration still has a plaintext remnant. Drives the green lock in the UI.
+export type NoteEncStatus = "encrypted" | "pending";
+
 export type StorageAdapter = {
   // Stable identifier so device-local settings (auth tokens, last-used
   // adapter) can be keyed per backend.
@@ -120,7 +125,7 @@ export type StorageAdapter = {
   // note and all its attachments are sealed, "pending" while an in-progress
   // migration still has a plaintext remnant. Drives the green lock. Empty/absent
   // when encryption is off.
-  getEncryptionStatus?(): Map<string, "encrypted" | "pending">;
+  getEncryptionStatus?(): Map<string, NoteEncStatus>;
 
   // Rebuild + seal the encrypted note index from the given snapshot, best-effort.
   // Called once the background encryption migration finishes so the first unlock

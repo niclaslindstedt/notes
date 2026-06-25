@@ -69,16 +69,15 @@ _(none)_
 
 ### Severity 7–8 — multipliers
 
-#### `src/storage/directory-adapter.ts` — 1766 lines, the shared base every file/cloud backend threads through
+#### `src/storage/directory-adapter.ts` — 1427 lines, the shared base every file/cloud backend threads through
 
-**Smell.** 656 lines over the cap, no opt-out — the shared `StorageAdapter`
+**Smell.** 427 lines over the cap, no opt-out — the shared `StorageAdapter`
 base for the folder, Dropbox, and Google-Drive backends. One file tangles
 several concerns: the markdown/path codec glue and types, the adapter
-closure state (revision tracking), the load path, attachment reconcile
-(plaintext + encrypted), the save/conflict path, and the atomic
-plain↔encrypted migration converters. Because **every** file/cloud backend
-runs through it, it is the highest-multiplier file in the storage layer.
-Re-verify with `wc -l src/storage/directory-adapter.ts`.
+closure state (revision tracking), the load path, the save/conflict path,
+and the atomic plain↔encrypted migration converters. Because **every**
+file/cloud backend runs through it, it is the highest-multiplier file in the
+storage layer. Re-verify with `wc -l src/storage/directory-adapter.ts`.
 
 **Plan (multi-PR, one seam per PR, lowest-coupling first).** All seams are
 pure relocations of sibling helpers out of the closure — the
@@ -97,15 +96,26 @@ pure relocations of sibling helpers out of the closure — the
    `createFolderRegistry` and reaches the two external-state touch points via
    `folderRegistry.readOk()` (load memo gate) and
    `folderRegistry.rememberFolders()` (save), so the call sites are unchanged.
-3. **Attachment reconcile** → `src/storage/attachment-reconcile.ts`
-   (~150 lines: the plaintext + encrypted write/remove helpers).
-   **Next — lowest remaining coupling.**
+3. ~~**Attachment reconcile** → `src/storage/attachment-reconcile.ts`.~~
+   **Done 2026-06** — see Landed. Scope was wider than the original
+   "~150 lines: write/remove helpers" note: the whole attachment-externalisation
+   concern moved (load-side `hydratePlaintext` + `attachEncryptedMetadata`,
+   save-side `reconcilePlaintext`/`reconcileEncrypted`/`clearWhere`/`clearAll`,
+   and the `attachmentPath` / `isPlaintextAttachmentPath` / `keptAttachments`
+   path helpers), because the `attachmentsTouched` session flag couples the load
+   and save sides — splitting only half would have left the flag straddling two
+   modules. The factory owns the flag; the adapter's encrypted-load fast path
+   calls `attachmentReconciler.markTouched()`, and the encrypted reconcile takes
+   the `attBlobPath` deriver as a per-call argument so the module stays
+   independent of the crypto session (357-line module).
 4. **Migration converters** → `src/storage/migration-converters.ts`
    (~180 lines: `migrateNote()`, `demigrateNote()`, `splitLegacyBlob()`).
-   Highest coupling — depends on seam 3 and the crypto session — do last.
+   Highest coupling — depends on the attachment path helpers (now importable
+   from `attachment-reconcile.ts`) and the crypto session — do last.
 
-Each remaining seam shaves the adapter toward the cap; the two together
-leave it around ~750 lines.
+The remaining seam shaves the adapter toward the cap, leaving it around
+~1250 lines (the migration converters carry the highest-risk invariants, so
+this last split stays in the 7–8 band even as the file shrinks).
 
 **Risk — HIGH, and there is no automated cloud coverage.** This is the most
 dangerous file in the tree to refactor: several seams carry silent
@@ -198,6 +208,43 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `directory-adapter.ts` Seam 3: attachment reconcile extracted.**
+  Moved the entire attachment-externalisation concern — the load-side
+  `hydrateAttachments` (→ `hydratePlaintext`) and `attachEncryptedMetadata`, the
+  save-side `reconcileAttachments` (→ `reconcilePlaintext`),
+  `reconcileEncryptedAttachments` (→ `reconcileEncrypted`),
+  `clearAttachmentsWhere` (→ `clearWhere`), `clearAttachments` (→ `clearAll`),
+  their `desiredAttachments` / `encDesiredAttachments` helpers, the
+  `attachmentsTouched` session flag, and the `attachmentPath` /
+  `stemOfAttachmentPath` / `isPlaintextAttachmentPath` / `keptAttachments` path
+  helpers — out of the `createDirectoryAdapter` closure into a
+  `createAttachmentReconciler` factory in `src/storage/attachment-reconcile.ts`
+  (357 lines). The factory owns `attachmentsTouched`; the adapter's
+  encrypted-load fast path (which spots attachment metadata off the note JSON
+  without going through hydration) sets it via `attachmentReconciler.markTouched()`
+  — the only flag touch-point left outside the module. The encrypted reconcile
+  takes the adapter's keyed-HMAC `attBlobPath` deriver as a per-call argument
+  (rather than holding it), so the new module has **no** dependency on the
+  crypto session — only `keys.contentKey` flows in for sealing. The scope was
+  deliberately wider than the roadmap's original "write/remove helpers" note:
+  the load and save sides share `attachmentsTouched`, so moving only the
+  save-side would have straddled the flag across two modules. `NoteEncStatus`
+  (previously a local alias in the adapter and an inline union in
+  `adapter.ts`'s `getEncryptionStatus`) was promoted to a shared export in
+  `adapter.ts` so both modules name it. The shared path helpers are imported
+  back into the adapter (still used by `fetchAttachment` / `migrateNote` /
+  `demigrateNote` and the save's representation-switch supersede), which also
+  pre-stages Seam 4. Pure relocation, no behaviour change, no on-disk format
+  change. Exposed the previously-closure-bound reconciler to direct unit tests
+  (added `tests/storage/attachment-reconcile.test.ts`, +16 tests covering the
+  path helpers + orphan-pruning `keptAttachments`, the plaintext write/orphan-
+  remove, the `attachmentsTouched` short-circuit vs. `markTouched`, plaintext
+  hydration, the encrypted "pending" downgrade, the encrypted seal/round-trip +
+  content-addressed skip + keep-without-bytes + orphan removal, the
+  representation-switch clears, and the no-store no-ops). All 520 tests green;
+  attachment-reconcile.ts holds 100% function / 92% line coverage and
+  directory-adapter.ts holds 96% line coverage. directory-adapter 1658 → 1427
+  lines. Seam 4 (migration converters) remains in Pending.
 - **2026-06 — `directory-adapter.ts` Seam 2: folder registry extracted.**
   Moved the `folders.json` sidecar concern — the `lastFoldersJson` /
   `lastFolders` / `foldersReadOk` closure state, the `readFolders()` retry
