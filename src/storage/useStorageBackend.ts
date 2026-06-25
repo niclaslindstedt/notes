@@ -31,21 +31,13 @@ import {
   getBackend,
   getDropboxRefreshToken,
   getDropboxToken,
-  getEncryption,
   getGdriveToken,
   setBackend as persistBackend,
   setDropboxRefreshToken,
   setDropboxToken,
-  setEncryption as persistEncryption,
   setGdriveToken,
 } from "./backend-preference.ts";
-import {
-  OfflineUnavailableError,
-  localCacheKey,
-  withLocalCache,
-} from "./cache/index.ts";
-import { decryptEnvelope, encryptText, isEncryptedEnvelope } from "./crypto.ts";
-import type { DecryptNoteReporter } from "./directory-adapter.ts";
+import { localCacheKey, withLocalCache } from "./cache/index.ts";
 import {
   type DropboxAuth,
   completeDropboxAuth,
@@ -101,34 +93,22 @@ import {
   loadDirectoryHandle,
   saveDirectoryHandle,
 } from "./folder/handle-store.ts";
+import {
+  type EncryptionProgress,
+  type EncryptionProgressDetail,
+  type EncryptionProgressStep,
+  useEncryption,
+} from "./useEncryption.ts";
 
 const log = createLogger("storage");
 
-// The ordered phases turning encryption on/off passes through, surfaced to the
-// settings UI so it can flash a one-line status while the work runs. `reading`,
-// `saving`, and `finalizing` bracket the storage round-trip; the key-derivation
-// and cipher phases (`derivingKey` / `encrypting` / `decrypting`) bubble up from
-// the crypto layer — the superset keeps a single callback driving both.
-export type EncryptionProgressStep =
-  | "reading"
-  | "derivingKey"
-  | "encrypting"
-  | "decrypting"
-  | "saving"
-  | "finalizing";
-// Optional per-note context a phase can carry — only the `decrypting` phase of
-// an unlock fills it in, once per note as the file/cloud backend unseals them in
-// sequence, so the status line can name the note being decrypted (and how far
-// through the run it is) instead of a single undifferentiated wait.
-export type EncryptionProgressDetail = {
-  title: string;
-  index: number;
-  total: number;
+// Re-exported from their new home in `useEncryption.ts` so the settings UI's
+// `encryption-progress.ts` import path stays unchanged.
+export type {
+  EncryptionProgress,
+  EncryptionProgressDetail,
+  EncryptionProgressStep,
 };
-export type EncryptionProgress = (
-  step: EncryptionProgressStep,
-  detail?: EncryptionProgressDetail,
-) => void;
 
 export interface UseStorageBackend {
   /** The adapter to hand to the sync engine. A no-op placeholder while locked. */
@@ -330,47 +310,26 @@ export function useStorageBackend(): UseStorageBackend {
   const [gdriveToken, setGdriveTokenState] = useState<string | null>(
     getGdriveToken,
   );
-  const [encryption, setEncryptionState] =
-    useState<EncryptionMode>(getEncryption);
-  // File/cloud only: true while the background de-encryption queue drains. The
-  // mode stays `encrypted` (and the passphrase held) until the last note is
-  // plaintext, then `finishDisableEncryption` flips it.
-  const [disabling, setDisabling] = useState(false);
-  // Session-only passphrase. Never persisted — lost on reload by design.
-  const [password, setPassword] = useState<string | null>(null);
-  // A stable ref the per-file directory adapters read at call time, so the
-  // adapter never needs rebuilding when the passphrase changes (unlock / enable
-  // / disable). Kept in lockstep with the `password` state via `applyPassword`.
-  const passwordRef = useRef<string | null>(null);
-  // Points at the unlock gate's status callback only while an unlock is in
-  // flight, so the directory adapter can report each note as it decrypts it.
-  // Null the rest of the time — a steady-state load reports nothing.
-  const decryptNoteRef = useRef<DecryptNoteReporter | null>(null);
-  const directoryCrypto = useMemo(
-    () => ({ passwordRef, onDecryptNote: decryptNoteRef }),
-    [],
-  );
-  // Set or clear the session passphrase in one place: the imperative ref (read
-  // by the adapters) and the React state (drives `locked` / re-renders).
-  const applyPassword = useCallback((next: string | null) => {
-    passwordRef.current = next;
-    setPassword(next);
-  }, []);
-
-  // Seal/unseal the offline cache so localStorage holds one whole-document
-  // envelope (ciphertext) even though the per-file directory adapter hands the
-  // cache plaintext. No passphrase held → pass through. `unseal` is what an
-  // offline unlock verifies the candidate passphrase against.
-  const seal = useCallback(async (plaintext: string): Promise<string> => {
-    const pw = passwordRef.current;
-    return pw ? await encryptText(plaintext, pw) : plaintext;
-  }, []);
-  const unseal = useCallback(async (stored: string): Promise<string> => {
-    const pw = passwordRef.current;
-    return pw && isEncryptedEnvelope(stored)
-      ? await decryptEnvelope(stored, pw)
-      : stored;
-  }, []);
+  // The active document adapter, exposed to the encryption verbs through a ref
+  // they read at call time. Assigned right after `inner` is built below; null
+  // only during the first render pass, before any verb can fire. This breaks
+  // the render-order cycle: `useEncryption` produces the `directoryCrypto` /
+  // `seal` / `unseal` that build the very adapter its verbs need.
+  const innerRef = useRef<StorageAdapter | null>(null);
+  const {
+    directoryCrypto,
+    seal,
+    unseal,
+    passwordRef,
+    encryption,
+    locked,
+    disabling,
+    wrapBrowserForActive,
+    enableEncryption,
+    disableEncryption,
+    finishDisableEncryption,
+    unlock,
+  } = useEncryption(innerRef, backend);
   // The picked local folder (File System Access API). `null` until the boot
   // probe resolves, the user picks one, or a revoked grant drops it.
   const [folderHandle, setFolderHandle] =
@@ -565,6 +524,9 @@ export function useStorageBackend(): UseStorageBackend {
     () => makeInner(activeNamespace),
     [makeInner, activeNamespace],
   );
+  // Hand the live adapter to the encryption verbs, which read it at call time
+  // (always well after this first assignment).
+  innerRef.current = inner;
 
   // The active backend's root settings store — the same selection as `inner`
   // but independent of encryption (settings are app-wide plaintext). Null for
@@ -656,8 +618,6 @@ export function useStorageBackend(): UseStorageBackend {
     };
   }, [namespaceStore]);
 
-  const locked = encryption === "encrypted" && password === null;
-
   // The adapter handed to the app. While locked, a no-op placeholder. The
   // file/cloud backends encrypt per-file *inside* the directory adapter (via
   // `directoryCrypto`), so only the single-document browser backend still needs
@@ -668,7 +628,7 @@ export function useStorageBackend(): UseStorageBackend {
       return withEncryption(inner, passwordRef);
     }
     return inner;
-  }, [inner, encryption, locked, backend, selection.kind]);
+  }, [inner, encryption, locked, backend, selection.kind, passwordRef]);
 
   // On-demand attachment fetch, surfaced as a `data:` URL for the UI. Bound to
   // the active adapter; a no-op (null) on backends without an attachment store.
@@ -710,19 +670,6 @@ export function useStorageBackend(): UseStorageBackend {
     persistBackend("browser");
     setBackendState("browser");
   }, []);
-
-  // Wrap a single-document adapter (the browser store) in the session's
-  // whole-document encryption envelope so a folder seed / mirror round-trips the
-  // same bytes the steady-state app does. The file/cloud adapters encrypt
-  // per-file internally via `directoryCrypto`, so they are *not* wrapped — only
-  // the browser store passes through here. A no-op when encryption is off.
-  const wrapBrowserForActive = useCallback(
-    (raw: StorageAdapter): StorageAdapter =>
-      encryption === "encrypted" && password !== null
-        ? withEncryption(raw, passwordRef)
-        : raw,
-    [encryption, password],
-  );
 
   // Pick a folder and switch to it. When the folder is empty, seed it with the
   // current document so the switch doesn't blank the screen; when it already
@@ -839,144 +786,6 @@ export function useStorageBackend(): UseStorageBackend {
     persistBackend("browser");
     setBackendState("browser");
   }, []);
-
-  // Pull every attachment's bytes into the snapshot before a representation
-  // switch. A note loads metadata-only (bytes fetched on demand), but a switch
-  // has to *move* the bytes from the old representation to the new one — so they
-  // must be in hand while the old representation is still readable (keys still
-  // in their pre-flip state). Without this, the switch would clear the old
-  // attachment files with nothing written in their place. The migration queue
-  // does this incrementally per attachment; the toggle does it in one pass.
-  const hydrateForSwitch = useCallback(
-    async (text: string): Promise<string> => {
-      const snap = parse(text);
-      for (const note of snap.notes) {
-        for (const a of note.attachments ?? []) {
-          if (a.data) continue;
-          const got = await inner.fetchAttachment?.(note, a.filename);
-          if (got) a.data = bytesToDataUrl(got.mime, got.bytes);
-        }
-      }
-      return serialize(snap);
-    },
-    [inner],
-  );
-
-  const enableEncryption = useCallback(
-    async (next: string, onProgress?: EncryptionProgress) => {
-      if (!next) throw new Error("Passphrase is required");
-      log.info("enable encryption: start");
-      // The browser backend has no per-note representation: its whole document
-      // is one envelope, so the switch is a single re-save through the
-      // `withEncryption` wrapper here and now.
-      if (backend === "browser") {
-        onProgress?.("reading");
-        const snap = await inner.load();
-        const hydrated = snap ? await hydrateForSwitch(snap.text) : null;
-        onProgress?.("derivingKey");
-        passwordRef.current = next;
-        if (snap && hydrated !== null) {
-          onProgress?.("encrypting");
-          onProgress?.("saving");
-          await inner.save(hydrated, snap.revision);
-        }
-        onProgress?.("finalizing");
-      } else {
-        // File/cloud: flip the mode immediately and let the background queue
-        // seal each note one at a time (the encrypted load merges any
-        // not-yet-sealed plaintext remnant, so the document stays whole). No
-        // bulk re-save here — that would burst the cloud API and block the UI.
-        onProgress?.("derivingKey");
-        passwordRef.current = next;
-      }
-      persistEncryption("encrypted");
-      setEncryptionState("encrypted");
-      applyPassword(next);
-      log.info("enable encryption: mode on");
-      unlockAchievement("paranoidMode");
-    },
-    [backend, inner, applyPassword, hydrateForSwitch],
-  );
-
-  const disableEncryption = useCallback(
-    async (onProgress?: EncryptionProgress) => {
-      if (passwordRef.current === null) {
-        throw new Error("Unlock before turning encryption off");
-      }
-      log.info("disable encryption: start");
-      if (backend === "browser") {
-        // Whole-document backend: read + decrypt and re-save as plaintext in one
-        // pass, clearing the encrypted bytes only after the plaintext is written.
-        onProgress?.("reading");
-        onProgress?.("decrypting");
-        const snap = await inner.load();
-        const hydrated = snap ? await hydrateForSwitch(snap.text) : null;
-        passwordRef.current = null;
-        if (snap && hydrated !== null) {
-          onProgress?.("saving");
-          await inner.save(hydrated, snap.revision);
-        }
-        onProgress?.("finalizing");
-        persistEncryption("plaintext");
-        setEncryptionState("plaintext");
-        applyPassword(null);
-        log.info("disable encryption: done");
-        return;
-      }
-      // File/cloud: keep the mode `encrypted` and the passphrase held, and raise
-      // the flag so the background queue decrypts note-by-note. It calls
-      // `finishDisableEncryption` once the last note is plaintext.
-      setDisabling(true);
-    },
-    [backend, inner, applyPassword, hydrateForSwitch],
-  );
-
-  const finishDisableEncryption = useCallback(() => {
-    log.info("disable encryption: queue drained — finalising");
-    persistEncryption("plaintext");
-    setEncryptionState("plaintext");
-    applyPassword(null);
-    setDisabling(false);
-  }, [applyPassword]);
-
-  const unlock = useCallback(
-    async (candidate: string, onProgress?: EncryptionProgress) => {
-      if (!candidate) throw new Error("Passphrase is required");
-      // Tentatively activate the candidate so the directory adapter derives keys
-      // and decrypts the per-file notes (or the offline cache falls back and
-      // unseals against it). A wrong passphrase surfaces as an AES-GCM auth
-      // failure ("Wrong password"); an unreachable backend with nothing cached
-      // maps to the distinct "you're offline" error.
-      // The phases bracket the single `inner.load()` that does the real work
-      // (derive key → read → decrypt) so the unlock gate can flash what's
-      // happening instead of sitting blank.
-      onProgress?.("derivingKey");
-      passwordRef.current = candidate;
-      // Forward each note the file/cloud backend unseals to the status line, so
-      // a long decrypt names the note it's on. Cleared in `finally` so it never
-      // fires for a steady-state load. The browser backend decrypts one whole
-      // envelope (no per-note events), so it just keeps the generic phase line.
-      decryptNoteRef.current = onProgress
-        ? (info) => onProgress("decrypting", info)
-        : null;
-      try {
-        onProgress?.("decrypting");
-        await inner.load();
-      } catch (err) {
-        passwordRef.current = password;
-        if (err instanceof Error && /wrong password/i.test(err.message)) {
-          throw new Error("Wrong password", { cause: err });
-        }
-        log.warn("unlock: backend unreachable and no cached copy", err);
-        throw new OfflineUnavailableError(undefined, { cause: err });
-      } finally {
-        decryptNoteRef.current = null;
-      }
-      onProgress?.("finalizing");
-      applyPassword(candidate);
-    },
-    [inner, password, applyPassword],
-  );
 
   const switchNamespace = useCallback((slug: string) => {
     setActiveNamespaceSlug(slug);
