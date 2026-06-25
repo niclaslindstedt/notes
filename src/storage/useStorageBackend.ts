@@ -69,19 +69,14 @@ import {
   useNamespaceRegistry,
 } from "./useNamespaceRegistry.ts";
 import type { SettingsStore } from "./settings-store.ts";
-import {
-  clearDirectoryHandle,
-  ensurePermission,
-  isFolderBackendAvailable,
-  loadDirectoryHandle,
-  saveDirectoryHandle,
-} from "./folder/handle-store.ts";
+import { isFolderBackendAvailable } from "./folder/handle-store.ts";
 import {
   type EncryptionProgress,
   type EncryptionProgressDetail,
   type EncryptionProgressStep,
   useEncryption,
 } from "./useEncryption.ts";
+import { type FolderActiveRef, useFolderBackend } from "./useFolderBackend.ts";
 
 const log = createLogger("storage");
 
@@ -313,54 +308,41 @@ export function useStorageBackend(): UseStorageBackend {
     finishDisableEncryption,
     unlock,
   } = useEncryption(innerRef, backend);
-  // The picked local folder (File System Access API). `null` until the boot
-  // probe resolves, the user picks one, or a revoked grant drops it.
-  const [folderHandle, setFolderHandle] =
-    useState<FileSystemDirectoryHandle | null>(null);
-  // Gates the folder branch of the adapter memo until the boot probe has run,
-  // so we don't briefly build a folder adapter without a handle.
-  const [folderHandleLoaded, setFolderHandleLoaded] = useState<boolean>(
-    () => getBackend() !== "folder",
-  );
-  const [folderReconnectNeeded, setFolderReconnectNeeded] = useState(false);
-
-  // Drop the live handle and surface the reconnect cue. Called by the folder
-  // adapter when an in-flight read / write hits a revoked grant; the IDB
-  // record stays so Settings can re-grant in one click.
-  const markFolderPermissionLost = useCallback(() => {
-    log.warn("folder: permission lost during operation");
-    setFolderHandle(null);
-    setFolderReconnectNeeded(true);
+  // Persist + activate a backend in one call (localStorage preference + the
+  // re-render). Handed to the folder hook, whose connect / disconnect verbs
+  // switch the active backend.
+  const selectBackend = useCallback((id: BackendId) => {
+    persistBackend(id);
+    setBackendState(id);
   }, []);
 
-  // Boot probe: when the saved backend is the folder, load the stored handle
-  // from IndexedDB and ask the OS whether the grant still stands. Either
-  // rehydrate the handle or fall back to the browser store with a reconnect
-  // cue (the IDB record is kept so Reconnect can re-grant).
-  useEffect(() => {
-    if (getBackend() !== "folder") {
-      setFolderHandleLoaded(true);
-      return;
-    }
-    let cancelled = false;
-    setFolderHandleLoaded(false);
-    void (async () => {
-      const stored = await loadDirectoryHandle();
-      if (cancelled) return;
-      if (!stored) {
-        setFolderHandleLoaded(true);
-        return;
-      }
-      const status = await ensurePermission(stored, false);
-      if (cancelled) return;
-      if (status === "granted") setFolderHandle(stored);
-      else setFolderReconnectNeeded(true);
-      setFolderHandleLoaded(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // The active document adapter + namespace the folder hook's connect /
+  // disconnect verbs read at call time. Assigned right after `adapter` is built
+  // below; the verbs only fire from UI mounted well after that, so it's never
+  // read while null. This breaks the folder hook's render-order cycle: it
+  // produces the `folderHandle` the backend selection (and so the adapter) is
+  // built from.
+  const folderActiveRef = useRef<FolderActiveRef["current"]>(null);
+
+  // The picked-folder concern: the live FSA handle and its boot-probe
+  // rehydration, the revoked-grant reconnect cue, and the connect / reconnect /
+  // disconnect verbs. Produces `folderHandle` / `folderHandleLoaded` /
+  // `markFolderPermissionLost`, which the selection / adapter / store memos
+  // below key off — so it runs before them.
+  const {
+    folderHandle,
+    folderHandleLoaded,
+    folderReconnectNeeded,
+    markFolderPermissionLost,
+    connectFolder,
+    reconnectFolder,
+    disconnectFolder,
+  } = useFolderBackend({
+    activeRef: folderActiveRef,
+    directoryCrypto,
+    wrapBrowserForActive,
+    selectBackend,
+  });
 
   // Complete a Dropbox OAuth redirect on boot. Google Drive uses a popup
   // (resolved inline in `connectGdrive`), so only Dropbox lands back here
@@ -577,6 +559,9 @@ export function useStorageBackend(): UseStorageBackend {
     }
     return inner;
   }, [inner, encryption, locked, backend, selection.kind, passwordRef]);
+  // Hand the live adapter + namespace to the folder verbs, which read them at
+  // call time (always well after this first assignment).
+  folderActiveRef.current = { adapter, activeNamespace };
 
   // On-demand attachment fetch, surfaced as a `data:` URL for the UI. Bound to
   // the active adapter; a no-op (null) on backends without an attachment store.
@@ -618,91 +603,6 @@ export function useStorageBackend(): UseStorageBackend {
     persistBackend("browser");
     setBackendState("browser");
   }, []);
-
-  // Pick a folder and switch to it. When the folder is empty, seed it with the
-  // current document so the switch doesn't blank the screen; when it already
-  // holds notes, adopt them (the folder wins). The handle is persisted to
-  // IndexedDB so the grant survives reloads.
-  const connectFolder = useCallback(async () => {
-    if (typeof window === "undefined" || !window.showDirectoryPicker) return;
-    let handle: FileSystemDirectoryHandle;
-    try {
-      handle = await window.showDirectoryPicker({ mode: "readwrite" });
-    } catch (err) {
-      // AbortError = the user dismissed the picker; nothing to do.
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      log.error("folder picker failed", err);
-      return;
-    }
-    const folder = createFolderAdapter({
-      directoryHandle: handle,
-      namespace: activeNamespace,
-      crypto: directoryCrypto,
-    });
-    try {
-      const [remote, source] = await Promise.all([
-        folder.load().catch(() => null),
-        adapter.load().catch(() => null),
-      ]);
-      if (!remote && source) await folder.save(source.text);
-    } catch (err) {
-      log.error("folder seed failed", err);
-    }
-    await saveDirectoryHandle(handle);
-    persistBackend("folder");
-    setFolderHandle(handle);
-    setFolderReconnectNeeded(false);
-    setFolderHandleLoaded(true);
-    setBackendState("folder");
-    unlockAchievement("localVault");
-  }, [activeNamespace, adapter, directoryCrypto]);
-
-  // Re-confirm the OS grant on the already-stored handle. `requestPermission`
-  // needs a user gesture, which is why this lives in a click handler.
-  const reconnectFolder = useCallback(async () => {
-    const stored = await loadDirectoryHandle();
-    if (!stored) {
-      await connectFolder();
-      return;
-    }
-    const status = await ensurePermission(stored, true);
-    if (status === "granted") {
-      setFolderHandle(stored);
-      setFolderReconnectNeeded(false);
-    }
-  }, [connectFolder]);
-
-  // Mirror the folder's current document back into the browser store, then
-  // forget the handle and switch back. Best-effort: a stale browser copy is a
-  // few-edit regression at worst.
-  const disconnectFolder = useCallback(async () => {
-    if (folderHandle) {
-      try {
-        const folder = createFolderAdapter({
-          directoryHandle: folderHandle,
-          namespace: activeNamespace,
-          crypto: directoryCrypto,
-        });
-        const snap = await folder.load();
-        if (snap) {
-          const browser = wrapBrowserForActive(
-            new BrowserLocalStorageAdapter(
-              globalThis.localStorage,
-              activeNamespace,
-            ),
-          );
-          await browser.save(snap.text);
-        }
-      } catch (err) {
-        log.error("folder disconnect: mirror to browser failed", err);
-      }
-    }
-    await clearDirectoryHandle();
-    persistBackend("browser");
-    setFolderHandle(null);
-    setFolderReconnectNeeded(false);
-    setBackendState("browser");
-  }, [folderHandle, activeNamespace, directoryCrypto, wrapBrowserForActive]);
 
   const connectDropbox = useCallback(() => {
     // Redirects away; completion runs in the boot effect above — anything
