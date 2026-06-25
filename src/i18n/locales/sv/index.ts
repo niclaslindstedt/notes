@@ -13,6 +13,7 @@ import namespace from "./namespace.ts";
 import nativeApp from "./native.ts";
 import nav from "./nav.ts";
 import pwa from "./pwa.ts";
+import search from "./search.ts";
 import settings from "./settings.ts";
 import sync from "./sync.ts";
 
@@ -26,6 +27,7 @@ export const sv: Catalog = {
   native: nativeApp,
   nav,
   pwa,
+  search,
   settings,
   sync,
 };

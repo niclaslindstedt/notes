@@ -7,16 +7,18 @@ import {
   ListIcon,
   PlusIcon,
   RedoIcon,
+  SearchIcon,
   UndoIcon,
 } from "./icons.tsx";
 import { NOTE_DROP_ARCHIVE, NOTE_DROP_ATTR } from "./note-drag-context.ts";
 
-// The button island: New note / New folder / Show all / Archive and Undo / Redo
-// share one bordered block pinned to the foot of the list (mt-auto), so it falls
-// under the thumb no matter how long the note list is. A top row of
-// create/navigate actions and a bottom row of history actions are split by a
-// divider, so the six icon buttons read as one coherent unit rather than
-// competing widgets. Each cell splits its row's width evenly; the parent owns the
+// The button island: New note / New folder / Search / Show all / Archive and
+// Undo / Redo share one bordered block pinned to the foot of the list (mt-auto),
+// so it falls under the thumb no matter how long the note list is. A top row of
+// create/navigate actions (Search opens the full-text search modal) and a bottom
+// row of history actions are split by a divider, so the icon buttons read as one
+// coherent unit rather than competing widgets. Each cell splits its row's width
+// evenly; the parent owns the
 // border, rounding, and the inner dividers. Show all and Archive light up
 // (accent) when their view is showing; Archive carries the archived-note count
 // and accepts a dragged note as a drop target. New folder drops the inline name
@@ -30,6 +32,7 @@ import { NOTE_DROP_ARCHIVE, NOTE_DROP_ATTR } from "./note-drag-context.ts";
 export function SideMenuActionBar({
   onNewNote,
   onNewFolder,
+  onSearch,
   onShowAll,
   showAllActive,
   onOpenArchive,
@@ -48,6 +51,8 @@ export function SideMenuActionBar({
   onNewNote: () => void;
   /** Drop the inline "new folder" name input into the list above. */
   onNewFolder: () => void;
+  /** Open the full-text search modal (the drawer closes behind it). */
+  onSearch: () => void;
   /** Leave the editor and show the full overview (the drawer closes behind it). */
   onShowAll: () => void;
   /** Whether the overview is the view currently showing. */
@@ -86,6 +91,11 @@ export function SideMenuActionBar({
             icon={<FolderIcon className="h-5 w-5" />}
             label={t("nav.newFolder")}
             onClick={onNewFolder}
+          />
+          <BarButton
+            icon={<SearchIcon className="h-5 w-5" />}
+            label={t("search.title")}
+            onClick={onSearch}
           />
           <BarButton
             icon={<ListIcon className="h-5 w-5" />}

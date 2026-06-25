@@ -18,6 +18,7 @@ function renderBar(
   const props = {
     onNewNote: vi.fn(),
     onNewFolder: vi.fn(),
+    onSearch: vi.fn(),
     onShowAll: vi.fn(),
     showAllActive: false,
     onOpenArchive: vi.fn(),
@@ -42,10 +43,12 @@ describe("SideMenuActionBar", () => {
     const props = renderBar();
     fireEvent.click(screen.getByRole("menuitem", { name: "New note" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "New folder" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Search" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Show all" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
     expect(props.onNewNote).toHaveBeenCalledTimes(1);
     expect(props.onNewFolder).toHaveBeenCalledTimes(1);
+    expect(props.onSearch).toHaveBeenCalledTimes(1);
     expect(props.onShowAll).toHaveBeenCalledTimes(1);
     expect(props.onOpenArchive).toHaveBeenCalledTimes(1);
   });

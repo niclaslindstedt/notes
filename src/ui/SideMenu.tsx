@@ -645,6 +645,7 @@ export function SideMenu({
           close();
         }}
         onNewFolder={() => setCreatingFolder(true)}
+        onSearch={() => pick(() => dispatch({ kind: "search" }))}
         onShowAll={() => {
           onShowAll();
           close();

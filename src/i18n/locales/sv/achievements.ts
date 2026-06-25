@@ -189,6 +189,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Kopieringsknappen bredvid synkglyfen lägger den öppna anteckningen på urklipp. Inställningar → Redigerare väljer hur mycket som tas med — bara brödtexten, titel och brödtext, eller hela .md-filen med dess YAML-frontmatter.",
     },
+    seeker: {
+      name: "Sökare",
+      condition: "Sök bland dina anteckningar.",
+      learnMore:
+        "Förstoringsglaset på sidomenyns åtgärdsrad söker igenom varje antecknings titel och brödtext på en gång. Den är vanlig text och luddig som standard — skriv en grov förkortning så hittar den ändå anteckningen — och tar även jokertecken (recipe*, dr?ft) eller ett /regex/. På krypterade lagringsbackender söker den i samma förhandsvisning som anteckningsindexet redan har, så den fungerar utan att låsa upp varje anteckning.",
+    },
 
     // ── Proffs ────────────────────────────────────────────────────────
     localVault: {
