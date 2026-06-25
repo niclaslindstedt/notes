@@ -1,4 +1,10 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
 
 import { useT } from "../i18n/index.ts";
@@ -31,6 +37,11 @@ type Props = {
   // `"alertdialog"` for destructive confirmations so assistive tech
   // announces them as an interruption; defaults to `"dialog"`.
   role?: "dialog" | "alertdialog";
+  // The element to focus on open instead of the card. A modal with a text
+  // field (search, rename) points this at its input so focus — and, when the
+  // open is wrapped in `flushSync` from the tap that opens it, the iOS soft
+  // keyboard — lands on the field rather than the non-typing card.
+  initialFocusRef?: RefObject<HTMLElement | null>;
   // When true the modal renders as a compact centered card on every
   // viewport size instead of filling the screen on mobile. Use it for
   // short content that opens no soft keyboard — confirmations, pickers —
@@ -48,6 +59,7 @@ export function Modal({
   onClose,
   labelledBy,
   role = "dialog",
+  initialFocusRef,
   centered = false,
   size = "max-w-md",
   children,
@@ -57,21 +69,36 @@ export function Modal({
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const tokenRef = useRef<symbol>(Symbol("modal"));
 
-  // Hold the latest onClose in a ref so the focus/keydown effect can depend
-  // on `open` alone. Callers commonly pass an inline arrow (`onClose={() =>
+  // Hold the latest onClose in a ref so the keydown effect can depend on
+  // `open` alone. Callers commonly pass an inline arrow (`onClose={() =>
   // …}`) that is a fresh identity every render; keying the effect on it
-  // would tear down and re-run on every parent re-render, and the re-run
-  // calls `cardRef.current?.focus()` — stealing focus from whatever input
-  // the user is typing into and dismissing the soft keyboard on mobile.
+  // would tear down and re-run on every parent re-render — re-adding the
+  // Escape listener and re-running focus, which would steal focus from
+  // whatever input the user is typing into and dismiss the soft keyboard.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+
+  // Focus runs in a layout effect, not a passive one, so it fires
+  // synchronously on commit. When the open is dispatched inside `flushSync`
+  // from the tap that triggered it, this layout effect therefore runs *within*
+  // that user gesture — the only context in which iOS raises the soft keyboard
+  // for a programmatic `focus()`. A passive effect (or a `setTimeout` /
+  // `requestAnimationFrame`) lands outside the gesture, so the field focuses
+  // but the keyboard never appears. Focus the caller's `initialFocusRef` (an
+  // input) when given, else the card; restore the prior focus on close.
+  useLayoutEffect(() => {
+    if (!open) return;
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    (initialFocusRef?.current ?? cardRef.current)?.focus();
+    return () => {
+      previouslyFocused.current?.focus?.();
+    };
+  }, [open, initialFocusRef]);
 
   useEffect(() => {
     if (!open) return;
     const token = tokenRef.current;
     modalStack.push(token);
-    previouslyFocused.current = document.activeElement as HTMLElement | null;
-    cardRef.current?.focus();
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -91,7 +118,6 @@ export function Modal({
       const i = modalStack.lastIndexOf(token);
       if (i !== -1) modalStack.splice(i, 1);
       document.body.style.overflow = prevOverflow;
-      previouslyFocused.current?.focus?.();
     };
   }, [open]);
 
