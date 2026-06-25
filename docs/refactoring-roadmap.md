@@ -104,42 +104,50 @@ extraction must thread a wide prop surface (or lift the drag state into a hook
 first). No storage hot-path. **Severity: 5** (one cohesive seam left; the file
 is now ~1.3× the cap).
 
-#### `src/storage/useStorageBackend.ts` — 1154 lines, four backend concerns in one hook
+#### `src/storage/useStorageBackend.ts` — 1053 lines, three backend concerns left in one hook
 
-**Smell.** 154 lines over the cap. One hook wires backend **selection**,
+**Smell.** 53 lines over the cap. The hook wires backend **selection**,
 **OAuth** (Dropbox + Google Drive connect/disconnect + redirect
-completion), the **folder** FSA permission lifecycle, the **encryption**
-state machine (enable/disable/unlock/password refs), and the **namespace
-registry** (create/rename/remove + sync) — five cohesive concerns
-interleaved across ~845 lines of hook body. Re-verify with
+completion), the **folder** FSA permission lifecycle, and the **namespace
+registry** (create/rename/remove + sync). The **encryption** state machine
+(step 1) has been relocated to `useEncryption.ts`. Re-verify with
 `wc -l src/storage/useStorageBackend.ts`.
 
 **Plan (multi-PR, extract one concern-hook per PR, lowest-coupling
 first).** Each seam becomes a focused hook the main hook composes:
 
-1. **Encryption** → `src/storage/useEncryption.ts` (~160–200 lines).
-   Safest — self-contained state machine, minimal external deps; keep
-   `passwordRef` / `decryptNoteRef` / `directoryCrypto` inside it and hand
-   the stable ref bundle to the adapter factory. Improves testability.
+1. ~~**Encryption** → `src/storage/useEncryption.ts`. Self-contained state
+   machine; keep `passwordRef` / `decryptNoteRef` / `directoryCrypto` inside
+   it and hand the stable ref bundle to the adapter factory.~~ **Done
+   2026-06** — see Landed.
 2. **Namespace registry** → `src/storage/useNamespaceRegistry.ts`
    (~140–180 lines). Must preserve the reconciliation effect's dep chain.
 3. **Folder backend** → `src/storage/useFolderBackend.ts` (~130–160). Tighter
-   coupling to the adapter factory and active-encryption wrap on disconnect.
+   coupling to the adapter factory and active-encryption wrap on disconnect
+   (the `wrapBrowserForActive` now lives in `useEncryption.ts`, so the folder
+   hook would consume it as a passed-in dep).
 4. **Cloud OAuth** → `src/storage/useCloudBackend.ts` (~180–200). Highest
    risk — OAuth redirect handling is fragile and has **zero automated
    coverage**.
 
 The `selection` memo, `makeInner` adapter factory, and the return object
-stay in the orchestrating hook (~400–500 lines after extraction).
+stay in the orchestrating hook.
 
 **Risk.** The OAuth/cloud and folder flows have **no automated coverage** —
 any extraction touching them must be smoke-tested by hand (browser default
 plus the cloud backend touched) before merge. The extraction order in the
-`selection` memo, the encryption wrapper asymmetry (browser =
-whole-document `withEncryption`; file/cloud = per-file `directoryCrypto`),
-and the lockstep `applyPassword` state+ref update must be preserved exactly.
-Start with encryption (step 1) where the seam is cleanest and adds
-testability. **Severity: 6.**
+`selection` memo and the encryption wrapper asymmetry (browser =
+whole-document `withEncryption`; file/cloud = per-file `directoryCrypto`)
+must be preserved exactly. With encryption extracted, the file is only ~53
+over the cap; the remaining three seams are lower-leverage now. **Severity:
+5.**
+
+**Note for the next seam.** The encryption extraction broke a render-order
+cycle with an `innerRef` the verbs read at call time (the hook produces the
+`directoryCrypto` / `seal` / `unseal` that build the very adapter its verbs
+need). The namespace/folder/cloud seams don't have this cycle — they don't
+produce anything `makeInner` consumes — so they can take `inner` / `adapter`
+as plain args.
 
 ### Easy wins
 
@@ -149,6 +157,43 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `useStorageBackend.ts` Seam 1: encryption state machine
+  extracted.** Moved the entire at-rest encryption concern — the session
+  passphrase (`password` state + `passwordRef`), the `encryption` mode and
+  `disabling` flags, the `decryptNoteRef` / `directoryCrypto` per-file ref
+  bundle, the `applyPassword` lockstep setter, the offline-cache `seal` /
+  `unseal`, the `wrapBrowserForActive` helper, the `locked` derivation, and
+  the four `enableEncryption` / `disableEncryption` / `finishDisableEncryption`
+  / `unlock` verbs (plus the `EncryptionProgress*` types and `hydrateForSwitch`)
+  — out of `useStorageBackend` into a self-contained `useEncryption` hook
+  (`src/storage/useEncryption.ts`, 317 lines). The verbs need the active
+  document adapter, which is built *from* this hook's `directoryCrypto` /
+  `seal` / `unseal` outputs — a render-order cycle, broken by handing in an
+  `innerRef` the verbs read at call time (the main hook assigns
+  `innerRef.current = inner` right after building it). `hydrateForSwitch`
+  became a module-scope **pure function** (`(inner, text) => Promise<string>`)
+  rather than an `inner`-closured `useCallback`, so it's now directly testable.
+  The `EncryptionProgress*` types are re-exported from `useStorageBackend.ts`
+  so the settings UI's `encryption-progress.ts` import path is unchanged; the
+  `unlock` catch now restores the pre-attempt `passwordRef` value (captured
+  locally) instead of reading the `password` state — behaviour-identical
+  because `applyPassword` keeps them in lockstep, but it drops `password` from
+  the verb's deps. Pure relocation, no behaviour change, no on-disk format
+  change, no layering edge crossed (still `app → storage → domain`). Exposed
+  the previously closure-bound state machine to direct unit tests (added
+  `tests/storage/use-encryption.test.tsx`, +10 tests covering `hydrateForSwitch`
+  hydrate + skip-already-loaded, the browser-backend enable re-save + phase
+  order, the empty-passphrase reject, the disable round-trip to plaintext, the
+  "unlock before disabling" guard, the unlock wrong-password / offline / success
+  paths, and `seal`/`unseal` pass-through). All 571 tests green; useEncryption.ts
+  holds 87% statement / 90% line coverage (the uncovered lines are the
+  file/cloud `else` branches with no automated reach — by design).
+  useStorageBackend 1244 → 1053 lines. **NOTE: the file/cloud encryption verbs
+  (enable/disable/unlock on a folder or Dropbox / Google Drive backend) have no
+  Vitest reach; hand-smoke-test enable → migrate, disable → demigrate, and an
+  unlock on a folder + cloud backend before merging.** Seams 2–4 (namespace
+  registry, folder backend, cloud OAuth) remain in Pending; the entry dropped
+  to the 5–6 band as the file is now only ~53 over the cap.
 - **2026-06 — `SideMenu.tsx` Seam 3: action-bar island extracted.** Moved the
   bordered "button island" below the note list — the
   New note / New folder / Show all / Archive top row and the Undo / Redo bottom
