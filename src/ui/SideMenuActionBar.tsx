@@ -12,13 +12,13 @@ import {
 } from "./icons.tsx";
 import { NOTE_DROP_ARCHIVE, NOTE_DROP_ATTR } from "./note-drag-context.ts";
 
-// The button island: New note / New folder / Search / Show all / Archive and
-// Undo / Redo share one bordered block pinned to the foot of the list (mt-auto),
-// so it falls under the thumb no matter how long the note list is. A top row of
-// create/navigate actions (Search opens the full-text search modal) and a bottom
-// row of history actions are split by a divider, so the icon buttons read as one
-// coherent unit rather than competing widgets. Each cell splits its row's width
-// evenly; the parent owns the
+// The button island: New note / New folder / Show all / Archive and
+// Undo / Redo / Search share one bordered block pinned to the foot of the list
+// (mt-auto), so it falls under the thumb no matter how long the note list is. A
+// top row of create/navigate actions and a bottom row of history actions (with
+// Search, which opens the full-text search modal, on the right) are split by a
+// divider, so the icon buttons read as one coherent unit rather than competing
+// widgets. Each cell splits its row's width evenly; the parent owns the
 // border, rounding, and the inner dividers. Show all and Archive light up
 // (accent) when their view is showing; Archive carries the archived-note count
 // and accepts a dragged note as a drop target. New folder drops the inline name
@@ -93,11 +93,6 @@ export function SideMenuActionBar({
             onClick={onNewFolder}
           />
           <BarButton
-            icon={<SearchIcon className="h-5 w-5" />}
-            label={t("search.title")}
-            onClick={onSearch}
-          />
-          <BarButton
             icon={<ListIcon className="h-5 w-5" />}
             label={t("nav.showAll")}
             active={showAllActive}
@@ -128,6 +123,11 @@ export function SideMenuActionBar({
             label={t("nav.redo")}
             disabled={!canRedo}
             onClick={onRedo}
+          />
+          <BarButton
+            icon={<SearchIcon className="h-5 w-5" />}
+            label={t("search.title")}
+            onClick={onSearch}
           />
         </div>
       </div>
