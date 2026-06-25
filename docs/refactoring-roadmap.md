@@ -73,37 +73,6 @@ _(none)_
 
 ### Severity 5–6 — friction
 
-#### `src/ui/SideMenu.tsx` — 1275 lines, container + five sub-components
-
-**Smell.** 275 lines over the cap. The SideMenu container plus five
-presentational sub-components (SectionHeader, FolderRow, FolderEditRow,
-NavItem, SwipeToRemove). The pure sort helpers (step 1), the footer (step 2),
-and the action-bar island (step 3, `BarButton`) have been relocated; the only
-remaining concern is splitting the note/folder list/namespace switcher out of
-the container. Re-verify with `wc -l src/ui/SideMenu.tsx`.
-
-**Plan (multi-PR).**
-
-1. ~~**Easy win first:** relocate the pure sort/grouping helpers to
-   `src/domain/`.~~ **Done 2026-06** — see Landed.
-2. ~~**Footer** → `src/ui/SideMenuFooter.tsx` — the Donate / Achievements /
-   About-dropdown / Settings burger menu plus the `MenuButton` / `MenuLink`
-   primitives.~~ **Done 2026-06** — see Landed.
-3. ~~**Action bar** → `src/ui/SideMenuActionBar.tsx` — the
-   New/Folder/Show-all/Archive/Undo/Redo `BarButton` island.~~ **Done
-   2026-06** — see Landed.
-4. The note/folder list and namespace switcher are higher-risk (drag
-   state + folder expand/rename state scattered across the parent) — defer or
-   do as a careful prop-drilled presenter extraction last.
-
-**Risk.** The list extraction (Seam 4) carries the drag/expand/rename
-state coupling: the `dragItem` / `dropTarget` HTML5-drag state, the
-`expandedFolders` / `creatingFolder` / `renamingFolderId` view state, and the
-`renderNoteRow` / `renderFolder` closures all read parent state, so a presenter
-extraction must thread a wide prop surface (or lift the drag state into a hook
-first). No storage hot-path. **Severity: 5** (one cohesive seam left; the file
-is now ~1.3× the cap).
-
 #### `src/storage/useStorageBackend.ts` — 917 lines, two backend concerns left in one hook
 
 **Smell.** Now **under** the 1000-line cap. The hook wires backend
@@ -162,6 +131,39 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `SideMenu.tsx` Seam 4: row primitives extracted — the SideMenu
+  split-by-concern candidate is now resolved.** Rather than the roadmap's
+  original Seam-4 sketch (a stateful note/folder-list *presenter* extraction
+  that would have had to thread the `dragItem` / `dropTarget` /
+  `expandedFolders` / `creatingFolder` / `renamingFolderId` state through a wide
+  prop surface), a **lower-risk, higher-leverage seam** was used: the five pure
+  presentational leaf components — `SectionHeader`, `FolderRow`, `FolderEditRow`,
+  `NavItem`, `SwipeToRemove` (plus the shared `REMOVE_ACTION_W` const) — were
+  relocated verbatim into a sibling `src/ui/SideMenuRows.tsx` (540 lines),
+  exported and imported back. These take everything via props and touch none of
+  the container's drag / folder-expand / namespace state, so the move carries
+  **zero** state-threading risk while still leaving `SideMenu.tsx` holding only
+  the stateful container that composes them (the `renderNoteRow` / `renderFolder`
+  closures, the drag handlers, and the `sections` JSX stay put). Dropped the now
+  unused `useSwipeReveal` / `RowActionMenu` imports, the moved-only icons
+  (`ArchiveIcon` / `ChevronDownIcon` / `ChevronRightIcon` / `FolderIcon` /
+  `FolderOpenIcon` / `PencilIcon` / `PlusIcon` / `TrashIcon`), and `useRef` /
+  `ReactNode` from `SideMenu.tsx`. Pure presentational relocation, no behaviour
+  change, no layering edge crossed (`app → ui`), no storage hot-path. Exposed the
+  previously-buried primitives (they only rendered inside a mounted `SideMenu`)
+  to direct unit tests (added `tests/ui/side-menu-rows.test.tsx`, +15 tests
+  covering the `SectionHeader` collapsible toggle + add action, the `NavItem`
+  active `aria-current` / badge show-hide / disabled-inert / drop wiring, the
+  `FolderEditRow` Enter-commit-trimmed / empty-blur-cancel / Escape-cancel, the
+  `FolderRow` toggle + add-note + count-pill + touch swipe-strip rename/delete +
+  desktop right-click menu, and the `SwipeToRemove` touch trash + desktop
+  archive/delete menu). All 597 tests green; SideMenuRows.tsx holds 94%
+  statement / 97.9% line coverage. SideMenu 1275 → 757 lines, well under the
+  §20.5 cap — every distinct concern (sort helpers, footer, action bar, row
+  primitives) is now its own module and the residual is the cohesive stateful
+  drawer container. Also updated the `dictionary.md` `SectionHeader` / `FolderRow`
+  / `FolderEditRow` pointers and the `overview.md` side-menu description to name
+  the new module.
 - **2026-06 — `useStorageBackend.ts` Seam 2: namespace registry extracted —
   the orchestrating hook is now under the 1000-line cap.** Moved the entire
   namespace-registry concern — the `namespaces` list + `activeNamespace` cursor
