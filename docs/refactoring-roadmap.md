@@ -73,63 +73,7 @@ _(none)_
 
 ### Severity 5–6 — friction
 
-#### `src/storage/useStorageBackend.ts` — 817 lines, one backend concern left in one hook
-
-**Smell.** Well **under** the 1000-line cap. The hook still wires backend
-**selection** and **cloud OAuth** (Dropbox + Google Drive connect / disconnect
-+ the Dropbox redirect completion) inline. The **encryption** state machine
-(step 1), the **namespace registry** (step 2), and the **folder** FSA
-permission lifecycle (step 3) have been relocated to `useEncryption.ts` /
-`useNamespaceRegistry.ts` / `useFolderBackend.ts`. Re-verify with
-`wc -l src/storage/useStorageBackend.ts`.
-
-**Plan (multi-PR, extract one concern-hook per PR, lowest-coupling
-first).** Each seam becomes a focused hook the main hook composes:
-
-1. ~~**Encryption** → `src/storage/useEncryption.ts`.~~ **Done 2026-06** — see
-   Landed.
-2. ~~**Namespace registry** → `src/storage/useNamespaceRegistry.ts`.~~
-   **Done 2026-06** — see Landed. (Landed at 245 lines, taking the built
-   `namespaceStore` as a plain arg.)
-3. ~~**Folder backend** → `src/storage/useFolderBackend.ts`.~~ **Done
-   2026-06** — see Landed. (Landed at 247 lines. The roadmap predicted this
-   seam had *no* render-order cycle; it does — the hook produces `folderHandle`,
-   which the backend `selection`, and so the adapter, is built from, while its
-   connect / disconnect verbs need that late-built adapter. Broken with an
-   `activeRef` the verbs read at call time, exactly like the encryption seam's
-   `innerRef`.)
-4. **Cloud OAuth** → `src/storage/useCloudBackend.ts` (~120–160). The Dropbox /
-   Google Drive token state, the `connect*` / `disconnect*` verbs, and the
-   Dropbox boot-redirect effect (`completeDropboxAuth` + `cleanAuthParamsFromUrl`).
-   Highest risk — OAuth redirect handling is fragile and has **zero automated
-   coverage**. Like the folder seam, this hook produces the `dropboxToken` /
-   `gdriveToken` the `selection` memo keys off, so the parts the verbs need that
-   are built later (none beyond `selectBackend`) would thread through an
-   `activeRef` / plain-arg the same way; the boot-redirect effect produces token
-   state too, so it moves with the hook. **Severity: 4.**
-
-The `selection` memo, `makeInner` adapter factory, the `settingsStore` /
-`namespaceStore` root-store memos, the cross-namespace `moveNoteToNamespace` /
-`moveFolderToNamespace` (coupled to `makeInner` / `wrapBrowserForActive`), and
-the return object stay in the orchestrating hook.
-
-**Risk.** The OAuth/cloud flow has **no automated coverage** — any extraction
-touching it must be smoke-tested by hand (browser default plus the cloud
-backend touched) before merge. The extraction order in the `selection` memo and
-the encryption wrapper asymmetry (browser = whole-document `withEncryption`;
-file/cloud = per-file `directoryCrypto`) must be preserved exactly. With
-encryption, the namespace registry, and the folder backend extracted, the file
-is now **well under the cap**; the remaining cloud-OAuth seam is a
-lower-leverage split worth doing only when the file is touched again.
-
-**Note for the next seam.** Three of the four extracted seams hit a
-render-order cycle (encryption via `innerRef`; folder via `activeRef`) because
-each *produces* state the backend `selection` / adapter factory consumes while
-its verbs need the *late-built* adapter. Only the namespace seam was
-cycle-free (it consumes the already-built `namespaceStore` and produces nothing
-the factory reads). Expect the cloud seam to be in the cycle camp too — it
-produces `dropboxToken` / `gdriveToken` that `selection` keys off — so reach
-for the `activeRef`-read-at-call-time pattern, not plain args, by default.
+_(none)_
 
 ### Easy wins
 
@@ -139,6 +83,57 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `useStorageBackend.ts` Seam 4 (final): cloud OAuth extracted —
+  the orchestrating-hook split-by-concern candidate is now resolved.** Moved the
+  entire cloud-OAuth concern — the Dropbox / Google Drive access-token state
+  (`dropboxToken` / `dropboxRefresh` / `gdriveToken`), the `connectDropbox` /
+  `disconnectDropbox` / `connectGdrive` / `disconnectGdrive` verbs, the Dropbox
+  boot-redirect completion effect, and the `cleanAuthParamsFromUrl` helper — out
+  of `useStorageBackend` into a self-contained `useCloudBackend` hook
+  (`src/storage/useCloudBackend.ts`, 190 lines). **The roadmap's prediction that
+  this seam would hit a render-order cycle was wrong:** unlike the encryption and
+  folder seams, the cloud verbs need *nothing* built from the backend selection —
+  they only switch the active backend (via the `selectBackend` callback handed
+  in, built early in the orchestrator) and persist token state the hook owns. So
+  it takes `selectBackend` as a plain arg, no `activeRef` — the namespace seam's
+  cycle-free shape, not the encryption/folder one. The hook produces
+  `dropboxToken` / `dropboxRefresh` / `gdriveToken` (consumed by the `selection`
+  memo and the namespace registry) plus the `dropboxConfigured` /
+  `gdriveConfigured` / `dropboxConnected` / `gdriveConnected` booleans the return
+  object surfaces. The one piece of token state the orchestrator still writes —
+  the silent access-token refresh wired into the selection memo's
+  `onAccessTokenRefreshed` — is exposed as the hook's `applyDropboxAccessToken`
+  (persist + setState), so the hook owns every token mutation. The `selection`
+  memo, `makeInner` adapter factory, the `settingsStore` / `namespaceStore`
+  root-store memos, the cross-namespace moves, and the return object stay in the
+  orchestrator. Dropped the now-unused `useEffect` import and the
+  `clearDropbox*` / `getDropbox*` / `getGdrive*` / `setDropboxRefreshToken` /
+  `setGdriveToken` / `hasPendingDropboxAuth` / `completeDropboxAuth` /
+  `startDropboxAuth` / `startGdriveAuth` / `isDropboxConfigured` /
+  `isGdriveConfigured` / `unlockAchievement` imports from the orchestrator
+  (`setDropboxToken` stays only inside the hook). Pure relocation, no behaviour
+  change, no on-disk format change, no layering edge crossed (still
+  `app → storage → domain`). Exposed the previously closure-bound cloud logic to
+  direct unit tests (added `tests/storage/use-cloud-backend.test.tsx`, +9 tests
+  covering the connected-flag seeding from stored tokens, the connect-Dropbox
+  redirect-without-switch, the disconnect-Dropbox clear-both-tokens +
+  fall-back-to-browser, the connect-Gdrive popup + store + switch + achievement,
+  the disconnect-Gdrive clear + fall-back, the `applyDropboxAccessToken`
+  persist + apply, the boot-redirect completion with `?code=` present
+  (token + refresh stored, backend switched, achievement fired, URL params
+  stripped), the no-pending-auth no-op, and the missing-refresh-token branch).
+  All 617 tests green; useCloudBackend.ts holds 95% statement / 96.5% line
+  coverage (the two uncovered lines are the `cleanAuthParamsFromUrl` and
+  boot-effect `catch` branches with no automated reach — by design).
+  useStorageBackend 817 → 727 lines — every distinct concern (encryption,
+  namespace registry, folder, cloud OAuth) is now its own focused hook the
+  orchestrator composes, and the residual is the cohesive selection / adapter-
+  factory / cross-namespace-move core. **NOTE: the OAuth redirect/popup flow
+  (Dropbox full-page redirect, Google Drive popup) has no Vitest reach against
+  the real cloud APIs; hand-smoke-test a Dropbox connect (redirect → boot
+  completion), a Google Drive connect (popup), and a disconnect of each before
+  merging.** This was the last seam — the `useStorageBackend.ts`
+  split-by-concern candidate is now fully resolved and off Pending.
 - **2026-06 — `useStorageBackend.ts` Seam 3: folder backend extracted.** Moved
   the entire picked-folder (File System Access API) concern — the
   `folderHandle` / `folderHandleLoaded` / `folderReconnectNeeded` state, the

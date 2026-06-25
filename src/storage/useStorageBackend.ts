@@ -1,7 +1,9 @@
 // Top-level storage wiring, as a hook. Selects the active `StorageAdapter`
-// from the per-device backend preference, holds the cloud access tokens,
-// completes the OAuth redirect on boot, and layers optional at-rest
-// encryption on top. Collapsed to fit an account-less, single-document app.
+// from the per-device backend preference and composes the concern-hooks that
+// own each backend's state — at-rest encryption (`useEncryption`), the
+// namespace registry (`useNamespaceRegistry`), the picked folder
+// (`useFolderBackend`), and the cloud OAuth tokens (`useCloudBackend`).
+// Collapsed to fit an account-less, single-document app.
 //
 // Encryption note: there are no user accounts, so the encryption passphrase
 // isn't derived from a login — it's set explicitly in Settings and held only
@@ -9,10 +11,8 @@
 // is on but no passphrase is held) until the user re-enters it; the `locked`
 // flag drives the unlock gate in `App`.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
-// Aliased: this module already has a passphrase `unlock` of its own.
-import { unlock as unlockAchievement } from "../achievements/index.ts";
 import { createLogger } from "../dev/logger.ts";
 import type { Folder, Note } from "../domain/note.ts";
 import type {
@@ -25,36 +25,21 @@ import { parse, serialize } from "./serialize.ts";
 import {
   type BackendId,
   type EncryptionMode,
-  clearDropboxRefreshToken,
-  clearDropboxToken,
-  clearGdriveToken,
   getBackend,
-  getDropboxRefreshToken,
-  getDropboxToken,
-  getGdriveToken,
   setBackend as persistBackend,
-  setDropboxRefreshToken,
-  setDropboxToken,
-  setGdriveToken,
 } from "./backend-preference.ts";
 import { localCacheKey, withLocalCache } from "./cache/index.ts";
 import {
   type DropboxAuth,
-  completeDropboxAuth,
   createDropboxAdapter,
   createDropboxNamespaceStore,
   createDropboxSettingsStore,
-  hasPendingDropboxAuth,
-  isDropboxConfigured,
-  startDropboxAuth,
 } from "./dropbox/index.ts";
 import { withEncryption } from "./encrypting/index.ts";
 import {
   createGdriveAdapter,
   createGdriveNamespaceStore,
   createGdriveSettingsStore,
-  isGdriveConfigured,
-  startGdriveAuth,
 } from "./gdrive/index.ts";
 import { BrowserLocalStorageAdapter } from "./local/index.ts";
 import {
@@ -76,6 +61,7 @@ import {
   type EncryptionProgressStep,
   useEncryption,
 } from "./useEncryption.ts";
+import { useCloudBackend } from "./useCloudBackend.ts";
 import { type FolderActiveRef, useFolderBackend } from "./useFolderBackend.ts";
 
 const log = createLogger("storage");
@@ -228,27 +214,6 @@ export interface UseStorageBackend {
   removeNamespace: (slug: string) => Promise<void>;
 }
 
-// Strip the OAuth redirect's query params (`code`, `state`, `scope`) from the
-// address bar without reloading, so a refresh doesn't replay a spent
-// authorization code.
-function cleanAuthParamsFromUrl(): void {
-  try {
-    const url = new URL(window.location.href);
-    let touched = false;
-    for (const key of ["code", "state", "scope"]) {
-      if (url.searchParams.has(key)) {
-        url.searchParams.delete(key);
-        touched = true;
-      }
-    }
-    if (touched) {
-      window.history.replaceState(null, "", url.toString());
-    }
-  } catch (err) {
-    log.warn("failed to clean auth params from URL", err);
-  }
-}
-
 // Placeholder used while the store is locked: never touches the real backend,
 // so the encrypted bytes stay sealed and an accidental edit behind the unlock
 // gate can't overwrite them. Resolves saves to a no-op rather than rejecting
@@ -279,15 +244,6 @@ type BackendSelection =
 
 export function useStorageBackend(): UseStorageBackend {
   const [backend, setBackendState] = useState<BackendId>(getBackend);
-  const [dropboxToken, setDropboxTokenState] = useState<string | null>(
-    getDropboxToken,
-  );
-  const [dropboxRefresh, setDropboxRefreshState] = useState<string | null>(
-    getDropboxRefreshToken,
-  );
-  const [gdriveToken, setGdriveTokenState] = useState<string | null>(
-    getGdriveToken,
-  );
   // The active document adapter, exposed to the encryption verbs through a ref
   // they read at call time. Assigned right after `inner` is built below; null
   // only during the first render pass, before any verb can fire. This breaks
@@ -315,6 +271,26 @@ export function useStorageBackend(): UseStorageBackend {
     persistBackend(id);
     setBackendState(id);
   }, []);
+
+  // The cloud-OAuth concern: the Dropbox / Google Drive token state, the
+  // connect / disconnect verbs, and the Dropbox boot-redirect completion.
+  // Produces `dropboxToken` / `gdriveToken`, which the selection memo (and the
+  // namespace registry) below key off — so it runs before them. Cycle-free:
+  // its verbs need nothing built from the selection, only `selectBackend`.
+  const {
+    dropboxToken,
+    dropboxRefresh,
+    gdriveToken,
+    dropboxConfigured,
+    gdriveConfigured,
+    dropboxConnected,
+    gdriveConnected,
+    applyDropboxAccessToken,
+    connectDropbox,
+    disconnectDropbox,
+    connectGdrive,
+    disconnectGdrive,
+  } = useCloudBackend(selectBackend);
 
   // The active document adapter + namespace the folder hook's connect /
   // disconnect verbs read at call time. Assigned right after `adapter` is built
@@ -344,39 +320,6 @@ export function useStorageBackend(): UseStorageBackend {
     selectBackend,
   });
 
-  // Complete a Dropbox OAuth redirect on boot. Google Drive uses a popup
-  // (resolved inline in `connectGdrive`), so only Dropbox lands back here
-  // with a `?code=`.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    if (!code || !hasPendingDropboxAuth()) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        log.info("boot: completing Dropbox OAuth redirect");
-        const result = await completeDropboxAuth(code);
-        if (cancelled) return;
-        setDropboxToken(result.accessToken);
-        setDropboxTokenState(result.accessToken);
-        if (result.refreshToken) {
-          setDropboxRefreshToken(result.refreshToken);
-          setDropboxRefreshState(result.refreshToken);
-        }
-        persistBackend("dropbox");
-        setBackendState("dropbox");
-        unlockAchievement("cloudWalker");
-      } catch (err) {
-        log.error("boot: Dropbox OAuth completion failed", err);
-      } finally {
-        if (!cancelled) cleanAuthParamsFromUrl();
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   // Resolve the active backend once. Both builders below switch on this
   // single selection rather than re-deriving the `backend && token` chain.
   const selection = useMemo<BackendSelection>(() => {
@@ -386,10 +329,7 @@ export function useStorageBackend(): UseStorageBackend {
         auth: {
           accessToken: dropboxToken,
           refreshToken: dropboxRefresh,
-          onAccessTokenRefreshed: (token) => {
-            setDropboxToken(token);
-            setDropboxTokenState(token);
-          },
+          onAccessTokenRefreshed: applyDropboxAccessToken,
         },
       };
     }
@@ -408,6 +348,7 @@ export function useStorageBackend(): UseStorageBackend {
     dropboxToken,
     dropboxRefresh,
     gdriveToken,
+    applyDropboxAccessToken,
     folderHandle,
     folderHandleLoaded,
   ]);
@@ -604,37 +545,6 @@ export function useStorageBackend(): UseStorageBackend {
     setBackendState("browser");
   }, []);
 
-  const connectDropbox = useCallback(() => {
-    // Redirects away; completion runs in the boot effect above — anything
-    // queued here wouldn't survive the redirect.
-    void startDropboxAuth();
-  }, []);
-
-  const disconnectDropbox = useCallback(() => {
-    clearDropboxToken();
-    clearDropboxRefreshToken();
-    setDropboxTokenState(null);
-    setDropboxRefreshState(null);
-    persistBackend("browser");
-    setBackendState("browser");
-  }, []);
-
-  const connectGdrive = useCallback(async () => {
-    const token = await startGdriveAuth();
-    setGdriveToken(token);
-    setGdriveTokenState(token);
-    persistBackend("gdrive");
-    setBackendState("gdrive");
-    unlockAchievement("cloudWalker");
-  }, []);
-
-  const disconnectGdrive = useCallback(() => {
-    clearGdriveToken();
-    setGdriveTokenState(null);
-    persistBackend("browser");
-    setBackendState("browser");
-  }, []);
-
   const moveNoteToNamespace = useCallback(
     async (note: Note, targetSlug: string): Promise<boolean> => {
       if (locked) return false;
@@ -782,10 +692,10 @@ export function useStorageBackend(): UseStorageBackend {
     splitLegacyBlob,
     settingsStore,
     backend,
-    dropboxConfigured: isDropboxConfigured(),
-    gdriveConfigured: isGdriveConfigured(),
-    dropboxConnected: dropboxToken !== null,
-    gdriveConnected: gdriveToken !== null,
+    dropboxConfigured,
+    gdriveConfigured,
+    dropboxConnected,
+    gdriveConnected,
     folderAvailable: isFolderBackendAvailable(),
     folderConnected: backend === "folder" && folderHandle !== null,
     folderReconnectNeeded,

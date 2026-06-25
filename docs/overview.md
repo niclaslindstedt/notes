@@ -1099,11 +1099,15 @@ through the same pipeline. Typed failures — `ConflictError`, `AuthError`,
 
 `useStorageBackend` (`src/storage/useStorageBackend.ts`) — wires the whole
 storage layer: it resolves the active adapter from the [backend
-preference](#backend-preference) + tokens/handles, completes OAuth redirects on
-boot, and layers `withLocalCache` then `withEncryption` on cloud backends. It
-holds the cloud tokens and the session passphrase, exposes connect/disconnect/
-reconnect actions per backend, the `locked` flag and `unlock`, and the namespace
-operations. The adapter is memoised so it doesn't churn each render.
+preference](#backend-preference) + tokens/handles and layers `withLocalCache`
+then `withEncryption` on cloud backends. Each backend concern is its own focused
+hook the orchestrator composes — at-rest encryption (`useEncryption`), the
+namespace registry (`useNamespaceRegistry`), the picked folder
+(`useFolderBackend`), and the cloud OAuth tokens + boot-redirect completion
+(`useCloudBackend`). Through them it holds the cloud tokens and the session
+passphrase, exposes connect/disconnect/reconnect actions per backend, the
+`locked` flag and `unlock`, and the namespace operations. The adapter is
+memoised so it doesn't churn each render.
 
 ### Backend preference
 
