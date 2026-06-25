@@ -67,6 +67,7 @@ import {
   isEncryptedEnvelope,
 } from "./crypto.ts";
 import { createCryptoSession } from "./crypto-session.ts";
+import { encJsonToNote, noteToEncJson } from "./enc-note-codec.ts";
 import { createFolderRegistry, injectFolders } from "./folder-registry.ts";
 import {
   openBytes,
@@ -90,7 +91,7 @@ import {
   snapshotToFiles,
 } from "./markdown/codec.ts";
 import { parse, serialize } from "./serialize.ts";
-import { type Attachment, mimeForFilename } from "../domain/attachment.ts";
+import { mimeForFilename } from "../domain/attachment.ts";
 import type { Note, Snapshot } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 
@@ -283,74 +284,6 @@ type Tracked = {
   hash: number;
   rev: string;
 };
-
-// Minimal per-note JSON stored inside an encrypted note file: the note minus
-// its attachment *bytes* (those live in their own blobs), plus attachment
-// metadata so the load knows what to fetch. The opaque ref is re-derived, never
-// stored.
-type EncAttachmentMeta = { filename: string; mime: string };
-
-function noteToEncJson(note: Note): string {
-  const meta: EncAttachmentMeta[] = (note.attachments ?? []).map((a) => ({
-    filename: a.filename,
-    mime: a.mime,
-  }));
-  const obj: Record<string, unknown> = {
-    id: note.id,
-    title: note.title,
-    body: note.body,
-    createdAt: note.createdAt,
-    updatedAt: note.updatedAt,
-  };
-  if (note.archived) obj.archived = true;
-  if (note.folderId) obj.folderId = note.folderId;
-  if (meta.length > 0) obj.attachments = meta;
-  return JSON.stringify(obj);
-}
-
-function encJsonToNote(json: string): Note | null {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(json);
-  } catch {
-    return null;
-  }
-  if (!raw || typeof raw !== "object") return null;
-  const n = raw as Record<string, unknown>;
-  if (
-    typeof n.id !== "string" ||
-    typeof n.body !== "string" ||
-    typeof n.createdAt !== "number" ||
-    typeof n.updatedAt !== "number"
-  ) {
-    return null;
-  }
-  const note: Note = {
-    id: n.id,
-    title: typeof n.title === "string" ? n.title : "",
-    body: n.body,
-    createdAt: n.createdAt,
-    updatedAt: n.updatedAt,
-  };
-  if (n.archived === true) note.archived = true;
-  if (typeof n.folderId === "string" && n.folderId.length > 0) {
-    note.folderId = n.folderId;
-  }
-  if (Array.isArray(n.attachments)) {
-    const meta: Attachment[] = [];
-    for (const a of n.attachments) {
-      if (a && typeof a === "object") {
-        const m = a as Record<string, unknown>;
-        if (typeof m.filename === "string" && typeof m.mime === "string") {
-          // Metadata only — the bytes live in a separate blob, fetched on demand.
-          meta.push({ filename: m.filename, mime: m.mime });
-        }
-      }
-    }
-    if (meta.length > 0) note.attachments = meta;
-  }
-  return note;
-}
 
 export function createDirectoryAdapter(
   store: FileStore,
