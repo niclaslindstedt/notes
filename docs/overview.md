@@ -801,7 +801,7 @@ backend-specific delete). See [namespaces](#namespaces).
 
 `SearchModal` (`src/ui/SearchModal.tsx`) — find any note across the whole
 namespace at once. Opened from the magnifier on the [action bar](#folders-in-the-side-menu)
-(`SideMenuActionBar`, between New folder and Show all) via a `{ kind: "search" }`
+(`SideMenuActionBar`, on the history row to the right of Undo / Redo) via a `{ kind: "search" }`
 command on the [modal bus](#modal-bus); `SearchModalHost` owns its open state and
 is handed the live document (`sync.doc`) and `switchTo` from `App`. It is a plain
 `Modal`, so it fills the screen on mobile and centres on desktop.
