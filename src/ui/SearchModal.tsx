@@ -100,12 +100,15 @@ export function SearchModal({ open, onClose, snapshot, onOpen }: Props) {
   const trimmed = query.trim();
 
   // Reset and focus the field each time the modal opens, so it's ready to type
-  // into and never reopens onto a stale query.
+  // into and never reopens onto a stale query. `Modal` moves focus to its card
+  // on open in a child effect (which runs before this one), so focusing on the
+  // next animation frame lands the caret in the search box *after* that — a
+  // frame is deterministic where the previous fixed timeout was a guess.
   useEffect(() => {
     if (!open) return;
     setQuery("");
-    const id = window.setTimeout(() => inputRef.current?.focus(), 30);
-    return () => window.clearTimeout(id);
+    const raf = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
   }, [open]);
 
   // Searching is the gesture the "Seeker" trophy watches for. The unlock bus
