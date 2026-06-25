@@ -69,70 +69,6 @@ _(none)_
 
 ### Severity 7–8 — multipliers
 
-#### `src/storage/directory-adapter.ts` — 1427 lines, the shared base every file/cloud backend threads through
-
-**Smell.** 427 lines over the cap, no opt-out — the shared `StorageAdapter`
-base for the folder, Dropbox, and Google-Drive backends. One file tangles
-several concerns: the markdown/path codec glue and types, the adapter
-closure state (revision tracking), the load path, the save/conflict path,
-and the atomic plain↔encrypted migration converters. Because **every**
-file/cloud backend runs through it, it is the highest-multiplier file in the
-storage layer. Re-verify with `wc -l src/storage/directory-adapter.ts`.
-
-**Plan (multi-PR, one seam per PR, lowest-coupling first).** All seams are
-pure relocations of sibling helpers out of the closure — the
-`StorageAdapter` contract is unchanged and stays interchangeable:
-
-1. ~~**Crypto session** → `src/storage/crypto-session.ts`
-   (`ensureKeys()`, `cachedRef()`, key/ref/note caches).~~ **Done 2026-06** —
-   see Landed. The adapter destructures `{ ensureKeys, cachedRef,
-   encNoteCache }` from `createCryptoSession`, so the load/save/migration call
-   sites are unchanged; `lastLoad` stays in the adapter and is cleared via the
-   session's `onKeysInvalidated` callback.
-2. ~~**Folder registry** → `src/storage/folder-registry.ts` (`readFolders()`
-   + retry, `injectFolders()`, `persistFolders()` and its state).~~
-   **Done 2026-06** — see Landed. The adapter destructures
-   `{ readFolders, persistFolders, plaintextNotePath }` from
-   `createFolderRegistry` and reaches the two external-state touch points via
-   `folderRegistry.readOk()` (load memo gate) and
-   `folderRegistry.rememberFolders()` (save), so the call sites are unchanged.
-3. ~~**Attachment reconcile** → `src/storage/attachment-reconcile.ts`.~~
-   **Done 2026-06** — see Landed. Scope was wider than the original
-   "~150 lines: write/remove helpers" note: the whole attachment-externalisation
-   concern moved (load-side `hydratePlaintext` + `attachEncryptedMetadata`,
-   save-side `reconcilePlaintext`/`reconcileEncrypted`/`clearWhere`/`clearAll`,
-   and the `attachmentPath` / `isPlaintextAttachmentPath` / `keptAttachments`
-   path helpers), because the `attachmentsTouched` session flag couples the load
-   and save sides — splitting only half would have left the flag straddling two
-   modules. The factory owns the flag; the adapter's encrypted-load fast path
-   calls `attachmentReconciler.markTouched()`, and the encrypted reconcile takes
-   the `attBlobPath` deriver as a per-call argument so the module stays
-   independent of the crypto session (357-line module).
-4. **Migration converters** → `src/storage/migration-converters.ts`
-   (~180 lines: `migrateNote()`, `demigrateNote()`, `splitLegacyBlob()`).
-   Highest coupling — depends on the attachment path helpers (now importable
-   from `attachment-reconcile.ts`) and the crypto session — do last.
-
-The remaining seam shaves the adapter toward the cap, leaving it around
-~1250 lines (the migration converters carry the highest-risk invariants, so
-this last split stays in the 7–8 band even as the file shrinks).
-
-**Risk — HIGH, and there is no automated cloud coverage.** This is the most
-dangerous file in the tree to refactor: several seams carry silent
-data-loss risk if the byte-level round-trip drifts. Hard invariants that
-must be preserved verbatim across any split: the encrypted-note JSON
-encoding must stay **identical** between `save()` and `migrateNote()` (a
-divergence → hash mismatch → infinite re-upload loop); `attBlobPath()`'s
-HMAC ref derivation and `splitLegacyBlob()` must share the **same**
-`ensureKeys()` as `save()` (wrong key → orphaned/garbage blobs); the
-revision-hash tracked-state map must not split from `plan()` / `isOurs()`
-(conflict detection); `lastFolders` and the `foldersReadOk` memo gate must
-stay coherent with the load path. Each PR must be hand-smoke-tested:
-local default **plus** a folder round-trip at minimum, and the cloud
-backend touched if any (Dropbox / Google Drive have no Vitest reach).
-Pin the round-trip behaviour with a serialize/migrate test against the
-local adapter before moving anything. **Severity: 8.**
-
 #### `src/ui/SideMenu.tsx` — 1489 lines, container + eight sub-components
 
 **Smell.** 489 lines over the cap. The SideMenu container plus eight
@@ -208,6 +144,67 @@ _(none — the SideMenu sort-helper relocation landed 2026-06; see Landed.)_
 
 ## Landed
 
+- **2026-06 — `directory-adapter.ts` Seam 4a: encrypted-note JSON codec
+  extracted.** Moved the pure `noteToEncJson()` / `encJsonToNote()` functions
+  and the `EncAttachmentMeta` type out of `directory-adapter.ts` into a
+  standalone `src/storage/enc-note-codec.ts` (89 lines), imported back at all
+  five call sites (`save`, the encrypted load, `fetchNoteBody`, `migrateNote`,
+  `demigrateNote`). These were already module-scope and pure (no closure state,
+  no I/O), so the relocation is zero-risk — but it pre-stages the
+  migration-converter split (Seam 4 proper) by isolating its single most
+  dangerous invariant: the encrypted-note encoding is now defined in exactly
+  one place, so `save()` and `migrateNote()` are *structurally* unable to drift
+  into two encodings (the divergence the roadmap flags as a hash-mismatch →
+  infinite-re-upload risk). The now-unused `Attachment` type import was dropped
+  from the adapter. Pure relocation, no behaviour change, no on-disk format
+  change. Exposed the previously-untested codec to direct unit tests (added
+  `tests/storage/enc-note-codec.test.ts`, +13 tests covering the required-field
+  encoding, the falsy-optional omission that keeps the content hash stable, the
+  archived/folderId/attachment-metadata inclusion, the bytes-never-stored
+  guarantee, the full + minimal round-trips, and every reject/coerce path of
+  the parser — malformed JSON, non-object, missing/mistyped required fields,
+  title default, empty-folderId drop, non-`true` archived, and the
+  malformed-attachment skip/drop). All 533 tests green; enc-note-codec.ts holds
+  100% statement / branch / function / line coverage. directory-adapter
+  1427 → 1360 lines. (Seam 4 proper, the migrate/demigrate/splitLegacyBlob
+  orchestration, landed in the **same PR** — see the next entry.)
+- **2026-06 — `directory-adapter.ts` Seam 4: migration converters extracted —
+  the directory-adapter split-by-concern candidate is now resolved.** Moved the
+  three plain↔encrypted converter functions — `migrateNote()` (plaintext → per-
+  file `.enc` + opaque attachment blobs), `demigrateNote()` (the exact reverse),
+  and `splitLegacyBlob()` (the one-time `notes.json` → per-file upgrade) — out
+  of the `createDirectoryAdapter` closure into a `createMigrationConverters`
+  factory in `src/storage/migration-converters.ts` (306 lines). This was the
+  highest-coupling seam: the factory takes an explicit deps bundle (the crypto
+  session `ensureKeys`/`encNoteCache`, the `encNotePath`/`attBlobPath` ref
+  derivers, the `plaintextNotePath` resolver, the revision-tracking
+  `track`/`untrack`, the `store`/`attachments` stores, the `passwordRef`, the
+  `blobFileName`/`isEncNotePath` path vocabulary, and the adapter's own `save`,
+  which `splitLegacyBlob` reuses for the representation switch). The
+  `encStatus`-reassignment snag flagged in the old plan was sidestepped by
+  passing `setEncStatus`/`deleteEncStatus` **callbacks** rather than the Map —
+  the load path still reassigns its own `encStatus` binding untouched, and the
+  callbacks always see the current map. The pure codecs the converters use come
+  from `enc-note-codec.ts` (Seam 4a), which is what structurally guarantees the
+  encrypted-note encoding here is byte-identical to `save`'s. Dropped the now-
+  unused `noteToMarkdown` / `sealBytes` imports and the `NoteConversionProgress`
+  type from the adapter. Pure relocation, no behaviour change, no on-disk format
+  change — pinned by the existing encrypted/migration directory-adapter
+  integration tests (all green) plus a new direct unit test of the factory
+  (`tests/storage/migration-converters.test.ts`, +7 tests: the migrate seal +
+  plaintext-removal + status/track/cache wiring, the already-migrated and
+  no-passphrase no-ops, the demigrate round-trip from a *deferred* note that
+  proves the `.enc` is authoritative for the body, the no-ciphertext clear, and
+  the `splitLegacyBlob` no-blob / no-passphrase early returns). All 540 tests
+  green. **directory-adapter 1360 → 1195 lines** — below the old ~1250 target;
+  every distinct concern (crypto session, folder registry, attachment reconcile,
+  enc-note codec, migration converters) is now its own module and the residual
+  ~195-over-cap is the cohesive load / save / plan / conflict / index sync core,
+  which has no clean further seam — a future Explore pass should re-evaluate
+  rather than force an artificial split. **NOTE: the folder + cloud (Dropbox /
+  Google Drive) backends have no Vitest reach; hand-smoke-test a folder + cloud
+  round-trip (enable encryption → migrate, disable → demigrate, and a legacy-
+  blob unlock) before merging.**
 - **2026-06 — `directory-adapter.ts` Seam 3: attachment reconcile extracted.**
   Moved the entire attachment-externalisation concern — the load-side
   `hydrateAttachments` (→ `hydratePlaintext`) and `attachEncryptedMetadata`, the

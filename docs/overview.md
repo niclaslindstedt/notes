@@ -1188,7 +1188,13 @@ on demand (the deferred-body counterpart of `fetchAttachment`); a deferred note
 is skipped by the save planner so it's never rewritten body-less nor pruned. It
 also exposes `fetchAttachment`, `getEncryptionStatus`, `migrateNote`,
 `demigrateNote`, and `splitLegacyBlob` for the
-[encryption migration](#encryption-migration). A representation conversion is
+[encryption migration](#encryption-migration) — the latter three are
+implemented in `src/storage/migration-converters.ts`
+(`createMigrationConverters`), lifted out of the adapter closure but wired back
+through an explicit deps bundle so the byte-level behaviour is unchanged; the
+pure encrypted-note JSON codec they share with `save` (`noteToEncJson` /
+`encJsonToNote`) lives in `src/storage/enc-note-codec.ts`. A representation
+conversion is
 the one case it removes files it didn't author, done atomically (write-new →
 verify-by-readback → delete-old over distinct deterministic paths): enabling
 supersedes every `*.md` (+ plaintext attachment files) and a legacy `notes.json`;
