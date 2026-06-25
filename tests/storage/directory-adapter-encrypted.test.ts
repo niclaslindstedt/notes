@@ -231,6 +231,118 @@ describe("directory adapter — encrypted per-file", () => {
     expect(seen.map((s) => s.index).sort()).toEqual([1, 2]);
   });
 
+  it("retries a transient index read failure instead of decrypting every note", async () => {
+    // The flaky-Dropbox bug: on a dropped fetch the index read used to give up on
+    // the first throw and fall back to decrypting the whole vault note-by-note.
+    // A single transient failure followed by a success must stay index-fast.
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const notes: Note[] = Array.from({ length: 4 }, (_, i) => ({
+      ...createNote(i + 1),
+      title: `Note ${i}`,
+      body: `secret ${i}`,
+    }));
+    await encAdapter(store, att, { current: "pw" }).save(serialize({ notes }));
+
+    let throwOnce = true;
+    const flaky: FileStore = {
+      list: () => store.list(),
+      read: (p) => {
+        if (p === INDEX_FILE_NAME && throwOnce) {
+          throwOnce = false;
+          throw new TypeError("Load failed");
+        }
+        return store.read(p);
+      },
+      write: (p, t) => store.write(p, t),
+      remove: (p) => store.remove(p),
+    };
+
+    const seen: Array<unknown> = [];
+    const b = createDirectoryAdapter(flaky, { id: "folder", label: "T" }, att, {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (i) => seen.push(i) },
+    });
+    const restored = parse((await b.load())!.text).notes;
+    // The retry rode out the dropped fetch: nothing decrypted up front, every
+    // body deferred — exactly as if the read had succeeded the first time.
+    expect(seen).toHaveLength(0);
+    expect(restored).toHaveLength(4);
+    expect(restored.every((n) => n.body === undefined)).toBe(true);
+  });
+
+  it("falls back to per-note decryption when the index read fails every attempt", async () => {
+    // A persistently unreachable index (every retry throws) must still load —
+    // the per-note files are authoritative — by decrypting each note in full.
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const notes: Note[] = [
+      { ...createNote(1), title: "Groceries", body: "milk" },
+      { ...createNote(2), title: "Trip", body: "pack" },
+    ];
+    await encAdapter(store, att, { current: "pw" }).save(serialize({ notes }));
+
+    const downIndex: FileStore = {
+      list: () => store.list(),
+      read: (p) => {
+        if (p === INDEX_FILE_NAME) throw new TypeError("Load failed");
+        return store.read(p);
+      },
+      write: (p, t) => store.write(p, t),
+      remove: (p) => store.remove(p),
+    };
+
+    const seen: Array<{ title: string }> = [];
+    const b = createDirectoryAdapter(
+      downIndex,
+      { id: "folder", label: "T" },
+      att,
+      {
+        passwordRef: { current: "pw" },
+        onDecryptNote: { current: (i) => seen.push(i) },
+      },
+    );
+    const restored = parse((await b.load())!.text).notes;
+    expect(restored).toHaveLength(2);
+    expect(seen.map((s) => s.title).sort()).toEqual(["Groceries", "Trip"]);
+  });
+
+  it("retries a transient index write failure so the next unlock is index-fast", async () => {
+    // A dropped index write used to be swallowed outright, leaving the index
+    // stale until the next save; the retry lands it on the first save.
+    const store = memoryStore();
+    const att = memoryAttachments();
+    let throwOnce = true;
+    const flaky: FileStore = {
+      list: () => store.list(),
+      read: (p) => store.read(p),
+      write: (p, t) => {
+        if (p === INDEX_FILE_NAME && throwOnce) {
+          throwOnce = false;
+          throw new TypeError("Load failed");
+        }
+        return store.write(p, t);
+      },
+      remove: (p) => store.remove(p),
+    };
+    const notes: Note[] = [
+      { ...createNote(1), title: "Groceries", body: "milk" },
+      { ...createNote(2), title: "Trip", body: "pack" },
+    ];
+    await encAdapter(flaky, att, { current: "pw" }).save(serialize({ notes }));
+
+    // Despite the first write throwing, the index landed (retry), so a cold
+    // unlock renders from it with nothing decrypted up front.
+    expect(store.files.has(INDEX_FILE_NAME)).toBe(true);
+    const seen: Array<unknown> = [];
+    const b = createDirectoryAdapter(store, { id: "folder", label: "T" }, att, {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (i) => seen.push(i) },
+    });
+    await b.load();
+    expect(seen).toHaveLength(0);
+  });
+
   it("self-heals the index on a no-index unlock so the next is fast", async () => {
     // The user's case: the index was removed from the remote (e.g. deleted in
     // Dropbox). The first unlock should fall back to per-note decryption AND
@@ -260,6 +372,49 @@ describe("directory adapter — encrypted per-file", () => {
     });
     const restored = parse((await b.load())!.text).notes;
     expect(seen2).toHaveLength(0); // index-fast: nothing decrypted up front
+    expect(restored.every((n) => n.body === undefined)).toBe(true);
+  });
+
+  it("self-heals a stale (non-empty) index on load so the next unlock is fast", async () => {
+    // The user's case: the index exists but is stale — a row's rev no longer
+    // matches its `.enc` file (another device edited a note and its index write
+    // was lost), so the load falls back to decrypting that note. A non-empty
+    // index used to never be rewritten on load, so every unlock stayed slow.
+    // Now the load self-heals it from the authoritative picture it just built.
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const notes: Note[] = Array.from({ length: 3 }, (_, i) => ({
+      ...createNote(i + 1),
+      title: `Note ${i}`,
+      body: `secret ${i}`,
+    }));
+    await encAdapter(store, att, { current: "pw" }).save(serialize({ notes }));
+
+    // Make the index stale without touching it: bump every `.enc` file's
+    // revision so the listing now reports revs ahead of the index's rows —
+    // exactly what a lost index write after a remote edit leaves behind.
+    for (const [p, f] of store.files) {
+      if (p.endsWith(".enc")) store.files.set(p, { ...f, rev: f.rev + 100 });
+    }
+
+    const seen1: Array<unknown> = [];
+    const a = createDirectoryAdapter(store, { id: "folder", label: "T" }, att, {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (i) => seen1.push(i) },
+    });
+    await a.load();
+    expect(seen1).toHaveLength(3); // stale index → fell back this once
+
+    // The index was rewritten with current revs, so a fresh adapter unlocks
+    // index-fast: nothing decrypted up front, every body deferred.
+    const seen2: Array<unknown> = [];
+    const b = createDirectoryAdapter(store, { id: "folder", label: "T" }, att, {
+      passwordRef: { current: "pw" },
+      onDecryptNote: { current: (i) => seen2.push(i) },
+    });
+    const restored = parse((await b.load())!.text).notes;
+    expect(seen2).toHaveLength(0);
+    expect(restored).toHaveLength(3);
     expect(restored.every((n) => n.body === undefined)).toBe(true);
   });
 

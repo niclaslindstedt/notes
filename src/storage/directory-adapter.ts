@@ -129,6 +129,20 @@ export const INDEX_FILE_NAME = ".index.bin";
 // whole file as binary, breaking `git diff`/`blame` and the review UI).
 const DEFERRED_SOURCE = "<<deferred-note: body not loaded>>";
 
+// The note-index sidecar read/write is retried so a transient cloud failure (a
+// cold-start 429 from the load's request burst, a dropped fetch on a flaky
+// mobile link — Safari reports both as a bare `TypeError: Load failed`) isn't
+// mistaken for "the file isn't there", which would force the load to decrypt
+// every note up front instead of rendering from the index. A few short,
+// backing-off attempts comfortably outlast a brief rate-limit window without
+// stalling a genuinely absent index for long. (The folder registry sidecar
+// applies the same retry in folder-registry.ts.)
+const SIDECAR_RETRY_ATTEMPTS = 3;
+const SIDECAR_RETRY_BACKOFF_MS = 250;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 // How many encrypted note files to read + decrypt at once during an unlock /
 // encrypted load. Sequential decryption made a cold load O(notes) network
 // round-trips on a cloud backend (tens of seconds for a 500-note vault); a
@@ -420,11 +434,28 @@ export function createDirectoryAdapter(
   async function readIndexEntries(
     keys: SessionKeys,
   ): Promise<IndexEntry[] | null> {
-    let text: string | null;
-    try {
-      text = await store.read(INDEX_FILE_NAME);
-    } catch (err) {
-      log.warn(`${options.id} index: read failed — per-note fallback`, err);
+    // Retry the read the same way the folder sidecar does: a single dropped
+    // fetch on a flaky link must not be mistaken for "no index", which would
+    // force the whole vault to be decrypted note-by-note on unlock.
+    let text: string | null = null;
+    let read = false;
+    for (let attempt = 0; attempt < SIDECAR_RETRY_ATTEMPTS; attempt += 1) {
+      try {
+        text = await store.read(INDEX_FILE_NAME);
+        read = true;
+        break;
+      } catch (err) {
+        log.warn(
+          `${options.id} index: read failed (attempt ${attempt + 1}/${SIDECAR_RETRY_ATTEMPTS})`,
+          err,
+        );
+        if (attempt < SIDECAR_RETRY_ATTEMPTS - 1) {
+          await sleep(SIDECAR_RETRY_BACKOFF_MS * (attempt + 1));
+        }
+      }
+    }
+    if (!read) {
+      log.warn(`${options.id} index: read failed — per-note fallback`);
       return null;
     }
     if (text === null) return null;
@@ -446,7 +477,19 @@ export function createDirectoryAdapter(
   ): Promise<void> {
     try {
       const sealed = await sealString(keys.contentKey, serializeIndex(entries));
-      await store.write(INDEX_FILE_NAME, sealed);
+      // Retry like the read: a flaky link that drops this write would leave the
+      // index stale/absent, so the *next* unlock decrypts every note. The
+      // per-note files are already committed, so a write that fails every
+      // attempt is still non-fatal — the next save (or self-heal) re-seals it.
+      for (let attempt = 0; attempt < SIDECAR_RETRY_ATTEMPTS; attempt += 1) {
+        try {
+          await store.write(INDEX_FILE_NAME, sealed);
+          return;
+        } catch (err) {
+          if (attempt === SIDECAR_RETRY_ATTEMPTS - 1) throw err;
+          await sleep(SIDECAR_RETRY_BACKOFF_MS * (attempt + 1));
+        }
+      }
     } catch (err) {
       log.warn(`${options.id} index: write failed (non-fatal)`, err);
     }
@@ -564,15 +607,23 @@ export function createDirectoryAdapter(
     // so opened/warmed bodies stay loaded across reloads.
     const deferredPaths: [string, IndexEntry][] = [];
     const decryptPaths: string[] = [];
+    // Whether the index on disk fully covers the current note files — a fresh
+    // row for every one and no orphan rows for deleted notes. A single miss
+    // means it's stale/incomplete; the load self-heals it below so the next
+    // unlock is index-fast again rather than decrypting the same notes forever.
+    let indexCoversAll = indexEntries.length === encPaths.length;
     for (const path of encPaths) {
       const rev = revisions.get(path) ?? "";
+      const entry = indexByPath.get(path);
+      const indexFresh =
+        entry !== undefined && entry.rev !== undefined && entry.rev === rev;
+      if (!indexFresh) indexCoversAll = false;
       const cached = encNoteCache.get(path);
       if (cached && cached.rev === rev) {
         decryptPaths.push(path);
         continue;
       }
-      const entry = indexByPath.get(path);
-      if (entry && entry.rev !== undefined && entry.rev === rev) {
+      if (indexFresh) {
         deferredPaths.push([path, entry]);
       } else {
         decryptPaths.push(path);
@@ -675,13 +726,17 @@ export function createDirectoryAdapter(
       attachmentReconciler.markTouched();
     }
 
-    // Self-heal: a vault with encrypted notes but no index yet (the first load
-    // after enabling encryption, before any save has run) just decrypted every
-    // note in the fallback, so it has the full metadata in hand — write the
-    // index now so the *next* unlock takes the fast path. Best-effort; skipped
-    // once an index exists (the save path keeps it fresh) and while a migration
-    // is still in flight (plaintext remnants), since the picture is incomplete.
-    if (indexEntries.length === 0 && mdPaths.length === 0 && notes.length > 0) {
+    // Self-heal a missing or stale index. If this load couldn't render entirely
+    // from the index — no index at all (the first load after enabling
+    // encryption, before any save has run), or one another device left
+    // stale/incomplete (missing rows, moved revisions, or orphan rows for
+    // deleted notes) — some notes fell to the per-note fallback above, so we now
+    // hold the full authoritative metadata. Rewrite the index from it so the
+    // *next* unlock takes the fast path instead of decrypting the same notes
+    // again. Best-effort; skipped when the index already matched (nothing to do)
+    // and while a migration is still in flight (plaintext remnants), since the
+    // picture is incomplete.
+    if (!indexCoversAll && mdPaths.length === 0 && notes.length > 0) {
       const entries = await Promise.all(
         notes.map(async (note) =>
           noteToIndexEntry(
