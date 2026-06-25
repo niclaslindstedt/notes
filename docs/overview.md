@@ -873,8 +873,12 @@ shared with the
 [storage tab's encryption status bar](#storage-settings). On a file/cloud
 backend the unlock now renders the list from the [note index](#encryption) in a
 single read + decrypt with every body deferred, so it's near-instant and decrypts
-no note bodies up front. When there is no usable index — a vault from before the
-index existed, or one another device left stale — the load falls back to
+no note bodies up front. The index read (and write) is retried with a short
+backoff, the same way the folder registry sidecar is, so a single dropped fetch
+on a flaky link isn't mistaken for a missing index and doesn't needlessly drop
+the unlock into the per-note path. When there is genuinely no usable index — a
+vault from before the index existed, or one another device left stale — the load
+falls back to
 decrypting the per-file notes through a bounded concurrency pool (overlapping the
 reads instead of one round-trip per note), and *that* path drives the gate's
 per-note progress line ("Decrypting "Groceries" (3/12)…", a completion counter
@@ -1306,9 +1310,12 @@ Two things keep an index in place so the fallback stays rare: every encrypted
 `refreshIndex` the moment it finishes sealing a freshly-encrypted vault (the
 paced `migrateNote` writes `.enc` files but never the index, so this is what
 makes the very first unlock after enabling encryption index-fast rather than a
-full per-note decrypt). A load that still finds encrypted notes but no index —
-a vault from before the index existed — self-heals by writing one after the
-fallback decrypt, so it pays that cost only once.
+full per-note decrypt). A load that couldn't render entirely from the index —
+no index at all (a vault from before the index existed), or one another device
+left **stale or incomplete** (missing rows, moved revisions, or orphan rows for
+deleted notes), which forced some notes into the per-note fallback — self-heals
+by rewriting the index from the authoritative picture it just built, so it pays
+that fallback cost only once instead of on every unlock.
 Because a deferred note's body isn't in memory, the save planner **skips** it
 (never re-writing it body-less, never removing it as an orphan) and attachment
 reconciliation keeps all of its declared blobs; a metadata edit (retitle /
