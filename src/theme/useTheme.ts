@@ -1,31 +1,36 @@
-// Appearance store + the projection mount.
+// Theme engine + appearance store. Holds the user's appearance preferences
+// (theme preset, font family + size, and the Custom-theme overrides) in a
+// `useSyncExternalStore` store persisted to localStorage, and projects them
+// onto `<html>` so the CSS variables in `src/styles/` (and every Tailwind
+// utility that resolves through them) follow the picker.
 //
-// Holds the user's appearance preferences (theme preset, font family + size,
-// and the Custom-theme overrides) in a `useSyncExternalStore` store persisted
-// to localStorage. The projection itself — painting those values onto `<html>`
-// as CSS variables, so `src/styles/` and every Tailwind utility that resolves
-// through them follow the picker — is the framework's shared theme engine
-// (`useApplyTheme` from `@niclaslindstedt/oss-framework/theme`); this module
-// keeps only the *store*, which is fused with app-only concerns the framework
-// knows nothing about (editor / list / sidebar preferences and the synced
-// achievements map).
+// Ported from checklist's `useTheme` + appearance store. Like checklist, the
+// settings dialog edits a draft that only persists on Save: while it's open it
+// streams the draft through `setAppearancePreview`, the projection paints that
+// preview live, and `commitAppearance` / Cancel commit or drop it. Quick
+// toggles outside the dialog (the theme switcher) still persist immediately via
+// `updateAppearance`. The projection runs as four independent effects so a font
+// change doesn't rewrite the colour overrides (and vice versa):
 //
-// The store is the part the framework deliberately leaves app-side. Like
-// checklist, the settings dialog edits a draft that only persists on Save:
-// while it's open it streams the draft through `setAppearancePreview`, the
-// projection paints that preview live, and `commitAppearance` / Cancel commit
-// or drop it. Quick toggles outside the dialog (the theme switcher) still
-// persist immediately via `updateAppearance`. `useApplyAppearance` feeds the
-// effective (preview-or-persisted) appearance to the engine and returns the
-// persisted document, so consumers that read editor / achievement settings off
-// it don't shift mid-edit and snap back on Cancel.
+//   1. `data-theme` on `<html>` from `theme`. CSS owns the preset palettes;
+//      `custom` is a no-op at the CSS layer — effect (4) writes inline
+//      overrides instead. While `system` is active the attribute stays
+//      `system` and CSS follows `prefers-color-scheme`.
+//   2. `--app-font-family` from the selected webfont stack; non-default
+//      families are fetched on demand first (font-display: swap).
+//   3. `--app-font-scale` multiplier the body font-size reads.
+//   4. Custom-theme overrides: the colour vars + radius / density /
+//      reduce-motion. Only written when `theme === "custom"` so flipping
+//      back to a preset cleans every inline value out of the style
+//      attribute.
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
-import { useApplyTheme } from "@niclaslindstedt/oss-framework/theme";
 import { isCopyScope, isDefaultTitleScheme } from "../domain/note.ts";
+import { loadFontFamily } from "./fonts.ts";
 import {
-  coerceCustomTheme,
+  COLOR_KEYS,
+  COLOR_KEY_TO_CSS_VAR,
   DEFAULT_CUSTOM_THEME,
   DEFAULT_EDITOR_SETTINGS,
   DEFAULT_FOLDER_PLACEMENT,
@@ -34,20 +39,21 @@ import {
   DEFAULT_LIST_LAYOUT,
   DEFAULT_NOTE_SORT_KEY,
   DEFAULT_THEME,
+  FONT_FAMILIES,
+  FONT_SCALE_PRESETS,
   isEditorMargin,
   isFolderPlacement,
-  isFontFamily,
-  isFontScale,
   isListLayout,
   isNoteSortKey,
-  isThemePreset,
   LINK_SHORTEN_LENGTHS,
   type CustomTheme,
+  type DensityPreset,
   type EditorSettings,
   type FolderPlacement,
   type FontFamilyId,
   type ListLayout,
   type NoteSortKey,
+  type RadiusPreset,
   type ThemePreset,
 } from "./themes.ts";
 
@@ -117,6 +123,40 @@ const STORAGE_KEY = "notes/appearance";
 // a bare preset string. Read once on boot to carry the old preference over.
 const LEGACY_THEME_KEY = "notes/theme";
 
+// Single `--radius` value per preset. "md" sits at the historical default
+// (8px); the others fan out around it.
+const RADIUS_PX: Record<RadiusPreset, string> = {
+  none: "0px",
+  sm: "4px",
+  md: "8px",
+  lg: "16px",
+};
+
+// Row padding the `--density-row-py` var feeds. "comfortable" matches the
+// pre-existing default.
+const DENSITY_ROW_PY: Record<DensityPreset, string> = {
+  compact: "0.25rem",
+  comfortable: "0.5rem",
+  spacious: "0.75rem",
+};
+
+const VALID_FONT_FAMILIES = new Set(FONT_FAMILIES.map((f) => f.id));
+const VALID_FONT_SCALES = new Set(FONT_SCALE_PRESETS.map((p) => p.scale));
+
+const THEME_SET = new Set<string>([
+  "dark",
+  "light",
+  "dracula",
+  "monokai",
+  "githubDark",
+  "githubLight",
+  "solarizedLight",
+  "quietLight",
+  "excel",
+  "system",
+  "custom",
+]);
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
@@ -147,21 +187,45 @@ function validUnseen(v: unknown, unlocked: Record<string, number>): string[] {
 // the boot — a forward/backward-compatible read, like checklist's store.
 function coerce(raw: unknown): Appearance {
   if (!isRecord(raw)) return DEFAULT_APPEARANCE;
+  const theme = raw.theme as ThemePreset;
+  const fontFamily = raw.fontFamily as FontFamilyId;
+  const fontScale = raw.fontScale as number;
+  const custom = isRecord(raw.customTheme) ? raw.customTheme : {};
+  const colors = isRecord(custom.colors) ? custom.colors : {};
   const editor = isRecord(raw.editor) ? raw.editor : {};
   const achievements = validAchievements(raw.achievements);
   return {
-    theme: isThemePreset(raw.theme) ? raw.theme : DEFAULT_THEME,
-    fontFamily: isFontFamily(raw.fontFamily)
-      ? raw.fontFamily
+    theme:
+      typeof theme === "string" && (THEME_SET as Set<string>).has(theme)
+        ? theme
+        : DEFAULT_THEME,
+    fontFamily: VALID_FONT_FAMILIES.has(fontFamily)
+      ? fontFamily
       : DEFAULT_FONT_FAMILY,
-    fontScale: isFontScale(raw.fontScale) ? raw.fontScale : DEFAULT_FONT_SCALE,
-    // The framework owns the Custom-theme shape (eighteen colour slots + the
-    // shape / motion presets); its coercion fills any missing or malformed
-    // slot from `DEFAULT_CUSTOM_THEME`, so a legacy eleven-slot document (or a
-    // partial / stale remote one) is upgraded in place rather than crashing
-    // the boot. notes only edits the eleven slots it paints; the rest ride at
-    // their seeded defaults.
-    customTheme: coerceCustomTheme(raw.customTheme),
+    fontScale: VALID_FONT_SCALES.has(fontScale)
+      ? fontScale
+      : DEFAULT_FONT_SCALE,
+    customTheme: {
+      colors: COLOR_KEYS.reduce(
+        (acc, k) => {
+          const v = colors[k];
+          acc[k] = typeof v === "string" ? v : DEFAULT_CUSTOM_THEME.colors[k];
+          return acc;
+        },
+        {} as CustomTheme["colors"],
+      ),
+      radius:
+        typeof custom.radius === "string" &&
+        (RADIUS_PX as Record<string, string>)[custom.radius]
+          ? (custom.radius as RadiusPreset)
+          : DEFAULT_CUSTOM_THEME.radius,
+      density:
+        typeof custom.density === "string" &&
+        (DENSITY_ROW_PY as Record<string, string>)[custom.density]
+          ? (custom.density as DensityPreset)
+          : DEFAULT_CUSTOM_THEME.density,
+      reduceMotion: custom.reduceMotion === true,
+    },
     listLayout: isListLayout(raw.listLayout)
       ? raw.listLayout
       : DEFAULT_LIST_LAYOUT,
@@ -226,8 +290,8 @@ function readStored(): Appearance {
   // No appearance document yet — carry over the legacy bare-preset key if
   // the user had picked a theme under the old engine.
   const legacy = localStorage.getItem(LEGACY_THEME_KEY);
-  if (isThemePreset(legacy)) {
-    return { ...DEFAULT_APPEARANCE, theme: legacy };
+  if (legacy && THEME_SET.has(legacy)) {
+    return { ...DEFAULT_APPEARANCE, theme: legacy as ThemePreset };
   }
   return DEFAULT_APPEARANCE;
 }
@@ -388,16 +452,63 @@ export function useApplyAppearance(): Appearance {
   const { theme, fontFamily, fontScale, customTheme } =
     useEffectiveAppearance();
 
-  // The shared engine runs the four independent projecting effects: it sets
-  // `data-theme`, the `--app-font-family` stack (lazily fetching a non-default
-  // webfont), the `--app-font-scale` multiplier, and — only while
-  // `theme === "custom"` — the inline colour / radius / density / border-width
-  // vars and the `data-reduce-motion` attribute, clearing them again the
-  // moment the user switches back to a preset. notes paints eleven of the
-  // eighteen custom colour vars (`src/styles/palettes.css` + `theme.css`) and
-  // reads `--density-row-py` + `--radius` (aliased to `--radius-md`); the rest
-  // of the vars the engine writes are inert here.
-  useApplyTheme({ theme, fontFamily, fontScale, customTheme });
+  // (1) Theme preset attribute.
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
+  // (2) Font family stack. Non-default families are fetched lazily (the
+  // default `mono` is bundled statically); the stack var is set immediately
+  // either way so the fallback paints at once and the webfont swaps in when
+  // it lands.
+  useEffect(() => {
+    const family = FONT_FAMILIES.find((f) => f.id === fontFamily);
+    if (!family) return;
+    void loadFontFamily(fontFamily);
+    document.documentElement.style.setProperty(
+      "--app-font-family",
+      family.stack,
+    );
+  }, [fontFamily]);
+
+  // (3) UI text-size multiplier.
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--app-font-scale",
+      String(fontScale),
+    );
+  }, [fontScale]);
+
+  // (4) Custom theme overrides. Only writes inline vars when the active
+  // theme is `"custom"`; otherwise clears any prior overrides so flipping
+  // back to a preset leaves a clean style attribute.
+  useEffect(() => {
+    const html = document.documentElement;
+    if (theme !== "custom") {
+      for (const k of COLOR_KEYS) {
+        html.style.removeProperty(`--${COLOR_KEY_TO_CSS_VAR[k]}`);
+      }
+      html.style.removeProperty("--radius");
+      html.style.removeProperty("--density-row-py");
+      html.removeAttribute("data-reduce-motion");
+      return;
+    }
+    for (const k of COLOR_KEYS) {
+      html.style.setProperty(
+        `--${COLOR_KEY_TO_CSS_VAR[k]}`,
+        customTheme.colors[k],
+      );
+    }
+    html.style.setProperty("--radius", RADIUS_PX[customTheme.radius]);
+    html.style.setProperty(
+      "--density-row-py",
+      DENSITY_ROW_PY[customTheme.density],
+    );
+    html.setAttribute(
+      "data-reduce-motion",
+      customTheme.reduceMotion ? "true" : "false",
+    );
+  }, [theme, customTheme]);
 
   return persisted;
 }

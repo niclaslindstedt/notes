@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-// Clone a sibling repo (checklist / budget) or the shared oss-framework
-// package into a local folder so a skill can read it — with full git
-// history. The copy-feature skill uses it to study checklist; the
-// migrate-component skill uses it to study oss-framework.
+// Clone a sibling repo (checklist / budget) into a local folder so a
+// skill can read it — with full git history. The copy-feature skill uses
+// it to study checklist.
 //
 // These repos push-mirror themselves to an external git host (each
 // repo's .github/workflows/mirror.yml). That mirror is reachable over
@@ -24,7 +23,6 @@
 //   node clone-sibling.mjs <sibling> [dest] [ref]
 //
 //   node clone-sibling.mjs checklist            # -> /tmp/checklist     @ main
-//   node clone-sibling.mjs oss-framework        # -> /tmp/oss-framework @ main
 //   node clone-sibling.mjs budget /tmp/b        # -> /tmp/b             @ main
 //   node clone-sibling.mjs checklist /tmp/c dev # -> /tmp/c             @ dev
 //

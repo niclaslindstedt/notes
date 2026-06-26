@@ -1,18 +1,68 @@
-// On-demand webfont loaders — re-exported from the framework's theme module.
+// On-demand loading for the non-default webfont families. Ported from
+// checklist's `src/theme/fonts.ts`.
 //
-// The loaders, their per-session memoisation, and the latin / latin-ext subset
-// choices used to be a local clone here; they now live in
-// `@niclaslindstedt/oss-framework/theme` (which dynamically imports the
-// `@fontsource/*` CSS for the non-default families). This shim keeps the
-// `theme/fonts.ts` import path stable for the Appearance picker
-// (`loadAllFontFamilies`, to warm the previews) and the projection engine
-// (`loadFontFamily`).
+// The default family (JetBrains Mono, the `mono` id) is imported statically
+// in `src/app/main.tsx`, so it's part of the main bundle and precached for
+// offline first paint. The three non-default families load lazily — when
+// the user selects one (`useTheme`) or when the Appearance font picker
+// mounts to render its previews.
 //
-// The default `mono` family (JetBrains Mono) stays statically imported by
-// `src/app/main.tsx`, so it's part of the main bundle and precached for
-// offline first paint — the framework treats it as a no-op in `loadFontFamily`.
+// Only the latin + latin-ext subsets ship: the app's UI text lives entirely
+// within them, so fontsource's bare `400.css` / `700.css` entrypoints —
+// which also pull cyrillic / greek / vietnamese — would be pure waste.
+// OpenDyslexic is latin-only upstream, so it has no latin-ext import.
+//
+// Local-first: every byte is bundled and served from our own origin — no
+// CDN at runtime.
 
-export {
-  loadFontFamily,
-  loadAllFontFamilies,
-} from "@niclaslindstedt/oss-framework/theme";
+import type { FontFamilyId } from "./themes.ts";
+
+type NonDefaultFamily = Exclude<FontFamilyId, "mono">;
+
+const loaders: Record<NonDefaultFamily, () => Promise<unknown>> = {
+  sans: () =>
+    Promise.all([
+      import("@fontsource/inter/latin-400.css"),
+      import("@fontsource/inter/latin-ext-400.css"),
+      import("@fontsource/inter/latin-700.css"),
+      import("@fontsource/inter/latin-ext-700.css"),
+    ]),
+  serif: () =>
+    Promise.all([
+      import("@fontsource/source-serif-4/latin-400.css"),
+      import("@fontsource/source-serif-4/latin-ext-400.css"),
+      import("@fontsource/source-serif-4/latin-700.css"),
+      import("@fontsource/source-serif-4/latin-ext-700.css"),
+    ]),
+  dyslexic: () =>
+    Promise.all([
+      import("@fontsource/opendyslexic/latin-400.css"),
+      import("@fontsource/opendyslexic/latin-700.css"),
+    ]),
+};
+
+// Memoise so each family's CSS is fetched at most once per session.
+const started = new Map<FontFamilyId, Promise<unknown>>();
+
+/**
+ * Ensure the `@font-face` rules for `id` are present. A no-op (resolved
+ * promise) for the statically-bundled default family.
+ */
+export function loadFontFamily(id: FontFamilyId): Promise<unknown> {
+  if (id === "mono") return Promise.resolve();
+  const existing = started.get(id);
+  if (existing) return existing;
+  const p = loaders[id]();
+  started.set(id, p);
+  return p;
+}
+
+/**
+ * Kick off every non-default family so the font-picker previews render in
+ * their real face. Fire-and-forget — previews swap in as each lands.
+ */
+export function loadAllFontFamilies(): void {
+  for (const id of Object.keys(loaders) as NonDefaultFamily[]) {
+    void loadFontFamily(id);
+  }
+}
