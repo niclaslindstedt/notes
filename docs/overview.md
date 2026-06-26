@@ -1758,24 +1758,6 @@ directory may linger harmlessly until the backend prunes it.
 
 ## Theme and appearance
 
-> **Framework split.** The shared, drift-prone parts of the theme engine —
-> the preset vocabulary and families, the font stacks and text-size steps, the
-> radius / density / border-width shape presets, the `CustomTheme` shape, the
-> per-preset palettes, the webfont loaders, and the projection that paints it
-> all onto `<html>` — live in
-> [`@niclaslindstedt/oss-framework/theme`](https://github.com/niclaslindstedt/oss-framework),
-> shared verbatim with the checklist app. `src/theme/themes.ts` and
-> `src/theme/fonts.ts` are thin re-export shims over it, and
-> `src/theme/useTheme.ts`'s projection is a one-line call to the framework's
-> `useApplyTheme`. What stays app-side is the **appearance store** (fused with
-> editor / list / sidebar prefs and the synced achievements map) and the
-> Appearance **UI**. Two deliberate partial matches: notes paints **11** of the
-> framework's 18 colour slots (the rest are seeded but inert — see [custom
-> theme](#custom-theme)), and notes reads a single `--radius` token aliased to
-> the framework's `--radius-md` (see [design tokens](#design-tokens)). See the
-> [migrate-component skill](../.agent/skills/migrate-component/SKILL.md) for the
-> migration procedure.
-
 ### Appearance store
 
 `useTheme.ts` (`src/theme/`) — the external store (persisted to
@@ -1785,10 +1767,9 @@ layout preferences — see
 [folders in the side menu](#folders-in-the-side-menu)), `editor`
 ([Editor settings](#editor-settings)), and the achievements map + unseen queue.
 `useAppearance` reads it, `updateAppearance` /
-`setTheme` write it, `useApplyAppearance` feeds the effective (preview-or-
-persisted) appearance to the framework's `useApplyTheme` projection and returns
-the persisted document. Achievement progress lives here so it syncs across
-devices via [settings sync](#settings-sync).
+`setTheme` write it, `useApplyAppearance` projects it onto the DOM. Achievement
+progress lives here so it syncs across devices via [settings
+sync](#settings-sync).
 
 The store also carries an **ephemeral preview override** for the [settings
 modal](#settings-modal)'s draft/Save flow: `setAppearancePreview(draft | null)`
@@ -1802,61 +1783,44 @@ immediately through `updateAppearance` / `setTheme`.
 
 ### Theme preset
 
-`ThemePreset` / `THEMES` (framework, re-exported via `src/theme/themes.ts`) —
-the built-in palettes (dark, light, Dracula, Monokai, GitHub dark/light,
-Solarized Light, Quiet Light, Excel, plus `system` and `custom`). `themeFamily`
-and `FAMILY_DEFAULT_THEME` classify light vs dark; the projection sets
-`<html data-theme>` which the [design tokens](#design-tokens) key off.
+`ThemePreset` / `THEMES` (`src/theme/themes.ts`) — the built-in palettes (dark,
+light, Dracula, Monokai, GitHub dark/light, Solarized Light, Quiet Light, Excel,
+plus `system` and `custom`). `themeFamily` and `FAMILY_DEFAULT_THEME` classify
+light vs dark; the projection sets `<html data-theme>` which the
+[design tokens](#design-tokens) key off.
 
 ### Custom theme
 
-`CustomTheme` / `CustomThemeColors` (framework) — the framework models **18**
-colour slots; notes paints **11** of them (`pageBg`, `surface`, `surface2/3`,
-`fg`, `fgBright`, `muted`, `line`, `accent`, `danger`, `link`), so the editor
-exposes only those: notes keeps its own reduced `COLOR_KEYS`, `COLOR_GROUPS`,
-and `COLOR_LABELS` (`src/theme/themes.ts`, an `as const satisfies` subset of the
-framework's slot keys) that the `AppearanceSection` (`src/ui/settings/`) Custom
-panel iterates. The 7 status / syntax slots notes has no rule for (meta, path,
-flag, pipe, success, positive, negative) are persisted at their seeded defaults
-and never read. `PRESET_PALETTES` (framework, 18-slot) supplies the seed
-swatches; switching to custom seeds from the current theme (`customThemeSeed`).
-When `theme === "custom"` the framework projection writes every slot as an
-inline CSS-variable override on `<html>` (notes reads the 11 it knows);
-`coerceCustomTheme` (framework, folded into the store's validator) upgrades a
-legacy 11-slot document in place on load.
+`CustomTheme` / `CustomThemeColors` (`src/theme/themes.ts`) — the 11 colour slots
+(`pageBg`, `surface`, `surface2/3`, `fg`, `fgBright`, `muted`, `line`, `accent`,
+`danger`, `link`) the user can override. `COLOR_KEYS`, `COLOR_GROUPS`,
+`COLOR_LABELS`, and `PRESET_PALETTES` drive the `ColorPalette`
+(`src/ui/ColorPalette.tsx`) editor; switching to custom seeds from the current
+theme (`customThemeSeed`). When `theme === "custom"` the store writes the slots
+as inline CSS-variable overrides.
 
 ### Fonts
 
-`FontFamilyId` / `FONT_FAMILIES` / `FONT_SCALE_PRESETS` (framework, re-exported
-via `src/theme/themes.ts`) — mono (static), sans, serif, and a
-dyslexic-friendly face. `loadFontFamily` / `loadAllFontFamilies`
-(`src/theme/fonts.ts`, a re-export shim over the framework loaders) lazy-load
-the non-default webfont stacks on demand; the scale multiplier rides
-`--app-font-scale`. The default mono family (JetBrains Mono) stays statically
-imported by `src/app/main.tsx` so it precaches for offline first paint.
+`FontFamilyId` / `FONT_FAMILIES` / `FONT_SCALE_PRESETS` (`src/theme/themes.ts`)
+— mono (static), sans, serif, and a dyslexic-friendly face. `loadFontFamily`
+(`src/theme/fonts.ts`) lazy-loads the non-default webfont stacks on demand; the
+scale multiplier rides `--app-font-scale`.
 
 ### Density / radius
 
 `DensityPreset` (compact / comfortable / spacious) and `RadiusPreset` (none / sm
-/ md / lg) (framework) — global spacing and corner-rounding. The framework's
-projection owns the concrete pixel maps and writes `--density-row-py` /
-`--density-row-px`, the `--radius-sm/md/lg` triple, and `--border-width` inline
-on `<html>` in custom mode. notes reads `--density-row-py` directly and a single
-`--radius` token (aliased to `--radius-md`); the `--density-row-px` and
-`--border-width` vars are written but unused.
+/ md / lg) in `src/theme/themes.ts` — global spacing and corner-rounding,
+applied as `--density-*` and `--radius` tokens.
 
 ### Design tokens
 
 `src/styles/theme.css` (the `@theme` Tailwind mapping and structural tokens),
 `src/styles/palettes.css` (one `[data-theme]` block per preset defining the 11
-slots; `system` follows `prefers-color-scheme`, `custom` is filled at runtime by
-the framework projection), and `src/styles.css`. `theme.css` aliases the app's
-single `--radius` token to the framework's `--radius-md` (`--radius:
-var(--radius-md, 8px)`) so a Custom radius choice flows through while every
-non-custom preset falls back to the historical 8px. `COLOR_KEY_TO_CSS_VAR`
-(framework) bridges the custom-theme slot keys to their CSS-variable names. The
-whole UI paints from these variables, so a palette change is a token change,
-never a per-component edit.
+slots; `system` follows `prefers-color-scheme`, `custom` is filled at runtime),
+and `src/styles.css`. `COLOR_KEY_TO_CSS_VAR` (`src/theme/themes.ts`) bridges the
+custom-theme slot keys to their CSS-variable names. The whole UI paints from
+these variables, so a palette change is a token change, never a per-component
+edit.
 
 ## Achievements
 

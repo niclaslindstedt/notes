@@ -232,10 +232,10 @@ Honour these when naming a new file, key, or string.
 | Term                                                       | Refers to                                                                                                   |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | **Appearance store** / **theme/font/editor settings**      | `Appearance`, `useAppearance`, `updateAppearance`, `getAppearance`, `setAppearancePreview`, `commitAppearance` (`src/theme/useTheme.ts`). [→](overview.md#appearance-store) |
-| **Theme preset** / **light / dark / Dracula / system**     | `ThemePreset`, `THEMES`, `themeFamily` (framework `@niclaslindstedt/oss-framework/theme`, re-exported via `src/theme/themes.ts`). [→](overview.md#theme-preset)                |
-| **Custom theme** / **color editor** / **color slots**      | `CustomTheme`, `CustomThemeColors`, `PRESET_PALETTES`, `customThemeSeed`, `coerceCustomTheme` (framework); notes' reduced 11-slot `COLOR_KEYS` / `COLOR_GROUPS` / `COLOR_LABELS` (`src/theme/themes.ts`); the Custom panel in `AppearanceSection` (`src/ui/settings/AppearanceSection.tsx`). [→](overview.md#custom-theme) |
-| **Font family** / **font scale** / **text size**           | `FontFamilyId`, `FONT_FAMILIES`, `FONT_SCALE_PRESETS` (framework, re-exported via `src/theme/themes.ts`); `loadFontFamily` (`src/theme/fonts.ts`, a framework re-export shim). [→](overview.md#fonts) |
-| **Density** / **corner radius**                            | `DensityPreset`, `RadiusPreset` (framework); the projection's pixel maps + the `--radius` → `--radius-md` alias in `src/styles/theme.css`. [→](overview.md#density--radius)                     |
+| **Theme preset** / **light / dark / Dracula / system**     | `ThemePreset`, `THEMES`, `themeFamily` (`src/theme/themes.ts`). [→](overview.md#theme-preset)                |
+| **Custom theme** / **color editor** / **color slots**      | `CustomTheme`, `CustomThemeColors`, `COLOR_KEYS`, `PRESET_PALETTES` (`src/theme/themes.ts`); `ColorPalette` (`src/ui/ColorPalette.tsx`). [→](overview.md#custom-theme) |
+| **Font family** / **font scale** / **text size**           | `FontFamilyId`, `FONT_FAMILIES`, `FONT_SCALE_PRESETS` (`src/theme/themes.ts`); `loadFontFamily` (`src/theme/fonts.ts`). [→](overview.md#fonts) |
+| **Density** / **corner radius**                            | `DensityPreset`, `RadiusPreset` (`src/theme/themes.ts`). [→](overview.md#density--radius)                     |
 | **Design tokens** / **CSS variables** / **palettes**       | `src/styles/theme.css`, `src/styles/palettes.css`, `src/styles.css`; `COLOR_KEY_TO_CSS_VAR`. [→](overview.md#design-tokens) |
 
 ## Achievements

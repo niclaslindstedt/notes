@@ -323,12 +323,8 @@ The source tree under `src/` is organized by concern, not by file type:
   `localStorage` key, or a per-slug folder; the default keeps the historical
   root). The list mirrors to `namespaces.json` beside `settings.json` so it
   travels with a synced folder.
-- `src/theme/` — the appearance store (`useTheme.ts`), persisted to
-  `localStorage`; its projection delegates to the framework's `useApplyTheme`,
-  which paints the chosen preset onto `<html data-theme>` (and the Custom
-  slots inline) for the CSS tokens to key off. `themes.ts` / `fonts.ts` are
-  re-export shims over `@niclaslindstedt/oss-framework/theme` (the shared
-  preset/palette/font data); the store and the Appearance UI stay app-side.
+- `src/theme/` — the theme engine (`useTheme.ts`): projects the chosen
+  preset onto `<html data-theme>`, which the CSS tokens key off.
 - `src/styles/` — the CSS-variable token system (`theme.css`).
 - `src/pwa/` — service-worker registration and update lifecycle
   (`usePwaUpdate.ts`), standalone/install detection (`standalone.ts`).
