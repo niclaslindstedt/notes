@@ -276,5 +276,11 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["tests/**/*.test.{ts,tsx}"],
+    // Inline the framework so Vite transforms its dynamic `@fontsource/*.css`
+    // imports (in the theme font loaders). Left external, Vitest hands those
+    // to Node's native ESM loader, which throws `ERR_UNKNOWN_FILE_EXTENSION`
+    // on `.css` — a test reaching the loaders would fail even though it
+    // "passes".
+    server: { deps: { inline: ["@niclaslindstedt/oss-framework"] } },
   },
 });
