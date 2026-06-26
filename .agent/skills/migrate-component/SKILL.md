@@ -14,15 +14,16 @@ folders, namespaces — and used to copy changes between each other by hand (tha
 hand-porting is what the `copy-feature` skill still does for app-specific UI).
 The framework is where the genuinely shared surface lives now.
 
-notes has **not adopted the framework yet** — there is no `.npmrc`, no
-`@niclaslindstedt/oss-framework` dependency, and every shared subsystem
-(`src/theme/`, `src/storage/`, the encryption wrapper) is still a local clone
-awaiting extraction. checklist has already migrated its `theme` module — its
-local `src/theme/*.ts` are thin re-export shims over
-`@niclaslindstedt/oss-framework/theme` — so that is the **cross-app precedent**
-worth studying before you start. This skill is the procedure that migration
-followed; use it for the first notes migration and every subsequent one so they
-all land in the same shape.
+notes has migrated its **`theme`** module — the first notes adoption. The
+`.npmrc`, the `@niclaslindstedt/oss-framework` dependency, the CI registry
+wiring, and the Vitest inline config are all in place from that migration;
+`src/theme/themes.ts` + `src/theme/fonts.ts` are thin re-export shims and
+`src/theme/useTheme.ts`'s projection is a one-line `useApplyTheme` call (the
+store stays app-side). That is the **in-repo precedent** to study before
+starting the next one (`src/storage/`, the encryption wrapper — still local
+clones awaiting extraction); checklist's `theme` migration is the cross-app
+precedent. This skill is the procedure those migrations followed; use it for
+every subsequent notes migration so they all land in the same shape.
 
 > **Goal of a migration:** the app's local module for that subsystem shrinks to
 > near-zero — a re-export shim plus a thin adapter — while the framework owns the
@@ -49,7 +50,7 @@ Do **not** invoke when:
 
 The package is published to the **GitHub Packages npm registry**, not npmjs.
 
-- notes has **no `.npmrc` yet** — the first migration adds one. It points the
+- notes' **`.npmrc`** (added by the `theme` migration) points the
   `@niclaslindstedt` scope at `https://npm.pkg.github.com` and reads the token
   from `${GITHUB_TOKEN}`:
 
@@ -58,7 +59,8 @@ The package is published to the **GitHub Packages npm registry**, not npmjs.
   //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
   ```
 
-  The token is **never committed** — only the env-var reference.
+  The token is **never committed** — only the env-var reference. It's in place
+  now; a later migration reuses it.
 
 - **Installing locally in the remote/web environment:** the auth token is in the
   **`GITHUB_PAT`** env var, *not* `GITHUB_TOKEN`. Bridge it at the call site:
@@ -76,8 +78,8 @@ The package is published to the **GitHub Packages npm registry**, not npmjs.
   reserves `GITHUB_TOKEN` for its own git/MCP auth. Keep the secret named
   `GITHUB_PAT` and bridge it into `GITHUB_TOKEN` only at the moment of install.
 
-- **CI wiring (not yet present in notes — add it on the first migration).** Every
-  workflow job that runs `npm ci` / `npm install` needs **both**:
+- **CI wiring (in place since the `theme` migration).** Every workflow job that
+  runs `npm ci` / `npm install` needs **both**:
 
   ```yaml
   permissions:
@@ -86,10 +88,10 @@ The package is published to the **GitHub Packages npm registry**, not npmjs.
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   ```
 
-  `ci.yml` (test), `pages.yml` (build), and `release.yml` (release) all install
-  dependencies and so each needs both additions. checklist already wired these;
-  notes has not — replicate both on every notes workflow that installs, and on
-  any **new** workflow you add.
+  `ci.yml` (the `build` job), `pages.yml` (the `build` job — four `npm ci`
+  calls), and `release.yml` (the `release` job) were each wired this way by the
+  `theme` migration. They're done; only a **new** workflow that installs needs
+  the same two additions.
 
 - **Cross-repo access caveat (maintainer action, not a code fix).** The built-in
   `GITHUB_TOKEN` can only read a package published from *another* repo once that
@@ -178,6 +180,23 @@ Delete the local data tables, value maps, and per-property effects the framework
 now owns. Leave a short header comment on each shim explaining it delegates to
 the framework and what stays app-side.
 
+**notes' in-repo `theme` precedent** (study these files before the next
+migration): `src/theme/fonts.ts` is the one-line `export { … } from
+"@niclaslindstedt/oss-framework/theme"` shim; `src/theme/themes.ts` is a
+**partial** shim — it re-exports the framework theme data **but keeps an
+app-side reduced vocabulary** (notes paints 11 of the framework's 18 colour
+slots, so it declares its own `COLOR_KEYS` / `COLOR_GROUPS` / `COLOR_LABELS` as
+`as const satisfies readonly (keyof CustomThemeColors)[]` — a typed subset —
+rather than re-exporting the framework's 18-slot versions, so the Custom editor
+renders only the slots notes styles). `src/theme/useTheme.ts` keeps the whole
+appearance **store** and replaces its four projection `useEffect`s with a single
+`useApplyTheme({ theme, fontFamily, fontScale, customTheme })` call, and folds
+the framework's `coerceCustomTheme` into its store validator (it upgrades a
+legacy 11-slot document to 18 slots on load). The CSS-var contract mismatch
+(notes' single `--radius` vs the framework's `--radius-sm/md/lg`) was reconciled
+with an **alias** in `src/styles/theme.css` (`--radius: var(--radius-md, 8px)`),
+the README's low-risk option — no component CSS changed.
+
 ## Step 4 — Keep these app-side (do NOT move them)
 
 | Stays in the app | Why |
@@ -200,9 +219,10 @@ consuming test throws `ERR_UNKNOWN_FILE_EXTENSION` unless the package is
 server: { deps: { inline: ["@niclaslindstedt/oss-framework"] } }
 ```
 
-notes does not inline anything yet (it has no framework dependency). The first
-migration of a module that ships CSS (or other Vite-only) imports must add this;
-it covers the whole package, so later migrations inherit it.
+The `theme` migration added this (its font loaders dynamically import
+`@fontsource/*` CSS) in `vite.config.ts → test.server.deps.inline`. It covers
+the whole package, so later migrations inherit it — no action needed unless it's
+removed.
 
 ## Step 6 — Verify
 
@@ -236,9 +256,9 @@ After a migration:
 
 1. If the framework's export surface, module list, or registry/auth setup
    changed, update Step 0–1 here.
-2. If a new module needed a different shim shape than the theme precedent, record
-   it under Step 3 — especially once notes lands its **first** real migration and
-   has its own in-repo precedent to point at instead of checklist's.
+2. If a new module needs a different shim shape than the `theme` precedent now
+   recorded under Step 3, document it there alongside it (the `theme` migration
+   is the in-repo reference; the next one may add a second pattern).
 3. If you hit a new Vitest/build gotcha consuming the framework, add it to Step 5.
 4. Commit the SKILL.md edit alongside the migration, and refresh `.last-updated`
    with today's date.

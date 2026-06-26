@@ -24,8 +24,11 @@ app  ──▶  ui  ──▶  domain
   list to `localStorage` under the versioned key `notes/v1`, validating the
   shape defensively on read. It depends only on `domain/`. A synced or
   IndexedDB backend would implement the same load/save pair behind this seam.
-- **`src/theme/`** — `useTheme.ts` is a small external store that projects the
-  chosen preset onto `<html data-theme>` and persists it to `localStorage`.
+- **`src/theme/`** — `useTheme.ts` is a small external store persisted to
+  `localStorage`; its projection delegates to the framework's `useApplyTheme`,
+  and `themes.ts` / `fonts.ts` are re-export shims over
+  `@niclaslindstedt/oss-framework/theme` (the shared theme data, palettes, and
+  font loaders). The store and the Appearance UI stay app-side.
 - **`src/styles/`** — `theme.css` defines the CSS-variable token vocabulary
   (`--page-bg`, `--surface`, `--fg`, `--accent`, …) and the dark/light/system
   palettes the tokens resolve to.

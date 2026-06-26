@@ -26,6 +26,9 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  # Read access to the GitHub Packages npm registry that serves
+  # `@niclaslindstedt/oss-framework` (see `.npmrc`).
+  packages: read
 
 concurrency:
   group: pages
@@ -42,6 +45,11 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # `.npmrc` authenticates the `@niclaslindstedt` scope against GitHub
+    # Packages with `${GITHUB_TOKEN}` on every `npm ci` below; the built-in
+    # token has `packages: read` via the permissions block above.
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
         with:

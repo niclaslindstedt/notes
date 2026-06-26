@@ -27,9 +27,16 @@
      `./palettes.css`, keyed off `data-theme`; these defaults are the same
      across every preset and the Custom-theme editor overrides them inline
      on <html>. "md" radius / "comfortable" density are the baseline. */
-  --radius: 8px;
+  /* The framework projection writes `--radius-sm/md/lg` inline on <html> only
+     while the Custom theme is active; notes styles through a single `--radius`,
+     aliased to the `md` step so a Custom radius choice flows through. For every
+     non-custom preset the engine writes no radius vars, so this falls back to
+     the historical 8px default. */
+  --radius: var(--radius-md, 8px);
   /* Vertical padding of a navigation / menu row, driven by the density
-     preference in the Custom theme (otherwise the comfortable default). */
+     preference in the Custom theme (otherwise the comfortable default). The
+     framework projection writes this exact var inline on <html> in Custom
+     mode (alongside an unused `--density-row-px`). */
   --density-row-py: 0.5rem;
   --app-font-family: var(--font-mono);
   --app-font-scale: 1;
