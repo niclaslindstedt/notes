@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// Clone a sibling repo (checklist / budget) into a local folder so the
-// copy-feature skill can read it — with full git history.
+// Clone a sibling repo (checklist / budget) or the shared oss-framework
+// package into a local folder so a skill can read it — with full git
+// history. The copy-feature skill uses it to study checklist; the
+// migrate-component skill uses it to study oss-framework.
 //
-// The siblings push-mirror themselves to an external git host (each
+// These repos push-mirror themselves to an external git host (each
 // repo's .github/workflows/mirror.yml). That mirror is reachable over
 // plain `git` even in the scoped web sandbox where github.com egress is
 // blocked (403), so we clone the mirror directly. The clone URL is just
@@ -21,9 +23,10 @@
 // Usage:
 //   node clone-sibling.mjs <sibling> [dest] [ref]
 //
-//   node clone-sibling.mjs checklist            # -> /tmp/checklist @ main
-//   node clone-sibling.mjs budget /tmp/b        # -> /tmp/b         @ main
-//   node clone-sibling.mjs checklist /tmp/c dev # -> /tmp/c         @ dev
+//   node clone-sibling.mjs checklist            # -> /tmp/checklist     @ main
+//   node clone-sibling.mjs oss-framework        # -> /tmp/oss-framework @ main
+//   node clone-sibling.mjs budget /tmp/b        # -> /tmp/b             @ main
+//   node clone-sibling.mjs checklist /tmp/c dev # -> /tmp/c             @ dev
 //
 // The resolved destination path is printed to STDOUT on success; all
 // progress and diagnostics go to STDERR so the path can be captured

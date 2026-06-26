@@ -1,6 +1,6 @@
 ---
 name: migrate-component
-description: "Use whenever you are moving a subsystem out of notes and onto the shared @niclaslindstedt/oss-framework package — 'migrate the theme engine to the framework', 'consume the framework's storage module', 'replace our encryption with the shared one', 'adopt oss-framework for <X>'. Covers the GitHub Packages registry + auth setup (the GITHUB_PAT→GITHUB_TOKEN bridge, CI permissions, the cross-repo access grant), which framework docs to read first, the re-export-shim pattern that keeps the app's import paths stable, what stays app-side vs. what the framework owns, the Vitest CSS-inline gotcha, and the changeset/label decision. Reach for this instead of hand-wiring the dependency, so each migration lands in the same shape as the last."
+description: "Use whenever you are moving a subsystem out of notes and onto the shared @niclaslindstedt/oss-framework package — 'migrate the theme engine to the framework', 'consume the framework's storage module', 'replace our encryption with the shared one', 'adopt oss-framework for <X>'. Covers the GitHub Packages registry + auth setup (the GITHUB_PAT→GITHUB_TOKEN bridge, CI permissions, the cross-repo access grant), how to clone the framework (the shared clone-sibling helper that pulls the whole repo with history from its gitlab mirror, since a github.com clone 403s in the scoped sandbox), which framework docs to read first, the re-export-shim pattern that keeps the app's import paths stable, what stays app-side vs. what the framework owns, the Vitest CSS-inline gotcha, and the changeset/label decision. Reach for this instead of hand-wiring the dependency, so each migration lands in the same shape as the last."
 ---
 
 # Migrating a notes subsystem onto `@niclaslindstedt/oss-framework`
@@ -101,14 +101,39 @@ The package is published to the **GitHub Packages npm registry**, not npmjs.
   means this grant is missing — surface it to the maintainer rather than churning
   the workflow files.
 
-## Step 1 — Read the framework's per-module migration guide
+## Step 1 — Clone the framework and read its per-module migration guide
 
-Clone the framework and read the guide for the module you're migrating **before
-touching any app code**:
+Fetch the framework's source and read the guide for the module you're migrating
+**before touching any app code**.
+
+Clone it with the **same helper `copy-feature` uses**
+(`.agent/skills/copy-feature/clone-sibling.mjs`) — pass `oss-framework` and it
+clones the **entire** framework repo, with **full git history**, from the gitlab
+mirror:
 
 ```sh
-git clone https://x-access-token:${GITHUB_PAT}@github.com/niclaslindstedt/oss-framework.git /tmp/oss-framework
+node .agent/skills/copy-feature/clone-sibling.mjs oss-framework  # -> /tmp/oss-framework
+# optional 2nd/3rd args: a destination and a ref
+node .agent/skills/copy-feature/clone-sibling.mjs oss-framework /tmp/oss-framework some-branch
 ```
+
+> **Why the helper, not `git clone github.com`:** in the Claude Code on the web
+> sandbox the git proxy is scoped to this repo only — `git clone` of github.com
+> **403s** (`repository not authorized`) and the GitHub MCP tools refuse a
+> foreign repo. The framework (like the `checklist` / `budget` siblings)
+> push-mirrors itself to an external git host that **is** reachable over plain
+> `git` in the scoped sandbox, and the helper clones that mirror directly —
+> `oss-framework.git` appended to `MIRROR_BASE` — giving a real checkout with
+> full history (so `git log` / `git show` work directly, no depth flag). Don't
+> retry the github.com clone or hand-curl around it.
+
+> **Config (via env, same as `copy-feature`).** `MIRROR_BASE` = the mirror
+> host+namespace, no scheme / no repo (e.g. `gitlab.com/niclaslindstedt`) —
+> **required**. `MIRROR_TOKEN` = the PAT for a private mirror (omit for a public
+> one); `MIRROR_USER` optional (default `oauth2`). If `MIRROR_BASE` isn't set, or
+> the clone fails, the helper stops with a clear error — fix the config (or ask
+> the user to paste the relevant files) rather than falling back to the
+> scope-locked github.com clone.
 
 Then read, in order:
 
@@ -255,7 +280,10 @@ removed.
 After a migration:
 
 1. If the framework's export surface, module list, or registry/auth setup
-   changed, update Step 0–1 here.
+   changed, update Step 0–1 here. If how the framework's source is reached
+   changed (mirror host, auth, scope, proxy rules), that lives in
+   `copy-feature`'s `clone-sibling.mjs` — update it there (both skills share it)
+   and refresh the Step 1 summary.
 2. If a new module needs a different shim shape than the `theme` precedent now
    recorded under Step 3, document it there alongside it (the `theme` migration
    is the in-repo reference; the next one may add a second pattern).
