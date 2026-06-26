@@ -177,6 +177,19 @@ make icons       # regenerate PWA icons from public/favicon.svg
   `.changes/unreleased/` (see "Releases and changelog"). The `changeset` CI
   job enforces this; opt out with the `no-changelog` label.
 
+### Watching a PR (self check-in tooling)
+
+When asked to watch / babysit / autofix a PR, the harness guidance suggests a
+`send_later` tool for scheduling the periodic self check-in (webhooks don't
+deliver CI success, new pushes, or merge-conflict transitions, so you must
+re-poll). **`send_later` is not available in this environment** — don't waste a
+`ToolSearch` round looking for it. Use **`CronCreate`** instead (find it via
+`ToolSearch` for `CronCreate` if it isn't already loaded): schedule a recurring
+hourly job at an off-minute (e.g. `13 * * * *`) whose prompt re-checks the PR's
+CI status, mergeability, and new review comments, stays silent when nothing
+changed, and stops once the PR is merged or closed. Note `CronCreate` jobs are
+session-only and auto-expire after 7 days.
+
 ## Releases and changelog
 
 ### Deployment slots
@@ -480,6 +493,10 @@ checklist's `.agent/skills/` and adapted to the notes domain.
 
 - `copy-feature` — clone checklist, explore a named feature, and port it into
   this app adapted to the notes domain.
+- `migrate-component` — move a subsystem onto the shared
+  `@niclaslindstedt/oss-framework` package: registry/auth setup, which framework
+  docs to read, the re-export-shim pattern, what stays app-side, and the
+  Vitest/changeset caveats.
 - `commit` — run the quality gates, commit, push, and open/update a PR.
 - `write-changeset` — decide whether a PR needs a `.changes/unreleased/`
   fragment, and write or fold one in.
