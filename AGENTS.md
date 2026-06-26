@@ -480,6 +480,10 @@ checklist's `.agent/skills/` and adapted to the notes domain.
 
 - `copy-feature` — clone checklist, explore a named feature, and port it into
   this app adapted to the notes domain.
+- `migrate-component` — move a subsystem onto the shared
+  `@niclaslindstedt/oss-framework` package: registry/auth setup, which framework
+  docs to read, the re-export-shim pattern, what stays app-side, and the
+  Vitest/changeset caveats.
 - `commit` — run the quality gates, commit, push, and open/update a PR.
 - `write-changeset` — decide whether a PR needs a `.changes/unreleased/`
   fragment, and write or fold one in.
