@@ -257,7 +257,9 @@ Every leaf carries a `data-src` offset so a click maps back to a caret position
 in the raw source (and a [selection](#selection-mapping) back to a source
 column); a shortened bare URL also carries `data-len` (its full source length).
 `markdownLineClass` (`src/ui/markdown-line-class.ts`) maps a block kind to its
-CSS classes.
+CSS classes. List items indent by their `depth` and pick a marker from it: an
+unordered item cycles `•` → `◦` → `▪` (the top-level `•` drawn a little larger),
+an ordered item shows its computed sequential `marker`.
 
 A rendered **link** (and an inline image) is the exception to click-to-caret:
 inside the contenteditable surface a plain click would drop the caret (turning
@@ -282,7 +284,21 @@ a `link` node, so a pasted or typed URL renders and clicks through without the
 punctuation and an unbalanced `)` stay outside the link). An autolinked node
 carries a `bare: true` flag so the renderer knows it may [shorten it for
 display](#shorten-links) — an explicit link's label is never touched. The `image` node (`![alt](href)`) is what
-the [attachment renderer](#attachments) turns into an inline thumbnail. It is pure (no DOM/IO) and fast enough to run on every
+the [attachment renderer](#attachments) turns into an inline thumbnail.
+
+After the per-line pass, `numberLists` walks the blocks once more to fill in the
+two list fields the classifier can't decide line-by-line: a `depth` from each
+`ul`/`ol` item's indentation (a stack of `{ indent, count }` frames opens a
+child list on a deeper indent, closes back on a shallower one, and treats an
+equal indent as the next sibling), and a sequential `marker` for every `ol` item
+so `1.`/`1.` displays as `1.` then `2.` — honouring the first item's number as
+the start value and rotating the style by depth (decimal → lower-alpha →
+lower-roman, `1.` → `a.` → `i.`). Blank lines are skipped so a gap between items
+keeps a list going; any other non-list line ends it. A line that is just a
+single `-` (as well as `---`/`***`/`___`) classifies as an `hr`, a quick divider
+without counting out three dashes.
+
+It is pure (no DOM/IO) and fast enough to run on every
 keystroke, which is why it lives in `domain/`.
 
 ### Title field

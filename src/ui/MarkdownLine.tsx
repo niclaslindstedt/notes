@@ -18,6 +18,19 @@ import { lineTextClass } from "./markdown-line-class.ts";
 // `data-src` attribute so the editor can map a click on rendered text back to
 // a caret position in the raw source (see `MarkdownEditor.tsx`).
 
+// The bullet glyph for an unordered item, rotating by nesting depth the way a
+// browser's own nested `<ul>` does: disc → circle → square, then repeat.
+const BULLET_GLYPHS = ["•", "◦", "▪"];
+function bulletGlyph(depth = 0): string {
+  return BULLET_GLYPHS[depth % BULLET_GLYPHS.length]!;
+}
+
+// Left-indent for a nested list item — one step per nesting level. `undefined`
+// at the top level so the row keeps its natural margin.
+function indentStyle(depth = 0): { marginLeft: string } | undefined {
+  return depth > 0 ? { marginLeft: `${depth * 1.25}em` } : undefined;
+}
+
 function renderInline(
   nodes: InlineNode[],
   shortenLinkChars: number,
@@ -223,9 +236,12 @@ function RenderedLineImpl({
 
     case "ul":
       return (
-        <div className="flex gap-2">
-          <span aria-hidden className="text-accent select-none">
-            •
+        <div className="flex gap-2" style={indentStyle(block.depth)}>
+          <span
+            aria-hidden
+            className="text-[1.3em] leading-[0.9] text-accent select-none"
+          >
+            {bulletGlyph(block.depth)}
           </span>
           <span className="min-w-0 flex-1">
             {inlineContent(block, shortenLinkChars)}
@@ -235,9 +251,9 @@ function RenderedLineImpl({
 
     case "ol":
       return (
-        <div className="flex gap-2">
+        <div className="flex gap-2" style={indentStyle(block.depth)}>
           <span aria-hidden className="text-accent tabular-nums select-none">
-            {block.ordinal}
+            {block.marker ?? block.ordinal}
           </span>
           <span className="min-w-0 flex-1">
             {inlineContent(block, shortenLinkChars)}
@@ -275,5 +291,7 @@ export const RenderedLine = memo(
     a.block.content === b.block.content &&
     a.block.contentStart === b.block.contentStart &&
     a.block.level === b.block.level &&
-    a.block.ordinal === b.block.ordinal,
+    a.block.ordinal === b.block.ordinal &&
+    a.block.depth === b.block.depth &&
+    a.block.marker === b.block.marker,
 );

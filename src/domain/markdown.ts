@@ -33,8 +33,20 @@ export type LineBlock = {
   raw: string;
   /** Heading level 1–6 (only on `heading`). */
   level?: number;
-  /** Ordered-list marker, e.g. `"1."` (only on `ol`). */
+  /** The ordered-list marker as typed, e.g. `"1."` (only on `ol`). */
   ordinal?: string;
+  /**
+   * Nesting depth (0-based) for `ul`/`ol`, derived from indentation in a
+   * cross-line pass (`numberLists`). Drives the indent and which marker glyph /
+   * numbering style the renderer picks.
+   */
+  depth?: number;
+  /**
+   * The display marker for an `ol` item, computed sequentially across the list
+   * so `1.`/`1.` shows as `1.`/`2.`; the style rotates by `depth`
+   * (numeric → alpha → roman). Falls back to `ordinal` when unset.
+   */
+  marker?: string;
   /** The text after any block marker — the part inline parsing runs over. */
   content: string;
   /** Column in `raw` where `content` begins (so leaf offsets stay absolute). */
@@ -70,14 +82,132 @@ export function classifyLines(body: string): LineBlock[] {
     }
     blocks.push(classifyLine(raw));
   }
+  numberLists(blocks);
   return blocks;
+}
+
+// Second pass over the classified blocks: assign every `ul`/`ol` item a nesting
+// `depth` from its indentation, and every `ol` item a sequential `marker`. The
+// per-line classifier can't do this — the displayed number of `1.`/`1.` (→ `1.`
+// then `2.`) and the nesting level both depend on the lines around it. A stack
+// of `{ indent, count }` frames tracks the open lists: a deeper indent opens a
+// child list, a shallower one closes back to the matching level, and an equal
+// indent is the next sibling (its counter ticks up). Blank lines are ignored so
+// a gap between items keeps the list going; any other non-list line ends it.
+function numberLists(blocks: LineBlock[]): void {
+  const stack: { indent: number; count: number }[] = [];
+  for (const block of blocks) {
+    if (block.kind !== "ul" && block.kind !== "ol") {
+      if (block.kind !== "blank") stack.length = 0;
+      continue;
+    }
+    const indent = leadingIndent(block.raw);
+    while (stack.length > 0 && indent < stack[stack.length - 1]!.indent) {
+      stack.pop();
+    }
+    const top = stack[stack.length - 1];
+    if (!top || indent > top.indent) {
+      // A new (possibly nested) list: an `ol` starts at its own first number,
+      // so `3.` opens the list at three; a `ul` start value is irrelevant.
+      stack.push({ indent, count: startNumber(block.ordinal) });
+    } else {
+      top.count += 1;
+    }
+    const depth = stack.length - 1;
+    block.depth = depth;
+    if (block.kind === "ol") {
+      block.marker = orderedMarker(stack[stack.length - 1]!.count, depth);
+    }
+  }
+}
+
+// Leading-whitespace width in columns (space = 1, tab advances to the next
+// multiple of four). Only used for the relative depth comparison in
+// `numberLists`, so the exact tab stop matters little — what matters is that a
+// more-indented line always measures wider.
+function leadingIndent(raw: string): number {
+  let cols = 0;
+  for (const ch of raw) {
+    if (ch === " ") cols += 1;
+    else if (ch === "\t") cols += 4 - (cols % 4);
+    else break;
+  }
+  return cols;
+}
+
+// The number an `ol` item opens its list at: the digits of its typed marker
+// (`"3."` → 3), or 1 when absent or unparseable.
+function startNumber(ordinal?: string): number {
+  const m = ordinal ? /\d+/.exec(ordinal) : null;
+  const n = m ? Number.parseInt(m[0], 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+// The display marker for an ordered item at `n` and nesting `depth`. The style
+// rotates every three levels — decimal, then lower-alpha, then lower-roman —
+// mirroring the classic outline numbering (`1.` → `a.` → `i.`).
+function orderedMarker(n: number, depth: number): string {
+  switch (depth % 3) {
+    case 1:
+      return `${toAlpha(n)}.`;
+    case 2:
+      return `${toRoman(n)}.`;
+    default:
+      return `${n}.`;
+  }
+}
+
+// Spreadsheet-style lower-alpha label: 1 → a … 26 → z, 27 → aa, ….
+function toAlpha(n: number): string {
+  if (n <= 0) return String(n);
+  let out = "";
+  let rem = n;
+  while (rem > 0) {
+    rem -= 1;
+    out = String.fromCharCode(97 + (rem % 26)) + out;
+    rem = Math.floor(rem / 26);
+  }
+  return out;
+}
+
+const ROMAN_NUMERALS: [number, string][] = [
+  [1000, "m"],
+  [900, "cm"],
+  [500, "d"],
+  [400, "cd"],
+  [100, "c"],
+  [90, "xc"],
+  [50, "l"],
+  [40, "xl"],
+  [10, "x"],
+  [9, "ix"],
+  [5, "v"],
+  [4, "iv"],
+  [1, "i"],
+];
+
+// Lowercase Roman numeral (1 → i, 4 → iv, 9 → ix …); non-positive input falls
+// back to the plain number so an odd list never renders blank.
+function toRoman(n: number): string {
+  if (n <= 0) return String(n);
+  let out = "";
+  let rem = n;
+  for (const [value, sym] of ROMAN_NUMERALS) {
+    while (rem >= value) {
+      out += sym;
+      rem -= value;
+    }
+  }
+  return out;
 }
 
 function classifyLine(raw: string): LineBlock {
   if (raw.trim() === "") {
     return { kind: "blank", raw, content: "", contentStart: 0 };
   }
-  if (HR_RE.test(raw)) {
+  // `---`/`***`/`___`, and also a line that is just a single `-` — a quick
+  // divider a note-taker reaches for without counting out three dashes.
+  if (HR_RE.test(raw) || raw.trim() === "-") {
     return { kind: "hr", raw, content: "", contentStart: 0 };
   }
   const heading = HEADING_RE.exec(raw);

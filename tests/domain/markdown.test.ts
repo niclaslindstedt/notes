@@ -54,6 +54,14 @@ describe("classifyLines", () => {
     expect(blank?.kind).toBe("blank");
   });
 
+  it("treats a lone hyphen as a horizontal rule", () => {
+    expect(classifyLines("-")[0]?.kind).toBe("hr");
+    // Surrounding whitespace still counts as a bare divider…
+    expect(classifyLines("  -  ")[0]?.kind).toBe("hr");
+    // …but a hyphen with content after it is still a bullet.
+    expect(classifyLines("- item")[0]?.kind).toBe("ul");
+  });
+
   it("treats lines inside a fence as code, not Markdown", () => {
     const blocks = classifyLines("```\n# not a heading\n```");
     expect(blocks.map((b) => b.kind)).toEqual(["fence", "code", "fence"]);
@@ -65,6 +73,60 @@ describe("classifyLines", () => {
     const [block] = classifyLines("just words");
     expect(block?.kind).toBe("paragraph");
     expect(block?.contentStart).toBe(0);
+  });
+});
+
+describe("classifyLines — list numbering", () => {
+  it("renumbers an ordered list sequentially regardless of the source digits", () => {
+    const blocks = classifyLines("1. a\n1. b\n1. c");
+    expect(blocks.map((b) => b.marker)).toEqual(["1.", "2.", "3."]);
+    // The typed marker is preserved for offset/source use.
+    expect(blocks.map((b) => b.ordinal)).toEqual(["1.", "1.", "1."]);
+  });
+
+  it("honours the first item's number as the list's start value", () => {
+    const blocks = classifyLines("5. a\n1. b");
+    expect(blocks.map((b) => b.marker)).toEqual(["5.", "6."]);
+  });
+
+  it("keeps numbering across a blank line but restarts after other content", () => {
+    const across = classifyLines("1. a\n\n1. b");
+    expect(across.filter((b) => b.kind === "ol").map((b) => b.marker)).toEqual([
+      "1.",
+      "2.",
+    ]);
+    const broken = classifyLines("1. a\ntext\n1. b");
+    expect(broken.filter((b) => b.kind === "ol").map((b) => b.marker)).toEqual([
+      "1.",
+      "1.",
+    ]);
+  });
+
+  it("rotates ordered markers by depth: numeric → alpha → roman", () => {
+    const blocks = classifyLines(
+      "1. a\n1. b\n  1. b-a\n  1. b-b\n    1. b-b-a\n    1. b-b-b",
+    );
+    const ol = blocks.filter((b) => b.kind === "ol");
+    expect(ol.map((b) => b.depth)).toEqual([0, 0, 1, 1, 2, 2]);
+    expect(ol.map((b) => b.marker)).toEqual([
+      "1.",
+      "2.",
+      "a.",
+      "b.",
+      "i.",
+      "ii.",
+    ]);
+  });
+
+  it("restarts a nested list's counter each time it opens", () => {
+    const blocks = classifyLines("1. a\n  1. a-a\n2. b\n  1. b-a");
+    const ol = blocks.filter((b) => b.kind === "ol");
+    expect(ol.map((b) => b.marker)).toEqual(["1.", "a.", "2.", "a."]);
+  });
+
+  it("assigns unordered items a nesting depth from indentation", () => {
+    const blocks = classifyLines("- a\n  - b\n    - c\n- d");
+    expect(blocks.map((b) => b.depth)).toEqual([0, 1, 2, 0]);
   });
 });
 
