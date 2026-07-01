@@ -2,8 +2,8 @@ import type { LineBlock } from "../domain/markdown.ts";
 
 // Font size / weight for a Markdown line's text, keyed off its block kind.
 // Shared between the rendered line (`MarkdownLine.tsx`) and the live editor's
-// active textarea (`MarkdownEditor.tsx`) so switching the caret onto a line
-// keeps it the same height — the source line replaces the rendered one in
+// active raw line (`MarkdownEditor.tsx`) so switching the caret onto a line
+// keeps it the same height — the raw source line replaces the rendered one in
 // place without a reflow. Kept in its own module (no component exports) so
 // fast-refresh stays happy.
 export function lineTextClass(block: LineBlock): string {

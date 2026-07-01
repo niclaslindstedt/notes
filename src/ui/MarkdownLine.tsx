@@ -152,7 +152,20 @@ function LinkNode({
       // Links are draggable by default, which would start a link drag-and-drop
       // instead of a text selection when the user drags across the note.
       draggable={false}
-      onMouseDown={(e) => e.stopPropagation()}
+      // Inside the contenteditable surface a plain click would drop the caret
+      // (turning the link's line into raw source) and the browser won't navigate
+      // an editable anchor. Suppress the caret on press and open the link on a
+      // plain, unmodified click instead — to edit it, click just past and
+      // backspace in. A modified click (new tab / download shortcuts) or a
+      // drag-select is left to the browser.
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed) return; // a drag-select ending here
+        e.preventDefault();
+        window.open(href, "_blank", "noreferrer,noopener");
+      }}
       className="text-link underline underline-offset-2"
     >
       {display ?? text}

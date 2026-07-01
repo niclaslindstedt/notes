@@ -8,7 +8,6 @@ import {
   type ClipboardEvent as ReactClipboardEvent,
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
   type Ref,
 } from "react";
 
@@ -19,6 +18,12 @@ import {
   hiddenAttachmentLines,
   INLINE_PLACEMENT,
 } from "../domain/attachment.ts";
+import {
+  orderPoints,
+  pointsEqual,
+  replaceRange,
+  type SourcePoint,
+} from "../domain/line-edit.ts";
 import { classifyLines } from "../domain/markdown.ts";
 import type { Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
@@ -28,7 +33,11 @@ import {
   attachableFilesFrom,
   fileToAttachment,
 } from "./attachments/fromFile.ts";
-import { useMediaQuery } from "./hooks/useMediaQuery.ts";
+import {
+  lineElementOf,
+  lineIndexOf,
+  placeCaret,
+} from "./contenteditable-caret.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
 import {
@@ -36,32 +45,37 @@ import {
   sourcePointFromDom,
 } from "./markdown-selection.ts";
 
-// Zero-width space — invisible, but a real character the keyboard can delete.
-const SENTINEL = "​";
-
-// An Obsidian-style live-preview Markdown editor. The document is rendered as
-// a column of lines; every line shows its formatted Markdown except the one
-// the caret sits on, which becomes a plain textarea showing the raw source.
-// Moving the caret (arrows, click) "rolls" that single editable textarea from
-// line to line, so editing always happens against the literal source while
-// the rest of the note stays formatted.
+// An Obsidian-style live-preview Markdown editor built on a single
+// `contenteditable` surface. The document renders as a column of lines: every
+// line shows its formatted Markdown except the one the caret sits on, which
+// renders as raw source so it can be edited verbatim. Because the whole note is
+// one editable element, the browser owns caret movement (arrows glide across
+// wrapped lines natively), whole-document selection (Ctrl/Cmd+A), and touch
+// selection across lines on mobile — none of which the older per-line
+// `<textarea>` model could do (each textarea was a selection island).
 //
-// Until the user actually places the caret — by clicking a line, the empty
-// space below it, or being handed focus from the title — *no* line is active
-// and the whole note renders as formatted Markdown (`active` is null). This is
-// the opening state for an existing note: there is no raw textarea to leave the
-// last line unformatted, and on mobile the soft keyboard stays down until a tap.
+// The source string stays the single source of truth, and React fully owns the
+// DOM. Every edit the browser proposes arrives as a native `beforeinput`, is
+// `preventDefault`ed, and is applied to the source through the pure
+// `replaceRange` engine — typing, autocorrect, Backspace/Delete, Enter, and
+// multi-line paste all funnel through it; the active line then re-renders with
+// the new text and the caret is re-placed at the column the edit left it. We
+// intercept everything because letting the browser mutate a contenteditable
+// itself corrupts its structure (it inserts bare text at the root). IME
+// composition is the one edit that can't be `preventDefault`ed: it runs
+// natively on the active line and is reconciled on `compositionend`.
 //
-// The source string is the single source of truth — we never read formatted
-// DOM back. Each edit mutates the line array and re-derives the string;
-// structural keys (Enter / Backspace / Delete at a boundary) splice lines
-// explicitly. Clicks on a rendered line map back to a caret column via the
-// `data-src` source offsets the renderer stamps on every leaf.
-//
-// A drag across lines is a selection, not a caret move: the textarea (a
-// selection island) is dissolved so every line is plain selectable text, the
-// selection is driven with the Selection API, and a copy puts the verbatim
+// Moving the caret onto a different line (arrow keys, a click) is observed via
+// `selectionchange`: the line the caret landed on becomes the new active raw
+// line at the mapped source column, and the line it left re-formats. A ranged
+// selection is left exactly as the browser drew it — the raw active line maps to
+// source the same as a formatted one — and a copy / cut puts the verbatim
 // *source* (Markdown, full URLs) on the clipboard via `markdown-selection.ts`.
+//
+// Until the user places the caret — by clicking, or being handed focus from the
+// title — no line is active (`active.index` is null) and the note renders fully
+// formatted. This is the opening state for an existing note, and on mobile it
+// keeps the soft keyboard down until a deliberate tap.
 
 type Props = {
   body: string;
@@ -94,9 +108,15 @@ type Props = {
 
 /** What the editor exposes to its parent: a way to start editing from outside. */
 export type MarkdownEditorHandle = {
-  /** Place the caret at the end of the note and open the textarea there. */
+  /** Place the caret at the end of the note and start editing there. */
   focus: () => void;
 };
+
+// The active line's identity: which source line is being edited as raw text, and
+// a monotonically-rising key bumped only when the caret rolls onto a *different*
+// line, so React remounts a clean node then but merely updates the text in place
+// while the user types within one line.
+type Active = { index: number | null; key: number };
 
 export function MarkdownEditor({
   body,
@@ -115,11 +135,6 @@ export function MarkdownEditor({
   ref,
 }: Props) {
   const t = useT();
-  // True on phones / tablets — the devices that show a soft keyboard, and so
-  // the only ones where `autoCapitalize` does anything. Gates the manual
-  // sentence-start capitalization below so desktop (where the attribute is a
-  // no-op) keeps behaving exactly as before.
-  const coarsePointer = useMediaQuery("(pointer: coarse)");
   // Local source of truth, seeded from the note. App keys the editor by note
   // id, so a different note remounts rather than reconciling mid-edit.
   const [value, setValue] = useState(body);
@@ -131,125 +146,377 @@ export function MarkdownEditor({
     [value, placement],
   );
 
-  // The line currently being edited as raw text, or `null` when no line is
-  // active and the whole note renders formatted. We only auto-open a line when
-  // the parent asks the body to take focus on mount (`focusOnMount`); otherwise
-  // the note stays fully formatted until the user clicks (or focus is handed
-  // down from the title), so nothing renders as a raw textarea on open.
-  const [active, setActive] = useState<number | null>(() =>
-    focusOnMount ? Math.max(0, value.split("\n").length - 1) : null,
-  );
+  const [active, setActive] = useState<Active>(() => ({
+    index: focusOnMount ? Math.max(0, body.split("\n").length - 1) : null,
+    key: 0,
+  }));
 
-  // Adopt an out-of-band change to this note's body — a live cloud pull while
-  // the note is open — without disturbing the user's own typing. Our own
-  // keystrokes echo back through `onChange` to the identical string, so a
-  // `body` that differs from the local value can only be another writer's edit
-  // (the upstream live-pull quiet window guarantees it never arrives
-  // mid-keystroke). Clamp the active line so the caret stays in range against
-  // the freshly pulled, possibly shorter document.
-  const valueRef = useRef(value);
-  valueRef.current = value;
-  useEffect(() => {
-    if (body === valueRef.current) return;
-    setValue(body);
-    setActive((a) =>
-      a === null ? null : Math.min(a, body.split("\n").length - 1),
-    );
-  }, [body]);
-  const taRef = useRef<HTMLTextAreaElement>(null);
+  // Refs so the document-level and native listeners below always read current
+  // state without re-binding (they capture these, not the render closure).
   const rootRef = useRef<HTMLDivElement>(null);
-  // Caret column to install the next time the textarea (re)focuses — set
-  // whenever we move the active line programmatically. Null on mount when the
-  // body shouldn't grab focus (a new note focuses its title field instead);
-  // clicks / arrow keys still set it, so the body stays fully editable.
+  const activeElRef = useRef<HTMLDivElement | null>(null);
+  const valueRef = useRef(value);
+  const linesRef = useRef(lines);
+  const blocksRef = useRef(blocks);
+  const activeRef = useRef(active);
+  valueRef.current = value;
+  linesRef.current = lines;
+  blocksRef.current = blocks;
+  activeRef.current = active;
+
+  // The caret column to install after the active line (re)renders, or null when
+  // the browser already left the caret where it belongs (a plain caret move).
   const pendingCaret = useRef<number | null>(
-    focusOnMount ? value.length : null,
+    focusOnMount ? Math.max(0, (lines[lines.length - 1] ?? "").length) : null,
   );
+  // Guards so a caret we place programmatically doesn't re-enter the
+  // `selectionchange` handler, and so IME composition isn't disturbed.
+  const settingSel = useRef(false);
+  const composing = useRef(false);
 
-  const clampedActive =
-    active === null ? null : Math.min(active, lines.length - 1);
-  // Whether a line is open as a raw textarea (edit mode), versus the note
-  // rendering fully formatted with no caret placed yet.
-  const isEditing = clampedActive !== null;
+  const clampedIndex =
+    active.index === null ? null : Math.min(active.index, lines.length - 1);
 
-  // An empty active line below the first one carries an invisible zero-width
-  // sentinel inside its textarea. A soft keyboard only fires the `beforeinput`
-  // delete event when there is something *before* the caret to delete; an
-  // empty textarea therefore swallows Backspace, so holding it would erase a
-  // line down to its start and then stop instead of merging into the line
-  // above. The sentinel gives that Backspace something to bite on, which we
-  // intercept and turn into a merge. It never reaches the source string — the
-  // textarea shows it but `value`/`onChange` only ever see the real line.
-  const activeLine = clampedActive === null ? "" : (lines[clampedActive] ?? "");
-  const useSentinel =
-    clampedActive !== null && clampedActive > 0 && activeLine === "";
-  const caretOffset = useSentinel ? SENTINEL.length : 0;
-
-  // Apply a line-array mutation: re-derive the source, move the active line,
-  // and queue the caret column for the effect below to install.
-  function commit(nextLines: string[], nextActive: number, caretCol: number) {
+  // Mutate the source and move the caret. Re-derives the string and queues the
+  // caret column for the effect below to install. The active node is remounted
+  // (bumped key) only when the caret crosses onto a *different* line — a
+  // same-line edit keeps the node, letting React update its text in place.
+  function commit(nextLines: string[], caret: SourcePoint) {
     const next = nextLines.join("\n");
     setValue(next);
     onChange(next);
-    setActive(nextActive);
-    pendingCaret.current = caretCol;
+    pendingCaret.current = caret.col;
+    setActive((a) => ({
+      index: caret.line,
+      key: a.index === caret.line ? a.key : a.key + 1,
+    }));
   }
 
-  function moveTo(nextActive: number, caretCol: number) {
-    setActive(nextActive);
-    pendingCaret.current = caretCol;
+  // Move the active line without editing the source (a caret move that reveals a
+  // new raw line). Remounts the active node so it renders that line's raw text.
+  function activate(index: number, col: number) {
+    pendingCaret.current = col;
+    setActive((a) => ({ index, key: a.index === index ? a.key : a.key + 1 }));
   }
 
-  // The three structural edits, shared by the desktop key handler and the
-  // mobile `beforeinput` handler below. Each splices the line array and moves
-  // the caret; callers decide *when* to fire them from their own event.
-  function splitLine(start: number, end: number) {
-    if (clampedActive === null) return;
-    const text = lines[clampedActive] ?? "";
-    const i = clampedActive;
-    const next = [...lines];
-    next.splice(i, 1, text.slice(0, start), text.slice(end));
-    commit(next, i + 1, 0);
+  // Adopt an out-of-band change to this note's body — a live cloud pull while
+  // the note is open — without disturbing the user's own typing (our keystrokes
+  // echo back to the identical string, so a differing `body` is another writer).
+  useEffect(() => {
+    if (body === valueRef.current) return;
+    setValue(body);
+    const editing = document.activeElement === rootRef.current;
+    setActive((a) =>
+      a.index === null
+        ? a
+        : {
+            index: Math.min(a.index, body.split("\n").length - 1),
+            key: a.key + 1,
+          },
+    );
+    // Only restore the caret when the editor was actually focused; a background
+    // pull must not steal focus into the body.
+    pendingCaret.current = editing ? 0 : null;
+  }, [body]);
+
+  // Install the pending caret after the active line (re)renders. React owns the
+  // line's DOM — the browser never mutates it (every edit is intercepted below)
+  // — so after each edit the caret must be re-placed at the column the edit
+  // left it. Runs whenever the value or active line changes; a null pending
+  // caret (plain caret move the browser already handled) is a no-op.
+  useLayoutEffect(() => {
+    const el = activeElRef.current;
+    if (active.index === null || !el || pendingCaret.current === null) return;
+    settingSel.current = true;
+    const root = rootRef.current;
+    if (root && document.activeElement !== root) root.focus();
+    placeCaret(el, pendingCaret.current);
+    pendingCaret.current = null;
+    // Let the selectionchange this fires settle, then re-arm the handler.
+    queueMicrotask(() => {
+      settingSel.current = false;
+    });
+  }, [active, value]);
+
+  // --- Structural edits (cross-line) ---------------------------------------
+  //
+  // Everything that spans a line boundary is applied through the pure engine so
+  // formatted DOM is never read back. Desktop `keydown` and mobile `beforeinput`
+  // both funnel here via `selectionPoints`, which resolves the live DOM
+  // selection to ordered source `(line, col)` endpoints.
+  function selectionPoints(): {
+    start: SourcePoint;
+    end: SourcePoint;
+    collapsed: boolean;
+  } | null {
+    const root = rootRef.current;
+    const sel = window.getSelection();
+    if (!root || !sel || sel.rangeCount === 0) return null;
+    const a = sourcePointFromDom(
+      root,
+      blocksRef.current,
+      sel.anchorNode!,
+      sel.anchorOffset,
+    );
+    const b = sourcePointFromDom(
+      root,
+      blocksRef.current,
+      sel.focusNode!,
+      sel.focusOffset,
+    );
+    if (!a || !b) return null;
+    const [start, end] = orderPoints(a, b);
+    return { start, end, collapsed: sel.isCollapsed };
   }
 
-  function mergeWithPrev() {
-    if (clampedActive === null) return;
-    const text = lines[clampedActive] ?? "";
-    const i = clampedActive;
-    const prev = lines[i - 1]!;
-    const next = [...lines];
-    next.splice(i - 1, 2, prev + text);
-    commit(next, i - 1, prev.length);
+  function replaceSelection(
+    start: SourcePoint,
+    end: SourcePoint,
+    text: string,
+  ) {
+    const r = replaceRange(linesRef.current, start, end, text);
+    commit(r.lines, r.caret);
   }
 
-  function mergeWithNext() {
-    if (clampedActive === null) return;
-    const text = lines[clampedActive] ?? "";
-    const i = clampedActive;
-    const next = [...lines];
-    next.splice(i, 2, text + lines[i + 1]!);
-    commit(next, i, text.length);
+  // Resolve a `beforeinput`'s target range (the exact span the browser is about
+  // to edit — it hands it to us, so word- and line-deletes come out right) to
+  // ordered source points, falling back to the live selection.
+  function editPoints(
+    e: InputEvent,
+  ): { start: SourcePoint; end: SourcePoint } | null {
+    const root = rootRef.current;
+    if (!root) return null;
+    const ranges = e.getTargetRanges?.() ?? [];
+    const r = ranges[0];
+    if (r) {
+      const a = sourcePointFromDom(
+        root,
+        blocksRef.current,
+        r.startContainer,
+        r.startOffset,
+      );
+      const b = sourcePointFromDom(
+        root,
+        blocksRef.current,
+        r.endContainer,
+        r.endOffset,
+      );
+      if (a && b) {
+        const [start, end] = orderPoints(a, b);
+        return { start, end };
+      }
+    }
+    const pts = selectionPoints();
+    return pts ? { start: pts.start, end: pts.end } : null;
   }
 
-  // Insert one attachment reference per line at the active line, followed by an
-  // empty line to keep typing on. Replaces the active line when it's blank so a
-  // paste into an empty note doesn't leave a stray gap above the attachment.
+  // The single source of edits. Every mutation the browser proposes — typing,
+  // autocorrect, delete, word/line delete, Enter — is intercepted here and
+  // applied through the pure engine, so React fully owns the DOM and the browser
+  // never inserts stray nodes at the contenteditable root (which it does, given
+  // the chance). IME composition is the sole exception: it must run natively
+  // (it can't be `preventDefault`ed), and is reconciled on `compositionend`.
+  const beforeInputRef = useRef<(e: InputEvent) => void>(() => {});
+  beforeInputRef.current = (e: InputEvent) => {
+    const it = e.inputType;
+    // Let the composition run; `onCompositionEnd` reads the result back.
+    if (composing.current || it === "insertCompositionText") return;
+    // Files are handled at the `paste` / `drop` events (which `preventDefault`),
+    // so their `beforeinput` never carries usable data — leave it alone.
+    if (it === "insertFromPaste" || it === "insertFromDrop") return;
+    // The app owns undo/redo; native contenteditable history would desync it.
+    if (it === "historyUndo" || it === "historyRedo") {
+      e.preventDefault();
+      return;
+    }
+    const pts = editPoints(e);
+    if (!pts) return;
+    e.preventDefault();
+    if (it === "insertParagraph" || it === "insertLineBreak") {
+      replaceSelection(pts.start, pts.end, "\n");
+    } else if (it.startsWith("insert")) {
+      replaceSelection(
+        pts.start,
+        pts.end,
+        e.data ?? e.dataTransfer?.getData("text/plain") ?? "",
+      );
+    } else if (it.startsWith("delete")) {
+      // A ranged target (a selection, or a word/line delete the browser scoped
+      // for us) deletes exactly that span. A collapsed one is a single
+      // Backspace/Delete: derive the one-character-or-boundary span from the
+      // caret and direction (also the fallback where `getTargetRanges` is
+      // absent).
+      const span = pointsEqual(pts.start, pts.end)
+        ? collapsedDeletion(it, pts.start)
+        : pts;
+      if (span) replaceSelection(span.start, span.end, "");
+    }
+    // Any other input type (formatting commands etc.) is simply swallowed.
+  };
+
+  // The span a collapsed Backspace / Delete removes: the character on the
+  // relevant side of the caret, or — at a line edge — the newline joining it to
+  // the neighbouring line (a merge).
+  function collapsedDeletion(
+    inputType: string,
+    p: SourcePoint,
+  ): { start: SourcePoint; end: SourcePoint } | null {
+    const curLines = linesRef.current;
+    const lineLen = (i: number) => (curLines[i] ?? "").length;
+    if (inputType.toLowerCase().includes("backward")) {
+      if (p.col > 0) return { start: { line: p.line, col: p.col - 1 }, end: p };
+      if (p.line > 0)
+        return {
+          start: { line: p.line - 1, col: lineLen(p.line - 1) },
+          end: p,
+        };
+      return null; // start of document
+    }
+    if (p.col < lineLen(p.line))
+      return { start: p, end: { line: p.line, col: p.col + 1 } };
+    if (p.line < curLines.length - 1)
+      return { start: p, end: { line: p.line + 1, col: 0 } };
+    return null; // end of document
+  }
+
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const listener = (e: Event) => beforeInputRef.current(e as InputEvent);
+    // Native listener: React's synthetic `onBeforeInput` has unreliable
+    // `inputType` / `getTargetRanges` coverage across browsers.
+    el.addEventListener("beforeinput", listener);
+    return () => el.removeEventListener("beforeinput", listener);
+  }, []);
+
+  // Reconcile the active line after an IME composition (the one edit the browser
+  // applies itself): read the raw line's text back into the source and restore
+  // the caret to where composition left it.
+  function readBackComposition() {
+    const el = activeElRef.current;
+    const root = rootRef.current;
+    const i = activeRef.current.index;
+    if (!el || root === null || i === null) return;
+    const raw = el.textContent ?? "";
+    const sel = window.getSelection();
+    const col =
+      sel && sel.rangeCount > 0
+        ? (sourcePointFromDom(
+            root,
+            blocksRef.current,
+            sel.focusNode!,
+            sel.focusOffset,
+          )?.col ?? raw.length)
+        : raw.length;
+    const next = [...linesRef.current];
+    if (next[i] !== raw) {
+      next[i] = raw;
+      commit(next, { line: i, col });
+    }
+  }
+
+  // --- Selection-driven active line ----------------------------------------
+  //
+  // Moving the caret is a browser affair; we just observe where it ends up. A
+  // collapsed caret on a new line makes that line active (raw) at the mapped
+  // column. A ranged selection is left exactly as the browser drew it — the raw
+  // active line maps to source the same as a formatted one (see
+  // `markdown-selection.ts`), so there's no need to disturb it mid-selection.
+  const selChangeRef = useRef<() => void>(() => {});
+  selChangeRef.current = () => {
+    if (settingSel.current || composing.current) return;
+    const root = rootRef.current;
+    const sel = window.getSelection();
+    if (!root || !sel || sel.rangeCount === 0) return;
+    if (!sel.anchorNode || !root.contains(sel.anchorNode)) return;
+    const cur = activeRef.current.index;
+
+    if (!sel.isCollapsed) return;
+
+    const lineEl = lineElementOf(root, sel.anchorNode);
+    const L = lineIndexOf(lineEl);
+    if (L === null || L === cur) return;
+    // The caret entered a formatted line: map its DOM position to a source
+    // column, then make that line active (raw) at the same column.
+    const pt = sourcePointFromDom(
+      root,
+      blocksRef.current,
+      sel.anchorNode,
+      sel.anchorOffset,
+    );
+    activate(L, pt?.col ?? 0);
+  };
+
+  // --- Clipboard: copy/cut verbatim source, paste through the engine --------
+  const onCopyRef = useRef<(e: ClipboardEvent) => void>(() => {});
+  onCopyRef.current = (e: ClipboardEvent) => {
+    const source = selectionSource();
+    if (source === null) return;
+    e.preventDefault();
+    e.clipboardData?.setData("text/plain", source);
+  };
+
+  const onCutRef = useRef<(e: ClipboardEvent) => void>(() => {});
+  onCutRef.current = (e: ClipboardEvent) => {
+    const pts = selectionPoints();
+    const source = selectionSource();
+    if (source === null || !pts || pts.collapsed) return;
+    e.preventDefault();
+    e.clipboardData?.setData("text/plain", source);
+    replaceSelection(pts.start, pts.end, "");
+  };
+
+  // The verbatim source a live-preview selection covers, or null when the
+  // selection is empty or outside this editor (leave it to the browser).
+  function selectionSource(): string | null {
+    const root = rootRef.current;
+    const sel = window.getSelection();
+    if (!root || !sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+    const { anchorNode, focusNode } = sel;
+    if (!anchorNode || !focusNode) return null;
+    if (!root.contains(anchorNode) || !root.contains(focusNode)) return null;
+    const start = sourcePointFromDom(
+      root,
+      blocksRef.current,
+      anchorNode,
+      sel.anchorOffset,
+    );
+    const end = sourcePointFromDom(
+      root,
+      blocksRef.current,
+      focusNode,
+      sel.focusOffset,
+    );
+    if (!start || !end) return null;
+    return extractSourceRange(linesRef.current, blocksRef.current, start, end);
+  }
+
+  useEffect(() => {
+    const copy = (e: ClipboardEvent) => onCopyRef.current(e);
+    const cut = (e: ClipboardEvent) => onCutRef.current(e);
+    const selChange = () => selChangeRef.current();
+    document.addEventListener("copy", copy);
+    document.addEventListener("cut", cut);
+    document.addEventListener("selectionchange", selChange);
+    return () => {
+      document.removeEventListener("copy", copy);
+      document.removeEventListener("cut", cut);
+      document.removeEventListener("selectionchange", selChange);
+    };
+  }, []);
+
+  // --- Attachments (paste / drop) ------------------------------------------
   function insertAttachments(atts: readonly Attachment[]) {
     if (atts.length === 0) return;
-    // A drop can land while no line is active (the note is fully formatted);
-    // fall back to the last line so the reference appends to the note's foot.
-    const i = clampedActive ?? lines.length - 1;
+    const i = clampedIndex ?? lines.length - 1;
     const cur = lines[i] ?? "";
     const inserted = [...atts.map(attachmentMarkdown), ""];
     const next = [...lines];
     const base = cur.trim() === "" ? i : i + 1;
     next.splice(base, cur.trim() === "" ? 1 : 0, ...inserted);
-    commit(next, base + inserted.length - 1, 0);
+    commit(next, { line: base + inserted.length - 1, col: 0 });
   }
 
-  // Read each file into an attachment, persist it onto the note, and drop its
-  // reference into the body. A no-op when the backend can't store files or
-  // nothing in the payload was attachable.
   async function attachFiles(files: File[]) {
     if (!canAttach || files.length === 0) return;
     const built = await Promise.all(files.map(fileToAttachment));
@@ -259,285 +526,73 @@ export function MarkdownEditor({
     insertAttachments(atts);
   }
 
-  function onPaste(e: ReactClipboardEvent<HTMLTextAreaElement>) {
-    if (!canAttach) return;
-    const files = attachableFilesFrom(e.clipboardData);
-    if (files.length === 0) return; // let normal text paste through
+  function onPaste(e: ReactClipboardEvent<HTMLDivElement>) {
+    const files = canAttach ? attachableFilesFrom(e.clipboardData) : [];
+    if (files.length > 0) {
+      e.preventDefault();
+      void attachFiles(files);
+      return;
+    }
+    // Route all text paste through the engine so a multi-line paste never edits
+    // formatted DOM and the exact source is preserved.
+    const text = e.clipboardData.getData("text/plain");
+    const pts = selectionPoints();
+    if (!pts) return;
     e.preventDefault();
-    void attachFiles(files);
+    replaceSelection(pts.start, pts.end, text);
   }
 
   function onDrop(e: ReactDragEvent<HTMLDivElement>) {
     if (!canAttach) return;
     const files = attachableFilesFrom(e.dataTransfer);
-    if (files.length === 0) return; // nothing to attach — leave it to import
-    // Claim the drop so the global markdown-import handler ignores it and the
-    // browser doesn't navigate to the dropped file.
+    if (files.length === 0) return;
     e.preventDefault();
     e.stopPropagation();
     void attachFiles(files);
   }
 
-  // Size the textarea to its content (so it never scrolls internally) and
-  // install any pending caret. Runs after every value / active-line change.
-  useLayoutEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${ta.scrollHeight}px`;
-    if (wordWrap) {
-      ta.style.width = "";
-    } else {
-      ta.style.width = "auto";
-      ta.style.width = `${ta.scrollWidth}px`;
-    }
-    if (pendingCaret.current !== null) {
-      const col =
-        caretOffset + Math.min(pendingCaret.current, activeLine.length);
-      ta.focus();
-      ta.setSelectionRange(col, col);
-      pendingCaret.current = null;
-    } else if (
-      useSentinel &&
-      document.activeElement === ta &&
-      ta.selectionStart < caretOffset
-    ) {
-      // Keep the caret *after* the sentinel so a Backspace deletes the sentinel
-      // (which we turn into a merge) rather than landing before it and no-op-ing
-      // — the case that previously left the caret stuck at the line start.
-      ta.setSelectionRange(caretOffset, caretOffset);
-    }
-  }, [
-    clampedActive,
-    value,
-    wordWrap,
-    useSentinel,
-    caretOffset,
-    activeLine.length,
-  ]);
-
-  // Structural edits also arrive as `beforeinput` events, and on mobile this
-  // is the *only* place they show up: soft keyboards (and IME composition)
-  // deliver Enter / Backspace / Delete as `keyCode 229` "Unidentified"
-  // keystrokes that never match the `onKeyDown` cases above, but they always
-  // fire a `beforeinput` carrying a semantic `inputType`. We mirror the same
-  // three edits here, keyed off `inputType` instead of `key`. On desktop the
-  // key handler runs first and `preventDefault()`s, which suppresses the
-  // matching `beforeinput`, so the two paths never both fire for one keystroke.
-  //
-  // Attached natively (not via React's synthetic `onBeforeInput`, whose
-  // `inputType` coverage is unreliable) through a ref so the listener always
-  // sees current state. The textarea keeps a stable identity (`key="active"`)
-  // as the active line rolls, so we only re-bind when it actually mounts or
-  // unmounts — i.e. when the note enters or leaves edit mode.
-  const handleBeforeInput = useRef<(e: InputEvent) => void>(() => {});
-  handleBeforeInput.current = (e: InputEvent) => {
-    const ta = taRef.current;
-    if (!ta || clampedActive === null) return;
-    // Work in source-line columns: subtract the sentinel so column 0 of an
-    // empty line is detected whether or not the textarea carries the sentinel.
-    const start = ta.selectionStart - caretOffset;
-    const end = ta.selectionEnd - caretOffset;
-    const text = lines[clampedActive] ?? "";
-    const i = clampedActive;
-    switch (e.inputType) {
-      case "insertLineBreak":
-      case "insertParagraph":
-        e.preventDefault();
-        splitLine(start, end);
-        break;
-      case "deleteContentBackward":
-        if (start === 0 && end === 0 && i > 0) {
-          e.preventDefault();
-          mergeWithPrev();
-        }
-        break;
-      case "deleteContentForward":
-        if (
-          start === text.length &&
-          end === text.length &&
-          i < lines.length - 1
-        ) {
-          e.preventDefault();
-          mergeWithNext();
-        }
-        break;
-    }
-  };
-
-  useEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    const listener = (e: InputEvent) => handleBeforeInput.current(e);
-    ta.addEventListener("beforeinput", listener);
-    return () => ta.removeEventListener("beforeinput", listener);
-    // Re-bind whenever the textarea mounts/unmounts (edit mode toggling on/off,
-    // including a selection drag dissolving it — see below).
-  }, [isEditing]);
-
-  function onTextChange(ta: HTMLTextAreaElement) {
-    if (clampedActive === null) return;
-    const raw = ta.value;
-    // The sentinel was deleted, leaving the field empty: that Backspace is the
-    // one a soft keyboard would otherwise have swallowed. Merge into the line
-    // above (this only fires below the first line, where the sentinel lives).
-    if (useSentinel && raw === "") {
-      mergeWithPrev();
-      return;
-    }
-    // Strip the sentinel back out so the source string never sees it, and
-    // shift the queued caret to match the removed character.
-    const hadSentinel = raw.startsWith(SENTINEL);
-    let text = hadSentinel ? raw.slice(SENTINEL.length) : raw;
-    if (hadSentinel) {
-      pendingCaret.current = Math.max(0, ta.selectionStart - SENTINEL.length);
-      // The sentinel that seeds an empty continuation line sits in front of the
-      // caret, so the soft keyboard reads the field as mid-sentence and skips
-      // the capitalization `autoCapitalize="sentences"` would otherwise apply at
-      // the start of a new paragraph (the first line, which carries no sentinel,
-      // capitalizes natively). Restore it for the first character typed onto the
-      // line — but only on touch devices, mirroring where the attribute applies,
-      // and never when autocorrect is off (which also turns `autoCapitalize`
-      // off). Guard against a case-fold that changes length (e.g. ß → SS) so the
-      // queued caret stays put.
-      if (coarsePointer && !disableAutocorrect && text.length > 0) {
-        const first = text[0]!;
-        const upper = first.toLocaleUpperCase();
-        if (upper.length === first.length) text = upper + text.slice(1);
-      }
-    }
-    const next = [...lines];
-    next[clampedActive] = text;
-    const joined = next.join("\n");
-    setValue(joined);
-    onChange(joined);
-  }
-
-  function onKeyDown(e: ReactKeyboardEvent<HTMLTextAreaElement>) {
-    if (clampedActive === null) return;
-    const ta = e.currentTarget;
-    // Source-line columns (see the `beforeinput` handler): the sentinel sits in
-    // front of the caret on an empty line, so discount it before comparing.
-    const start = ta.selectionStart - caretOffset;
-    const end = ta.selectionEnd - caretOffset;
-    const text = lines[clampedActive] ?? "";
-    const i = clampedActive;
-
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+  // --- Keyboard shortcuts we own -------------------------------------------
+  function onKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    // Select-all must select the whole note, not just the caret's line. Select
+    // from the first rendered line to the last — anchoring the range *inside*
+    // the line elements (not at the contenteditable root) so both endpoints map
+    // back to source, which a later delete/copy relies on. The raw active line
+    // maps to source too, so it can stay put.
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+      const root = rootRef.current;
+      if (!root) return;
       e.preventDefault();
-      splitLine(start, end);
-      return;
-    }
-
-    if (e.key === "Backspace" && start === 0 && end === 0 && i > 0) {
-      e.preventDefault();
-      mergeWithPrev();
-      return;
-    }
-
-    if (
-      e.key === "Delete" &&
-      start === text.length &&
-      end === text.length &&
-      i < lines.length - 1
-    ) {
-      e.preventDefault();
-      mergeWithNext();
-      return;
-    }
-
-    if (e.key === "ArrowLeft" && start === 0 && end === 0 && i > 0) {
-      e.preventDefault();
-      moveTo(i - 1, lines[i - 1]!.length);
-      return;
-    }
-
-    if (
-      e.key === "ArrowRight" &&
-      start === text.length &&
-      end === text.length &&
-      i < lines.length - 1
-    ) {
-      e.preventDefault();
-      moveTo(i + 1, 0);
-      return;
-    }
-
-    // Up / down cross to the adjacent line when the caret is already on the
-    // textarea's first / last visual row (a single-row line always qualifies),
-    // otherwise the textarea moves the caret within its own wrapped rows.
-    if (e.key === "ArrowUp" && i > 0) {
-      if (visualRows(ta) <= 1 || start === 0) {
-        e.preventDefault();
-        moveTo(i - 1, Math.min(start, lines[i - 1]!.length));
-        return;
-      }
-    }
-    if (e.key === "ArrowDown" && i < lines.length - 1) {
-      if (visualRows(ta) <= 1 || end === text.length) {
-        e.preventDefault();
-        moveTo(i + 1, Math.min(start, lines[i + 1]!.length));
-        return;
-      }
+      const lineEls = root.querySelectorAll("[data-line-index]");
+      const first = lineEls[0];
+      const last = lineEls[lineEls.length - 1];
+      const sel = window.getSelection();
+      if (!first || !last || !sel) return;
+      const range = document.createRange();
+      range.setStart(first, 0);
+      range.setEnd(last, last.childNodes.length);
+      sel.removeAllRanges();
+      sel.addRange(range);
     }
   }
 
-  // Clicking a rendered line makes it active, placing the caret at the source
-  // column nearest the pointer (resolved through the `data-src` offsets).
-  function activateAt(e: ReactMouseEvent, index: number) {
-    e.preventDefault();
-    moveTo(index, columnFromPoint(e.clientX, e.clientY, blocks[index]!));
-  }
-
-  // A click anywhere in the empty note space (the scroll container or the
-  // padding around the lines) drops the caret on a blank line at the very
-  // bottom of the note and opens the editor. When the document doesn't already
-  // end in an empty line, append one and put the caret there — otherwise the
-  // click would roll the editing textarea onto the last *content* line, turning
-  // a rendered image (or any formatted line) back into raw source just to give
-  // the caret somewhere to land. Creating the trailing newline keeps the caret
-  // below the content, where the user expects to keep typing.
-  function activateEnd(e: ReactMouseEvent) {
-    e.preventDefault();
-    placeCaretAtEnd();
-  }
-
-  // Open edit mode at the end of the note (the bottom blank line), the shared
-  // body of `activateEnd` and the imperative `focus()` the title hands down to.
+  // Open edit mode at the end of the note (its bottom blank line). Appends a
+  // trailing blank line when the note doesn't already end in one — held locally,
+  // never pushed through `onChange`, so placing the caret is not an edit and
+  // doesn't bump `updatedAt`. Shared by the click-below handler and the
+  // imperative `focus()` the title hands down.
   function placeCaretAtEnd() {
-    const last = lines.length - 1;
-    if (lines[last] !== "") {
-      // Append the blank line locally so the caret has somewhere to land, but
-      // *don't* push it through `onChange` — placing the caret is not an edit,
-      // and persisting this newline would bump `updatedAt` and jump the note to
-      // the top of the list just for entering edit mode. The empty line becomes
-      // part of the document only once the user actually types onto it.
-      const next = [...lines, ""];
+    rootRef.current?.focus();
+    const cur = linesRef.current;
+    const last = cur.length - 1;
+    if ((cur[last] ?? "") !== "") {
+      const next = [...cur, ""];
       setValue(next.join("\n"));
-      setActive(next.length - 1);
       pendingCaret.current = 0;
+      setActive((a) => ({ index: next.length, key: a.key + 1 }));
       return;
     }
-    // The document already ends in a blank line; just land the caret on it.
-    // When that blank line is already the active line — the single empty-line
-    // case — `setActive` would be a no-op, so the layout effect that installs
-    // the caret never runs; focus the textarea directly here so editing always
-    // starts, regardless of how tall the document is.
-    if (last === clampedActive) {
-      const ta = taRef.current;
-      if (ta) {
-        ta.focus();
-        ta.setSelectionRange(0, 0);
-      }
-      return;
-    }
-    moveTo(last, 0);
+    activate(last, 0);
   }
-
-  // Expose `focus()` to the parent so the title field can hand the caret down
-  // into the body on Enter / Arrow-Down. Routed through a ref so the handle
-  // always runs the latest closure (over the current line array), matching the
-  // `beforeinput` listener above.
   const placeCaretAtEndRef = useRef(placeCaretAtEnd);
   placeCaretAtEndRef.current = placeCaretAtEnd;
   useImperativeHandle(
@@ -546,122 +601,11 @@ export function MarkdownEditor({
     [],
   );
 
-  // --- Cross-line text selection -------------------------------------------
-  //
-  // The active line is a textarea, an isolated selection island, and every
-  // other line is its own element — so a native drag can only ever select
-  // within one line. To let the user sweep a selection across the whole note
-  // (desktop), a drag is tracked from a capture-phase mousedown (so it fires
-  // even on a link, which stops the bubble-phase handler) and, once it crosses
-  // a small threshold, edit mode is dropped (`active = null`, all lines render
-  // as formatted divs) and the selection is driven directly with the Selection
-  // API from the press point to the pointer. A plain click (no drag) still
-  // rolls the caret onto the clicked line via the existing handlers.
-  const dragRef = useRef<{ x: number; y: number; dragging: boolean } | null>(
-    null,
-  );
-
-  function driveSelection(ax: number, ay: number, fx: number, fy: number) {
-    const a = caretFromPoint(ax, ay);
-    const b = caretFromPoint(fx, fy);
-    if (!a || !b) return;
-    const sel = window.getSelection();
-    if (!sel) return;
-    try {
-      sel.setBaseAndExtent(a.node, a.offset, b.node, b.offset);
-    } catch {
-      // The anchor node can be transiently invalid in the frame the textarea is
-      // dissolved; the next mousemove re-runs against the settled DOM.
-    }
-  }
-
-  const onSelMove = useRef<(e: MouseEvent) => void>(() => {});
-  const onSelUp = useRef<(e: MouseEvent) => void>(() => {});
-  onSelMove.current = (e: MouseEvent) => {
-    const d = dragRef.current;
-    if (!d) return;
-    if (!d.dragging) {
-      if (Math.abs(e.clientX - d.x) < 4 && Math.abs(e.clientY - d.y) < 4)
-        return;
-      d.dragging = true;
-      // Drop edit mode so every line is plain selectable text (no textarea).
-      setActive(null);
-    }
-    e.preventDefault();
-    driveSelection(d.x, d.y, e.clientX, e.clientY);
-  };
-  onSelUp.current = () => {
-    const d = dragRef.current;
-    dragRef.current = null;
-    document.removeEventListener("mousemove", selMoveListener);
-    document.removeEventListener("mouseup", selUpListener);
-    if (d?.dragging) {
-      // Swallow the click the browser fires after the drag so a sweep that began
-      // on a link doesn't also navigate to it once the button is released.
-      const swallow = (ev: MouseEvent) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-      };
-      document.addEventListener("click", swallow, {
-        capture: true,
-        once: true,
-      });
-    }
-  };
-  const selMoveListener = useRef((e: MouseEvent) =>
-    onSelMove.current(e),
-  ).current;
-  const selUpListener = useRef((e: MouseEvent) => onSelUp.current(e)).current;
-
-  // Begin tracking a potential selection drag. Runs in the capture phase so it
-  // sees presses on links too (their bubble-phase handler stops propagation to
-  // keep a click navigating). Caret placement stays on the bubble handlers, so
-  // a press that turns out to be a plain click behaves exactly as before.
-  function startDragTracking(e: ReactMouseEvent) {
-    if (e.button !== 0) return;
-    dragRef.current = { x: e.clientX, y: e.clientY, dragging: false };
-    document.addEventListener("mousemove", selMoveListener);
-    document.addEventListener("mouseup", selUpListener);
-  }
-
-  // Put the verbatim source of a live-preview selection on the clipboard rather
-  // than the rendered text — so Markdown and full (un-shortened) URLs survive a
-  // copy. A selection inside the active textarea isn't part of the document
-  // selection, so it falls through to the browser's own (already-raw) copy.
-  const onCopy = useRef<(e: ClipboardEvent) => void>(() => {});
-  onCopy.current = (e: ClipboardEvent) => {
-    const root = rootRef.current;
-    if (!root) return;
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-    const { anchorNode, focusNode } = sel;
-    if (!anchorNode || !focusNode) return;
-    if (!root.contains(anchorNode) || !root.contains(focusNode)) return;
-    const start = sourcePointFromDom(
-      root,
-      blocks,
-      anchorNode,
-      sel.anchorOffset,
-    );
-    const end = sourcePointFromDom(root, blocks, focusNode, sel.focusOffset);
-    if (!start || !end) return;
-    e.preventDefault();
-    e.clipboardData?.setData(
-      "text/plain",
-      extractSourceRange(lines, blocks, start, end),
-    );
-  };
-
-  useEffect(() => {
-    const copyListener = (e: ClipboardEvent) => onCopy.current(e);
-    document.addEventListener("copy", copyListener);
-    return () => {
-      document.removeEventListener("copy", copyListener);
-      // Drop any drag listeners left over from an unmount mid-gesture.
-      document.removeEventListener("mousemove", selMoveListener);
-      document.removeEventListener("mouseup", selUpListener);
-    };
-  }, [selMoveListener, selUpListener]);
+  // Feature-detect the friendlier `plaintext-only` mode (Chrome/Safari): it
+  // stops the browser inserting rich markup (bold spans, nested divs) that our
+  // read-back can't interpret. Firefox falls back to plain `true`, where our
+  // beforeinput interception keeps edits line-clean.
+  const editableMode = useMemo(() => supportsPlaintextOnly(), []);
 
   const widthStyle =
     maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" };
@@ -675,165 +619,142 @@ export function MarkdownEditor({
       note={note}
       placement={placement}
     >
-      {/* This is one editing widget, not a set of independent controls: the
-        textarea is the focusable, keyboard-driven surface, and the line
-        <div>s are non-interactive visual proxies for source the textarea
-        edits. Clicking one only repositions the caret (keyboard users move it
-        with the arrow keys), so the static-interaction a11y rule doesn't apply. */}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div
-        ref={rootRef}
         className={`min-h-0 flex-1 ${wordWrap ? "overflow-y-auto" : "overflow-auto"}`}
-        // Capture phase so a press on a link (which stops the bubble handler to
-        // stay clickable) still arms a cross-line selection drag.
-        onMouseDownCapture={startDragTracking}
         onMouseDown={(e) => {
-          // A click in the empty area below the text drops the caret at the end
+          // A click in the empty space below the text lands the caret at the end
           // of the note rather than doing nothing.
-          if (e.target === e.currentTarget) activateEnd(e);
+          if (e.target === e.currentTarget) {
+            e.preventDefault();
+            placeCaretAtEnd();
+          }
         }}
         onDrop={onDrop}
         onDragOver={(e) => {
-          // A drag carrying files must have its default prevented for a drop to
-          // fire at all; the drop handler then decides whether it's an image to
-          // attach or something to leave to the global markdown import.
           if (canAttach && carriesFiles(e)) e.preventDefault();
         }}
       >
-        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
         <div
-          className={`px-4 py-4 ${wordWrap ? "" : "w-max min-w-full"}`}
-          style={widthStyle}
-          onMouseDown={(e) => {
-            // Clicks landing on the content wrapper itself — its padding or the
-            // gaps around the lines — count as the empty note space too.
-            if (e.target === e.currentTarget) activateEnd(e);
+          ref={rootRef}
+          role="textbox"
+          aria-multiline="true"
+          aria-label={t("app.startWriting")}
+          tabIndex={0}
+          contentEditable={editableMode}
+          suppressContentEditableWarning
+          spellCheck={!disableSpellcheck}
+          autoCorrect={disableAutocorrect ? "off" : "on"}
+          autoCapitalize={disableAutocorrect ? "off" : "sentences"}
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
+          onCompositionStart={() => {
+            composing.current = true;
           }}
+          onCompositionEnd={() => {
+            composing.current = false;
+            readBackComposition();
+          }}
+          className={`relative px-4 py-4 text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
+          style={widthStyle}
         >
+          {value === "" && (
+            <span
+              contentEditable={false}
+              className="pointer-events-none absolute text-muted/60 select-none"
+            >
+              {t("app.startWriting")}
+            </span>
+          )}
           {lines.map((line, index) => {
-            if (index === clampedActive) {
+            if (index === clampedIndex) {
               return (
-                <textarea
-                  key="active"
-                  ref={taRef}
-                  rows={1}
-                  wrap={wordWrap ? "soft" : "off"}
-                  value={useSentinel ? SENTINEL : line}
-                  spellCheck={!disableSpellcheck}
-                  autoCorrect={disableAutocorrect ? "off" : "on"}
-                  autoCapitalize={disableAutocorrect ? "off" : "sentences"}
-                  placeholder={
-                    lines.length === 1 ? t("app.startWriting") : undefined
-                  }
-                  onChange={(e) => onTextChange(e.currentTarget)}
-                  onKeyDown={onKeyDown}
-                  onPaste={onPaste}
-                  className={`block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-fg outline-none placeholder:text-muted/60 ${wrapClass} ${lineTextClass(
-                    blocks[index]!,
-                  )}`}
+                <ActiveLine
+                  key={`active-${active.key}`}
+                  index={index}
+                  text={line}
+                  setRef={(el) => {
+                    activeElRef.current = el;
+                  }}
+                  className={`cursor-text ${wrapClass} ${lineTextClass(blocks[index]!)}`}
                 />
               );
             }
-            // A line that is just an attachment reference rendered in the
-            // collected end-of-note block instead is hidden in place. It's
-            // still walked (as nothing) so the line indices the editor keys its
-            // caret off stay aligned with the source; navigating onto it makes
-            // it the active line, which reveals its raw source.
+            // An at-end attachment reference is drawn in the collected block, not
+            // in place; skip its line here. It stays in the source (so indices
+            // and structural edits are unaffected) and reveals its raw markdown
+            // when the caret lands on it (making it the active line).
             if (hidden.has(index)) return null;
             return (
-              // A visual proxy for one source line; clicking rolls the editing
-              // textarea here. See the widget note above.
-              // eslint-disable-next-line jsx-a11y/no-static-element-interactions
               <div
                 key={index}
                 data-line-index={index}
-                onMouseDown={(e) => activateAt(e, index)}
-                className={`cursor-text text-fg ${wrapClass}`}
+                className={`cursor-text ${wrapClass}`}
               >
-                {value === "" ? (
-                  // An entirely empty note has nothing to format, so show the
-                  // same "Start writing" affordance the active textarea would —
-                  // clicking it opens edit mode on this blank line.
-                  <span className="text-muted/60">{t("app.startWriting")}</span>
-                ) : (
-                  <RenderedLine
-                    block={blocks[index]!}
-                    shortenLinkChars={shortenLinkChars}
-                  />
-                )}
+                <RenderedLine
+                  block={blocks[index]!}
+                  shortenLinkChars={shortenLinkChars}
+                />
               </div>
             );
           })}
-          <AttachmentsEndBlock />
+          <div contentEditable={false}>
+            <AttachmentsEndBlock />
+          </div>
         </div>
       </div>
     </AttachmentsProvider>
   );
 }
 
-// Whether a drag is carrying files (rather than, say, dragged text) — the same
-// `"Files"` type check the global import uses, so the editor only claims file
-// drags and leaves selection drags to the textarea.
+// The active (raw) line: the one line rendered as verbatim source so it can be
+// edited. React fully owns its DOM — every edit is intercepted in `beforeinput`
+// and applied to the source, then this re-renders with the new text and the
+// caret is re-placed — so the browser never mutates it behind React's back
+// (which, left to its own devices, corrupts a contenteditable's structure). The
+// keyed remount on activation gives a clean node when the caret rolls to a new
+// line; within a line it just updates the text. A lone `<br>` keeps an empty
+// line tall and focusable.
+function ActiveLine({
+  index,
+  text,
+  className,
+  setRef,
+}: {
+  index: number;
+  text: string;
+  className: string;
+  setRef: (el: HTMLDivElement | null) => void;
+}) {
+  return (
+    <div
+      ref={setRef}
+      data-line-index={index}
+      data-raw=""
+      suppressContentEditableWarning
+      className={className}
+    >
+      {text === "" ? <br /> : text}
+    </div>
+  );
+}
+
+// Whether a drag is carrying files (rather than dragged text) — the same
+// `"Files"` type check the global import uses.
 function carriesFiles(e: ReactDragEvent): boolean {
   const types = e.dataTransfer?.types;
   return types ? Array.from(types).includes("Files") : false;
 }
 
-// How many visual rows the textarea's content occupies — used to decide
-// whether an up/down arrow should cross to the next line or move within a
-// wrapped line.
-function visualRows(ta: HTMLTextAreaElement): number {
-  const cs = getComputedStyle(ta);
-  let lh = parseFloat(cs.lineHeight);
-  if (!lh) lh = parseFloat(cs.fontSize) * 1.5;
-  return lh > 0 ? Math.max(1, Math.round(ta.scrollHeight / lh)) : 1;
-}
-
-type CaretHit = { node: Node; offset: number };
-
-function caretFromPoint(x: number, y: number): CaretHit | null {
-  const doc = document as Document & {
-    caretPositionFromPoint?: (
-      x: number,
-      y: number,
-    ) => { offsetNode: Node; offset: number } | null;
-    caretRangeFromPoint?: (x: number, y: number) => Range | null;
-  };
-  if (doc.caretPositionFromPoint) {
-    const pos = doc.caretPositionFromPoint(x, y);
-    return pos ? { node: pos.offsetNode, offset: pos.offset } : null;
+// `contenteditable="plaintext-only"` where supported (Chrome/Safari), else the
+// plain boolean. Detected once by probing a throwaway element.
+function supportsPlaintextOnly(): "plaintext-only" | true {
+  if (typeof document === "undefined") return true;
+  try {
+    const el = document.createElement("div");
+    el.setAttribute("contenteditable", "plaintext-only");
+    return el.contentEditable === "plaintext-only" ? "plaintext-only" : true;
+  } catch {
+    return true;
   }
-  if (doc.caretRangeFromPoint) {
-    const range = doc.caretRangeFromPoint(x, y);
-    return range
-      ? { node: range.startContainer, offset: range.startOffset }
-      : null;
-  }
-  return null;
-}
-
-// Translate a pointer position over a rendered line into a source column,
-// reading the `data-src` offset off the nearest stamped leaf. Falls back to
-// the end of the line's content when the pointer doesn't land on text.
-function columnFromPoint(
-  x: number,
-  y: number,
-  block: { content: string; contentStart: number },
-): number {
-  const fallback = block.contentStart + block.content.length;
-  const hit = caretFromPoint(x, y);
-  if (!hit) return fallback;
-  let el: Element | null =
-    hit.node.nodeType === Node.TEXT_NODE
-      ? hit.node.parentElement
-      : (hit.node as Element);
-  while (el && !(el instanceof HTMLElement && el.dataset.src !== undefined)) {
-    el = el.parentElement;
-  }
-  if (el instanceof HTMLElement && el.dataset.src !== undefined) {
-    const base = Number.parseInt(el.dataset.src, 10);
-    const local = hit.node.nodeType === Node.TEXT_NODE ? hit.offset : 0;
-    return base + local;
-  }
-  return fallback;
 }

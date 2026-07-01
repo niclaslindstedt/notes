@@ -1,16 +1,18 @@
+import { type SourcePoint } from "../domain/line-edit.ts";
 import { type LineBlock } from "../domain/markdown.ts";
+import { offsetWithin } from "./contenteditable-caret.ts";
 
 // Maps a live-preview text selection back onto the raw note source.
 //
-// The editor renders each line as its own element and the caret's line as a
-// textarea (see `MarkdownEditor.tsx`), so a native selection spans a column of
+// The editor renders each line as its own element within one contenteditable
+// surface (see `MarkdownEditor.tsx`), so a native selection spans a column of
 // rendered <div>s. Browsers would copy the *rendered* text — losing the
 // Markdown a note-taker typed and, worse, copying a shortened bare URL as its
 // elided `…[...]…` display rather than the real link. These helpers translate
 // the selection's DOM endpoints into source `(line, column)` positions so the
 // editor can put the verbatim source on the clipboard instead.
 
-export type SourcePoint = { line: number; col: number };
+export type { SourcePoint };
 
 // Resolve one selection endpoint (`node` + `offset`) to a source position, or
 // null when it doesn't fall inside a rendered line of this editor (`root`).
@@ -37,8 +39,22 @@ export function sourcePointFromDom(
   );
   if (Number.isNaN(line)) return null;
 
+  // The active line renders as raw source (`data-raw`), so a DOM offset into it
+  // *is* the source column — no inline leaf mapping needed.
+  if (lineEl instanceof HTMLElement && lineEl.dataset.raw !== undefined) {
+    return { line, col: offsetWithin(lineEl, node, offset) };
+  }
+
   const block = blocks[line];
   const contentStart = block?.contentStart ?? 0;
+
+  // An endpoint anchored at the line container itself (rather than a text leaf)
+  // — e.g. Ctrl+A's range boundaries `(lineEl, 0)` / `(lineEl, childCount)` —
+  // maps to the true line edge, markers included, so select-all covers the
+  // whole source line and a delete/replace leaves nothing behind.
+  if (node === lineEl) {
+    return { line, col: offset <= 0 ? 0 : (block?.raw.length ?? 0) };
+  }
 
   // Walk up to the nearest source-stamped leaf within the line.
   let el: Element | null = startEl;
