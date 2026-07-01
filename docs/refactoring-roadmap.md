@@ -90,21 +90,5 @@ _(none yet — history before this reset lives in git; see the
 
 ## Investigated and skipped
 
-- **2026-06 — `directory-adapter.ts` (1250 lines, over the §20.5 cap):
-  re-evaluated, no clean further seam — left as the cohesive sync core.**
-  This file has already been split four times — `crypto-session.ts`,
-  `folder-registry.ts`, `attachment-reconcile.ts`, `enc-note-codec.ts`, and
-  `migration-converters.ts` were each extracted out of it. The residual is the
-  load / save / plan / conflict-detection / index-sync core, where every concern
-  threads through the others (`save` → `plan` → `writeFiles` → `verifyEncrypted`;
-  the encrypted-load index fast-path, deferred-note tracking, and the
-  representation-switch atomicity all share the same closure state), so there is
-  no concern that lifts out cleanly without a wide, leaky deps bundle. The file
-  is ~250 over the cap but a forced split here would trade a tolerable
-  large-but-cohesive file for two artificially-coupled modules — a worse smell.
-  The +55-line growth since the last measurement (1195 → 1250) is PR #163
-  ("make encrypted unlock resilient to a flaky index"), a resilience fix *inside*
-  the existing index-sync concern, not a new separable one. **Re-evaluate if** a
-  genuinely new concern accretes (e.g. a second sync strategy, a new
-  representation), or the file grows materially past ~1350 — not on line count
-  alone. **Severity 1** as a split candidate (cohesive); do not force the split.
+_(none yet — reasoning before this reset lives in prior revisions of this
+file in git.)_
