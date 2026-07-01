@@ -224,10 +224,11 @@ inline leaf carries. A leaf whose rendered text is shorter than its source (a
 [shortened bare URL](#shorten-links)) also carries `data-len` so the *end* of the
 leaf maps to the end of the full source token, and an endpoint anchored at the
 line container itself (Ctrl/Cmd+A's range boundaries) maps to the true line edge,
-markers included. `extractSourceRange` then returns the verbatim source the
-selection covers, clamping interior lines to their content so list/heading/quote
-markers (drawn as non-selectable glyphs) never leak in. Both are pure/DOM-only
-helpers the editor uses in its `copy` / `cut` handlers.
+markers included. `extractSourceRange` then returns the **verbatim** source the
+selection covers — raw Markdown, list/heading/quote markers and all, so a copy
+round-trips as the source it was typed as; only the columns at the very start and
+end of the selection are trimmed, interior lines are taken in full. Both are
+pure/DOM-only helpers the editor uses in its `copy` / `cut` handlers.
 
 ### Rendered line
 
