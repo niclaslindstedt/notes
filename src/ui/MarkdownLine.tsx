@@ -237,11 +237,16 @@ function RenderedLineImpl({
     case "ul":
       return (
         <div className="flex gap-2" style={indentStyle(block.depth)}>
+          {/* Fix the marker box to one line-height and center the (enlarged)
+              glyph inside it, so a bigger bullet stays vertically centered on
+              the first text line instead of riding up to the top of the row. */}
           <span
             aria-hidden
-            className="text-[1.3em] leading-[0.9] text-accent select-none"
+            className="flex h-[1lh] items-center text-accent select-none"
           >
-            {bulletGlyph(block.depth)}
+            <span className="text-[1.3em] leading-none">
+              {bulletGlyph(block.depth)}
+            </span>
           </span>
           <span className="min-w-0 flex-1">
             {inlineContent(block, shortenLinkChars)}
