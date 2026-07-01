@@ -439,7 +439,7 @@ function PlainEditor({
       }}
       placeholder={t("app.startWriting")}
       style={maxWidth === "none" ? undefined : { maxWidth }}
-      className={`mx-auto w-full flex-1 resize-none bg-page-bg px-4 py-4 text-fg outline-none placeholder:text-muted/60 ${
+      className={`mx-auto w-full flex-1 resize-none overscroll-contain bg-page-bg px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none placeholder:text-muted/60 ${
         wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"
       }`}
     />
