@@ -158,77 +158,76 @@ while a sibling `<span>` draws the tick off the `:checked` state.
 
 ### Markdown editor
 
-`MarkdownEditor` (`src/ui/MarkdownEditor.tsx`) — the Obsidian-style
-live-preview editor. Every line except the one with the caret renders as
-formatted Markdown (`RenderedLine`); the active line becomes a plain textarea
-showing raw source, and the caret "rolls" between lines on arrow keys or clicks
-on rendered text. Structural edits (Enter, boundary Backspace/Delete) splice
-the body explicitly; it reads the parsed blocks from `classifyLines`
-(`src/domain/markdown.ts`) and honours the `EditorSettings` (word-wrap,
-spell-check, autocorrect, margin width).
+`MarkdownEditor` (`src/ui/MarkdownEditor.tsx`) — the Obsidian-style live-preview
+editor, built on **one `contenteditable` surface** (not a stack of per-line
+inputs). Every line except the one the caret is on renders as formatted Markdown
+(`RenderedLine`); the caret's line renders as raw source (the `data-raw`
+`ActiveLine`) so it can be edited verbatim. Because the whole note is a single
+editable element, the browser owns caret movement — **arrow keys glide across a
+wrapped line's visual rows natively** — whole-document selection (**Ctrl/Cmd+A**),
+and **touch selection across lines on mobile**; the older per-line `<textarea>`
+model could do none of these (each textarea was its own selection island). It
+reads parsed blocks from `classifyLines` (`src/domain/markdown.ts`) and honours
+the `EditorSettings` (word-wrap, spell-check, autocorrect, margin width).
+
+**The source string stays the single source of truth.** React fully owns the
+DOM: every edit the browser proposes arrives as a native `beforeinput`, is
+`preventDefault`ed, and is applied to the source through the pure `replaceRange`
+engine (`src/domain/line-edit.ts`) — typing, autocorrect, Backspace/Delete
+(single-char via a direction fallback, or the exact span `getTargetRanges()`
+reports for a word/line delete), Enter, and multi-line paste all funnel through
+it. The active line then re-renders with the new text and the caret is re-placed
+at the column the edit left it (`contenteditable-caret.ts` helpers). Letting the
+browser mutate a contenteditable itself corrupts its structure (it inserts bare
+text at the root), which is exactly why every edit is intercepted. **IME
+composition is the one exception** — it can't be `preventDefault`ed, so it runs
+natively on the active line and is reconciled on `compositionend`.
 
 **Opening a note shows it fully formatted.** The active line is nullable
-(`active: number | null`), and an existing note opens with *no* line active
-(the app passes `focusOnMount={false}`), so every line — last one included —
-renders as Markdown and there is no raw textarea until the user actually places
-the caret. This is what keeps a note's final line (or its only line) from
-opening as plain source, and on mobile it keeps the soft keyboard down until a
-deliberate tap. A line goes active only on a click (`activateAt` /
-`activateEnd`) or when the title field hands focus down through the editor's
-imperative `focus()` handle (`MarkdownEditorHandle`, consumed by `focusBody` in
-`App`) on Enter / Arrow-Down. A brand-new empty note shows the "Start writing"
-placeholder on the blank rendered line instead of a textarea.
+(`active: { index: number | null; key }`), and an existing note opens with *no*
+line active (the app passes `focusOnMount={false}`), so every line — last one
+included — renders as Markdown and there is no raw line until the user places the
+caret. On mobile this keeps the soft keyboard down until a deliberate tap. A line
+goes active when the caret lands on it — observed via a `selectionchange`
+listener that maps the caret's DOM position to a source `(line, col)`, makes that
+line raw, and restores the caret there — or when the title hands focus down
+through the editor's imperative `focus()` handle (`MarkdownEditorHandle`, consumed
+by `focusBody` in `App`) on Enter / Arrow-Down. A brand-new empty note shows the
+"Start writing" placeholder (a non-editable overlay span).
 
-**Capitalizing a new line.** An empty continuation line is seeded with an
-invisible zero-width *sentinel* so a soft-keyboard Backspace has a character to
-delete (which the editor turns into a merge into the line above). That sentinel
-sits in front of the caret, so a phone keyboard reads the line as mid-sentence
-and skips the capital `autoCapitalize="sentences"` would put at the start of a
-new paragraph — the first line, which has no sentinel, capitalizes natively. On
-touch devices (a coarse pointer, mirroring where `autoCapitalize` applies) the
-editor restores that capital for the first character typed onto the line, so a
-new paragraph starts capitalized like the first line and the plain editor; it
-honours the autocorrect editor setting and never fires on desktop.
+Clicking the empty space below the note lands the caret on a blank line at the
+very bottom, **appending one when the document doesn't already end in a newline**
+so a note that ends in an image gains a fresh line to type on. That appended
+blank line is held locally and is **not** pushed through `onChange`: placing the
+caret is not an edit, so it never bumps `updatedAt` or jumps the note to the top
+of the list — the line joins the document only once the user types onto it.
 
-Clicking the empty space below the note (`activateEnd`) always lands the caret
-on a blank line at the very bottom, **appending one when the document doesn't
-already end in a newline**. Without that trailing blank line the click would
-have nowhere to go but the last content line, rolling edit mode onto it and
-turning a rendered image (or any formatted line) back into raw source — so a
-note that ends in an image gains a fresh line to keep typing on instead. That
-appended blank line is held locally and is **not** pushed through `onChange`:
-placing the caret is not an edit, so it never bumps `updatedAt` or jumps the
-note to the top of the list — the line joins the document only once the user
-types onto it.
-
-**Selecting across lines.** A press-and-drag is treated as a text selection
-rather than a caret move. Because the active line is a `<textarea>` (its own
-selection island) and every other line is a separate element, a plain native
-drag could only ever select within one line; so once a drag crosses a few
-pixels the editor dissolves the textarea (`active = -1`, every line renders as a
-formatted div) and drives the selection with the Selection API from the press
-point to the pointer. The drag is armed from a **capture-phase** `mousedown` so
-it fires even when the press lands on a link (whose own `mousedown` stops the
-bubble phase to stay clickable); the click the browser fires after such a drag
-is swallowed so a sweep that began on a link doesn't also navigate. A copy of a
-live-preview selection is intercepted (`markdown-selection.ts`) and the verbatim
-**source** is placed on the clipboard — so Markdown syntax and full,
-un-shortened URLs survive the copy rather than the rendered text. A selection
-inside the active textarea is untouched (it's already raw source). See
+**Select-all and cross-line selection.** Selection is native on the single
+surface — a mouse drag or a mobile long-press-and-extend selects straight across
+lines, and **Ctrl/Cmd+A** selects the whole note (the handler anchors the range
+*inside* the first and last line elements, not at the contenteditable root, so
+both endpoints map back to source and a following delete/replace leaves nothing
+behind). A `copy` (and `cut`) is intercepted (`markdown-selection.ts`) and the
+verbatim **source** is placed on the clipboard — Markdown syntax and full,
+un-shortened URLs survive the copy rather than the rendered text. See
 [Selection mapping](#selection-mapping).
 
 ### Selection mapping
 
 `src/ui/markdown-selection.ts` — translates a live-preview DOM selection back
 onto the raw note. `sourcePointFromDom` resolves one selection endpoint (a DOM
-node + offset) to a source `(line, column)` using the `data-line-index` the
-editor stamps on every rendered line and the `data-src` offset each inline leaf
-carries; a leaf whose rendered text is shorter than its source (a [shortened
-bare URL](#shorten-links)) also carries `data-len` so the *end* of the leaf maps
-to the end of the full source token. `extractSourceRange` then returns the
-verbatim source the selection covers, clamping interior lines to their content
-so list/heading/quote markers (drawn as non-selectable glyphs) never leak in.
-Both are pure/DOM-only helpers the editor uses in its `copy` handler.
+node + offset) to a source `(line, column)`: on the active **raw** line
+(`data-raw`) the DOM offset *is* the source column (measured with the
+`contenteditable-caret.ts` helpers); on a formatted line it uses the
+`data-line-index` the editor stamps on every line and the `data-src` offset each
+inline leaf carries. A leaf whose rendered text is shorter than its source (a
+[shortened bare URL](#shorten-links)) also carries `data-len` so the *end* of the
+leaf maps to the end of the full source token, and an endpoint anchored at the
+line container itself (Ctrl/Cmd+A's range boundaries) maps to the true line edge,
+markers included. `extractSourceRange` then returns the verbatim source the
+selection covers, clamping interior lines to their content so list/heading/quote
+markers (drawn as non-selectable glyphs) never leak in. Both are pure/DOM-only
+helpers the editor uses in its `copy` / `cut` handlers.
 
 ### Rendered line
 
@@ -241,13 +240,14 @@ column); a shortened bare URL also carries `data-len` (its full source length).
 CSS classes.
 
 A rendered **link** (and an inline image) is the exception to click-to-caret:
-it stops the line-level `mousedown` from rolling the editing textarea onto its
-line, so a click (or tap, even while another line is being edited) opens the
-link instead of entering edit mode on it. To edit a link's text or URL, click
-just past it and backspace into it — the raw `[text](url)` source then shows in
-the active line's textarea like any other text. Links are rendered
-`draggable={false}` so dragging across one starts a text selection instead of a
-native link drag.
+inside the contenteditable surface a plain click would drop the caret (turning
+the link's line into raw source) and the browser won't navigate an editable
+anchor, so the anchor suppresses the caret on `mousedown` and opens the link on a
+plain, unmodified click instead (a modified click or a drag-select ending on it
+is left to the browser). To edit a link's text or URL, click just past it and
+backspace into it — the raw `[text](url)` source then shows in the active line
+like any other text. Links are rendered `draggable={false}` so dragging across
+one starts a text selection instead of a native link drag.
 
 ### Markdown parser
 

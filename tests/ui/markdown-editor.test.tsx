@@ -1,27 +1,9 @@
 // @vitest-environment jsdom
-import { createRef } from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act } from "react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  MarkdownEditor,
-  type MarkdownEditorHandle,
-} from "../../src/ui/MarkdownEditor.tsx";
-
-function renderEditor(body: string) {
-  const onChange = vi.fn();
-  const utils = render(
-    <MarkdownEditor
-      body={body}
-      onChange={onChange}
-      wordWrap
-      disableSpellcheck={false}
-      disableAutocorrect={false}
-      maxWidth="none"
-    />,
-  );
-  return { onChange, ...utils };
-}
+import { MarkdownEditor } from "../../src/ui/MarkdownEditor.tsx";
 
 const editorProps = {
   wordWrap: true,
@@ -30,284 +12,121 @@ const editorProps = {
   maxWidth: "none",
 } as const;
 
-// The active line is the one the caret sits on; it's the only <textarea>.
-function activeTextarea(): HTMLTextAreaElement {
-  return screen.getByRole("textbox") as HTMLTextAreaElement;
+function renderEditor(body: string, extra?: Record<string, unknown>) {
+  const onChange = vi.fn();
+  const utils = render(
+    <MarkdownEditor
+      body={body}
+      onChange={onChange}
+      {...editorProps}
+      {...extra}
+    />,
+  );
+  return { onChange, ...utils };
 }
 
-function caretAt(ta: HTMLTextAreaElement, pos: number) {
-  ta.setSelectionRange(pos, pos);
+// The single contenteditable surface; the whole note is one editable element.
+function surface(): HTMLElement {
+  return screen.getByRole("textbox");
 }
+
+// The active line renders as raw source and is stamped `data-raw`.
+function rawLine(): HTMLElement | null {
+  return surface().querySelector("[data-raw]");
+}
+
+// Point the collapsed caret at `offset` inside a line element's first text node.
+function caretIn(lineEl: HTMLElement, offset: number) {
+  const node = lineEl.firstChild ?? lineEl;
+  const sel = window.getSelection()!;
+  const range = document.createRange();
+  range.setStart(node, offset);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+// Dispatch a native `beforeinput` (how the editor receives Enter / Backspace /
+// Delete and mobile edits), which the editor turns into a source splice.
+function beforeInput(inputType: string, data: string | null = null) {
+  act(() => {
+    surface().dispatchEvent(
+      new InputEvent("beforeinput", {
+        inputType,
+        data,
+        cancelable: true,
+        bubbles: true,
+      }),
+    );
+  });
+}
+
+afterEach(() => {
+  window.getSelection()?.removeAllRanges();
+});
 
 describe("MarkdownEditor", () => {
   it("renders every non-active line as formatted Markdown", () => {
     // Two lines; the caret opens on the last, so the first renders formatted.
     renderEditor("**bold**\nplain");
-    // The leaf text sits in a source-stamped span inside the <strong>.
     expect(screen.getByText("bold").closest("strong")).not.toBeNull();
-    // The active (last) line shows its raw source in the textarea.
-    expect(activeTextarea().value).toBe("plain");
-  });
-
-  it("edits the active line and reports the whole body", () => {
-    const { onChange } = renderEditor("hello");
-    fireEvent.change(activeTextarea(), { target: { value: "hello!" } });
-    expect(onChange).toHaveBeenLastCalledWith("hello!");
+    // The active (last) line shows its raw source in the raw line.
+    expect(rawLine()?.textContent).toBe("plain");
+    expect(rawLine()?.getAttribute("data-line-index")).toBe("1");
   });
 
   it("splits the line on Enter at the caret", () => {
     const { onChange } = renderEditor("hello");
-    const ta = activeTextarea();
-    caretAt(ta, 2);
-    fireEvent.keyDown(ta, { key: "Enter" });
+    caretIn(rawLine()!, 2);
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("he\nllo");
+  });
+
+  it("splits the line on a mobile insertLineBreak", () => {
+    const { onChange } = renderEditor("hello");
+    caretIn(rawLine()!, 2);
+    beforeInput("insertLineBreak");
     expect(onChange).toHaveBeenLastCalledWith("he\nllo");
   });
 
   it("merges into the previous line on Backspace at column 0", () => {
     const { onChange } = renderEditor("a\nb");
-    const ta = activeTextarea();
-    expect(ta.value).toBe("b"); // caret opens on the last line
-    caretAt(ta, 0);
-    fireEvent.keyDown(ta, { key: "Backspace" });
+    const raw = rawLine()!;
+    expect(raw.textContent).toBe("b"); // caret opens on the last line
+    caretIn(raw, 0);
+    beforeInput("deleteContentBackward");
     expect(onChange).toHaveBeenLastCalledWith("ab");
   });
 
-  it("does not hijack Backspace mid-line", () => {
+  it("deletes the character after the caret on Delete mid-line", () => {
+    const { onChange } = renderEditor("abc");
+    caretIn(rawLine()!, 1);
+    beforeInput("deleteContentForward");
+    // The editor fully controls the DOM: it removes the character itself.
+    expect(onChange).toHaveBeenLastCalledWith("ac");
+  });
+
+  it("deletes the character before the caret on Backspace mid-line", () => {
     const { onChange } = renderEditor("a\nbc");
-    const ta = activeTextarea();
-    caretAt(ta, 1);
-    fireEvent.keyDown(ta, { key: "Backspace" });
-    // The browser handles the delete; we don't splice lines.
-    expect(onChange).not.toHaveBeenCalled();
+    caretIn(rawLine()!, 1);
+    beforeInput("deleteContentBackward");
+    expect(onChange).toHaveBeenLastCalledWith("a\nc");
   });
 
-  // Mobile soft keyboards deliver Enter / Backspace / Delete as `beforeinput`
-  // events with a semantic `inputType` rather than as `keydown` "Enter" etc.,
-  // so the same structural edits must work off `inputType` too.
-  function beforeInput(ta: HTMLTextAreaElement, inputType: string) {
-    fireEvent(
-      ta,
-      new InputEvent("beforeinput", {
-        inputType,
-        cancelable: true,
-        bubbles: true,
-      }),
-    );
-  }
-
-  it("splits the line on a mobile insertLineBreak", () => {
-    const { onChange } = renderEditor("hello");
-    const ta = activeTextarea();
-    caretAt(ta, 2);
-    beforeInput(ta, "insertLineBreak");
-    expect(onChange).toHaveBeenLastCalledWith("he\nllo");
+  it("inserts typed text through the engine (fully controlled)", () => {
+    const { onChange } = renderEditor("ac");
+    caretIn(rawLine()!, 1);
+    beforeInput("insertText", "b");
+    expect(onChange).toHaveBeenLastCalledWith("abc");
   });
 
-  it("splits the line on a mobile insertParagraph", () => {
-    const { onChange } = renderEditor("hello");
-    const ta = activeTextarea();
-    caretAt(ta, 2);
-    beforeInput(ta, "insertParagraph");
-    expect(onChange).toHaveBeenLastCalledWith("he\nllo");
-  });
-
-  it("merges on a mobile deleteContentBackward at column 0", () => {
-    const { onChange } = renderEditor("a\nb");
-    const ta = activeTextarea();
-    caretAt(ta, 0);
-    beforeInput(ta, "deleteContentBackward");
-    expect(onChange).toHaveBeenLastCalledWith("ab");
-  });
-
-  it("does not hijack a mobile deleteContentBackward mid-line", () => {
-    const { onChange } = renderEditor("a\nbc");
-    const ta = activeTextarea();
-    caretAt(ta, 1);
-    beforeInput(ta, "deleteContentBackward");
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  // A soft keyboard only emits a delete event when there is something before
-  // the caret to delete, so an *empty* active line would otherwise swallow
-  // Backspace — holding it erased a line to its start and then stopped instead
-  // of merging into the line above. An invisible zero-width sentinel gives the
-  // keyboard something to bite on so the merge still fires.
-  const SENTINEL = "​";
-
-  it("seeds an empty active line with the invisible sentinel", () => {
-    renderEditor("a\n");
-    const ta = activeTextarea();
-    // The empty second line shows the sentinel, with the caret parked after it.
-    expect(ta.value).toBe(SENTINEL);
-    expect(ta.selectionStart).toBe(1);
-  });
-
-  it("merges an empty line into the previous one on Backspace", () => {
-    const { onChange } = renderEditor("a\n");
-    const ta = activeTextarea();
-    fireEvent.keyDown(ta, { key: "Backspace" });
-    expect(onChange).toHaveBeenLastCalledWith("a");
-  });
-
-  it("merges an empty line via a mobile deleteContentBackward", () => {
-    const { onChange } = renderEditor("a\n");
-    const ta = activeTextarea();
-    beforeInput(ta, "deleteContentBackward");
-    expect(onChange).toHaveBeenLastCalledWith("a");
-  });
-
-  it("merges when the sentinel is deleted into an empty field", () => {
-    // Whatever path deletes the sentinel, an emptied field below the first
-    // line means the swallowed Backspace: merge rather than store the sentinel.
-    const { onChange } = renderEditor("a\n");
-    const ta = activeTextarea();
-    fireEvent.change(ta, { target: { value: "" } });
-    expect(onChange).toHaveBeenLastCalledWith("a");
-  });
-
-  it("never leaks the sentinel into the source when typing on an empty line", () => {
-    const { onChange } = renderEditor("a\n");
-    const ta = activeTextarea();
-    // The keyboard inserts a character after the sentinel.
-    fireEvent.change(ta, { target: { value: `${SENTINEL}x` } });
-    expect(onChange).toHaveBeenLastCalledWith("a\nx");
-  });
-
-  // The sentinel sits before the caret on an empty continuation line, which
-  // makes a soft keyboard read the field as mid-sentence and suppress the
-  // capital `autoCapitalize="sentences"` would put at the start of a new
-  // paragraph. On touch devices the editor restores it for the first typed
-  // character so a new line starts with a capital like the first line does.
-  describe("capitalizing the start of a new line (touch)", () => {
-    function withCoarsePointer(coarse: boolean) {
-      const original = window.matchMedia;
-      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-        matches: query.includes("pointer: coarse") ? coarse : false,
-        media: query,
-        onchange: null,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })) as unknown as typeof window.matchMedia;
-      return () => {
-        window.matchMedia = original;
-      };
-    }
-
-    it("capitalizes the first character typed onto a new empty line", () => {
-      const restore = withCoarsePointer(true);
-      try {
-        const { onChange } = renderEditor("a\n");
-        const ta = activeTextarea();
-        fireEvent.change(ta, { target: { value: `${SENTINEL}x` } });
-        expect(onChange).toHaveBeenLastCalledWith("a\nX");
-      } finally {
-        restore();
-      }
-    });
-
-    it("leaves the rest of the line alone, only the first character", () => {
-      const restore = withCoarsePointer(true);
-      try {
-        const { onChange } = renderEditor("a\n");
-        const ta = activeTextarea();
-        // A predictive-text insertion can drop a whole word at once.
-        fireEvent.change(ta, { target: { value: `${SENTINEL}hello` } });
-        expect(onChange).toHaveBeenLastCalledWith("a\nHello");
-      } finally {
-        restore();
-      }
-    });
-
-    it("does not capitalize on a desktop (fine) pointer", () => {
-      const restore = withCoarsePointer(false);
-      try {
-        const { onChange } = renderEditor("a\n");
-        const ta = activeTextarea();
-        fireEvent.change(ta, { target: { value: `${SENTINEL}x` } });
-        expect(onChange).toHaveBeenLastCalledWith("a\nx");
-      } finally {
-        restore();
-      }
-    });
-
-    it("does not capitalize when autocorrect is disabled", () => {
-      const restore = withCoarsePointer(true);
-      try {
-        const onChange = vi.fn();
-        render(
-          <MarkdownEditor
-            body={"a\n"}
-            onChange={onChange}
-            {...editorProps}
-            disableAutocorrect
-          />,
-        );
-        const ta = activeTextarea();
-        fireEvent.change(ta, { target: { value: `${SENTINEL}x` } });
-        expect(onChange).toHaveBeenLastCalledWith("a\nx");
-      } finally {
-        restore();
-      }
-    });
-  });
-
-  // A rendered link opens on click rather than rolling the editing textarea
-  // onto its line: tapping it (even while another line is being edited) must
-  // leave that line formatted so the anchor's own click fires and navigates.
-  // To edit the link you click just past it and backspace into it.
-  it("opens a link on click instead of entering edit mode on its line", () => {
-    renderEditor("[google](https://example.com)\nplain");
-    const link = screen.getByText("google");
-    expect(link.closest("a")?.getAttribute("href")).toBe("https://example.com");
-
-    fireEvent.mouseDown(link);
-
-    // The link's line stayed formatted (the anchor is still in the DOM) and the
-    // active textarea is still the original last line — edit mode never rolled
-    // onto the link's line.
-    expect(screen.getByText("google").closest("a")).not.toBeNull();
-    expect(activeTextarea().value).toBe("plain");
-  });
-
-  // Clicking the empty space below the note must always land the caret on a
-  // blank line at the very bottom, creating one when the note doesn't already
-  // end in a newline — otherwise the click would roll edit mode onto the last
-  // content line (e.g. an image), turning it back into raw source. The blank
-  // line is held locally and not reported as an edit: placing the caret is not
-  // a change, so it must not bump the note's modified date.
-  it("lands the caret on a fresh blank line below a note that lacks one without reporting an edit", () => {
-    const { onChange, container } = renderEditor("![img](attachments/a.png)");
-    // The outer scroll container is the empty note space below the content.
-    const scroll = container.firstElementChild as HTMLElement;
-    fireEvent.mouseDown(scroll, { target: scroll });
-    // The caret now sits on the fresh empty last line, but the unchanged
-    // document was never pushed back through onChange.
-    expect(activeTextarea().value).toBe(SENTINEL);
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it("does not add another blank line when the note already ends in one", () => {
-    const { onChange, container } = renderEditor("hello\n");
-    const scroll = container.firstElementChild as HTMLElement;
-    fireEvent.mouseDown(scroll, { target: scroll });
-    // The note already ends in a blank line, so clicking below adds nothing.
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  // A live cloud pull replaces the open note's `body` prop while the editor is
-  // mounted; the editor must adopt the new text in place (the "write here, see
-  // it there" path) rather than keeping its mount-time copy.
   it("adopts an out-of-band change to the body prop", () => {
     const onChange = vi.fn();
     const { rerender } = render(
       <MarkdownEditor body="first" onChange={onChange} {...editorProps} />,
     );
-    expect(activeTextarea().value).toBe("first");
+    expect(rawLine()?.textContent).toBe("first");
 
-    // A remote pull lands a longer document while the note is open.
     rerender(
       <MarkdownEditor
         body={"first\nfrom another device"}
@@ -321,69 +140,92 @@ describe("MarkdownEditor", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  // Opening an existing note (the app always passes focusOnMount={false}) must
-  // not drop a raw textarea on the last line — every line, last one included,
-  // renders as formatted Markdown until the user actually clicks to edit.
-  describe("opening without focus (focusOnMount=false)", () => {
-    function renderClosed(body: string) {
-      const onChange = vi.fn();
-      const utils = render(
-        <MarkdownEditor
-          body={body}
-          onChange={onChange}
-          focusOnMount={false}
-          {...editorProps}
-        />,
-      );
-      return { onChange, ...utils };
-    }
+  it("shows the start-writing placeholder for an empty note", () => {
+    renderEditor("", { focusOnMount: false });
+    expect(screen.getByText(/start writing/i)).not.toBeNull();
+  });
 
-    it("renders the whole note formatted with no active textarea on open", () => {
-      renderClosed("**bold**\nplain");
-      // No line is active, so there is no textarea at all.
-      expect(screen.queryByRole("textbox")).toBeNull();
-      // Both lines — including the last — render as formatted Markdown.
+  describe("opening without focus (focusOnMount=false)", () => {
+    it("renders the whole note formatted with no raw line on open", () => {
+      renderEditor("**bold**\nplain", { focusOnMount: false });
+      // No line is active, so nothing renders as raw source.
+      expect(rawLine()).toBeNull();
       expect(screen.getByText("bold").closest("strong")).not.toBeNull();
       expect(screen.getByText("plain")).not.toBeNull();
     });
 
     it("renders a single-line note formatted on open", () => {
-      // The "or first if only one line" case from the report: a lone content
-      // line must not open as a raw textarea — it stays a formatted heading.
-      renderClosed("# Heading");
-      expect(screen.queryByRole("textbox")).toBeNull();
-      // The heading text renders, and not inside the raw-source textarea.
+      renderEditor("# Heading", { focusOnMount: false });
+      expect(rawLine()).toBeNull();
       const heading = screen.getByText("Heading");
       expect(heading).not.toBeNull();
-      expect(heading.closest("textarea")).toBeNull();
+      expect(heading.closest("[data-raw]")).toBeNull();
     });
 
-    it("enters edit mode on the clicked line, leaving the rest formatted", () => {
-      renderClosed("**bold**\nplain");
-      fireEvent.mouseDown(screen.getByText("plain"));
-      // The clicked line is now the raw textarea; the other stays formatted.
-      expect(activeTextarea().value).toBe("plain");
+    it("makes the caret's line active (raw) when the selection lands on it", () => {
+      renderEditor("**bold**\nplain", { focusOnMount: false });
+      expect(rawLine()).toBeNull();
+      const plain = screen.getByText("plain");
+      caretIn(plain.firstChild as unknown as HTMLElement, 2);
+      act(() => document.dispatchEvent(new Event("selectionchange")));
+      // Line 1 is now the active raw line showing its source.
+      const raw = rawLine();
+      expect(raw?.getAttribute("data-line-index")).toBe("1");
+      expect(raw?.textContent).toBe("plain");
+      // The other line stays formatted.
       expect(screen.getByText("bold").closest("strong")).not.toBeNull();
     });
+  });
 
-    it("opens edit mode at the end via the imperative focus handle", () => {
-      const ref = createRef<MarkdownEditorHandle>();
-      const onChange = vi.fn();
-      render(
-        <MarkdownEditor
-          ref={ref}
-          body={"line one\nline two"}
-          onChange={onChange}
-          focusOnMount={false}
-          {...editorProps}
-        />,
+  describe("select all", () => {
+    it("selects the whole note (all lines) on Ctrl+A", () => {
+      renderEditor("one\ntwo\nthree");
+      fireEvent.keyDown(surface(), { key: "a", ctrlKey: true });
+      const sel = window.getSelection()!;
+      // The selection spans from the first line to the last — endpoints anchored
+      // inside line elements so they map back to source.
+      const first = surface().querySelector('[data-line-index="0"]')!;
+      const last = surface().querySelector('[data-line-index="2"]')!;
+      expect(sel.containsNode(first, true)).toBe(true);
+      expect(sel.containsNode(last, true)).toBe(true);
+    });
+  });
+
+  describe("links", () => {
+    it("opens a link on click instead of entering edit mode on its line", () => {
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      try {
+        renderEditor("[google](https://example.com)\nplain");
+        const link = screen.getByText("google");
+        expect(link.closest("a")?.getAttribute("href")).toBe(
+          "https://example.com",
+        );
+        fireEvent.click(link);
+        expect(open).toHaveBeenCalledWith(
+          "https://example.com",
+          "_blank",
+          "noreferrer,noopener",
+        );
+        // The link's line stayed formatted (the anchor is still in the DOM).
+        expect(screen.getByText("google").closest("a")).not.toBeNull();
+      } finally {
+        open.mockRestore();
+      }
+    });
+  });
+
+  describe("clicking the empty space below", () => {
+    it("lands the caret at the end without reporting an edit", () => {
+      const { onChange, container } = renderEditor(
+        "![img](attachments/a.png)",
+        { canAttach: true },
       );
-      expect(screen.queryByRole("textbox")).toBeNull();
-      // The title hands focus down: like clicking the empty space below, the
-      // editor lands the caret on a fresh blank line at the end of the note.
-      act(() => ref.current!.focus());
-      expect(activeTextarea().value).toBe(SENTINEL);
-      // Placing the caret is not an edit — the trailing newline stays local.
+      const scroll = container.firstElementChild as HTMLElement;
+      act(() => {
+        fireEvent.mouseDown(scroll, { target: scroll });
+      });
+      // A fresh trailing line is opened for editing, but placing the caret is
+      // not an edit — the unchanged document is never pushed through onChange.
       expect(onChange).not.toHaveBeenCalled();
     });
   });

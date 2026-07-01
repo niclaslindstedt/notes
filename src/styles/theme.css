@@ -64,6 +64,15 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Text selection follows the active theme rather than the browser default blue.
+   A translucent tint of the accent keeps the selected text (notably the
+   live-preview editor's, which spans formatted and raw lines) readable on every
+   preset instead of washing it out with a solid fill. */
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--fg-bright);
+}
+
 #app {
   height: 100%;
 }
