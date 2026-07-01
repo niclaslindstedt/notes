@@ -195,6 +195,17 @@ through the editor's imperative `focus()` handle (`MarkdownEditorHandle`, consum
 by `focusBody` in `App`) on Enter / Arrow-Down. A brand-new empty note shows the
 "Start writing" placeholder (a non-editable overlay span).
 
+**A touch tap scrolls the tapped line clear of the soft keyboard.** On mobile
+the browser's focus-time "reveal" runs before the keyboard shrinks the visual
+viewport, so a line tapped in the lower half ends up hidden behind the keyboard
+with the caret out of sight. A touch (or pen) `pointerdown` arms a reveal that
+the caret-placement effect consumes the next time the caret rolls onto a
+different line: it calls `scrollFocusedIntoView`
+(`src/ui/hooks/scrollFocusedIntoView.ts`), which waits for the visual viewport
+to settle, then centres the line. It is scoped to touch (a mouse never loses the
+caret to a keyboard) and gated on the active-line key so typing within a line
+never re-scrolls.
+
 Clicking the empty space below the note lands the caret on a blank line at the
 very bottom, **appending one when the document doesn't already end in a newline**
 so a note that ends in an image gains a fresh line to type on. That appended
@@ -753,7 +764,12 @@ as a sidebar and the floating button disappears; below that it's a drawer.
 `useViewportHeight` (`src/ui/hooks/useViewportHeight.ts`) reads the visual
 viewport (accounting for the mobile soft keyboard and Dynamic Island) as a
 `100svh` fallback; `appViewportRect` (`src/ui/appViewportRect.ts`) exposes the
-app's drawable rect for overlay positioning.
+app's drawable rect for overlay positioning. `scrollFocusedIntoView`
+(`src/ui/hooks/scrollFocusedIntoView.ts`) is the companion for the *content*
+side: it scrolls a freshly-focused field or tapped line clear of the soft
+keyboard by waiting for the visual viewport to shrink (the keyboard settling)
+before centring it — used by the [live-preview editor](#markdown-editor)'s
+tap-to-reveal and the Storage settings passphrase field.
 
 ## Modals and dialogs
 

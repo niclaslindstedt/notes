@@ -38,6 +38,7 @@ import {
   lineIndexOf,
   placeCaret,
 } from "./contenteditable-caret.ts";
+import { scrollFocusedIntoView } from "./hooks/scrollFocusedIntoView.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
 import {
@@ -175,6 +176,16 @@ export function MarkdownEditor({
   const settingSel = useRef(false);
   const composing = useRef(false);
 
+  // A touch tap opened (or moved within) the editor, so the line the caret
+  // lands on should be scrolled clear of the soft keyboard once it settles. Set
+  // on a touch `pointerdown`, consumed the next time the caret rolls onto a
+  // *different* line (see the caret-placement effect). Scoped to touch so a
+  // desktop click or arrow-key move never yanks the view around.
+  const revealPending = useRef(false);
+  // The last active-line key we revealed for, so typing within a line (which
+  // re-runs the effect without changing the key) never re-triggers a scroll.
+  const lastRevealKey = useRef<number | null>(null);
+
   const clampedIndex =
     active.index === null ? null : Math.min(active.index, lines.length - 1);
 
@@ -233,6 +244,17 @@ export function MarkdownEditor({
     if (root && document.activeElement !== root) root.focus();
     placeCaret(el, pendingCaret.current);
     pendingCaret.current = null;
+    // A touch tap that just landed the caret on a new line: scroll that line
+    // clear of the soft keyboard. The keyboard shrinks the visual viewport
+    // *after* the browser's own focus-time reveal, so a line tapped in the lower
+    // half ends up hidden behind it; `scrollFocusedIntoView` waits for the
+    // viewport to settle, then centres the line. Gated on the active-line key so
+    // typing within the line (same key) never re-scrolls.
+    if (revealPending.current && active.key !== lastRevealKey.current) {
+      revealPending.current = false;
+      lastRevealKey.current = active.key;
+      scrollFocusedIntoView(el);
+    }
     // Let the selectionchange this fires settle, then re-arm the handler.
     queueMicrotask(() => {
       settingSel.current = false;
@@ -646,6 +668,12 @@ export function MarkdownEditor({
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div
         className={`min-h-0 flex-1 overscroll-contain ${wordWrap ? "overflow-y-auto" : "overflow-auto"}`}
+        onPointerDown={(e) => {
+          // A touch (or pen) tap anywhere in the editor arms the reveal so the
+          // line the caret lands on is scrolled clear of the soft keyboard; a
+          // mouse never needs it (no keyboard steals the caret's space).
+          if (e.pointerType !== "mouse") revealPending.current = true;
+        }}
         onMouseDown={(e) => {
           // A click in the empty space below the text lands the caret at the end
           // of the note rather than doing nothing.
