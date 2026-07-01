@@ -126,7 +126,7 @@ Honour these when naming a new file, key, or string.
 | **Right-click menu** / **context menu** / **row actions** (desktop) | `RowActionMenu` (`src/ui/RowActionMenu.tsx`); built on `FloatingPanel`. [→](overview.md#right-click-menu) |
 | **Pull to refresh** / **pull down to sync**                | `usePullToRefresh` (`src/ui/hooks/usePullToRefresh.ts`); `PullToRefreshIndicator` (`src/ui/PullToRefreshIndicator.tsx`). [→](overview.md#pull-to-refresh) |
 | **Pinned sidebar** / **docked on tablet** / **media query** | `pinned` in `nav-context.ts`; `useMediaQuery` (`src/ui/hooks/useMediaQuery.ts`). [→](overview.md#pinned-sidebar) |
-| **Viewport height** / **soft-keyboard height**             | `useViewportHeight` (`src/ui/hooks/useViewportHeight.ts`); `appViewportRect` (`src/ui/appViewportRect.ts`). [→](overview.md#viewport-height) |
+| **Viewport height** / **soft-keyboard height** / **scroll a tapped line / field clear of the keyboard** | `useViewportHeight` (`src/ui/hooks/useViewportHeight.ts`); `appViewportRect` (`src/ui/appViewportRect.ts`); `scrollFocusedIntoView` (`src/ui/hooks/scrollFocusedIntoView.ts`). [→](overview.md#viewport-height) |
 
 ## Modals and dialogs
 
