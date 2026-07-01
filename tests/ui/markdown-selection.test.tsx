@@ -6,6 +6,7 @@ import { classifyLines } from "../../src/domain/markdown.ts";
 import { MarkdownEditor } from "../../src/ui/MarkdownEditor.tsx";
 import {
   extractSourceRange,
+  snapStartToLineEdge,
   sourcePointFromDom,
   type SourcePoint,
 } from "../../src/ui/markdown-selection.ts";
@@ -19,7 +20,7 @@ const editorProps = {
 
 describe("extractSourceRange", () => {
   function range(body: string, a: SourcePoint, b: SourcePoint): string {
-    return extractSourceRange(body.split("\n"), classifyLines(body), a, b);
+    return extractSourceRange(body.split("\n"), a, b);
   }
 
   it("slices within a single line", () => {
@@ -41,11 +42,21 @@ describe("extractSourceRange", () => {
     );
   });
 
-  it("excludes list / heading markers from interior lines", () => {
-    // A fully covered list line contributes its content, never the "- " marker.
+  it("keeps list / heading markers on interior and end lines (verbatim source)", () => {
+    // Copy round-trips as raw Markdown: an interior line keeps its "- " marker,
+    // and the end line keeps its marker too (only the columns at the very start
+    // and end of the selection are trimmed).
     const body = "- one\n- two\n- three";
     expect(range(body, { line: 0, col: 2 }, { line: 2, col: 5 })).toBe(
-      "one\ntwo\nthr",
+      "one\n- two\n- thr",
+    );
+  });
+
+  it("copies a heading marker on a non-first selected line", () => {
+    // The reported case: selecting across a paragraph into a heading keeps "# ".
+    const body = "alpha\n# Heading";
+    expect(range(body, { line: 0, col: 0 }, { line: 1, col: 9 })).toBe(
+      "alpha\n# Heading",
     );
   });
 
@@ -54,6 +65,37 @@ describe("extractSourceRange", () => {
     expect(range(body, { line: 0, col: 0 }, { line: 2, col: 1 })).toBe(
       "a\n\nb",
     );
+  });
+});
+
+describe("snapStartToLineEdge", () => {
+  function snap(body: string, p: SourcePoint): SourcePoint {
+    return snapStartToLineEdge(classifyLines(body), p);
+  }
+
+  it("extends a start at a heading's content over the '# ' marker", () => {
+    // "# Heading": content starts at column 2; a selection reaching there has
+    // taken the whole visible line, so include the marker.
+    expect(snap("# Heading", { line: 0, col: 2 })).toEqual({ line: 0, col: 0 });
+  });
+
+  it("extends a start at a list item's content over the '- ' marker", () => {
+    expect(snap("- item", { line: 0, col: 2 })).toEqual({ line: 0, col: 0 });
+  });
+
+  it("leaves a start that begins mid-content alone", () => {
+    expect(snap("# Heading", { line: 0, col: 5 })).toEqual({ line: 0, col: 5 });
+  });
+
+  it("is a no-op on a marker-less paragraph", () => {
+    expect(snap("plain text", { line: 0, col: 0 })).toEqual({
+      line: 0,
+      col: 0,
+    });
+    expect(snap("plain text", { line: 0, col: 3 })).toEqual({
+      line: 0,
+      col: 3,
+    });
   });
 });
 

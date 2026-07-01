@@ -84,6 +84,23 @@ export function sourcePointFromDom(
   return { line, col };
 }
 
+// A block marker (`# `, `- `, `> `, `1. `) is drawn as a non-selectable glyph
+// (or, for a heading, not drawn at all), so the browser can't anchor a selection
+// *before* it — the earliest a selection endpoint can land on a line is its
+// content start. For a ranged selection (copy / cut / replace) that means a
+// selection reaching a line's content start has visually taken the whole line,
+// so snap that start back to column 0 to include the leading marker. Only the
+// *start* endpoint needs this (markers are leading; a line's end already covers
+// its content), and only for a range — a collapsed caret still lands after the
+// marker, where editing happens.
+export function snapStartToLineEdge(
+  blocks: LineBlock[],
+  start: SourcePoint,
+): SourcePoint {
+  const contentStart = blocks[start.line]?.contentStart ?? 0;
+  return start.col <= contentStart ? { line: start.line, col: 0 } : start;
+}
+
 function comparePoints(a: SourcePoint, b: SourcePoint): number {
   return a.line - b.line || a.col - b.col;
 }
@@ -92,13 +109,12 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
-// The verbatim source text a selection spanning [a, b] covers. Endpoints are
-// ordered; each line contributes the slice between the selected columns, with
-// interior lines clamped to their content so a list/heading/quote marker (which
-// the live preview draws as a non-selectable glyph) never leaks into the copy.
+// The verbatim source text a selection spanning [a, b] covers — raw Markdown,
+// list/heading/quote markers and all, so a copy round-trips as the source it was
+// typed as. Endpoints are ordered; the first and last lines contribute the slice
+// from/to the selected column, and every interior line is taken in full.
 export function extractSourceRange(
   lines: string[],
-  blocks: LineBlock[],
   a: SourcePoint,
   b: SourcePoint,
 ): string {
@@ -106,11 +122,8 @@ export function extractSourceRange(
   const parts: string[] = [];
   for (let i = start.line; i <= end.line; i++) {
     const raw = lines[i] ?? "";
-    const block = blocks[i];
-    const cs = block?.contentStart ?? 0;
-    const ce = block ? cs + block.content.length : raw.length;
-    const lo = i === start.line ? start.col : cs;
-    const hi = i === end.line ? end.col : ce;
+    const lo = i === start.line ? start.col : 0;
+    const hi = i === end.line ? end.col : raw.length;
     parts.push(raw.slice(clamp(lo, 0, raw.length), clamp(hi, 0, raw.length)));
   }
   return parts.join("\n");

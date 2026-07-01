@@ -42,6 +42,7 @@ import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
 import {
   extractSourceRange,
+  snapStartToLineEdge,
   sourcePointFromDom,
 } from "./markdown-selection.ts";
 
@@ -266,7 +267,16 @@ export function MarkdownEditor({
     );
     if (!a || !b) return null;
     const [start, end] = orderPoints(a, b);
-    return { start, end, collapsed: sel.isCollapsed };
+    // A ranged selection that reaches a line's content start has visually taken
+    // the whole line, so extend it over any leading block marker (so a copy /
+    // cut / replace covers the `# `, `- `, `> ` too).
+    return {
+      start: sel.isCollapsed
+        ? start
+        : snapStartToLineEdge(blocksRef.current, start),
+      end,
+      collapsed: sel.isCollapsed,
+    };
   }
 
   function replaceSelection(
@@ -303,7 +313,14 @@ export function MarkdownEditor({
       );
       if (a && b) {
         const [start, end] = orderPoints(a, b);
-        return { start, end };
+        // Extend a real range over a leading block marker (see selectionPoints);
+        // a collapsed target (a single keystroke) is left exactly where it is.
+        return {
+          start: pointsEqual(start, end)
+            ? start
+            : snapStartToLineEdge(blocksRef.current, start),
+          end,
+        };
       }
     }
     const pts = selectionPoints();
@@ -488,7 +505,14 @@ export function MarkdownEditor({
       sel.focusOffset,
     );
     if (!start || !end) return null;
-    return extractSourceRange(linesRef.current, blocksRef.current, start, end);
+    // Order, then extend the start over any leading block marker so the copied
+    // source includes the `# ` / `- ` / `> ` of the first selected line.
+    const [lo, hi] = orderPoints(start, end);
+    return extractSourceRange(
+      linesRef.current,
+      snapStartToLineEdge(blocksRef.current, lo),
+      hi,
+    );
   }
 
   useEffect(() => {
