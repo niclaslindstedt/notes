@@ -13,6 +13,27 @@ predate the pipeline.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-01
+
+### Added
+
+- **Drag a folder to another namespace** — Drag a folder from the side menu onto another namespace to move it there with every note filed inside it.
+- **Search your notes** — Search every note's title and body from the magnifier on the side-menu action bar — plain-text and fuzzy by default, with wildcard and /regex/ support, and it works across encrypted notes without unlocking them.
+
+### Changed
+
+- **Editor selection & navigation** — Rebuilt the live-preview editor on a single editable surface so Select All grabs the whole note, arrow keys glide across wrapped lines, and you can select across lines on mobile.
+- **Sharper list and divider rendering** — Ordered lists now number themselves sequentially (1., 2., 3.) whatever digits you type, nested lists indent and rotate their markers by depth (numeric → a. → i. for numbered, • → ◦ → ▪ for bulleted, the top-level bullet drawn a little larger and vertically centred on its line), and a line that is just a single `-` renders as a horizontal divider.
+
+### Fixed
+
+- **Reliable unlock on flaky connections** — Unlocking an encrypted cloud vault now retries a dropped read of the note index, and rebuilds a stale index after a fallback, so a brief network blip no longer forces every unlock to slowly re-decrypt every note.
+- **Capitalize new paragraphs on mobile** — The mobile keyboard now capitalizes the first letter of a new line in the live-preview editor, matching the first line and the plain-text editor.
+- **Overview scroll bounds** — The note overview no longer rubber-bands past the end of the list on iOS, so it stops cleanly at the last note instead of overscrolling into empty space.
+- **Copy raw Markdown** — Selecting all and copying (or cutting) a note now carries the full raw Markdown — headings, list, and quote markers included — instead of dropping them.
+- **Editor scroll bounds** — Scrolling to the bottom of a note on mobile now stops on the last line — kept above the iOS safe area instead of scrolling away under it — rather than overscrolling into empty space.
+- **Tapping a line scrolls it clear of the keyboard** — Tapping a line in the lower half of a note on mobile now scrolls it into view so the caret no longer hides behind the soft keyboard.
+
 ## [1.2.1] - 2026-06-24
 
 ### Fixed
