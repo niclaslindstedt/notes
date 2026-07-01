@@ -645,7 +645,7 @@ export function MarkdownEditor({
     >
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div
-        className={`min-h-0 flex-1 ${wordWrap ? "overflow-y-auto" : "overflow-auto"}`}
+        className={`min-h-0 flex-1 overscroll-contain ${wordWrap ? "overflow-y-auto" : "overflow-auto"}`}
         onMouseDown={(e) => {
           // A click in the empty space below the text lands the caret at the end
           // of the note rather than doing nothing.
@@ -679,7 +679,7 @@ export function MarkdownEditor({
             composing.current = false;
             readBackComposition();
           }}
-          className={`relative px-4 py-4 text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
+          className={`relative px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
           style={widthStyle}
         >
           {value === "" && (

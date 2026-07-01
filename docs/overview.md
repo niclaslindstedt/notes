@@ -202,6 +202,14 @@ blank line is held locally and is **not** pushed through `onChange`: placing the
 caret is not an edit, so it never bumps `updatedAt` or jumps the note to the top
 of the list — the line joins the document only once the user types onto it.
 
+The scroll region ends **on the last line**: its content carries a bottom pad of
+`max(1rem, env(safe-area-inset-bottom))` so the final line clears the iOS home
+indicator (the shell fills the visual viewport down to the physical edge), and
+`overscroll-contain` keeps a mobile flick from chaining past it — the note
+bottoms out (and bounces) with the last line visible above the safe zone rather
+than scrolling away under it. Both editors (the live-preview `MarkdownEditor` and
+the Markdown-off `PlainEditor`) share this.
+
 **Select-all and cross-line selection.** Selection is native on the single
 surface — a mouse drag or a mobile long-press-and-extend selects straight across
 lines, and **Ctrl/Cmd+A** selects the whole note (the handler anchors the range
