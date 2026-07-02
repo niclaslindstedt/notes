@@ -18,9 +18,12 @@ import { lineTextClass } from "./markdown-line-class.ts";
 // `data-src` attribute so the editor can map a click on rendered text back to
 // a caret position in the raw source (see `MarkdownEditor.tsx`).
 
-// The bullet glyph for an unordered item, rotating by nesting depth the way a
-// browser's own nested `<ul>` does: disc → circle → square, then repeat.
-const BULLET_GLYPHS = ["•", "◦", "▪"];
+// The bullet glyph for an unordered item, rotating by nesting depth: parent →
+// sub → sub-sub, then repeat. All three glyphs are present in the app's
+// bundled monospace font, so they render and stay centred identically on every
+// platform (unlike the `◦` / `▪` this used to cycle through, which the font
+// lacks — those got substituted per-device and sat off-centre).
+const BULLET_GLYPHS = ["•", "-", "+"];
 function bulletGlyph(depth = 0): string {
   return BULLET_GLYPHS[depth % BULLET_GLYPHS.length]!;
 }
@@ -237,16 +240,16 @@ function RenderedLineImpl({
     case "ul":
       return (
         <div className="flex gap-2" style={indentStyle(block.depth)}>
-          {/* Fix the marker box to one line-height and center the (enlarged)
-              glyph inside it, so a bigger bullet stays vertically centered on
-              the first text line instead of riding up to the top of the row. */}
+          {/* A fixed-width marker box, one line tall, with the glyph centred in
+              both axes: the text of every level starts at the same column, and
+              the marker sits on the first text line's centre. Every default
+              glyph lives in the app font, so this centres identically on every
+              platform without per-glyph tuning. */}
           <span
             aria-hidden
-            className="flex h-[1lh] items-center text-accent select-none"
+            className="flex h-[1lh] w-[1.25em] items-center justify-center text-[1.15em] leading-none text-accent select-none"
           >
-            <span className="text-[1.3em] leading-none">
-              {bulletGlyph(block.depth)}
-            </span>
+            {bulletGlyph(block.depth)}
           </span>
           <span className="min-w-0 flex-1">
             {inlineContent(block, shortenLinkChars)}
