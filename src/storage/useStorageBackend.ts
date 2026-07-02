@@ -22,7 +22,6 @@ import type {
   StoredSnapshot,
 } from "./adapter.ts";
 import { bytesToDataUrl } from "./attachment-store.ts";
-import { parse, serialize } from "./serialize.ts";
 import {
   type BackendId,
   type EncryptionMode,
@@ -66,6 +65,7 @@ import {
 } from "./useEncryption.ts";
 import { type FolderActiveRef, useFolderBackend } from "./useFolderBackend.ts";
 import { useCloudBackend } from "./useCloudBackend.ts";
+import { useNamespaceMigration } from "./useNamespaceMigration.ts";
 
 const log = createLogger("storage");
 
@@ -543,142 +543,17 @@ export function useStorageBackend(): UseStorageBackend {
     setBackendState("browser");
   }, []);
 
-  const moveNoteToNamespace = useCallback(
-    async (note: Note, targetSlug: string): Promise<boolean> => {
-      if (locked) return false;
-      if (targetSlug === activeNamespace) return false;
-      if (!namespaces.some((n) => n.slug === targetSlug)) return false;
-
-      // Bring the note's attachment bytes in hand (the list loads metadata
-      // only) so they travel into the target namespace's store, where the
-      // directory adapter externalises them on save.
-      let moved: Note = note;
-      if (note.attachments?.length) {
-        const copy: Note = {
-          ...note,
-          attachments: note.attachments.map((a) => ({ ...a })),
-        };
-        for (const a of copy.attachments!) {
-          if (a.data) continue;
-          const got = await inner.fetchAttachment?.(note, a.filename);
-          if (got) a.data = bytesToDataUrl(got.mime, got.bytes);
-        }
-        moved = copy;
-      }
-      // The target namespace has its own folders, so the source folder link is
-      // meaningless there — drop it.
-      if (moved.folderId) {
-        moved = { ...moved };
-        delete moved.folderId;
-      }
-
-      // The browser store needs the whole-document encryption wrapper; the
-      // file/cloud adapters encrypt per-file internally via `directoryCrypto`.
-      const target =
-        selection.kind === "browser"
-          ? wrapBrowserForActive(makeInner(targetSlug))
-          : makeInner(targetSlug);
-      const prev = await target.load().catch(() => null);
-      const doc = prev ? parse(prev.text) : parse(null);
-      doc.notes = [moved, ...doc.notes.filter((n) => n.id !== moved.id)];
-      try {
-        await target.save(serialize(doc), prev?.revision);
-      } catch (err) {
-        log.warn(
-          `moveNoteToNamespace: target save failed (${targetSlug})`,
-          err,
-        );
-        return false;
-      }
-      log.info(`moveNoteToNamespace: ${note.id} → ${targetSlug}`);
-      return true;
-    },
-    [
-      locked,
-      activeNamespace,
-      namespaces,
-      inner,
-      selection.kind,
-      wrapBrowserForActive,
-      makeInner,
-    ],
-  );
-
-  const moveFolderToNamespace = useCallback(
-    async (
-      folder: Folder,
-      folderNotes: Note[],
-      targetSlug: string,
-    ): Promise<boolean> => {
-      if (locked) return false;
-      if (targetSlug === activeNamespace) return false;
-      if (!namespaces.some((n) => n.slug === targetSlug)) return false;
-
-      // Hydrate each note so the whole folder travels intact: the encrypted
-      // file/cloud backends render the list from an index with bodies (and
-      // attachment bytes) left unloaded, but the target store needs the full
-      // note to seal it. Each note keeps its `folderId` — the folder record
-      // travels alongside, so the notes stay filed under it in the target.
-      const moved: Note[] = [];
-      for (const note of folderNotes) {
-        let m: Note = note;
-        if (m.body === undefined && inner.fetchNoteBody) {
-          const body = await inner.fetchNoteBody(note);
-          if (body !== null) m = { ...m, body, preview: undefined };
-        }
-        if (m.attachments?.length) {
-          const copy: Note = {
-            ...m,
-            attachments: m.attachments.map((a) => ({ ...a })),
-          };
-          for (const a of copy.attachments!) {
-            if (a.data) continue;
-            const got = await inner.fetchAttachment?.(note, a.filename);
-            if (got) a.data = bytesToDataUrl(got.mime, got.bytes);
-          }
-          m = copy;
-        }
-        moved.push(m);
-      }
-
-      const target =
-        selection.kind === "browser"
-          ? wrapBrowserForActive(makeInner(targetSlug))
-          : makeInner(targetSlug);
-      const prev = await target.load().catch(() => null);
-      const doc = prev ? parse(prev.text) : parse(null);
-      const movedIds = new Set(moved.map((n) => n.id));
-      doc.notes = [...moved, ...doc.notes.filter((n) => !movedIds.has(n.id))];
-      // Carry the folder record across (replacing any same-id remnant), so the
-      // moved notes resolve to a real folder in the target.
-      doc.folders = [
-        folder,
-        ...(doc.folders ?? []).filter((f) => f.id !== folder.id),
-      ];
-      try {
-        await target.save(serialize(doc), prev?.revision);
-      } catch (err) {
-        log.warn(
-          `moveFolderToNamespace: target save failed (${targetSlug})`,
-          err,
-        );
-        return false;
-      }
-      log.info(
-        `moveFolderToNamespace: ${folder.id} (${moved.length} notes) → ${targetSlug}`,
-      );
-      return true;
-    },
-    [
-      locked,
-      activeNamespace,
-      namespaces,
-      inner,
-      selection.kind,
-      wrapBrowserForActive,
-      makeInner,
-    ],
-  );
+  // The two cross-namespace move verbs live in their own leaf hook, fed the
+  // resolved selection this orchestrator already built.
+  const { moveNoteToNamespace, moveFolderToNamespace } = useNamespaceMigration({
+    locked,
+    activeNamespace,
+    namespaces,
+    inner,
+    isBrowserBackend: selection.kind === "browser",
+    wrapBrowserForActive,
+    makeInner,
+  });
 
   return {
     adapter,
