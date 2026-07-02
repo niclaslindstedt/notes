@@ -240,16 +240,21 @@ function RenderedLineImpl({
     case "ul":
       return (
         <div className="flex gap-2" style={indentStyle(block.depth)}>
-          {/* A fixed-width marker box, one line tall, with the glyph centred in
-              both axes: the text of every level starts at the same column, and
-              the marker sits on the first text line's centre. Every default
+          {/* A fixed-width marker box exactly one text line tall, with the
+              glyph centred in both axes: every level's text starts at the same
+              column, and the marker sits on the first text line's centre. The
+              `1lh` height must live on this span (which keeps the text's line
+              height) — `leading-none` belongs on the inner glyph only, or it
+              would collapse `1lh` to 1em and the marker would ride high. Every
               glyph lives in the app font, so this centres identically on every
               platform without per-glyph tuning. */}
           <span
             aria-hidden
-            className="flex h-[1lh] w-[1.25em] items-center justify-center text-[1.15em] leading-none text-accent select-none"
+            className="flex h-[1lh] w-[1.25em] items-center justify-center text-accent select-none"
           >
-            {bulletGlyph(block.depth)}
+            <span className="text-[1.15em] leading-none">
+              {bulletGlyph(block.depth)}
+            </span>
           </span>
           <span className="min-w-0 flex-1">
             {inlineContent(block, shortenLinkChars)}
