@@ -32,6 +32,7 @@ import {
 } from "../namespace-store.ts";
 import { fileSettingsStore, type SettingsStore } from "../settings-store.ts";
 import { parseRetryAfterMs, readErrorBody } from "../http-utils.ts";
+import { type AuthedFetch, listAllFiles } from "./list.ts";
 import {
   type OAuthConfig,
   type TokenResult,
@@ -106,9 +107,6 @@ const TOKEN_ENDPOINT = "https://api.dropboxapi.com/oauth2/token";
 const AUTH_BASE = "https://www.dropbox.com/oauth2/authorize";
 const UPLOAD_ENDPOINT = "https://content.dropboxapi.com/2/files/upload";
 const DOWNLOAD_ENDPOINT = "https://content.dropboxapi.com/2/files/download";
-const LIST_FOLDER_ENDPOINT = "https://api.dropboxapi.com/2/files/list_folder";
-const LIST_FOLDER_CONTINUE_ENDPOINT =
-  "https://api.dropboxapi.com/2/files/list_folder/continue";
 const DELETE_ENDPOINT = "https://api.dropboxapi.com/2/files/delete_v2";
 
 // 1-second coalescing window so cloud sync matches local-storage "save on
@@ -144,19 +142,6 @@ export type DropboxAuth = {
   accessToken: string;
   refreshToken: string | null;
   onAccessTokenRefreshed: (accessToken: string) => void;
-};
-
-type DropboxEntry = {
-  ".tag": "file" | "folder" | "deleted";
-  path_display?: string;
-  path_lower?: string;
-  rev?: string;
-};
-
-type ListFolderResult = {
-  entries: DropboxEntry[];
-  cursor: string;
-  has_more: boolean;
 };
 
 export function createDropboxAdapter(
@@ -210,11 +195,6 @@ export function createDropboxNamespaceStore(
     createDropboxFileStore(createAuthedFetch(auth, fetchImpl), ""),
   );
 }
-
-type AuthedFetch = (
-  url: string,
-  build: (token: string) => RequestInit,
-) => Promise<Response>;
 
 // Build the bearer-token fetch the file store runs on: issue with the current
 // access token, and on a 401 swap in a fresh one via the refresh token
@@ -292,66 +272,22 @@ function createDropboxFileStore(
 ): FileStore {
   const rootPrefix = `${rootPath}/`.toLowerCase();
 
-  function relativePath(entry: DropboxEntry): string | null {
-    const full = entry.path_display ?? entry.path_lower;
-    if (!full) return null;
-    if (full.toLowerCase().startsWith(rootPrefix)) {
-      return full.slice(rootPrefix.length);
-    }
-    return null;
-  }
-
-  async function listOnce(
-    endpoint: string,
-    body: unknown,
-  ): Promise<ListFolderResult | null> {
-    const res = await authedFetch(endpoint, (token) => ({
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    }));
-    if (res.status === 409) return null; // path/not_found — empty folder
-    if (!res.ok) {
-      const detail = await readErrorBody(res);
-      throw new Error(`Dropbox list_folder failed: ${res.status} ${detail}`);
-    }
-    return (await res.json()) as ListFolderResult;
-  }
-
   return {
     async list(): Promise<FileEntry[]> {
       // The notes store lists recursively so a note filed into a folder
       // (`<folder-dir>/<stem>.md`) is found; the folder subdirectories live
       // inside the namespace's `notes/` root, so descending stays scoped to
-      // this namespace and never reaches another's sibling folder.
-      let page = await listOnce(LIST_FOLDER_ENDPOINT, {
-        path: rootPath,
+      // this namespace and never reaches another's sibling folder. When
+      // shallow, a relative path with a slash sits inside a subfolder — skip
+      // it. When recursive, those nested note files are the point.
+      return listAllFiles(
+        authedFetch,
+        rootPath,
         recursive,
-      });
-      if (!page) return [];
-      const out: FileEntry[] = [];
-      for (;;) {
-        for (const entry of page.entries) {
-          if (entry[".tag"] !== "file") continue;
-          const path = relativePath(entry);
-          if (!path) continue;
-          // When shallow, a relative path with a slash sits inside a subfolder
-          // — skip it. When recursive, those nested note files are the point.
-          if (recursive || !path.includes("/")) {
-            out.push({ path, rev: entry.rev });
-          }
-        }
-        if (!page.has_more) break;
-        const next = await listOnce(LIST_FOLDER_CONTINUE_ENDPOINT, {
-          cursor: page.cursor,
-        });
-        if (!next) break;
-        page = next;
-      }
-      return out;
+        rootPrefix,
+        (entry, path) =>
+          recursive || !path.includes("/") ? { path, rev: entry.rev } : null,
+      );
     },
 
     async read(path: string): Promise<string | null> {
@@ -433,59 +369,18 @@ function createDropboxAttachmentStore(
 ): AttachmentStore {
   const rootPrefix = `${rootPath}/`.toLowerCase();
 
-  function relativePath(entry: DropboxEntry): string | null {
-    const full = entry.path_display ?? entry.path_lower;
-    if (!full) return null;
-    if (full.toLowerCase().startsWith(rootPrefix)) {
-      return full.slice(rootPrefix.length);
-    }
-    return null;
-  }
-
-  async function listOnce(
-    endpoint: string,
-    body: unknown,
-  ): Promise<ListFolderResult | null> {
-    const res = await authedFetch(endpoint, (token) => ({
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    }));
-    if (res.status === 409) return null; // path/not_found — empty folder
-    if (!res.ok) {
-      const detail = await readErrorBody(res);
-      throw new Error(`Dropbox list_folder failed: ${res.status} ${detail}`);
-    }
-    return (await res.json()) as ListFolderResult;
-  }
-
   return {
     async list(): Promise<AttachmentEntry[]> {
       // Recursive: the attachments tree nests one note-name folder deep, so
-      // unlike the flat notes folder it must be walked in full.
-      let page = await listOnce(LIST_FOLDER_ENDPOINT, {
-        path: rootPath,
-        recursive: true,
-      });
-      if (!page) return [];
-      const out: AttachmentEntry[] = [];
-      for (;;) {
-        for (const entry of page.entries) {
-          if (entry[".tag"] !== "file") continue;
-          const path = relativePath(entry);
-          if (path && path.includes("/")) out.push({ path });
-        }
-        if (!page.has_more) break;
-        const next = await listOnce(LIST_FOLDER_CONTINUE_ENDPOINT, {
-          cursor: page.cursor,
-        });
-        if (!next) break;
-        page = next;
-      }
-      return out;
+      // unlike the flat notes folder it must be walked in full. Only the
+      // nested files (a relative path with a slash) are attachments.
+      return listAllFiles(
+        authedFetch,
+        rootPath,
+        true,
+        rootPrefix,
+        (_entry, path) => (path.includes("/") ? { path } : null),
+      );
     },
 
     async read(path: string): Promise<Uint8Array | null> {
