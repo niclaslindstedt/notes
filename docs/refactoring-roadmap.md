@@ -74,23 +74,28 @@ _(none)_
 
 ### Severity 7–8 — multipliers
 
-- **`src/storage/useStorageBackend.ts` (725 lines) — five concerns
-  tangled in one hook.** Backend selection/wiring (~lines 273–352,
-  407–469), encryption state (~256–269, 494–500), namespace routing
-  (~362–396), settings-store reconciliation (~471–488), folder/cloud
-  lifecycle (~284–319), and two cross-namespace move verbs (~546–681)
-  share one closure of refs/memos/callbacks. Every new backend,
-  encryption mode, or namespace operation threads through this hook, and
-  none of it is unit-testable in isolation. **Plan:** split by concern —
-  a `useBackendSelection()` seam first (resolves the active backend from
-  tokens/grants), then lift `moveNoteToNamespace`/`moveFolderToNamespace`
-  into a `useNamespaceMigration()` hook that consumes the selection;
-  sequence as multiple <500-line PRs, each leaving the hook working.
-  **Risk:** the move verbs and encryption re-wrap ordering are subtle;
-  smoke-test local + folder backends after each step, and one cloud
-  backend for the selection seam. **Severity: 7.**
+_(none)_
 
 ### Severity 5–6 — friction
+
+- **`src/storage/useStorageBackend.ts` (600 lines) — the
+  selection/adapter-building machinery is still inline.** Most concerns
+  the original 7-rated entry named have already been lifted into sibling
+  hooks (`useEncryption`, `useFolderBackend`, `useCloudBackend`,
+  `useNamespaceRegistry`), and the two cross-namespace move verbs now
+  live in `useNamespaceMigration` (2026-07). What remains tangled is the
+  backend-resolution core: the `selection` memo (~323–352), the
+  `namespaceStore` memo (~362–376), `makeInner` (~407–459), `inner`
+  (~463–466), and the `settingsStore` memo (~474–488) all switch on the
+  same `BackendSelection` union and rebuild together. **Plan:** lift a
+  `useBackendSelection()` seam that resolves the active backend from
+  tokens/grants and exposes `selection` + `makeInner`, so the four
+  consumer memos read one hook instead of re-deriving. **Risk:** the
+  encryption re-wrap ordering (`adapter` memo) and the cloud/local cache
+  keying are subtle; smoke-test local + folder after the split, and one
+  cloud backend for the selection seam (no automated cloud coverage).
+  Now that the file is only modestly over half the cap with clean
+  internal seams, this is 5, not 7. **Severity: 5.**
 
 - **`src/storage/dropbox/index.ts` (614 lines) — file store and
   attachment store duplicate `relativePath` + `listOnce` (~50 lines).**
@@ -135,6 +140,22 @@ _(none)_
 
 ## Landed
 
+- **2026-07 — `useNamespaceMigration` extracted from `useStorageBackend`
+  (part of the was-severity-7 hook split; narrower than catalogued).**
+  The two ~135-line cross-namespace move verbs
+  (`moveNoteToNamespace`/`moveFolderToNamespace`) now live in their own
+  leaf hook `src/storage/useNamespaceMigration.ts`, fed the resolved
+  selection as plain arguments (`isBrowserBackend` in place of the
+  `selection.kind` closure), so they're directly unit-testable —
+  `useStorageBackend.ts` dropped 725 → 600 lines. The verbs had **zero**
+  coverage before; the move now ships `tests/storage/use-namespace-migration.test.tsx`
+  (14 cases over the no-op guards, note/folder moves, attachment + body
+  hydration, same-id-remnant replacement, save-failure paths, and the
+  browser-encryption-wrap branch) against in-memory adapters — no cloud
+  needed. The remaining backend-resolution core of the hook is re-rated
+  and re-queued at severity 5 (see Pending). The reversal from the
+  roadmap's "selection seam first" plan was deliberate: the move verbs
+  are leaf consumers, so they were the cleaner first cut.
 - **2026-07 — gdrive list pagination (was severity 9; shipped as a `fix:`
   PR, user-authorized behaviour change).** `createDriveFolderFs`'s shared
   `search` now passes `pageSize=1000` and follows `nextPageToken` until
