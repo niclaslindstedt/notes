@@ -34,11 +34,20 @@ function scriptedFetch(responses: Scripted[]) {
   return { impl, calls };
 }
 
+function searchUrl(query: string, fields: string, pageToken?: string): string {
+  return (
+    `${FILES_API}?q=${encodeURIComponent(query)}&spaces=drive` +
+    `&fields=files(${fields}),nextPageToken&pageSize=1000` +
+    (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "")
+  );
+}
+
 function folderSearchUrl(name: string, parentId: string): string {
-  const query =
+  return searchUrl(
     `name='${name}' and mimeType='${FOLDER_MIME}'` +
-    ` and '${parentId}' in parents and trashed=false`;
-  return `${FILES_API}?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id)`;
+      ` and '${parentId}' in parents and trashed=false`,
+    "id",
+  );
 }
 
 describe("dirAndName", () => {
@@ -126,9 +135,7 @@ describe("createDriveFolderFs", () => {
     await expect(fs.findFileId("", "a.md")).resolves.toBe("f1");
 
     const fileQuery = `name='a.md' and 'app1' in parents and trashed=false`;
-    expect(calls[1]?.url).toBe(
-      `${FILES_API}?q=${encodeURIComponent(fileQuery)}&spaces=drive&fields=files(id)`,
-    );
+    expect(calls[1]?.url).toBe(searchUrl(fileQuery, "id"));
   });
 
   it("findFileId returns null when the directory itself is absent", async () => {
@@ -136,6 +143,43 @@ describe("createDriveFolderFs", () => {
     const fs = createDriveFolderFs("tok", impl);
 
     await expect(fs.findFileId("", "a.md")).resolves.toBeNull();
+    expect(calls).toHaveLength(1);
+  });
+
+  it("search follows nextPageToken and concatenates every page", async () => {
+    const { impl, calls } = scriptedFetch([
+      {
+        json: {
+          files: [{ id: "a", name: "a.md" }],
+          nextPageToken: "page2",
+        },
+      },
+      {
+        json: {
+          files: [{ id: "b", name: "b.md" }],
+          nextPageToken: "page3",
+        },
+      },
+      { json: { files: [{ id: "c", name: "c.md" }] } },
+    ]);
+    const fs = createDriveFolderFs("tok", impl);
+    const query = `'dir1' in parents and trashed=false`;
+
+    const files = await fs.search(query, "id,name");
+
+    expect(files.map((f) => f.id)).toEqual(["a", "b", "c"]);
+    expect(calls.map((c) => c.url)).toEqual([
+      searchUrl(query, "id,name"),
+      searchUrl(query, "id,name", "page2"),
+      searchUrl(query, "id,name", "page3"),
+    ]);
+  });
+
+  it("search stops when a page carries no nextPageToken", async () => {
+    const { impl, calls } = scriptedFetch([{ json: { files: [] } }]);
+    const fs = createDriveFolderFs("tok", impl);
+
+    await expect(fs.search("q", "id")).resolves.toEqual([]);
     expect(calls).toHaveLength(1);
   });
 });

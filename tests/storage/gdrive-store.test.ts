@@ -19,7 +19,7 @@ const APP_FOLDER_QUERY =
   ` and 'root' in parents and trashed=false`;
 
 function searchUrl(query: string, fields = "id"): string {
-  return `${FILES_API}?q=${encodeURIComponent(query)}&spaces=drive&fields=files(${fields})`;
+  return `${FILES_API}?q=${encodeURIComponent(query)}&spaces=drive&fields=files(${fields}),nextPageToken&pageSize=1000`;
 }
 
 type Scripted = {
