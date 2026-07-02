@@ -70,26 +70,7 @@ contract itself is respected everywhere._
 
 ### Severity 9–10 — architectural blockers
 
-- **`src/storage/gdrive/drive-fs.ts` (209 lines) — Drive listings never
-  paginate; silent truncation at 100 files.** The shared `search` helper
-  (all Drive `files.list` calls flow through it since the 2026-07
-  folder-plumbing dedup) neither passes `pageSize` nor follows
-  `nextPageToken` — grep for `nextPageToken` under `src/storage/gdrive/`:
-  zero hits. Google Drive's `files.list` returns at most 100 items per
-  page by default, so a namespace with >100 notes (or an attachments tree
-  with >100 subfolders/files) silently truncates the listing; downstream
-  sync/conflict logic would then treat the missing entries as remotely
-  deleted — a data-loss shape. The Dropbox backend paginates correctly
-  (`has_more`/`cursor` loop), so this is also a quiet contract divergence
-  between backends. **Plan:** add a `nextPageToken` loop inside
-  `createDriveFolderFs`'s `search` (one place now) and pass an explicit
-  `pageSize`; extend the scripted-fetch tests in
-  `tests/storage/gdrive-store.test.ts` / `gdrive-drive-fs.test.ts` with a
-  paged response. Note this is strictly a **bug fix, not a pure
-  refactor** — behaviour changes for large namespaces — so ship it as its
-  own `fix:` PR, not under a `refactor:` title. **Risk:** should also be
-  smoke-tested against a real Drive account with >100 files in one
-  folder, plaintext and encrypted. **Severity: 9.**
+_(none)_
 
 ### Severity 7–8 — multipliers
 
@@ -154,6 +135,15 @@ _(none)_
 
 ## Landed
 
+- **2026-07 — gdrive list pagination (was severity 9; shipped as a `fix:`
+  PR, user-authorized behaviour change).** `createDriveFolderFs`'s shared
+  `search` now passes `pageSize=1000` and follows `nextPageToken` until
+  the listing is exhausted, so namespaces or attachment trees with more
+  files than one Drive page no longer silently truncate (previously a
+  data-loss shape: truncated listings read as remote deletions). Covered
+  by scripted-fetch pagination tests in
+  `tests/storage/gdrive-drive-fs.test.ts`; still worth a manual smoke
+  test against a real Drive account with >100 files in one folder.
 - **2026-07 — gdrive folder-plumbing dedup (was severity 6, slightly
   wider than catalogued).** The ~130 lines of folder bookkeeping
   duplicated between the Google Drive file store and attachment store

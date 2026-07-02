@@ -31,7 +31,16 @@ export type DriveFile = {
   mimeType?: string;
   version?: string;
 };
-export type DriveListResponse = { files?: DriveFile[] };
+export type DriveListResponse = {
+  files?: DriveFile[];
+  nextPageToken?: string;
+};
+
+// Drive's `files.list` maximum page size. Listings must still follow
+// `nextPageToken` — Drive may return fewer items than this per page (it
+// treats the size as a hint), so a missing token is the only reliable
+// end-of-listing signal.
+const LIST_PAGE_SIZE = 1000;
 
 // Unlike Dropbox's clean 429, Google Drive signals a rate limit mostly as
 // HTTP 403 with a structured `reason` in the JSON body. A bare 429 counts
@@ -129,15 +138,23 @@ export function createDriveFolderFs(
     fields: string,
     op = "search",
   ): Promise<DriveFile[]> {
-    const url =
-      `${DRIVE_FILES_API}?q=${encodeURIComponent(query)}&spaces=drive` +
-      `&fields=files(${fields})`;
-    const res = await fetchImpl(url, { headers: authHeader() });
-    if (!res.ok) {
-      const body = await readErrorBody(res);
-      throw gdriveError(op, res.status, body, res.headers);
-    }
-    return ((await res.json()) as DriveListResponse).files ?? [];
+    const out: DriveFile[] = [];
+    let pageToken: string | undefined;
+    do {
+      const url =
+        `${DRIVE_FILES_API}?q=${encodeURIComponent(query)}&spaces=drive` +
+        `&fields=files(${fields}),nextPageToken&pageSize=${LIST_PAGE_SIZE}` +
+        (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "");
+      const res = await fetchImpl(url, { headers: authHeader() });
+      if (!res.ok) {
+        const body = await readErrorBody(res);
+        throw gdriveError(op, res.status, body, res.headers);
+      }
+      const page = (await res.json()) as DriveListResponse;
+      out.push(...(page.files ?? []));
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+    return out;
   }
 
   async function searchOneId(
