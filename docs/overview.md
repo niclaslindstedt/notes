@@ -805,9 +805,12 @@ viewport (accounting for the mobile soft keyboard and Dynamic Island) as a
 app's drawable rect for overlay positioning. `scrollFocusedIntoView`
 (`src/ui/hooks/scrollFocusedIntoView.ts`) is the companion for the *content*
 side: it scrolls a freshly-focused field or tapped line clear of the soft
-keyboard by waiting for the visual viewport to shrink (the keyboard settling)
-before centring it — used by the [live-preview editor](#markdown-editor)'s
-tap-to-reveal and the Storage settings passphrase field.
+keyboard by re-centring it on every visual-viewport change until the
+keyboard-settling burst goes quiet — the keyboard animates in as a series of
+intermediate heights, so centring only on the first would leave the last line
+(which can't scroll any further up) behind the keyboard. Used by the
+[live-preview editor](#markdown-editor)'s tap-to-reveal and the Storage
+settings passphrase field.
 
 ## Modals and dialogs
 
