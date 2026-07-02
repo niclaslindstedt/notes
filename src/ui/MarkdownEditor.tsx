@@ -717,6 +717,29 @@ export function MarkdownEditor({
           autoCapitalize={disableAutocorrect ? "off" : "sentences"}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
+          onBlur={() => {
+            // Focus left the editing surface (the title field, a header button,
+            // the side menu). Drop the active raw line so the whole note renders
+            // fully formatted — the same state as a freshly-opened note.
+            // Otherwise the last line the caret sat on keeps showing its raw
+            // markdown, so a trailing `-` stays a literal dash instead of
+            // becoming a horizontal rule (and a heading/quote/list its markers).
+            //
+            // Deferred to a microtask and gated on where focus actually landed:
+            // a cross-line edit momentarily removes the focused active line
+            // (React remounts it) and the caret effect refocuses the root in the
+            // same commit, which fires a transient blur we must ignore. By the
+            // microtask, focus is back inside the root in that case, but truly
+            // outside it on a real departure. Composition never clears.
+            if (composing.current) return;
+            queueMicrotask(() => {
+              const root = rootRef.current;
+              if (!root || root.contains(document.activeElement)) return;
+              setActive((a) =>
+                a.index === null ? a : { index: null, key: a.key + 1 },
+              );
+            });
+          }}
           onCompositionStart={() => {
             composing.current = true;
           }}

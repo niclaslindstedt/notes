@@ -195,6 +195,16 @@ through the editor's imperative `focus()` handle (`MarkdownEditorHandle`, consum
 by `focusBody` in `App`) on Enter / Arrow-Down. A brand-new empty note shows the
 "Start writing" placeholder (a non-editable overlay span).
 
+**Leaving the body clears the active line.** When focus moves out of the editor
+— to the title field, a header button, the side menu — the `onBlur` handler nulls
+the active line, so the note snaps back to fully-formatted, matching the just-
+opened state. Without it the last line the caret sat on would keep showing its raw
+markdown (a trailing `-` staying a literal dash instead of becoming a rule) until
+the user tapped back in. The clear is deferred to a microtask and gated on
+`document.activeElement` still being outside the root, so the transient blur a
+cross-line edit fires (React remounts the active line and the caret effect
+refocuses the root in the same commit) is ignored — only a real departure clears.
+
 **A touch tap scrolls the tapped line clear of the soft keyboard.** On mobile
 the browser's focus-time "reveal" runs before the keyboard shrinks the visual
 viewport, so a line tapped in the lower half ends up hidden behind the keyboard
