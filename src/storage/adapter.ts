@@ -43,6 +43,31 @@ export type AdapterCapability =
   // backend, which has nowhere to put a file, doesn't accept them.
   | "attachments";
 
+// Higher-order wrappers and the capability surface. Two adapters —
+// `withLocalCache` (`./cache/`) and `withEncryption` (`./encrypting/`) — wrap
+// another `StorageAdapter` and each adjusts `capabilities` as bytes pass
+// through, so the set a wrapped adapter advertises is not its inner one:
+//
+// - `withLocalCache` **adds** `loadSync`. The cloud backends carry no
+//   synchronous path of their own, so the offline mirror is the only source of
+//   one: it paints last-known bytes on the first frame, then the async
+//   `load()` replaces them with the fresh remote copy. Its `loadSync` returns
+//   null for a still-sealed envelope (unsealing is async), deferring to
+//   `load()`.
+// - `withEncryption` **removes** `loadSync`. Decryption is async even when the
+//   inner backend could answer synchronously, so an encrypted store exposes no
+//   sync fast path.
+//
+// Composition order therefore matters: for a `loadSync` to survive, the cache
+// must sit **outside** encryption — `withLocalCache(withEncryption(inner))` —
+// since the reverse strips the capability the cache just added, and the cache
+// is designed to hold the sealed envelope (it guards `loadSync` on
+// `isEncryptedEnvelope` and takes `seal`/`unseal`). In today's wiring the two
+// never stack: the browser backend uses `withEncryption` with no cache, and
+// the cloud backends use `withLocalCache` over a directory adapter that
+// encrypts per file internally. This rule governs any future stack that
+// combines them.
+
 // A single step within converting one note's at-rest representation, surfaced
 // so the UI can flash exactly which note — and which of that note's
 // attachments — is being sealed or unsealed right now. `note` is the note file
