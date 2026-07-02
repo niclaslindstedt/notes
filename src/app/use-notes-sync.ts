@@ -138,7 +138,9 @@ export interface NotesSync {
   /**
    * Pull the latest from a remote backend (pull-to-refresh / foreground /
    * opening a note). Like `reload`, but a no-op on the local browser backend,
-   * and it leaves the document and undo timeline untouched when nothing moved.
+   * it leaves the document and undo timeline untouched when nothing moved,
+   * and it stands down entirely while local edits are unsaved — a pull must
+   * never replace text that hasn't reached the backend yet.
    */
   refresh: () => Promise<void>;
   /** Flush any debounced save immediately (the "save now" affordance). */
@@ -204,6 +206,11 @@ export function useNotesSync(deps: {
   const [dirty, setDirty] = useState(false);
   const [offline, setOffline] = useState(false);
   const [loaded, setLoaded] = useState(false);
+
+  // Latest dirty flag, readable from the pull paths (`refresh`, the live-pull
+  // interval) without re-subscribing them to every render.
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
 
   // Debounced-save plumbing. `pendingDoc` holds the latest unsaved document;
   // the timer coalesces a burst of edits into one write per `saveDebounceMs`
@@ -484,6 +491,7 @@ export function useNotesSync(deps: {
     saveGeneration.current += 1;
     inFlight.current = false;
     pendingDoc.current = null;
+    const generation = saveGeneration.current;
     const prevRevision = revisionRef.current;
     let stored;
     try {
@@ -491,8 +499,21 @@ export function useNotesSync(deps: {
       // cheaply and only re-downloads the notes whose revision moved.
       stored = await adapterRef.current.load(lastStoredRef.current);
     } catch (err) {
+      if (saveGeneration.current !== generation) return;
       log.warn("reload failed", err);
       if (isOfflineError(err)) setOffline(true);
+      return;
+    }
+    // The document was swapped wholesale (backend/namespace change, another
+    // reload, a conflict-adopt) while this load was in flight — the result
+    // describes a baseline that's gone.
+    if (saveGeneration.current !== generation) return;
+    // A keystroke landed while the load was running (`pendingDoc` was cleared
+    // above, so anything in it now is a fresh local edit). Adopting the pulled
+    // copy would wipe that edit off the screen; leave the document alone — the
+    // edit is queued to save, and the next quiet pull reconciles.
+    if (pendingDoc.current !== null) {
+      log.info("reload: local edit landed mid-pull — keeping the local copy");
       return;
     }
     revisionRef.current = stored?.revision;
@@ -516,9 +537,26 @@ export function useNotesSync(deps: {
   // The pull-to-refresh / foreground / open-note gesture: re-read the backend,
   // but only for backends that actually have a remote to diverge from — the
   // local browser store has no other writer, so refreshing it would just churn
-  // the undo timeline for nothing.
+  // the undo timeline for nothing. Stands down whenever anything is unsaved —
+  // an edit queued behind the debounce, a save in flight or backing off, a
+  // held save — because `reload` replaces the document wholesale and drops the
+  // pending edit: pulling at that moment would wipe freshly-typed text off the
+  // screen (the same policy `shouldLivePull` enforces for the polling loop,
+  // applied to every automatic pull). Local is newer; the save pipeline syncs
+  // it, and the next quiet pull picks up the remote.
   const refresh = useCallback(async () => {
     if (adapterRef.current.id === "browser") return;
+    if (
+      dirtyRef.current ||
+      inFlight.current ||
+      saveHeld.current ||
+      pendingDoc.current !== null ||
+      saveTimer.current !== null ||
+      retryTimer.current !== null
+    ) {
+      log.info("refresh: unsaved local edits — skipping pull");
+      return;
+    }
     await reload();
   }, [reload]);
 
@@ -537,18 +575,28 @@ export function useNotesSync(deps: {
   // Coming back to the app (a tab refocus, returning from the home screen on
   // mobile) pulls the latest from the backend — the "exit and open again"
   // refresh, without a manual gesture. `refresh` is a no-op on the local
-  // backend and cheap (incremental) on the cloud ones.
+  // backend and cheap (incremental) on the cloud ones. Going the other way,
+  // backgrounding flushes any debounced edit immediately: mobile browsers
+  // throttle (or never fire) timers in a background tab and may evict the page
+  // outright, so a save left waiting on its debounce window could otherwise
+  // sit unwritten — or die with the page — and the foreground refresh would
+  // then find it missing from the backend.
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
   useEffect(() => {
     if (typeof document === "undefined") return;
-    const onVisible = () => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushSaveRef.current();
+        return;
+      }
       if (document.visibilityState !== "visible") return;
       log.info("app foregrounded — refreshing from backend");
       void refreshRef.current();
     };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
   }, []);
 
   // Live pull: poll a remote backend on a fixed cadence so an edit made on
@@ -559,8 +607,6 @@ export function useNotesSync(deps: {
   // no-ops on the local backend and leaves the document (and undo timeline)
   // untouched when the remote hasn't moved. State is read through refs so the
   // interval is armed once, not re-created on every render.
-  const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
   const conflictRef = useRef(conflict);
   conflictRef.current = conflict;
   const loadedRef = useRef(loaded);

@@ -618,7 +618,17 @@ fallback, and conflict detection (every save carries a `baseRevision`). `setDoc`
 and `scheduleSave` are the only paths that mutate the document; `refresh` pulls
 without resetting history, `reload` replaces the document and resets it. A
 fixed-cadence [live pull](#live-pull) drives `refresh` on its own so another
-device's edits arrive without a gesture.
+device's edits arrive without a gesture. Every automatic pull is guarded
+against clobbering unsaved work: `refresh` stands down entirely while anything
+is unsaved (an edit queued behind the debounce, a save in flight or backing
+off, a [held save](#save-hold)), and `reload` — after its awaited backend
+round-trip — refuses to adopt the pulled copy when a keystroke landed
+mid-flight or the document was swapped wholesale under it. Local is newer;
+the save pipeline syncs it, and the next quiet pull reconciles. Backgrounding
+the app (`visibilitychange` → hidden) flushes any debounced edit immediately,
+since a mobile browser throttles background timers and may evict the page
+before an armed save ever fires; foregrounding pulls the latest via
+`refresh`.
 
 ### Live pull
 
@@ -631,7 +641,9 @@ the first load has settled, and only after the note has sat **quiet for the
 full window** (no keystroke within the interval — tracked by `lastEditRef`,
 stamped in `scheduleSave`) with nothing unsaved, no open conflict, and no save
 in flight. So a pull never clobbers a keystroke mid-edit; it waits for a pause,
-then adopts the remote. Each pull passes the last `StoredSnapshot`
+then adopts the remote — and `reload` re-checks after its backend round-trip,
+so even a keystroke typed while the pull's slow cloud load is in flight
+survives (the pull result is discarded instead). Each pull passes the last `StoredSnapshot`
 (`lastStoredRef`) to `load` as the `previous` hint, so a file-per-note backend
 lists cheaply and re-downloads only the notes whose revision moved. When a pull
 actually moves the document it fires the `liveSync` ("Telepathy") trophy. The
