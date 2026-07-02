@@ -12,7 +12,7 @@
 // `notes.json` envelope in the app folder rather than markdown.
 
 import { createLogger } from "../../dev/logger.ts";
-import { AuthError, RateLimitError, type StorageAdapter } from "../adapter.ts";
+import type { StorageAdapter } from "../adapter.ts";
 import type { AttachmentEntry, AttachmentStore } from "../attachment-store.ts";
 import {
   type DirectoryCrypto,
@@ -30,7 +30,22 @@ import {
   type NamespaceRegistryStore,
 } from "../namespace-store.ts";
 import { fileSettingsStore, type SettingsStore } from "../settings-store.ts";
-import { parseRetryAfterMs, readErrorBody } from "../http-utils.ts";
+import { readErrorBody } from "../http-utils.ts";
+import {
+  DRIVE_FILES_API,
+  DRIVE_UPLOAD_API,
+  type DriveFile,
+  type DriveListResponse,
+  FOLDER_MIME_TYPE,
+  GDRIVE_APP_FOLDER_NAME,
+  type FetchImpl,
+  childFileQuery,
+  createDriveFolderFs,
+  dirAndName,
+  gdriveError,
+} from "./drive-fs.ts";
+
+export { GDRIVE_APP_FOLDER_NAME, type FetchImpl } from "./drive-fs.ts";
 
 const log = createLogger("gdrive");
 
@@ -43,52 +58,11 @@ export function isGdriveConfigured(): boolean {
   return GOOGLE_CLIENT_ID.length > 0;
 }
 
-// Name of the app folder at the root of the user's My Drive. All files this
-// adapter manages live inside it.
-export const GDRIVE_APP_FOLDER_NAME = "notes";
-
 // `drive.file` lets the app see and manage only files it created. Files stay
 // visible to the user in Drive's UI.
 export const GDRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
-const FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
-const DRIVE_FILES_API = "https://www.googleapis.com/drive/v3/files";
-const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3/files";
-
 const SAVE_DEBOUNCE_MS = 1000;
-
-// Floor for the cooldown after Drive rate-limits a request, used when the
-// response carries no usable `Retry-After`.
-const RATE_LIMIT_FALLBACK_MS = 5000;
-
-export type FetchImpl = typeof fetch;
-
-// Unlike Dropbox's clean 429, Google Drive signals a rate limit mostly as
-// HTTP 403 with a structured `reason` in the JSON body. A bare 429 counts
-// too. A 403 quota-exhaustion (`dailyLimitExceeded`) is deliberately NOT
-// treated as a transient throttle: that's a hard cap, not "retry shortly".
-function isDriveRateLimit(status: number, body: string): boolean {
-  if (status === 429) return true;
-  if (status !== 403) return false;
-  return (
-    body.includes("userRateLimitExceeded") || body.includes("rateLimitExceeded")
-  );
-}
-
-function gdriveError(
-  op: string,
-  status: number,
-  body: string,
-  headers?: Headers,
-): Error {
-  if (isDriveRateLimit(status, body)) {
-    return new RateLimitError(
-      parseRetryAfterMs(headers, RATE_LIMIT_FALLBACK_MS),
-    );
-  }
-  const message = `Google Drive ${op} failed: ${status} ${body}`;
-  return status === 401 ? new AuthError(message) : new Error(message);
-}
 
 // Returns a URL that opens Drive's web UI (the app folder, or My Drive when
 // the folder id isn't known here).
@@ -97,14 +71,6 @@ export function gdriveWebUrl(folderId: string | null): string {
     ? `https://drive.google.com/drive/folders/${folderId}`
     : "https://drive.google.com/drive/my-drive";
 }
-
-type DriveFile = {
-  id: string;
-  name?: string;
-  mimeType?: string;
-  version?: string;
-};
-type DriveListResponse = { files?: DriveFile[] };
 
 export function createGdriveAdapter(
   token: string,
@@ -166,100 +132,7 @@ function createGdriveFileStore(
   // registry stores never call `list`.
   recursive: boolean = false,
 ): FileStore {
-  // The folder, relative to the `notes/` app folder, this store is rooted at:
-  // `notes` / `<slug>/notes` for a namespace's documents, or empty for the
-  // root settings / registry stores that land directly in the app folder.
-  // Split into segments so a multi-segment base resolves folder by folder.
-  const baseSegments = split(baseFolder);
-  // Cache folder ids by their relative directory path ("" = the namespace's
-  // base folder). Drive ids are stable, so this only ever grows within an
-  // adapter's lifetime.
-  const dirIdCache = new Map<string, string>();
-
-  function authHeader(): Record<string, string> {
-    return { Authorization: `Bearer ${token}` };
-  }
-
-  async function searchOne(query: string): Promise<string | null> {
-    const url = `${DRIVE_FILES_API}?q=${encodeURIComponent(
-      query,
-    )}&spaces=drive&fields=files(id)`;
-    const res = await fetchImpl(url, { headers: authHeader() });
-    if (!res.ok) {
-      const body = await readErrorBody(res);
-      throw gdriveError("search", res.status, body, res.headers);
-    }
-    const json = (await res.json()) as DriveListResponse;
-    return json.files?.[0]?.id ?? null;
-  }
-
-  async function findChildFolder(
-    name: string,
-    parentId: string,
-  ): Promise<string | null> {
-    return searchOne(
-      `name='${name}' and mimeType='${FOLDER_MIME_TYPE}'` +
-        ` and '${parentId}' in parents and trashed=false`,
-    );
-  }
-
-  async function findChildFolderAtRoot(name: string): Promise<string | null> {
-    return searchOne(
-      `name='${name}' and mimeType='${FOLDER_MIME_TYPE}'` +
-        ` and 'root' in parents and trashed=false`,
-    );
-  }
-
-  async function createFolder(
-    name: string,
-    parentId: string | null,
-  ): Promise<string> {
-    const body: Record<string, unknown> = { name, mimeType: FOLDER_MIME_TYPE };
-    if (parentId) body.parents = [parentId];
-    const res = await fetchImpl(`${DRIVE_FILES_API}?fields=id`, {
-      method: "POST",
-      headers: { ...authHeader(), "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const detail = await readErrorBody(res);
-      throw gdriveError("folder create", res.status, detail, res.headers);
-    }
-    return ((await res.json()) as DriveFile).id;
-  }
-
-  // Resolve the id of the directory at `relDir` ("" = the app folder),
-  // creating each missing segment when `create` is set. Returns null when a
-  // segment is absent and `create` is false.
-  async function resolveDirId(
-    relDir: string,
-    create: boolean,
-  ): Promise<string | null> {
-    if (dirIdCache.has(relDir)) return dirIdCache.get(relDir)!;
-
-    let appId = await findChildFolderAtRoot(GDRIVE_APP_FOLDER_NAME);
-    if (!appId) {
-      if (!create) return null;
-      appId = await createFolder(GDRIVE_APP_FOLDER_NAME, null);
-    }
-
-    let parentId = appId;
-    // An empty base resolves at the app-folder root (the root settings /
-    // registry stores), so the segments drop out and files land directly in
-    // the `notes/` app folder.
-    for (const segment of [...baseSegments, ...split(relDir)].filter(
-      (s) => s.length > 0,
-    )) {
-      let id = await findChildFolder(segment, parentId);
-      if (!id) {
-        if (!create) return null;
-        id = await createFolder(segment, parentId);
-      }
-      parentId = id;
-    }
-    dirIdCache.set(relDir, parentId);
-    return parentId;
-  }
+  const drive = createDriveFolderFs(token, fetchImpl, baseFolder);
 
   // List the files under a directory. The notes store descends into the folder
   // subdirectories (a note filed into a folder lives at `<folder-dir>/<stem>.md`),
@@ -271,16 +144,11 @@ function createGdriveFileStore(
     prefix: string,
     out: FileEntry[],
   ): Promise<void> {
-    const query = `'${dirId}' in parents and trashed=false`;
-    const url =
-      `${DRIVE_FILES_API}?q=${encodeURIComponent(query)}&spaces=drive` +
-      `&fields=files(id,name,mimeType,version)`;
-    const res = await fetchImpl(url, { headers: authHeader() });
-    if (!res.ok) {
-      const body = await readErrorBody(res);
-      throw gdriveError("list", res.status, body, res.headers);
-    }
-    const files = ((await res.json()) as DriveListResponse).files ?? [];
+    const files = await drive.search(
+      `'${dirId}' in parents and trashed=false`,
+      "id,name,mimeType,version",
+      "list",
+    );
     for (const file of files) {
       const name = file.name ?? "";
       const path = prefix ? `${prefix}/${name}` : name;
@@ -290,22 +158,6 @@ function createGdriveFileStore(
       }
       out.push({ path, rev: file.version });
     }
-  }
-
-  function dirAndName(path: string): { dir: string; name: string } {
-    const idx = path.lastIndexOf("/");
-    return idx === -1
-      ? { dir: "", name: path }
-      : { dir: path.slice(0, idx), name: path.slice(idx + 1) };
-  }
-
-  async function findFileId(path: string): Promise<string | null> {
-    const { dir, name } = dirAndName(path);
-    const dirId = await resolveDirId(dir, false);
-    if (!dirId) return null;
-    return searchOne(
-      `name='${name}' and '${dirId}' in parents and trashed=false`,
-    );
   }
 
   async function createFile(
@@ -326,7 +178,7 @@ function createGdriveFileStore(
       {
         method: "POST",
         headers: {
-          ...authHeader(),
+          ...drive.authHeader(),
           "Content-Type": `multipart/related; boundary=${boundary}`,
         },
         body,
@@ -341,7 +193,7 @@ function createGdriveFileStore(
 
   return {
     async list(): Promise<FileEntry[]> {
-      const baseId = await resolveDirId("", false);
+      const baseId = await drive.resolveDirId("", false);
       if (!baseId) return [];
       const out: FileEntry[] = [];
       await listDir(baseId, "", out);
@@ -349,10 +201,11 @@ function createGdriveFileStore(
     },
 
     async read(path: string): Promise<string | null> {
-      const fileId = await findFileId(path);
+      const { dir, name } = dirAndName(path);
+      const fileId = await drive.findFileId(dir, name);
       if (!fileId) return null;
       const res = await fetchImpl(`${DRIVE_FILES_API}/${fileId}?alt=media`, {
-        headers: authHeader(),
+        headers: drive.authHeader(),
       });
       if (res.status === 404) return null;
       if (!res.ok) {
@@ -364,17 +217,15 @@ function createGdriveFileStore(
 
     async write(path: string, text: string): Promise<string | undefined> {
       const { dir, name } = dirAndName(path);
-      const dirId = await resolveDirId(dir, true);
+      const dirId = await drive.resolveDirId(dir, true);
       if (!dirId) throw new Error(`Google Drive: cannot resolve ${dir}`);
-      const existing = await searchOne(
-        `name='${name}' and '${dirId}' in parents and trashed=false`,
-      );
+      const existing = await drive.searchOneId(childFileQuery(name, dirId));
       if (existing) {
         const res = await fetchImpl(
           `${DRIVE_UPLOAD_API}/${existing}?uploadType=media&fields=version`,
           {
             method: "PATCH",
-            headers: { ...authHeader(), "Content-Type": "text/markdown" },
+            headers: { ...drive.authHeader(), "Content-Type": "text/markdown" },
             body: text,
           },
         );
@@ -391,11 +242,12 @@ function createGdriveFileStore(
     },
 
     async remove(path: string): Promise<void> {
-      const fileId = await findFileId(path);
+      const { dir, name } = dirAndName(path);
+      const fileId = await drive.findFileId(dir, name);
       if (!fileId) return;
       const res = await fetchImpl(`${DRIVE_FILES_API}/${fileId}`, {
         method: "DELETE",
-        headers: authHeader(),
+        headers: drive.authHeader(),
       });
       if (!res.ok && res.status !== 404) {
         const body = await readErrorBody(res);
@@ -415,96 +267,8 @@ function createGdriveAttachmentStore(
   fetchImpl: FetchImpl,
   baseFolder: string,
 ): AttachmentStore {
-  const baseSegments = split(baseFolder);
-  const dirIdCache = new Map<string, string>();
-
-  function authHeader(): Record<string, string> {
-    return { Authorization: `Bearer ${token}` };
-  }
-
-  async function search(query: string, fields: string): Promise<DriveFile[]> {
-    const url =
-      `${DRIVE_FILES_API}?q=${encodeURIComponent(query)}&spaces=drive` +
-      `&fields=files(${fields})`;
-    const res = await fetchImpl(url, { headers: authHeader() });
-    if (!res.ok) {
-      const body = await readErrorBody(res);
-      throw gdriveError("search", res.status, body, res.headers);
-    }
-    return ((await res.json()) as DriveListResponse).files ?? [];
-  }
-
-  async function createFolder(
-    name: string,
-    parentId: string | null,
-  ): Promise<string> {
-    const body: Record<string, unknown> = { name, mimeType: FOLDER_MIME_TYPE };
-    if (parentId) body.parents = [parentId];
-    const res = await fetchImpl(`${DRIVE_FILES_API}?fields=id`, {
-      method: "POST",
-      headers: { ...authHeader(), "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const detail = await readErrorBody(res);
-      throw gdriveError("folder create", res.status, detail, res.headers);
-    }
-    return ((await res.json()) as DriveFile).id;
-  }
-
-  // Resolve (optionally creating) the id of the directory at `relDir` under the
-  // attachments base — `""` is the base itself, `<note-name>` an image folder.
-  async function resolveDirId(
-    relDir: string,
-    create: boolean,
-  ): Promise<string | null> {
-    if (dirIdCache.has(relDir)) return dirIdCache.get(relDir)!;
-    const rootMatches = await search(
-      `name='${GDRIVE_APP_FOLDER_NAME}' and mimeType='${FOLDER_MIME_TYPE}'` +
-        ` and 'root' in parents and trashed=false`,
-      "id",
-    );
-    let parentId = rootMatches[0]?.id ?? null;
-    if (!parentId) {
-      if (!create) return null;
-      parentId = await createFolder(GDRIVE_APP_FOLDER_NAME, null);
-    }
-    for (const segment of [...baseSegments, ...split(relDir)]) {
-      const matches = await search(
-        `name='${segment}' and mimeType='${FOLDER_MIME_TYPE}'` +
-          ` and '${parentId}' in parents and trashed=false`,
-        "id",
-      );
-      let id = matches[0]?.id ?? null;
-      if (!id) {
-        if (!create) return null;
-        id = await createFolder(segment, parentId);
-      }
-      parentId = id;
-    }
-    dirIdCache.set(relDir, parentId);
-    return parentId;
-  }
-
-  async function findFileId(
-    relDir: string,
-    name: string,
-  ): Promise<string | null> {
-    const dirId = await resolveDirId(relDir, false);
-    if (!dirId) return null;
-    const matches = await search(
-      `name='${name}' and '${dirId}' in parents and trashed=false`,
-      "id",
-    );
-    return matches[0]?.id ?? null;
-  }
-
-  function dirAndName(path: string): { dir: string; name: string } {
-    const idx = path.lastIndexOf("/");
-    return idx === -1
-      ? { dir: "", name: path }
-      : { dir: path.slice(0, idx), name: path.slice(idx + 1) };
-  }
+  const drive = createDriveFolderFs(token, fetchImpl, baseFolder);
+  const { authHeader, search, resolveDirId, findFileId } = drive;
 
   return {
     async list(): Promise<AttachmentEntry[]> {
@@ -651,10 +415,6 @@ export async function deleteGdriveNamespace(
     const body = await readErrorBody(res);
     throw gdriveError("namespace delete", res.status, body, res.headers);
   }
-}
-
-function split(relDir: string): string[] {
-  return relDir.split("/").filter((s) => s.length > 0);
 }
 
 function randomBoundary(): string {

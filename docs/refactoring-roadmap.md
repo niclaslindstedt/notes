@@ -70,24 +70,26 @@ contract itself is respected everywhere._
 
 ### Severity 9–10 — architectural blockers
 
-- **`src/storage/gdrive/index.ts` (795 lines) — Drive listings never
-  paginate; silent truncation at 100 files.** Neither the file store's
-  recursive `listDir` (~line 269) nor the shared `search` helper
-  (~line 425) passes `pageSize` or follows `nextPageToken` — grep for
-  `nextPageToken` in the file: zero hits. Google Drive's `files.list`
-  returns at most 100 items per page by default, so a namespace with >100
-  notes (or an attachments tree with >100 subfolders/files) silently
-  truncates the listing; downstream sync/conflict logic would then treat
-  the missing entries as remotely deleted — a data-loss shape. The Dropbox
-  backend paginates correctly (`has_more`/`cursor` loop, ~line 336), so
-  this is also a quiet contract divergence between backends. **Plan:** add
-  a `nextPageToken` loop to `search`/`listDir` (mirroring Dropbox's
-  cursor loop) and pass an explicit `pageSize`. Note this is strictly a
-  **bug fix, not a pure refactor** — behaviour changes for large
-  namespaces — so ship it as its own `fix:` PR, not under a `refactor:`
-  title. **Risk:** no automated coverage for cloud backends; must be
-  smoke-tested manually against a real Drive account with >100 files in
-  one folder, plaintext and encrypted. **Severity: 9.**
+- **`src/storage/gdrive/drive-fs.ts` (209 lines) — Drive listings never
+  paginate; silent truncation at 100 files.** The shared `search` helper
+  (all Drive `files.list` calls flow through it since the 2026-07
+  folder-plumbing dedup) neither passes `pageSize` nor follows
+  `nextPageToken` — grep for `nextPageToken` under `src/storage/gdrive/`:
+  zero hits. Google Drive's `files.list` returns at most 100 items per
+  page by default, so a namespace with >100 notes (or an attachments tree
+  with >100 subfolders/files) silently truncates the listing; downstream
+  sync/conflict logic would then treat the missing entries as remotely
+  deleted — a data-loss shape. The Dropbox backend paginates correctly
+  (`has_more`/`cursor` loop), so this is also a quiet contract divergence
+  between backends. **Plan:** add a `nextPageToken` loop inside
+  `createDriveFolderFs`'s `search` (one place now) and pass an explicit
+  `pageSize`; extend the scripted-fetch tests in
+  `tests/storage/gdrive-store.test.ts` / `gdrive-drive-fs.test.ts` with a
+  paged response. Note this is strictly a **bug fix, not a pure
+  refactor** — behaviour changes for large namespaces — so ship it as its
+  own `fix:` PR, not under a `refactor:` title. **Risk:** should also be
+  smoke-tested against a real Drive account with >100 files in one
+  folder, plaintext and encrypted. **Severity: 9.**
 
 ### Severity 7–8 — multipliers
 
@@ -109,17 +111,6 @@ contract itself is respected everywhere._
 
 ### Severity 5–6 — friction
 
-- **`src/storage/gdrive/index.ts` (795 lines) — file store and
-  attachment store duplicate ~55 lines of folder plumbing.**
-  `authHeader` (~lines 179 and 421), `createFolder` (~213 and 437),
-  `resolveDirId` (~234 and 457, near-identical), and `dirAndName`
-  (~295 and 502, identical) are each defined twice, once per store
-  closure, each with its own `dirIdCache`. Grep: `function dirAndName`.
-  **Plan:** extract the folder-resolution helpers to module level
-  parameterized by `fetchImpl`/`token`/base segments; keep per-store
-  caches unless the stores are provably always co-created. **Risk:**
-  cloud backend, no automated coverage — manual Drive smoke test
-  (nested folders, plaintext + encrypted). **Severity: 6.**
 - **`src/storage/dropbox/index.ts` (614 lines) — file store and
   attachment store duplicate `relativePath` + `listOnce` (~50 lines).**
   Identical definitions at ~lines 295–322 (file store) and ~436–463
@@ -135,7 +126,7 @@ contract itself is respected everywhere._
 
 - **Dropbox and Google Drive map HTTP errors through divergent
   heuristics.** Drive centralizes mapping in `gdriveError()`
-  (`gdrive/index.ts` ~78–91: 403 + `rateLimitExceeded` body-sniff →
+  (`gdrive/drive-fs.ts`: 403 + `rateLimitExceeded` body-sniff →
   `RateLimitError`); Dropbox does it inline per call site
   (`dropbox/index.ts` ~272–283, 387–394: raw 429 + `Retry-After`). A
   third backend would have to reverse-engineer both. With only N=2
@@ -157,16 +148,27 @@ contract itself is respected everywhere._
 
 ### Easy wins
 
-- The `dirAndName`/`authHeader` extractions inside the gdrive
-  duplication row above are mechanical and type-safe — safe to land as
-  the first slice of that row when touching the file anyway.
+_(none)_
 
 ---
 
 ## Landed
 
-_(none yet — history before this reset lives in git; see the
-`refactor(...)` / `feat(...)` commits and prior revisions of this file.)_
+- **2026-07 — gdrive folder-plumbing dedup (was severity 6, slightly
+  wider than catalogued).** The ~130 lines of folder bookkeeping
+  duplicated between the Google Drive file store and attachment store
+  (`authHeader`, `search`, `createFolder`, `resolveDirId`, `dirAndName`)
+  now live once in `src/storage/gdrive/drive-fs.ts`
+  (`createDriveFolderFs`, per-store folder-id caches preserved);
+  `gdrive/index.ts` dropped 795 → 555 lines. The store request sequence
+  was pinned with scripted-fetch tests **before** the refactor
+  (`tests/storage/gdrive-store.test.ts`) and the newly-reachable seam got
+  direct tests (`tests/storage/gdrive-drive-fs.test.ts`) — gdrive
+  coverage went from zero to 96% on the shared module. A third partial
+  copy of the lookup inside `deleteGdriveNamespace` was deliberately left:
+  its error labels (`namespace delete (lookup)`) are intentionally
+  distinct and it omits response headers, so folding it in would change
+  error semantics — rated 2, not queued.
 
 ---
 
