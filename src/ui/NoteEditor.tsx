@@ -15,6 +15,7 @@ import { CipherGlyph } from "./CipherGlyph.tsx";
 import { CopyNoteButton } from "./CopyNoteButton.tsx";
 import { SelectPicker } from "./form/SelectPicker.tsx";
 import { useMediaQuery } from "./hooks/useMediaQuery.ts";
+import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { ArrowLeftIcon, FolderIcon, SpinnerIcon } from "./icons.tsx";
 import {
   MarkdownEditor,
@@ -424,6 +425,16 @@ function PlainEditor({
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
   }, [focusOnMount]);
+
+  // Ctrl/Cmd+A pressed while the textarea doesn't hold focus — the opening
+  // state of an existing note — would otherwise select the whole page (title
+  // and chrome included) instead of the note body.
+  useSelectAllShortcut(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+  });
 
   return (
     <textarea

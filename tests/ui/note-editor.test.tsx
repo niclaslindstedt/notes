@@ -85,6 +85,31 @@ describe("Editor", () => {
     expect(onChange).toHaveBeenCalledWith("the body!");
   });
 
+  it("routes Ctrl+A pressed with nothing focused into the body textarea", () => {
+    // Opening an existing note focuses nothing, so the shortcut lands on the
+    // body element; it must select the note body, not the whole page.
+    renderEditor();
+    const body = screen.getByDisplayValue("the body") as HTMLTextAreaElement;
+    expect(document.activeElement).toBe(document.body);
+
+    fireEvent.keyDown(document.body, { key: "a", ctrlKey: true });
+    expect(document.activeElement).toBe(body);
+    expect(body.selectionStart).toBe(0);
+    expect(body.selectionEnd).toBe(body.value.length);
+  });
+
+  it("keeps Ctrl+A field-scoped while the title holds focus", () => {
+    renderEditor();
+    const title = screen.getByDisplayValue("My note") as HTMLTextAreaElement;
+    const body = screen.getByDisplayValue("the body") as HTMLTextAreaElement;
+    title.focus();
+
+    fireEvent.keyDown(title, { key: "a", ctrlKey: true });
+    // The fallback must not yank focus (or the selection) into the body.
+    expect(document.activeElement).toBe(title);
+    expect(body.selectionEnd).toBe(0);
+  });
+
   it("shows the decrypting placeholder and withholds the editor while loading", () => {
     renderEditor({ loading: true });
 

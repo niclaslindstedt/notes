@@ -189,6 +189,38 @@ describe("MarkdownEditor", () => {
       expect(sel.containsNode(first, true)).toBe(true);
       expect(sel.containsNode(last, true)).toBe(true);
     });
+
+    it("routes Ctrl+A pressed with nothing focused into the editor", () => {
+      // An existing note opens with no focus at all (focusOnMount={false}), so
+      // the shortcut lands on the body; the fallback must scope it to the note
+      // and take focus so the selection can be typed over or cut.
+      renderEditor("one\ntwo\nthree", { focusOnMount: false });
+      expect(document.activeElement).toBe(document.body);
+      fireEvent.keyDown(document.body, { key: "a", ctrlKey: true });
+      const sel = window.getSelection()!;
+      const first = surface().querySelector('[data-line-index="0"]')!;
+      const last = surface().querySelector('[data-line-index="2"]')!;
+      expect(sel.containsNode(first, true)).toBe(true);
+      expect(sel.containsNode(last, true)).toBe(true);
+      expect(document.activeElement).toBe(surface());
+    });
+
+    it("leaves Ctrl+A alone while another editable field holds focus", () => {
+      // Focus in e.g. the title textarea keeps the browser's native
+      // field-scoped select-all — the note body must not steal it.
+      renderEditor("one\ntwo", { focusOnMount: false });
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      try {
+        input.focus();
+        fireEvent.keyDown(input, { key: "a", ctrlKey: true });
+        const sel = window.getSelection()!;
+        expect(sel.rangeCount === 0 || sel.isCollapsed).toBe(true);
+        expect(document.activeElement).toBe(input);
+      } finally {
+        input.remove();
+      }
+    });
   });
 
   describe("links", () => {

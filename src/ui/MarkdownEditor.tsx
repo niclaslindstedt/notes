@@ -39,6 +39,7 @@ import {
   placeCaret,
 } from "./contenteditable-caret.ts";
 import { scrollFocusedIntoView } from "./hooks/scrollFocusedIntoView.ts";
+import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
 import {
@@ -598,28 +599,44 @@ export function MarkdownEditor({
   }
 
   // --- Keyboard shortcuts we own -------------------------------------------
+  //
+  // Select-all must select the whole note, not just the caret's line. Select
+  // from the first rendered line to the last — anchoring the range *inside*
+  // the line elements (not at the contenteditable root) so both endpoints map
+  // back to source, which a later delete/copy relies on. The raw active line
+  // maps to source too, so it can stay put.
+  function selectAllLines() {
+    const root = rootRef.current;
+    if (!root) return;
+    const lineEls = root.querySelectorAll("[data-line-index]");
+    const first = lineEls[0];
+    const last = lineEls[lineEls.length - 1];
+    const sel = window.getSelection();
+    if (!first || !last || !sel) return;
+    // The document-level fallback arrives with focus elsewhere (or nowhere);
+    // take it so the selection lives in the editing host and the next
+    // keystroke replaces it / Ctrl+X cuts it. The ranged selection this sets
+    // keeps the focus-time selectionchange from activating a line.
+    if (document.activeElement !== root) root.focus();
+    const range = document.createRange();
+    range.setStart(first, 0);
+    range.setEnd(last, last.childNodes.length);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
   function onKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
-    // Select-all must select the whole note, not just the caret's line. Select
-    // from the first rendered line to the last — anchoring the range *inside*
-    // the line elements (not at the contenteditable root) so both endpoints map
-    // back to source, which a later delete/copy relies on. The raw active line
-    // maps to source too, so it can stay put.
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
-      const root = rootRef.current;
-      if (!root) return;
       e.preventDefault();
-      const lineEls = root.querySelectorAll("[data-line-index]");
-      const first = lineEls[0];
-      const last = lineEls[lineEls.length - 1];
-      const sel = window.getSelection();
-      if (!first || !last || !sel) return;
-      const range = document.createRange();
-      range.setStart(first, 0);
-      range.setEnd(last, last.childNodes.length);
-      sel.removeAllRanges();
-      sel.addRange(range);
+      selectAllLines();
     }
   }
+
+  // Ctrl/Cmd+A pressed while the surface doesn't hold focus — the opening
+  // state of an existing note — would otherwise fall through to the browser's
+  // page-wide select-all (title and chrome included), which can't be typed
+  // over or cut.
+  useSelectAllShortcut(selectAllLines);
 
   // Open edit mode at the end of the note (its bottom blank line). Appends a
   // trailing blank line when the note doesn't already end in one — held locally,

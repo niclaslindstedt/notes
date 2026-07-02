@@ -226,7 +226,17 @@ surface — a mouse drag or a mobile long-press-and-extend selects straight acro
 lines, and **Ctrl/Cmd+A** selects the whole note (the handler anchors the range
 *inside* the first and last line elements, not at the contenteditable root, so
 both endpoints map back to source and a following delete/replace leaves nothing
-behind). A `copy` (and `cut`) is intercepted (`markdown-selection.ts`) and the
+behind). The shortcut also works **before the body holds focus** — the opening
+state of an existing note, which deliberately focuses nothing: a document-level
+fallback (`useSelectAllShortcut`, `src/ui/hooks/useSelectAllShortcut.ts`) routes
+a bare Ctrl/Cmd+A to the same select-all and moves focus into the surface so
+the selection can be typed over or cut, instead of letting the browser take the
+whole page (title and header chrome included) as an inert highlight. Focus
+inside any other editable field (the title, a modal's input) keeps the
+browser's native field-scoped select-all, and a press from inside an open
+dialog is ignored so it never steals the dialog's focus; the Markdown-off
+`PlainEditor` wires the same fallback to its textarea. A `copy` (and `cut`) is
+intercepted (`markdown-selection.ts`) and the
 verbatim **source** is placed on the clipboard — Markdown syntax and full,
 un-shortened URLs survive the copy rather than the rendered text. See
 [Selection mapping](#selection-mapping).
