@@ -28,24 +28,18 @@ import {
   getBackend,
   setBackend as persistBackend,
 } from "./backend-preference.ts";
-import { localCacheKey, withLocalCache } from "./cache/index.ts";
 import {
-  type DropboxAuth,
-  createDropboxAdapter,
   createDropboxNamespaceStore,
   createDropboxSettingsStore,
   isDropboxConfigured,
 } from "./dropbox/index.ts";
 import { withEncryption } from "./encrypting/index.ts";
 import {
-  createGdriveAdapter,
   createGdriveNamespaceStore,
   createGdriveSettingsStore,
   isGdriveConfigured,
 } from "./gdrive/index.ts";
-import { BrowserLocalStorageAdapter } from "./local/index.ts";
 import {
-  createFolderAdapter,
   createFolderNamespaceStore,
   createFolderSettingsStore,
 } from "./folder/index.ts";
@@ -66,6 +60,7 @@ import {
 import { type FolderActiveRef, useFolderBackend } from "./useFolderBackend.ts";
 import { useCloudBackend } from "./useCloudBackend.ts";
 import { useNamespaceMigration } from "./useNamespaceMigration.ts";
+import { useBackendSelection } from "./useBackendSelection.ts";
 
 const log = createLogger("storage");
 
@@ -236,15 +231,6 @@ function lockedAdapter(id: BackendId): StorageAdapter {
   };
 }
 
-// The resolved active backend, computed once per change so the document
-// adapter and the root settings store are built from the same branch instead
-// of re-deriving the `backend && token` chain twice.
-type BackendSelection =
-  | { kind: "dropbox"; auth: DropboxAuth }
-  | { kind: "gdrive"; token: string }
-  | { kind: "folder"; handle: FileSystemDirectoryHandle }
-  | { kind: "browser" };
-
 export function useStorageBackend(): UseStorageBackend {
   const [backend, setBackendState] = useState<BackendId>(getBackend);
   // The active document adapter, exposed to the encryption verbs through a ref
@@ -318,30 +304,10 @@ export function useStorageBackend(): UseStorageBackend {
     disconnectGdrive,
   } = useCloudBackend({ selectBackend });
 
-  // Resolve the active backend once. Both builders below switch on this
-  // single selection rather than re-deriving the `backend && token` chain.
-  const selection = useMemo<BackendSelection>(() => {
-    if (backend === "dropbox" && dropboxToken) {
-      return {
-        kind: "dropbox",
-        auth: {
-          accessToken: dropboxToken,
-          refreshToken: dropboxRefresh,
-          onAccessTokenRefreshed: rememberDropboxAccessToken,
-        },
-      };
-    }
-    if (backend === "gdrive" && gdriveToken) {
-      return { kind: "gdrive", token: gdriveToken };
-    }
-    // Folder backend: only once the boot probe has resolved with a live,
-    // permission-granted handle. While probing, or after a revoked grant,
-    // fall through to the browser store so editing keeps working.
-    if (backend === "folder" && folderHandleLoaded && folderHandle) {
-      return { kind: "folder", handle: folderHandle };
-    }
-    return { kind: "browser" };
-  }, [
+  // Resolve the active backend once, and get the factory that builds an
+  // adapter for any namespace on it. Both the root stores below and the
+  // active-document adapter switch on this single selection.
+  const { selection, makeInner } = useBackendSelection({
     backend,
     dropboxToken,
     dropboxRefresh,
@@ -349,7 +315,11 @@ export function useStorageBackend(): UseStorageBackend {
     rememberDropboxAccessToken,
     folderHandle,
     folderHandleLoaded,
-  ]);
+    markFolderPermissionLost,
+    directoryCrypto,
+    seal,
+    unseal,
+  });
 
   // The active backend's root namespace registry — `namespaces.json` beside
   // `settings.json` at the app-folder root, so the list of namespaces travels
@@ -394,69 +364,6 @@ export function useStorageBackend(): UseStorageBackend {
     gdriveToken,
     folderHandle,
   });
-
-  // The unwrapped, namespace-scoped backend. Cloud adapters get fresh tokens
-  // on every change so a reconnect rebuilds them; the Dropbox adapter persists
-  // any silently refreshed access token back via the selection's
-  // `onAccessTokenRefreshed`. Keyed on `activeNamespace` so switching the
-  // namespace rebuilds the document adapter (and its offline cache) onto the
-  // new namespace's storage location.
-  // Build the unwrapped backend adapter for *any* namespace on the current
-  // selection. Factored out of `inner` so a cross-namespace move can spin up an
-  // adapter for the target namespace's storage location without switching to it.
-  const makeInner = useCallback(
-    (namespace: string): StorageAdapter => {
-      switch (selection.kind) {
-        // Cloud backends mirror their bytes into a local cache so the document
-        // can be unlocked, read, and edited offline (the cache holds the
-        // encrypted envelope when encryption is on). Folder / browser are
-        // already on-device, so they need no mirror.
-        case "dropbox":
-          return withLocalCache(
-            createDropboxAdapter(
-              selection.auth,
-              fetch,
-              namespace,
-              directoryCrypto,
-            ),
-            {
-              storage: globalThis.localStorage,
-              key: localCacheKey("dropbox", namespace),
-              seal,
-              unseal,
-            },
-          );
-        case "gdrive":
-          return withLocalCache(
-            createGdriveAdapter(
-              selection.token,
-              fetch,
-              namespace,
-              directoryCrypto,
-            ),
-            {
-              storage: globalThis.localStorage,
-              key: localCacheKey("gdrive", namespace),
-              seal,
-              unseal,
-            },
-          );
-        case "folder":
-          return createFolderAdapter({
-            directoryHandle: selection.handle,
-            namespace,
-            onPermissionLost: markFolderPermissionLost,
-            crypto: directoryCrypto,
-          });
-        case "browser":
-          return new BrowserLocalStorageAdapter(
-            globalThis.localStorage,
-            namespace,
-          );
-      }
-    },
-    [selection, markFolderPermissionLost, directoryCrypto, seal, unseal],
-  );
 
   // The active namespace's adapter — rebuilt when the namespace or backend
   // changes so it (and its offline cache) point at the right storage location.

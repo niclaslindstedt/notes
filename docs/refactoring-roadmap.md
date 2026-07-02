@@ -88,24 +88,7 @@ _(none)_
 
 ### Severity 5–6 — friction
 
-- **`src/storage/useStorageBackend.ts` (600 lines) — the
-  selection/adapter-building machinery is still inline.** Most concerns
-  the original 7-rated entry named have already been lifted into sibling
-  hooks (`useEncryption`, `useFolderBackend`, `useCloudBackend`,
-  `useNamespaceRegistry`), and the two cross-namespace move verbs now
-  live in `useNamespaceMigration` (2026-07). What remains tangled is the
-  backend-resolution core: the `selection` memo (~323–352), the
-  `namespaceStore` memo (~362–376), `makeInner` (~407–459), `inner`
-  (~463–466), and the `settingsStore` memo (~474–488) all switch on the
-  same `BackendSelection` union and rebuild together. **Plan:** lift a
-  `useBackendSelection()` seam that resolves the active backend from
-  tokens/grants and exposes `selection` + `makeInner`, so the four
-  consumer memos read one hook instead of re-deriving. **Risk:** the
-  encryption re-wrap ordering (`adapter` memo) and the cloud/local cache
-  keying are subtle; smoke-test local + folder after the split, and one
-  cloud backend for the selection seam (no automated cloud coverage).
-  Now that the file is only modestly over half the cap with clean
-  internal seams, this is 5, not 7. **Severity: 5.**
+_(none)_
 
 ### Severity 3–4 — nits with leverage
 
@@ -139,6 +122,26 @@ _(none)_
 
 ## Landed
 
+- **2026-07 — `useBackendSelection` extracted from `useStorageBackend`
+  (was severity 5).** The `selection` memo (backend resolution from the
+  preference + live tokens/grant) and `makeInner` (the per-namespace
+  adapter factory) now live in `src/storage/useBackendSelection.ts`, fed
+  the tokens/handle/crypto the orchestrator already produced and returning
+  `{ selection, makeInner }`. This also moved the six adapter-construction
+  imports (`withLocalCache`/`localCacheKey`, `createDropboxAdapter`,
+  `createGdriveAdapter`, `createFolderAdapter`, `BrowserLocalStorageAdapter`)
+  and the `BackendSelection` union out of the orchestrator, which dropped
+  600 → 507 lines. The dispatch had **no** direct coverage; it now ships
+  `tests/storage/use-backend-selection.test.tsx` (10 cases: selection
+  resolution for every backend incl. the token/grant fall-throughs to
+  browser and the Dropbox refresh-callback wiring, plus `makeInner`'s
+  per-backend adapter-id dispatch and any-namespace factory behaviour) —
+  all reachable without live OAuth, since the cloud adapter factories only
+  log at construction and don't hit the network until load/save. Pure
+  move, no behaviour change; the encryption re-wrap (`adapter` memo) and
+  the root store memos stayed in the orchestrator and were unaffected. A
+  manual local + folder smoke test is still worth a once-over, but the
+  branching is now automated.
 - **2026-07 — Dropbox `list_folder` walk deduped into `dropbox/list.ts`
   (was severity 5; landed slightly wider than catalogued).** The file
   store and attachment store each carried a byte-identical `relativePath`
