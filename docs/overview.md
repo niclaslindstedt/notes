@@ -655,9 +655,16 @@ entry; a `mergeKey` collapses rapid same-key records (a typing session) into one
 step, while creates/deletes always land as their own steps. `reset` rebuilds the
 timeline whenever the document arrives from outside the edit path (load, reload,
 conflict-adopt). `useUndoRedoShortcuts` (`src/ui/hooks/useUndoRedoShortcuts.ts`)
-binds ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z; the side menu also exposes undo/redo as the
-bottom row of the [button island](#folders-in-the-side-menu) at the foot of the
-list.
+binds ⌘/Ctrl+Z (undo) and ⌘/Ctrl+Shift+Z / Ctrl+Y (redo); the side menu also
+exposes undo/redo as the bottom row of the
+[button island](#folders-in-the-side-menu) at the foot of the list. The
+shortcut stands down inside plain `<input>` / `<textarea>` fields (the note
+title, settings, modal inputs) so their native character-level undo wins, but
+it **does** answer the shortcut inside the live-preview editor's
+`contenteditable` — that surface deliberately swallows the browser's native
+contenteditable undo (React owns its DOM), so without this the shortcut would
+be dead while the caret sits in a note. There it reverts the current editing
+session, exactly as the side menu's Undo button does.
 
 ### Settings sync
 
