@@ -58,6 +58,16 @@ doesn't re-derive):
   candidate. Severity tracks how far over the cap and how many distinct
   concerns are tangled — multi-concern files near 2× the cap land in the
   7–8 band; a modestly-over file with clean internal seams sits at 5–6.
+- A **cloud-backend dedup** (Dropbox / Google Drive) reads as
+  "manual-smoke-test-only, no automated coverage" but is landable in this
+  sandbox without live OAuth: pin the request sequence with a scripted
+  `fetch` through the backend's **public** store factory
+  (`createXSettingsStore` reaches `read`/`write`/`401`/`429`), then
+  extract the duplicated machinery into a dedicated module and unit-test
+  that seam directly (the gdrive `drive-fs.ts` and Dropbox `list.ts`
+  precedents). The refactor should *close* the coverage gap, not inherit
+  it — a manual smoke test against a real account stays a nice-to-have,
+  not the only safety net.
 
 ---
 
@@ -97,17 +107,6 @@ _(none)_
   Now that the file is only modestly over half the cap with clean
   internal seams, this is 5, not 7. **Severity: 5.**
 
-- **`src/storage/dropbox/index.ts` (614 lines) — file store and
-  attachment store duplicate `relativePath` + `listOnce` (~50 lines).**
-  Identical definitions at ~lines 295–322 (file store) and ~436–463
-  (attachment store), plus near-identical `has_more`/`cursor` pagination
-  loops in both `list()` implementations. Grep: `function listOnce`.
-  **Plan:** hoist `relativePath`/`listOnce` to module-level helpers
-  parameterized by `authedFetch`/`rootPrefix`; optionally share the
-  pagination loop as `listAll()`. **Risk:** cloud backend, no automated
-  coverage — manual Dropbox smoke test (plaintext + encrypted).
-  **Severity: 5.**
-
 ### Severity 3–4 — nits with leverage
 
 - **Dropbox and Google Drive map HTTP errors through divergent
@@ -140,6 +139,25 @@ _(none)_
 
 ## Landed
 
+- **2026-07 — Dropbox `list_folder` walk deduped into `dropbox/list.ts`
+  (was severity 5; landed slightly wider than catalogued).** The file
+  store and attachment store each carried a byte-identical `relativePath`
+  + `listOnce`, plus near-identical `has_more`/`cursor` pagination loops.
+  All three now live once in `src/storage/dropbox/list.ts` as
+  `relativePath` / `listOnce` (module-private) / `listAllFiles<T>(…, map)`
+  — the generic walk both stores call, each passing its own per-entry
+  `map` (the file store's shallow-vs-recursive shape carrying `rev`; the
+  attachment store's nested-only filter). `dropbox/index.ts` dropped
+  614 → 509 lines. The roadmap flagged this as manual-smoke-test-only
+  (no automated cloud coverage); the refactor **closed that gap** rather
+  than inheriting it — the read/write/401-refresh/429 paths are now
+  pinned through the public settings store (`tests/storage/dropbox-store.test.ts`,
+  written **before** the refactor and green on both sides), and the
+  extracted walk is unit-tested directly (`tests/storage/dropbox-list.test.ts`:
+  pagination, `.tag` filtering, root-scoping, both stores' map filters).
+  Dropbox went from zero automated coverage to 16 scripted-fetch cases.
+  A manual Dropbox smoke test (plaintext + encrypted) is still worth
+  doing once against a real account, but is no longer the only safety net.
 - **2026-07 — `useNamespaceMigration` extracted from `useStorageBackend`
   (part of the was-severity-7 hook split; narrower than catalogued).**
   The two ~135-line cross-namespace move verbs
