@@ -26,9 +26,18 @@
 // yanks the view). A timeout backstops platforms that fire no event (desktop
 // focus, or a focus that opens no keyboard — where the element is already on
 // screen and centring is harmless).
+//
+// The reveal glides rather than snaps: each event re-issues a `smooth`
+// `scrollIntoView`, and the browser retargets the in-flight animation, so the
+// burst reads as one continuous motion that lands on the final centred
+// position rather than a jump. Users who ask for reduced motion get the
+// instant jump instead.
 export function scrollFocusedIntoView(el: HTMLElement): void {
+  const reduceMotion =
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  const behavior: ScrollBehavior = reduceMotion ? "auto" : "smooth";
   const reveal = () => {
-    if (el.isConnected) el.scrollIntoView({ block: "center" });
+    if (el.isConnected) el.scrollIntoView({ block: "center", behavior });
   };
 
   const vv = window.visualViewport;
