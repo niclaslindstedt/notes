@@ -808,9 +808,11 @@ side: it scrolls a freshly-focused field or tapped line clear of the soft
 keyboard by re-centring it on every visual-viewport change until the
 keyboard-settling burst goes quiet — the keyboard animates in as a series of
 intermediate heights, so centring only on the first would leave the last line
-(which can't scroll any further up) behind the keyboard. Used by the
-[live-preview editor](#markdown-editor)'s tap-to-reveal and the Storage
-settings passphrase field.
+(which can't scroll any further up) behind the keyboard. The reveal glides
+(`behavior: "smooth"`, retargeted on each event so the burst reads as one
+continuous motion), falling back to an instant jump under
+`prefers-reduced-motion`. Used by the [live-preview editor](#markdown-editor)'s
+tap-to-reveal and the Storage settings passphrase field.
 
 ## Modals and dialogs
 

@@ -26,8 +26,17 @@ function fakeVisualViewport() {
 
 let vv: ReturnType<typeof fakeVisualViewport>;
 
+// Pin the reduced-motion query so the smooth/instant branch is deterministic.
+function stubReducedMotion(reduce: boolean) {
+  Object.defineProperty(window, "matchMedia", {
+    value: (query: string) => ({ matches: reduce, media: query }),
+    configurable: true,
+  });
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
+  stubReducedMotion(false);
   vv = fakeVisualViewport();
   Object.defineProperty(window, "visualViewport", {
     value: vv,
@@ -55,7 +64,10 @@ describe("scrollFocusedIntoView", () => {
     vv.emit("resize");
     vv.emit("resize");
     expect(scrollIntoView).toHaveBeenCalledTimes(3);
-    expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "center" });
+    expect(scrollIntoView).toHaveBeenLastCalledWith({
+      block: "center",
+      behavior: "smooth",
+    });
 
     // Once the viewport has been quiet past the settle window, it stops
     // listening so a later user scroll never yanks the view.
@@ -107,6 +119,24 @@ describe("scrollFocusedIntoView", () => {
 
     scrollFocusedIntoView(el);
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      block: "center",
+      behavior: "smooth",
+    });
+  });
+
+  it("snaps instantly when the user prefers reduced motion", () => {
+    stubReducedMotion(true);
+    const el = document.createElement("div");
+    document.body.append(el);
+    const scrollIntoView = vi.fn();
+    el.scrollIntoView = scrollIntoView;
+
+    scrollFocusedIntoView(el);
+    vv.emit("resize");
+    expect(scrollIntoView).toHaveBeenLastCalledWith({
+      block: "center",
+      behavior: "auto",
+    });
   });
 });
