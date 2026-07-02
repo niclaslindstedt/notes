@@ -268,8 +268,8 @@ in the raw source (and a [selection](#selection-mapping) back to a source
 column); a shortened bare URL also carries `data-len` (its full source length).
 `markdownLineClass` (`src/ui/markdown-line-class.ts`) maps a block kind to its
 CSS classes. List items indent by their `depth` and pick a marker from it: an
-unordered item cycles `•` → `◦` → `▪` (the top-level `•` drawn a little larger),
-an ordered item shows its computed sequential `marker`.
+unordered item cycles through the three [bullet characters](#bullet-characters)
+(`•` → `-` → `+`), an ordered item shows its computed sequential `marker`.
 
 A rendered **link** (and an inline image) is the exception to click-to-caret:
 inside the contenteditable surface a plain click would drop the caret (turning
@@ -360,6 +360,18 @@ short URL (where head + marker + tail would meet or overlap) is shown in full.
 `LinkNode` (`src/ui/MarkdownLine.tsx`) applies it; the
 [Short and sweet](#unlock-triggers) achievement fires the first time it's
 switched on.
+
+### Bullet characters
+
+An unordered list draws one of three fixed glyphs per nesting level:
+`BULLET_GLYPHS = ["•", "-", "+"]` in `src/ui/MarkdownLine.tsx`, picked by
+`bulletGlyph(depth)` as `depth % 3` (so a fourth level reuses the parent `•`).
+All three glyphs are present in the app's bundled monospace font (JetBrains
+Mono), so they render — and stay vertically centred — identically on every
+platform; the `◦` / `▪` the list used to cycle through are **not** in that
+font, so a device substituted them from another font and drew them off-centre.
+The marker sits in a fixed-width, one-line-tall flex box centred on both axes,
+which keeps every level's text starting at the same column.
 
 ### Format on save
 
