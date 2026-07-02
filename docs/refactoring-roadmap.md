@@ -92,15 +92,7 @@ _(none)_
 
 ### Severity 3–4 — nits with leverage
 
-- **Wrapper capability-forwarding rules are implicit.**
-  `cache/index.ts` (~238) adds `loadSync`; `encrypting/index.ts` (~36)
-  deletes it — each wrapper hand-rolls what it preserves or strips from
-  the `StorageAdapter` surface, and the valid stacking order
-  (encrypting inside cache) lives only in the wiring. **Plan:** codify
-  the composition rules where the contract lives (`adapter.ts`) — a
-  short doc comment naming what each wrapper adds/removes and the valid
-  stack order; type-level enforcement only if it falls out cheaply.
-  **Risk:** none (comment/type-only). **Severity: 3.**
+_(none)_
 
 ### Easy wins
 
@@ -110,6 +102,20 @@ _(none)_
 
 ## Landed
 
+- **2026-07 — wrapper capability-composition rules codified in
+  `adapter.ts` (was severity 3).** The two higher-order wrappers adjust
+  the `StorageAdapter` capability surface implicitly — `withLocalCache`
+  (`cache/`) adds `loadSync`, `withEncryption` (`encrypting/`) removes it
+  — and the valid stacking order (cache outside encryption, so a
+  `loadSync` survives) lived only in the wiring. A doc block beside
+  `AdapterCapability` now names what each wrapper adds/removes and why the
+  order matters. Type-level enforcement was left out (it doesn't fall out
+  cheaply); instead the contract is made **executable** by
+  `tests/storage/wrapper-capabilities.test.ts` — `withEncryption` strips
+  `loadSync` while forwarding the rest, `withLocalCache` adds it, and the
+  composition-order invariant (`cache(encryption(inner))` keeps `loadSync`;
+  `encryption(cache(inner))` drops it). Comment + test only, no code
+  change.
 - **2026-07 — Dropbox HTTP error mapping consolidated into
   `dropbox/errors.ts` (was severity 4).** The ~8 `throw new Error("Dropbox
   <op> failed: <status> <body>")` sites across the file store, attachment
