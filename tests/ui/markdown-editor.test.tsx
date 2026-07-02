@@ -177,6 +177,32 @@ describe("MarkdownEditor", () => {
     });
   });
 
+  describe("blur reformats the note", () => {
+    it("renders a trailing lone hyphen as a rule once the body loses focus", async () => {
+      const { container } = renderEditor("text\n-");
+      // The caret opens on the last line, so the trailing `-` shows as raw
+      // source rather than a horizontal rule.
+      expect(container.querySelector("[data-raw]")?.textContent).toBe("-");
+      expect(container.querySelector("hr")).toBeNull();
+
+      // Focus moves out of the body (to the title field / a header button): the
+      // active line must clear so the whole note renders formatted — the trailing
+      // dash is now a rule, not a literal `-`. (A plain <button> so it doesn't
+      // also match the editor's `textbox` role.)
+      const other = document.createElement("button");
+      document.body.appendChild(other);
+      try {
+        await act(async () => {
+          other.focus();
+        });
+        expect(container.querySelector("[data-raw]")).toBeNull();
+        expect(container.querySelector("hr")).not.toBeNull();
+      } finally {
+        other.remove();
+      }
+    });
+  });
+
   describe("select all", () => {
     it("selects the whole note (all lines) on Ctrl+A", () => {
       renderEditor("one\ntwo\nthree");
