@@ -99,6 +99,22 @@ describe("dropbox file store (via the settings store)", () => {
     await expect(store.save("x")).rejects.toBeInstanceOf(RateLimitError);
   });
 
+  it("read(): a non-ok, non-409 status surfaces the labelled generic error", async () => {
+    const { impl } = scriptedFetch([{ status: 500, text: "boom" }]);
+    const store = createDropboxSettingsStore("tok", impl);
+    await expect(store.load()).rejects.toThrow(
+      /Dropbox download failed: 500 boom/,
+    );
+  });
+
+  it("write(): a non-429 failure surfaces the labelled generic error", async () => {
+    const { impl } = scriptedFetch([{ status: 507, text: "no space" }]);
+    const store = createDropboxSettingsStore("tok", impl);
+    await expect(store.save("x")).rejects.toThrow(
+      /Dropbox upload failed: 507 no space/,
+    );
+  });
+
   it("read(): a 401 triggers a silent refresh and retries with the fresh token", async () => {
     const onAccessTokenRefreshed = vi.fn();
     const auth: DropboxAuth = {
