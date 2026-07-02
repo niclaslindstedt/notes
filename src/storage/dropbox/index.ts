@@ -13,7 +13,7 @@
 // single `/notes.json` envelope instead of markdown.
 
 import { createLogger } from "../../dev/logger.ts";
-import { AuthError, RateLimitError, type StorageAdapter } from "../adapter.ts";
+import { AuthError, type StorageAdapter } from "../adapter.ts";
 import type { AttachmentEntry, AttachmentStore } from "../attachment-store.ts";
 import {
   type DirectoryCrypto,
@@ -31,7 +31,8 @@ import {
   type NamespaceRegistryStore,
 } from "../namespace-store.ts";
 import { fileSettingsStore, type SettingsStore } from "../settings-store.ts";
-import { parseRetryAfterMs, readErrorBody } from "../http-utils.ts";
+import { readErrorBody } from "../http-utils.ts";
+import { dropboxError } from "./errors.ts";
 import { type AuthedFetch, listAllFiles } from "./list.ts";
 import {
   type OAuthConfig,
@@ -113,9 +114,6 @@ const DELETE_ENDPOINT = "https://api.dropboxapi.com/2/files/delete_v2";
 // every change" in feel — rapid edits within a single gesture collapse into
 // one network save.
 const SAVE_DEBOUNCE_MS = 1000;
-
-// Floor for the cooldown after Dropbox returns 429.
-const RATE_LIMIT_FALLBACK_MS = 5000;
 
 // `sessionStorage` survives the OAuth redirect round-trip but is scoped to
 // the tab, so a parallel auth flow in another tab can't race with this.
@@ -299,10 +297,7 @@ function createDropboxFileStore(
         },
       }));
       if (res.status === 409) return null;
-      if (!res.ok) {
-        const detail = await readErrorBody(res);
-        throw new Error(`Dropbox download failed: ${res.status} ${detail}`);
-      }
+      if (!res.ok) throw await dropboxError("download", res);
       return res.text();
     },
 
@@ -320,15 +315,7 @@ function createDropboxFileStore(
         },
         body: text,
       }));
-      if (res.status === 429) {
-        throw new RateLimitError(
-          parseRetryAfterMs(res.headers, RATE_LIMIT_FALLBACK_MS),
-        );
-      }
-      if (!res.ok) {
-        const detail = await readErrorBody(res);
-        throw new Error(`Dropbox upload failed: ${res.status} ${detail}`);
-      }
+      if (!res.ok) throw await dropboxError("upload", res, { rateLimit: true });
       // The upload response is the file's new metadata; its `rev` is exactly
       // what `list()` reports for these bytes, so the directory adapter can
       // stamp the post-save revision without an eventually-consistent re-list.
@@ -351,10 +338,7 @@ function createDropboxFileStore(
         body: JSON.stringify({ path: `${rootPath}/${path}` }),
       }));
       if (res.status === 409) return; // already gone
-      if (!res.ok) {
-        const detail = await readErrorBody(res);
-        throw new Error(`Dropbox delete failed: ${res.status} ${detail}`);
-      }
+      if (!res.ok) throw await dropboxError("delete", res);
     },
   };
 }
@@ -392,10 +376,7 @@ function createDropboxAttachmentStore(
         },
       }));
       if (res.status === 409) return null;
-      if (!res.ok) {
-        const detail = await readErrorBody(res);
-        throw new Error(`Dropbox download failed: ${res.status} ${detail}`);
-      }
+      if (!res.ok) throw await dropboxError("download", res);
       return new Uint8Array(await res.arrayBuffer());
     },
 
@@ -413,15 +394,7 @@ function createDropboxAttachmentStore(
         },
         body: bytes,
       }));
-      if (res.status === 429) {
-        throw new RateLimitError(
-          parseRetryAfterMs(res.headers, RATE_LIMIT_FALLBACK_MS),
-        );
-      }
-      if (!res.ok) {
-        const detail = await readErrorBody(res);
-        throw new Error(`Dropbox upload failed: ${res.status} ${detail}`);
-      }
+      if (!res.ok) throw await dropboxError("upload", res, { rateLimit: true });
     },
 
     async remove(path: string): Promise<void> {
@@ -434,10 +407,7 @@ function createDropboxAttachmentStore(
         body: JSON.stringify({ path: `${rootPath}/${path}` }),
       }));
       if (res.status === 409) return; // already gone
-      if (!res.ok) {
-        const detail = await readErrorBody(res);
-        throw new Error(`Dropbox delete failed: ${res.status} ${detail}`);
-      }
+      if (!res.ok) throw await dropboxError("delete", res);
     },
   };
 }
@@ -463,10 +433,7 @@ export async function deleteDropboxNamespace(
     body: JSON.stringify({ path }),
   }));
   if (res.status === 409) return; // already gone
-  if (!res.ok) {
-    const detail = await readErrorBody(res);
-    throw new Error(`Dropbox namespace delete failed: ${res.status} ${detail}`);
-  }
+  if (!res.ok) throw await dropboxError("namespace delete", res);
 }
 
 // ---- OAuth (PKCE) ---------------------------------------------------

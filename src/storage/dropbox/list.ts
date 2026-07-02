@@ -5,7 +5,7 @@
 // parameterised by the authed fetch and the store's root prefix; the per-entry
 // accept/shape decision stays with each caller via the `map` callback.
 
-import { readErrorBody } from "../http-utils.ts";
+import { dropboxError } from "./errors.ts";
 
 const LIST_FOLDER_ENDPOINT = "https://api.dropboxapi.com/2/files/list_folder";
 const LIST_FOLDER_CONTINUE_ENDPOINT =
@@ -60,10 +60,7 @@ async function listOnce(
     body: JSON.stringify(body),
   }));
   if (res.status === 409) return null; // path/not_found — empty folder
-  if (!res.ok) {
-    const detail = await readErrorBody(res);
-    throw new Error(`Dropbox list_folder failed: ${res.status} ${detail}`);
-  }
+  if (!res.ok) throw await dropboxError("list_folder", res);
   return (await res.json()) as ListFolderResult;
 }
 

@@ -92,18 +92,6 @@ _(none)_
 
 ### Severity 3–4 — nits with leverage
 
-- **Dropbox and Google Drive map HTTP errors through divergent
-  heuristics.** Drive centralizes mapping in `gdriveError()`
-  (`gdrive/drive-fs.ts`: 403 + `rateLimitExceeded` body-sniff →
-  `RateLimitError`); Dropbox does it inline per call site
-  (`dropbox/index.ts` ~272–283, 387–394: raw 429 + `Retry-After`). A
-  third backend would have to reverse-engineer both. With only N=2
-  backends, extracting a shared `ErrorMapper` seam is borderline
-  speculative — prefer first consolidating Dropbox's inline mapping into
-  its own `dropboxError()` mirror of `gdriveError()`, and revisit the
-  shared abstraction only if a third cloud backend lands. **Risk:**
-  changing which statuses count as transient could hide real failures;
-  keep semantics bit-identical per backend. **Severity: 4.**
 - **Wrapper capability-forwarding rules are implicit.**
   `cache/index.ts` (~238) adds `loadSync`; `encrypting/index.ts` (~36)
   deletes it — each wrapper hand-rolls what it preserves or strips from
@@ -122,6 +110,24 @@ _(none)_
 
 ## Landed
 
+- **2026-07 — Dropbox HTTP error mapping consolidated into
+  `dropbox/errors.ts` (was severity 4).** The ~8 `throw new Error("Dropbox
+  <op> failed: <status> <body>")` sites across the file store, attachment
+  store, list walk (`list.ts`), and namespace delete each hand-rolled the
+  message; the two upload paths additionally mapped 429 → `RateLimitError`.
+  All now throw through `dropboxError(op, res, { rateLimit? })` — the
+  Dropbox mirror of `gdriveError`. Kept **bit-identical, not** unified with
+  gdrive's uniform mapping: 401 is still handled upstream in
+  `createAuthedFetch` (never reaches the helper, so no 401 branch), and
+  only the upload paths pass `rateLimit: true` — a 429 on read/list/delete
+  stays a plain labelled failure exactly as before (adopting gdrive's
+  always-map-429 would have been a behaviour change, out of scope for a
+  refactor). Pinned before/after via the settings-store scripted-fetch
+  tests (download/upload/429/generic messages) and a direct helper unit
+  test (`tests/storage/dropbox-errors.test.ts`, incl. the "429 without
+  the flag stays generic" preservation case). `dropbox/index.ts` dropped
+  509 → 476 lines. A shared cross-backend `ErrorMapper` remains
+  deliberately un-built — revisit only if a third cloud backend lands.
 - **2026-07 — `useBackendSelection` extracted from `useStorageBackend`
   (was severity 5).** The `selection` memo (backend resolution from the
   preference + live tokens/grant) and `makeInner` (the per-namespace
