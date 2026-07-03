@@ -85,3 +85,24 @@ export function replaceRange(
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
+
+/**
+ * The index of the first line that differs between two versions of a note's
+ * source, or `null` when they are identical. Used to anchor the scroll when
+ * undo / redo swaps the body out from under the editor: the view jumps to the
+ * first line the reverted (or re-applied) edit touched, so you see what changed.
+ *
+ * The index is relative to the shared prefix, so it can equal the shorter
+ * version's line count when one is a strict prefix of the other (the change was
+ * an append or a trailing delete); callers clamp it into the line array they
+ * are scrolling.
+ */
+export function firstChangedLine(before: string, after: string): number | null {
+  if (before === after) return null;
+  const a = before.split("\n");
+  const b = after.split("\n");
+  const shared = Math.min(a.length, b.length);
+  let i = 0;
+  while (i < shared && a[i] === b[i]) i++;
+  return i;
+}

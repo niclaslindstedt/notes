@@ -19,6 +19,7 @@ import {
   INLINE_PLACEMENT,
 } from "../domain/attachment.ts";
 import {
+  firstChangedLine,
   orderPoints,
   pointsEqual,
   replaceRange,
@@ -83,6 +84,12 @@ import {
 type Props = {
   body: string;
   onChange: (body: string) => void;
+  /**
+   * Ticks when undo / redo swaps `body` out from under the editor. On a tick the
+   * editor diffs the incoming body against what's on screen and scrolls the
+   * first changed line into view, so the reverted / re-applied part is revealed.
+   */
+  undoScrollSeq?: number;
   /** Wrap long lines, or keep them on one line and scroll horizontally. */
   wordWrap: boolean;
   /** Turn off browser/OS spell check (the red squiggles). */
@@ -124,6 +131,7 @@ type Active = { index: number | null; key: number };
 export function MarkdownEditor({
   body,
   onChange,
+  undoScrollSeq = 0,
   wordWrap,
   disableSpellcheck,
   disableAutocorrect,
@@ -187,6 +195,14 @@ export function MarkdownEditor({
   // re-runs the effect without changing the key) never re-triggers a scroll.
   const lastRevealKey = useRef<number | null>(null);
 
+  // Undo/redo scroll bookkeeping. `lastUndoSeq` remembers the tick we last acted
+  // on (seeded to the current one so a fresh mount never scrolls); when it
+  // advances we diff the incoming body against what's on screen and stash the
+  // first changed line in `pendingScrollLine`, which the value-driven effect
+  // below scrolls to once the new lines have rendered.
+  const lastUndoSeq = useRef(undoScrollSeq);
+  const pendingScrollLine = useRef<number | null>(null);
+
   const clampedIndex =
     active.index === null ? null : Math.min(active.index, lines.length - 1);
 
@@ -232,6 +248,20 @@ export function MarkdownEditor({
     pendingCaret.current = editing ? 0 : null;
   }, [body]);
 
+  // An undo / redo just swapped the body in. Diff the incoming `body` against
+  // the value still on screen (`valueRef` — the `[body]` effect above has
+  // scheduled `setValue(body)` but React hasn't re-rendered yet, so it still
+  // holds the pre-undo text) and remember the first line that changed. The
+  // value-driven effect below scrolls to it once those lines have rendered. A
+  // no-op tick (nothing to undo) never fires, and a change that leaves the body
+  // untouched (only a title / attachment was reverted) diffs to `null`, so
+  // neither disturbs the scroll position.
+  useEffect(() => {
+    if (undoScrollSeq === lastUndoSeq.current) return;
+    lastUndoSeq.current = undoScrollSeq;
+    pendingScrollLine.current = firstChangedLine(valueRef.current, body);
+  }, [undoScrollSeq, body]);
+
   // Install the pending caret after the active line (re)renders. React owns the
   // line's DOM — the browser never mutates it (every edit is intercepted below)
   // — so after each edit the caret must be re-placed at the column the edit
@@ -261,6 +291,19 @@ export function MarkdownEditor({
       settingSel.current = false;
     });
   }, [active, value]);
+
+  // Scroll the line an undo / redo changed into view, now that the new value has
+  // rendered so the target line's DOM exists. Runs after every value change but
+  // only acts on the line the effect above stashed, so ordinary typing (which
+  // leaves `pendingScrollLine` null) never moves the view. Deferred behind the
+  // caret placement above (a `useEffect` runs after the `useLayoutEffect`), so
+  // the reveal centres on the change rather than on the restored caret.
+  useEffect(() => {
+    const line = pendingScrollLine.current;
+    if (line === null) return;
+    pendingScrollLine.current = null;
+    scrollLineIntoView(rootRef.current, Math.min(line, lines.length - 1));
+  }, [lines]);
 
   // --- Structural edits (cross-line) ---------------------------------------
   //
@@ -829,6 +872,30 @@ function ActiveLine({
       {text === "" ? <br /> : text}
     </div>
   );
+}
+
+// Bring the line at `index` into view within the editor's scroll container —
+// the anchor an undo / redo scrolls to. Left alone when the line is already
+// fully visible, so a small revert that's on screen doesn't jump the view; when
+// it's off screen the line is centred, gliding unless reduced motion is asked
+// for. `root` is the contenteditable; its parent is the `overflow-y-auto`
+// scroller, and the only scrollable ancestor, so `scrollIntoView` stays
+// contained to the note.
+function scrollLineIntoView(root: HTMLElement | null, index: number): void {
+  if (!root || index < 0) return;
+  const line = root.querySelector<HTMLElement>(`[data-line-index="${index}"]`);
+  const scroller = root.parentElement;
+  if (!line || !scroller) return;
+  const lineRect = line.getBoundingClientRect();
+  const viewRect = scroller.getBoundingClientRect();
+  if (lineRect.top >= viewRect.top && lineRect.bottom <= viewRect.bottom)
+    return;
+  const reduceMotion =
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  line.scrollIntoView({
+    block: "center",
+    behavior: reduceMotion ? "auto" : "smooth",
+  });
 }
 
 // Whether a drag is carrying files (rather than dragged text) — the same

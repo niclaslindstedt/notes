@@ -136,6 +136,7 @@ export function App() {
     redo,
     canUndo,
     canRedo,
+    undoScrollSeq,
     sync,
   } = useNotes(seedAdapter ?? storage.adapter, formatting, editingId);
   // Persist the open note per namespace so it survives a reload / upgrade. The
@@ -572,6 +573,7 @@ export function App() {
                       onChange={(body) => update(editing.id, body)}
                       onTitleChange={(title) => retitle(editing.id, title)}
                       onTitleSettle={sync.releaseSaves}
+                      undoScrollSeq={undoScrollSeq}
                       syncSlot={syncSlot}
                       uploading={uploadingIds.has(editing.id)}
                       loading={editingDeferred}
