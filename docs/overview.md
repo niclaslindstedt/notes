@@ -672,32 +672,57 @@ happens under the real title slug rather than the throwaway default filename.
 ### Undo / redo
 
 `useUndoRedo` (`src/app/use-undo-redo.ts`) — in-memory undo/redo over whole
-`Snapshot`s, capped at `UNDO_HISTORY_LIMIT` (50). `record` appends a labelled
-entry; a `mergeKey` collapses rapid same-key records into one step, while
-creates/deletes always land as their own steps. Body edits key on
-`edit:<noteId>:<completed-sentence-count>`, where the count comes from
-`sentenceBoundaryCount` (`src/domain/sentence.ts` — a terminator `.`/`!`/`?`/`…`
-followed by whitespace, ignoring the trailing newline the live-preview editor
-keeps at the end of the body so the sentence you're still typing isn't counted
-as finished the instant you type its terminator): keystrokes within the
-sentence being typed coalesce, and each finished sentence bumps the count so it
-locks in as its own checkpoint. Undo therefore walks a long paragraph back
-**sentence by sentence** rather than deleting the whole burst at once; an
-image/file paste
-keeps its body reference and attachment together on one step by sharing the
-current sentence's key. `reset` rebuilds the
-timeline whenever the document arrives from outside the edit path (load, reload,
-conflict-adopt). `useUndoRedoShortcuts` (`src/ui/hooks/useUndoRedoShortcuts.ts`)
-binds ⌘/Ctrl+Z (undo) and ⌘/Ctrl+Shift+Z / Ctrl+Y (redo); the side menu also
-exposes undo/redo as the bottom row of the
-[button island](#folders-in-the-side-menu) at the foot of the list. The
-shortcut stands down inside plain `<input>` / `<textarea>` fields (the note
-title, settings, modal inputs) so their native character-level undo wins, but
-it **does** answer the shortcut inside the live-preview editor's
+`Snapshot`s, **scoped per note**. It holds one timeline per *scope* — the id of
+the note being edited, or the shared `DOC_SCOPE` for structural changes that
+aren't about one note (create / delete / archive / restore / move / folder ops /
+import) — each capped at `UNDO_HISTORY_LIMIT` (50) and seeded lazily (from the
+pre-edit document) the first time something records against it. `undo` / `redo`
+and `canUndo` / `canRedo` all act on the **active scope** — the note open in the
+editor (`activeNoteId`, threaded from `App`'s `editingId`), or `DOC_SCOPE` on the
+list / archive views. So switching notes switches which timeline ⌘/Ctrl+Z walks:
+a burst of edits in one note is never reverted while you're looking at another,
+and each note keeps its own session history.
+
+`record` appends a labelled entry to a scope; a `mergeKey` collapses rapid
+same-key records into one step, while creates/deletes (no key) always land as
+their own steps. Body edits key on `edit:<noteId>:<run>:<completed-sentence-count>`,
+composed by `useNotes`:
+
+- the **sentence count** comes from `sentenceBoundaryCount`
+  (`src/domain/sentence.ts` — a terminator `.`/`!`/`?`/`…` followed by
+  whitespace, ignoring the trailing newline the live-preview editor keeps at the
+  end of the body so the sentence you're still typing isn't counted as finished
+  the instant you type its terminator), so keystrokes within one sentence
+  coalesce and each finished sentence locks in as its own checkpoint — undo walks
+  a long paragraph back **sentence by sentence**;
+- the **run** comes from `nextEditRun`, a per-note counter that ticks up every
+  time typing reverses direction (insert ↔ delete). Typing a word, erasing it,
+  then typing another leaves **three** undo steps (retype → erased → original)
+  instead of coalescing into one and swallowing the erase.
+
+An image/file paste keeps its body reference and attachment together on one step
+by sharing the note's current key (`currentBodyEditKey`, which peeks the run
+without advancing it).
+
+Applying a stepped-to entry is **surgical** so it never clobbers edits made in
+another scope since: a note scope splices just that note's content (body / title
+/ attachments) back into the live document, and `DOC_SCOPE` uses
+`mergeDocSnapshot` to restore the note *set*, each note's structural fields
+(`archived` / `folderId`) and the folder registry from the entry while keeping
+every surviving note's **current** body. `reset` drops every timeline (and the
+run bookkeeping) whenever the document arrives from outside the edit path (load,
+reload, conflict-adopt); scopes reseed on their next edit.
+
+`useUndoRedoShortcuts` (`src/ui/hooks/useUndoRedoShortcuts.ts`) binds ⌘/Ctrl+Z
+(undo) and ⌘/Ctrl+Shift+Z / Ctrl+Y (redo); the side menu also exposes undo/redo
+as the bottom row of the [button island](#folders-in-the-side-menu) at the foot
+of the list. The shortcut stands down inside plain `<input>` / `<textarea>`
+fields (the note title, settings, modal inputs) so their native character-level
+undo wins, but it **does** answer the shortcut inside the live-preview editor's
 `contenteditable` — that surface deliberately swallows the browser's native
-contenteditable undo (React owns its DOM), so without this the shortcut would
-be dead while the caret sits in a note. There it reverts one sentence of the
-current editing burst, exactly as the side menu's Undo button does.
+contenteditable undo (React owns its DOM), so without this the shortcut would be
+dead while the caret sits in a note. There it reverts one sentence of the open
+note's editing burst, exactly as the side menu's Undo button does.
 
 ### Settings sync
 

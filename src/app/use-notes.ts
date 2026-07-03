@@ -32,7 +32,13 @@ import { importedNote } from "../domain/import.ts";
 import { sentenceBoundaryCount } from "../domain/sentence.ts";
 import type { StorageAdapter } from "../storage/adapter.ts";
 import { useNotesSync, type NotesSync } from "./use-notes-sync.ts";
-import { useUndoRedo } from "./use-undo-redo.ts";
+import {
+  DOC_SCOPE,
+  mergeDocSnapshot,
+  nextEditRun,
+  useUndoRedo,
+  type EditRun,
+} from "./use-undo-redo.ts";
 
 export type NotesStore = {
   // Most-recently-edited first, with blank (never-typed) notes hidden — the
@@ -98,6 +104,7 @@ export type NotesStore = {
 export function useNotes(
   adapter: StorageAdapter,
   formatting?: SaveFormatting,
+  activeNoteId: string | null = null,
 ): NotesStore {
   // The undo timeline is built after the sync engine (it needs the engine's
   // `setDoc` / `scheduleSave` to apply a stepped-to snapshot), but the
@@ -114,11 +121,49 @@ export function useNotes(
   const docRef = useRef<Snapshot>(sync.doc);
   docRef.current = sync.doc;
 
+  // Per-note edit-run state, so the body-edit merge key can break the undo
+  // chain when typing reverses direction (type → erase → retype). Kept in a ref
+  // (never rendered) and cleared whenever the document is reseeded from outside.
+  const editRuns = useRef<Map<string, EditRun>>(new Map());
+
+  // The timeline undo / redo act on: the open note's own history, or the shared
+  // structural timeline when no note is open (the list / archive views).
+  const activeScope = activeNoteId ?? DOC_SCOPE;
+
   // Apply a snapshot stepped to off the undo / redo timeline: swap the visible
-  // document and persist it so the reverted state survives a reload, exactly
-  // as a normal edit would.
-  const applyHistorySnapshot = useCallback(
-    (next: Snapshot) => {
+  // document and persist it so the reverted state survives a reload, exactly as
+  // a normal edit would. A note scope splices just that note's content back into
+  // the live document (leaving every other note as it stands now); `DOC_SCOPE`
+  // restores the note set and structural fields while keeping surviving notes'
+  // current bodies (see `mergeDocSnapshot`).
+  const applyEntry = useCallback(
+    (scope: string, entry: Snapshot) => {
+      const cur = docRef.current;
+      let next: Snapshot;
+      if (scope === DOC_SCOPE) {
+        next = mergeDocSnapshot(cur, entry);
+      } else {
+        const restored = entry.notes.find((n) => n.id === scope);
+        if (!restored) return;
+        const exists = cur.notes.some((n) => n.id === scope);
+        next = {
+          ...cur,
+          notes: exists
+            ? cur.notes.map((n) =>
+                n.id === scope
+                  ? {
+                      ...n,
+                      body: restored.body,
+                      title: restored.title,
+                      attachments: restored.attachments,
+                      updatedAt: restored.updatedAt,
+                    }
+                  : n,
+              )
+            : [restored, ...cur.notes],
+        };
+      }
+      docRef.current = next;
       sync.setDoc(next);
       sync.scheduleSave(next);
     },
@@ -132,24 +177,33 @@ export function useNotes(
     redo: redoTimeline,
     canUndo,
     canRedo,
-  } = useUndoRedo({ initialSeed: sync.doc, setData: applyHistorySnapshot });
-  resetHistory.current = reset;
+  } = useUndoRedo({ activeScope, apply: applyEntry });
+  // Reseeding the document (load / reload / conflict-adopt) also clears the
+  // edit-run bookkeeping so the next keystroke starts a fresh run.
+  resetHistory.current = useCallback(() => {
+    editRuns.current.clear();
+    reset();
+  }, [reset]);
 
   // Apply a producer over the latest snapshot, render it immediately, queue
-  // the debounced save, and record the result on the undo timeline. The single
-  // seam every mutation runs through. `mergeKey` coalesces a run of continuous
-  // edits (typing in one note) into a single undo step.
+  // the debounced save, and record the result on the given scope's undo
+  // timeline. The single seam every mutation runs through. `scope` is the note
+  // id for a note-scoped edit, or `DOC_SCOPE` for a structural change;
+  // `mergeKey` coalesces a run of continuous edits (typing in one note) into a
+  // single undo step.
   const commitSnapshot = useCallback(
     (
       producer: (prev: Snapshot) => Snapshot,
       label: string,
+      scope: string,
       mergeKey: string | null = null,
     ): void => {
-      const next = producer(docRef.current);
+      const before = docRef.current;
+      const next = producer(before);
       docRef.current = next;
       sync.setDoc(next);
       sync.scheduleSave(next);
-      record(next, label, mergeKey);
+      record({ scope, before, after: next, label, mergeKey });
     },
     [sync, record],
   );
@@ -160,16 +214,35 @@ export function useNotes(
     (
       producer: (prev: Note[]) => Note[],
       label: string,
+      scope: string,
       mergeKey: string | null = null,
     ): void => {
       commitSnapshot(
         (prev) => ({ ...prev, notes: producer(prev.notes) }),
         label,
+        scope,
         mergeKey,
       );
     },
     [commitSnapshot],
   );
+
+  // The merge key for a body edit of `id`: fold in the completed-sentence count
+  // (so each finished sentence is its own checkpoint) and the edit-run counter
+  // (so reversing typing direction — type, erase, retype — breaks the chain).
+  const bodyEditKey = useCallback((id: string, body: string): string => {
+    const run = nextEditRun(editRuns.current.get(id), body.length);
+    editRuns.current.set(id, run);
+    return `edit:${id}:${run.run}:${sentenceBoundaryCount(body)}`;
+  }, []);
+
+  // The current body-edit key for `id` without advancing its run — used by an
+  // attachment paste so its record coalesces with the surrounding typing rather
+  // than starting a fresh run.
+  const currentBodyEditKey = useCallback((id: string, body: string): string => {
+    const run = editRuns.current.get(id)?.run ?? 0;
+    return `edit:${id}:${run}:${sentenceBoundaryCount(body)}`;
+  }, []);
 
   // Merge a freshly-decrypted body into the on-screen document without bumping
   // `updatedAt` or scheduling a save — loading a body to read it is not an edit.
@@ -225,7 +298,7 @@ export function useNotes(
     (title = "", folderId?: string): string => {
       const note: Note = { ...createNote(), title };
       if (folderId) note.folderId = folderId;
-      commit((prev) => [note, ...prev], "New note");
+      commit((prev) => [note, ...prev], "New note", DOC_SCOPE);
       return note.id;
     },
     [commit],
@@ -241,7 +314,7 @@ export function useNotes(
         fresh.length === 1
           ? `Imported note “${noteTitle(fresh[0]!)}”`
           : `Imported ${fresh.length} notes`;
-      commit((prev) => [...fresh, ...prev], label);
+      commit((prev) => [...fresh, ...prev], label, DOC_SCOPE);
       return fresh.length;
     },
     [commit],
@@ -255,17 +328,17 @@ export function useNotes(
       // jump the note to the top of the list).
       if (existing && existing.body === body) return;
       const title = existing ? noteTitle(existing) : "note";
-      // Suffix the merge key with the count of completed sentences so each
-      // finished sentence lands as its own undo step: keystrokes inside the
-      // sentence being typed share a key and coalesce, and finishing a
-      // sentence bumps the count so the next one starts a fresh checkpoint.
+      // Record onto the note's own timeline, keyed so keystrokes inside one
+      // sentence coalesce, each finished sentence checkpoints, and reversing
+      // direction (type → erase → retype) breaks into separate steps.
       commit(
         (prev) => prev.map((n) => (n.id === id ? editNote(n, body) : n)),
         `Edited note “${title}”`,
-        `edit:${id}:${sentenceBoundaryCount(body)}`,
+        id,
+        bodyEditKey(id, body),
       );
     },
-    [commit],
+    [commit, bodyEditKey],
   );
 
   // Attach a pasted / dropped file to a note. The editor inserts the body
@@ -278,7 +351,7 @@ export function useNotes(
       // reference the editor inserts alongside this attachment coalesces with
       // it — one paste stays one undo.
       const current = docRef.current.notes.find((n) => n.id === id);
-      const key = `edit:${id}:${sentenceBoundaryCount(current?.body ?? "")}`;
+      const key = currentBodyEditKey(id, current?.body ?? "");
       commit(
         (prev) =>
           prev.map((n) =>
@@ -291,10 +364,11 @@ export function useNotes(
               : n,
           ),
         "Attached a file",
+        id,
         key,
       );
     },
-    [commit],
+    [commit, currentBodyEditKey],
   );
 
   const retitle = useCallback(
@@ -303,6 +377,7 @@ export function useNotes(
         commit(
           (prev) => prev.map((n) => (n.id === id ? retitleNote(n, title) : n)),
           `Renamed note “${title.trim() || "Untitled note"}”`,
+          id,
           `retitle:${id}`,
         ),
       );
@@ -317,6 +392,7 @@ export function useNotes(
       commit(
         (prev) => prev.filter((n) => n.id !== id),
         `Deleted note “${title}”`,
+        DOC_SCOPE,
       );
     },
     [commit],
@@ -330,6 +406,7 @@ export function useNotes(
         commit(
           (prev) => prev.map((n) => (n.id === id ? setArchived(n, true) : n)),
           `Archived note “${title}”`,
+          DOC_SCOPE,
         ),
       );
     },
@@ -344,6 +421,7 @@ export function useNotes(
         commit(
           (prev) => prev.map((n) => (n.id === id ? setArchived(n, false) : n)),
           `Restored note “${title}”`,
+          DOC_SCOPE,
         ),
       );
     },
@@ -365,6 +443,7 @@ export function useNotes(
           folderId
             ? `Moved note “${title}” to a folder`
             : `Moved note “${title}” out of its folder`,
+          DOC_SCOPE,
         ),
       );
     },
@@ -377,6 +456,7 @@ export function useNotes(
       commitSnapshot(
         (prev) => ({ ...prev, folders: [...(prev.folders ?? []), folder] }),
         `Created folder “${folder.name}”`,
+        DOC_SCOPE,
       );
       unlock("organizer");
       return folder.id;
@@ -396,6 +476,7 @@ export function useNotes(
           ),
         }),
         `Renamed folder “${trimmed}”`,
+        DOC_SCOPE,
       );
     },
     [commitSnapshot],
@@ -417,6 +498,7 @@ export function useNotes(
             ),
           }),
           `Deleted folder “${name}”`,
+          DOC_SCOPE,
         );
       // Clearing the folder rewrites every note that was in it; load any
       // deferred ones first so the change reaches their `.enc` files.
@@ -444,6 +526,7 @@ export function useNotes(
           notes: prev.notes.filter((n) => n.folderId !== id),
         }),
         `Moved folder “${name}” to another namespace`,
+        DOC_SCOPE,
       );
     },
     [commitSnapshot],

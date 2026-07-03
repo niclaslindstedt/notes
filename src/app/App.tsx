@@ -103,6 +103,16 @@ export function App() {
     }),
     [editor.trimTrailingSpaces, editor.trailingNewline],
   );
+  // Restore the note that was open in the active namespace before the last
+  // reload / PWA upgrade, so a refresh lands back where you left off instead of
+  // dropping to the overview. Once the (possibly async-loading) document
+  // arrives, `editing` below resolves the id to the note; a stale id (the note
+  // was deleted elsewhere) simply resolves to nothing and falls back to the
+  // overview. Declared before `useNotes` so the open note scopes its undo
+  // timeline (undo/redo act on the note you're looking at).
+  const [editingId, setEditingId] = useState<string | null>(() =>
+    getActiveNote(storage.activeNamespace),
+  );
   const {
     notes,
     allNotes,
@@ -127,16 +137,7 @@ export function App() {
     canUndo,
     canRedo,
     sync,
-  } = useNotes(seedAdapter ?? storage.adapter, formatting);
-  // Restore the note that was open in the active namespace before the last
-  // reload / PWA upgrade, so a refresh lands back where you left off instead of
-  // dropping to the overview. Once the (possibly async-loading) document
-  // arrives, `editing` below resolves the id to the note; a stale id (the note
-  // was deleted elsewhere) simply resolves to nothing and falls back to the
-  // overview.
-  const [editingId, setEditingId] = useState<string | null>(() =>
-    getActiveNote(storage.activeNamespace),
-  );
+  } = useNotes(seedAdapter ?? storage.adapter, formatting, editingId);
   // Persist the open note per namespace so it survives a reload / upgrade. The
   // active-namespace pointer is itself per-device, so the pair stays consistent.
   useEffect(() => {
