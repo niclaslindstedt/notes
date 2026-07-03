@@ -22,8 +22,19 @@
 // harmless.
 const SENTENCE_BOUNDARY = /[.!?…]+["'”’)\]]*\s/gu;
 
+// The live-preview editor keeps a trailing empty line, so a note's body reaches
+// us as `"This?\n"` while you're still typing the last sentence. That trailing
+// newline is whitespace, so without stripping it the final terminator would
+// match the boundary rule the instant you type it — the last, in-progress
+// sentence would checkpoint a keystroke early and undo would peel just its
+// terminator off (`This?` → `This`). Trailing newlines are the editor's
+// structural padding, not the user moving past the sentence, so drop them
+// before counting. A trailing *space* is left intact: that one the user typed
+// to start the next sentence, and it should still lock the checkpoint.
+const TRAILING_NEWLINES = /\n+$/u;
+
 /** How many completed sentences `text` contains (see the boundary rule above). */
 export function sentenceBoundaryCount(text: string): number {
-  const matches = text.match(SENTENCE_BOUNDARY);
+  const matches = text.replace(TRAILING_NEWLINES, "").match(SENTENCE_BOUNDARY);
   return matches ? matches.length : 0;
 }
