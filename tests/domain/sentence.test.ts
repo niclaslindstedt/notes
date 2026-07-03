@@ -23,6 +23,19 @@ describe("sentenceBoundaryCount", () => {
     expect(sentenceBoundaryCount("First line.\nSecond line")).toBe(1);
   });
 
+  it("ignores the editor's trailing newline on the sentence being typed", () => {
+    // The live-preview editor keeps a trailing empty line, so the body arrives
+    // as `"This?\n"` mid-typing. That trailing newline must not turn the still-
+    // open last sentence into a completed one — otherwise its undo step splits
+    // and undo peels only the terminator off (`This?` → `This`).
+    expect(sentenceBoundaryCount("This?\n")).toBe(0);
+    expect(sentenceBoundaryCount("This?\n\n")).toBe(0);
+    // A completed earlier sentence still counts; only the trailing, in-progress
+    // one is spared — so a paragraph ending mid-sentence keeps its checkpoints.
+    expect(sentenceBoundaryCount("One. Two.\n")).toBe(1);
+    expect(sentenceBoundaryCount("One. Two. Three.\n")).toBe(2);
+  });
+
   it("treats an ellipsis or run of terminators as a single boundary", () => {
     expect(sentenceBoundaryCount("Wait... really? yes")).toBe(2);
     expect(sentenceBoundaryCount("Whoa!!! ok")).toBe(1);

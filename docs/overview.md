@@ -677,10 +677,13 @@ entry; a `mergeKey` collapses rapid same-key records into one step, while
 creates/deletes always land as their own steps. Body edits key on
 `edit:<noteId>:<completed-sentence-count>`, where the count comes from
 `sentenceBoundaryCount` (`src/domain/sentence.ts` — a terminator `.`/`!`/`?`/`…`
-followed by whitespace): keystrokes within the sentence being typed coalesce,
-and each finished sentence bumps the count so it locks in as its own
-checkpoint. Undo therefore walks a long paragraph back **sentence by
-sentence** rather than deleting the whole burst at once; an image/file paste
+followed by whitespace, ignoring the trailing newline the live-preview editor
+keeps at the end of the body so the sentence you're still typing isn't counted
+as finished the instant you type its terminator): keystrokes within the
+sentence being typed coalesce, and each finished sentence bumps the count so it
+locks in as its own checkpoint. Undo therefore walks a long paragraph back
+**sentence by sentence** rather than deleting the whole burst at once; an
+image/file paste
 keeps its body reference and attachment together on one step by sharing the
 current sentence's key. `reset` rebuilds the
 timeline whenever the document arrives from outside the edit path (load, reload,
