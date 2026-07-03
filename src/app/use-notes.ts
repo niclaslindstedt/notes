@@ -7,7 +7,7 @@
 // the sync state back up for the header indicator and the unlock / conflict
 // surfaces.
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { unlock } from "../achievements/index.ts";
 import { type Attachment, withAttachment } from "../domain/attachment.ts";
@@ -96,6 +96,14 @@ export type NotesStore = {
   canUndo: boolean;
   /** Whether there is an undone edit to re-apply. */
   canRedo: boolean;
+  /**
+   * A counter bumped each time undo / redo restores a note's content, so the
+   * open editor can scroll the reverted (or re-applied) part back into view. It
+   * only ticks on a real content apply — a no-op at a timeline edge doesn't move
+   * it — and the editor scrolls to wherever the body now differs from what's on
+   * screen.
+   */
+  undoScrollSeq: number;
   // The persistence engine's live state — save status, conflict, offline —
   // for the header sync indicator and the conflict surface.
   sync: NotesSync;
@@ -125,6 +133,11 @@ export function useNotes(
   // chain when typing reverses direction (type → erase → retype). Kept in a ref
   // (never rendered) and cleared whenever the document is reseeded from outside.
   const editRuns = useRef<Map<string, EditRun>>(new Map());
+
+  // Bumped each time undo / redo applies a stepped-to entry, so the open editor
+  // can scroll the reverted / re-applied part into view. Advances in lockstep
+  // with the `setDoc` that swaps the body, so both land in the editor together.
+  const [undoScrollSeq, setUndoScrollSeq] = useState(0);
 
   // The timeline undo / redo act on: the open note's own history, or the shared
   // structural timeline when no note is open (the list / archive views).
@@ -166,6 +179,9 @@ export function useNotes(
       docRef.current = next;
       sync.setDoc(next);
       sync.scheduleSave(next);
+      // Signal the editor to reveal the changed region. Batched with `setDoc`,
+      // so the new body and this tick reach the editor in the same commit.
+      setUndoScrollSeq((s) => s + 1);
     },
     [sync],
   );
@@ -587,6 +603,7 @@ export function useNotes(
     redo,
     canUndo,
     canRedo,
+    undoScrollSeq,
     sync,
   };
 }

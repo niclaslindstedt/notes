@@ -724,6 +724,20 @@ contenteditable undo (React owns its DOM), so without this the shortcut would be
 dead while the caret sits in a note. There it reverts one sentence of the open
 note's editing burst, exactly as the side menu's Undo button does.
 
+**Undo / redo scrolls the changed region back into view.** When a step lands off
+screen — you undo a paragraph you scrolled past, or redo an edit near the note's
+foot — the reverted (or re-applied) part is revealed rather than silently
+changing out of sight. Each content apply bumps `undoScrollSeq` (returned by
+`useNotes`, threaded through the `Editor` to both the live-preview and plain
+editors) in the same commit that swaps the body in; a no-op at a timeline edge
+never ticks it. On a tick the editor diffs the incoming body against the text
+still on screen with `firstChangedLine` (`src/domain/line-edit.ts`) and scrolls
+that first differing line into view — the live-preview editor centres the line's
+element (left alone when it's already fully visible), the plain textarea
+estimates the offset from its line height. A change that leaves the body
+untouched (only a title or attachment was reverted) diffs to nothing and never
+moves the view, and the glide respects reduced motion.
+
 ### Settings sync
 
 `useSettingsSync` (`src/app/use-settings-sync.ts`) reconciles the

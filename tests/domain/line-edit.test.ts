@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  firstChangedLine,
   orderPoints,
   pointsEqual,
   replaceRange,
@@ -100,5 +101,37 @@ describe("replaceRange", () => {
     const r = replaceRange(["one", "two"], P(0, 3), P(0, 3), "\n");
     expect(r.lines).toEqual(["one", "", "two"]);
     expect(r.caret).toEqual(P(1, 0));
+  });
+});
+
+describe("firstChangedLine", () => {
+  it("returns null when the sources are identical", () => {
+    expect(firstChangedLine("a\nb\nc", "a\nb\nc")).toBeNull();
+  });
+
+  it("finds the first line that differs", () => {
+    expect(firstChangedLine("one\ntwo\nthree", "one\nTWO\nthree")).toBe(1);
+  });
+
+  it("reports line 0 when the very first line changed", () => {
+    expect(firstChangedLine("hello", "world")).toBe(0);
+  });
+
+  it("points at the first appended line (shared prefix)", () => {
+    // "after" is longer; the shared prefix is the whole "before", so the change
+    // begins at the first line past it.
+    expect(firstChangedLine("one\ntwo", "one\ntwo\nthree")).toBe(2);
+  });
+
+  it("points past the shared prefix when lines were removed", () => {
+    // "after" is a strict prefix of "before" (a trailing delete); the index
+    // equals the shorter version's line count, which callers clamp.
+    expect(firstChangedLine("one\ntwo\nthree", "one\ntwo")).toBe(2);
+  });
+
+  it("handles a change deep in a long body", () => {
+    const before = Array.from({ length: 40 }, (_, i) => `line ${i}`).join("\n");
+    const after = before.replace("line 30", "line 30 edited");
+    expect(firstChangedLine(before, after)).toBe(30);
   });
 });

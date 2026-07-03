@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { type Attachment } from "../domain/attachment.ts";
+import { firstChangedLine } from "../domain/line-edit.ts";
 import { isBlank, type Folder, type Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
@@ -77,6 +78,7 @@ export function Editor({
   onChange,
   onTitleChange,
   onTitleSettle,
+  undoScrollSeq = 0,
   syncSlot,
   uploading = false,
   loading = false,
@@ -94,6 +96,9 @@ export function Editor({
   onChange: (body: string) => void;
   onTitleChange: (title: string) => void;
   onTitleSettle: () => void;
+  /** Ticks when undo / redo swaps the body — cues the editor to scroll the
+   *  reverted / re-applied region back into view. */
+  undoScrollSeq?: number;
   syncSlot: ReactNode;
   /** The open note's file is being uploaded — swap the glyph for a spinner. */
   uploading?: boolean;
@@ -197,6 +202,7 @@ export function Editor({
             ref={markdownEditorRef}
             body={note.body ?? ""}
             onChange={onChange}
+            undoScrollSeq={undoScrollSeq}
             wordWrap={editor.wordWrap}
             disableSpellcheck={editor.disableSpellcheck}
             disableAutocorrect={editor.disableAutocorrect}
@@ -216,6 +222,7 @@ export function Editor({
           <PlainEditor
             body={note.body ?? ""}
             onChange={onChange}
+            undoScrollSeq={undoScrollSeq}
             wordWrap={editor.wordWrap}
             disableSpellcheck={editor.disableSpellcheck}
             disableAutocorrect={editor.disableAutocorrect}
@@ -386,6 +393,7 @@ function TitleField({
 function PlainEditor({
   body,
   onChange,
+  undoScrollSeq = 0,
   wordWrap,
   disableSpellcheck,
   disableAutocorrect,
@@ -394,6 +402,8 @@ function PlainEditor({
 }: {
   body: string;
   onChange: (body: string) => void;
+  /** Ticks when undo / redo swaps the body — see the live-preview editor. */
+  undoScrollSeq?: number;
   wordWrap: boolean;
   disableSpellcheck: boolean;
   disableAutocorrect: boolean;
@@ -413,6 +423,26 @@ function PlainEditor({
   useEffect(() => {
     if (body !== valueRef.current) setValue(body);
   }, [body]);
+
+  // Reveal the region an undo / redo changed. On a tick (a real content apply —
+  // a timeline-edge no-op never fires), stash the first line that differs
+  // between the incoming body and the text still on screen; the value effect
+  // below scrolls the textarea to it once the new value has rendered. The
+  // keyboard undo shortcut stands down inside a textarea, so a timeline undo
+  // here only comes from the side-menu button, with the textarea unfocused.
+  const lastUndoSeqRef = useRef(undoScrollSeq);
+  const pendingScrollLineRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (undoScrollSeq === lastUndoSeqRef.current) return;
+    lastUndoSeqRef.current = undoScrollSeq;
+    pendingScrollLineRef.current = firstChangedLine(valueRef.current, body);
+  }, [undoScrollSeq, body]);
+  useEffect(() => {
+    const line = pendingScrollLineRef.current;
+    if (line === null) return;
+    pendingScrollLineRef.current = null;
+    scrollTextareaToLine(textareaRef.current, line);
+  }, [value]);
 
   // Focus the editor on open without the focusOnMount prop (which a11y
   // linting flags) — placing the caret at the end so editing an existing
@@ -455,4 +485,28 @@ function PlainEditor({
       }`}
     />
   );
+}
+
+// Scroll a plain textarea so the source line at `index` is on screen — the
+// anchor an undo / redo scrolls the fallback editor to. Left alone when the line
+// already sits within the visible band so an on-screen revert doesn't jump; when
+// it's off screen the line is centred. The offset is estimated from the line
+// height (exact without word wrap; a soft-wrapped line lands close enough to
+// bring the change into view), and reduced motion turns the glide into a jump.
+function scrollTextareaToLine(
+  el: HTMLTextAreaElement | null,
+  index: number,
+): void {
+  if (!el || index < 0) return;
+  const lineHeight = parseFloat(getComputedStyle(el).lineHeight);
+  if (!Number.isFinite(lineHeight) || lineHeight <= 0) return;
+  const top = index * lineHeight;
+  if (top >= el.scrollTop && top + lineHeight <= el.scrollTop + el.clientHeight)
+    return;
+  const reduceMotion =
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  el.scrollTo({
+    top: Math.max(0, top - el.clientHeight / 2),
+    behavior: reduceMotion ? "auto" : "smooth",
+  });
 }

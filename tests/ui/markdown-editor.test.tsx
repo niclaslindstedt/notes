@@ -145,6 +145,105 @@ describe("MarkdownEditor", () => {
     expect(screen.getByText(/start writing/i)).not.toBeNull();
   });
 
+  describe("undo / redo reveal", () => {
+    // jsdom has no layout, so pin the geometry: the scroll container (no
+    // data-line-index) sits at 0–100, every line sits at 500–520 (off screen),
+    // so a line the undo touched is always judged out of view and scrolled to.
+    function mockLayout() {
+      const original = HTMLElement.prototype
+        .getBoundingClientRect as typeof HTMLElement.prototype.getBoundingClientRect;
+      HTMLElement.prototype.getBoundingClientRect = function (
+        this: HTMLElement,
+      ) {
+        const offScreen = this.hasAttribute("data-line-index");
+        return {
+          top: offScreen ? 500 : 0,
+          bottom: offScreen ? 520 : 100,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: offScreen ? 20 : 100,
+          x: 0,
+          y: offScreen ? 500 : 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      };
+      const scrollIntoView = vi.fn();
+      const originalScroll = HTMLElement.prototype.scrollIntoView;
+      HTMLElement.prototype.scrollIntoView = scrollIntoView;
+      const restore = () => {
+        HTMLElement.prototype.getBoundingClientRect = original;
+        HTMLElement.prototype.scrollIntoView = originalScroll;
+      };
+      return { scrollIntoView, restore };
+    }
+
+    it("scrolls the first changed line into view when the seq advances", () => {
+      const { scrollIntoView, restore } = mockLayout();
+      try {
+        const onChange = vi.fn();
+        const { rerender } = render(
+          <MarkdownEditor
+            body={"alpha\nbravo\ncharlie"}
+            onChange={onChange}
+            undoScrollSeq={0}
+            focusOnMount={false}
+            {...editorProps}
+          />,
+        );
+        expect(scrollIntoView).not.toHaveBeenCalled();
+
+        // An undo swaps the body and ticks the seq in the same commit.
+        rerender(
+          <MarkdownEditor
+            body={"alpha\nBRAVO\ncharlie"}
+            onChange={onChange}
+            undoScrollSeq={1}
+            focusOnMount={false}
+            {...editorProps}
+          />,
+        );
+
+        const changed = surface().querySelector('[data-line-index="1"]');
+        expect(scrollIntoView).toHaveBeenCalledTimes(1);
+        expect(scrollIntoView.mock.instances[0]).toBe(changed);
+      } finally {
+        restore();
+      }
+    });
+
+    it("does not scroll when the body changes without a seq bump", () => {
+      const { scrollIntoView, restore } = mockLayout();
+      try {
+        const onChange = vi.fn();
+        const { rerender } = render(
+          <MarkdownEditor
+            body={"alpha\nbravo\ncharlie"}
+            onChange={onChange}
+            undoScrollSeq={0}
+            focusOnMount={false}
+            {...editorProps}
+          />,
+        );
+
+        // A live cloud pull changes the body but never ticks the undo seq.
+        rerender(
+          <MarkdownEditor
+            body={"alpha\nBRAVO\ncharlie"}
+            onChange={onChange}
+            undoScrollSeq={0}
+            focusOnMount={false}
+            {...editorProps}
+          />,
+        );
+
+        expect(scrollIntoView).not.toHaveBeenCalled();
+      } finally {
+        restore();
+      }
+    });
+  });
+
   describe("opening without focus (focusOnMount=false)", () => {
     it("renders the whole note formatted with no raw line on open", () => {
       renderEditor("**bold**\nplain", { focusOnMount: false });
