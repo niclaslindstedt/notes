@@ -29,6 +29,7 @@ import {
   type Snapshot,
 } from "../domain/note.ts";
 import { importedNote } from "../domain/import.ts";
+import { sentenceBoundaryCount } from "../domain/sentence.ts";
 import type { StorageAdapter } from "../storage/adapter.ts";
 import { useNotesSync, type NotesSync } from "./use-notes-sync.ts";
 import { useUndoRedo } from "./use-undo-redo.ts";
@@ -254,10 +255,14 @@ export function useNotes(
       // jump the note to the top of the list).
       if (existing && existing.body === body) return;
       const title = existing ? noteTitle(existing) : "note";
+      // Suffix the merge key with the count of completed sentences so each
+      // finished sentence lands as its own undo step: keystrokes inside the
+      // sentence being typed share a key and coalesce, and finishing a
+      // sentence bumps the count so the next one starts a fresh checkpoint.
       commit(
         (prev) => prev.map((n) => (n.id === id ? editNote(n, body) : n)),
         `Edited note “${title}”`,
-        `edit:${id}`,
+        `edit:${id}:${sentenceBoundaryCount(body)}`,
       );
     },
     [commit],
@@ -269,6 +274,11 @@ export function useNotes(
   // Coalesced with the body edit's undo step so one paste is one undo.
   const attach = useCallback(
     (id: string, attachment: Attachment): void => {
+      // Share the key of the current sentence's edit step so the body
+      // reference the editor inserts alongside this attachment coalesces with
+      // it — one paste stays one undo.
+      const current = docRef.current.notes.find((n) => n.id === id);
+      const key = `edit:${id}:${sentenceBoundaryCount(current?.body ?? "")}`;
       commit(
         (prev) =>
           prev.map((n) =>
@@ -281,7 +291,7 @@ export function useNotes(
               : n,
           ),
         "Attached a file",
-        `edit:${id}`,
+        key,
       );
     },
     [commit],

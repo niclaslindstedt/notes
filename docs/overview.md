@@ -673,8 +673,16 @@ happens under the real title slug rather than the throwaway default filename.
 
 `useUndoRedo` (`src/app/use-undo-redo.ts`) — in-memory undo/redo over whole
 `Snapshot`s, capped at `UNDO_HISTORY_LIMIT` (50). `record` appends a labelled
-entry; a `mergeKey` collapses rapid same-key records (a typing session) into one
-step, while creates/deletes always land as their own steps. `reset` rebuilds the
+entry; a `mergeKey` collapses rapid same-key records into one step, while
+creates/deletes always land as their own steps. Body edits key on
+`edit:<noteId>:<completed-sentence-count>`, where the count comes from
+`sentenceBoundaryCount` (`src/domain/sentence.ts` — a terminator `.`/`!`/`?`/`…`
+followed by whitespace): keystrokes within the sentence being typed coalesce,
+and each finished sentence bumps the count so it locks in as its own
+checkpoint. Undo therefore walks a long paragraph back **sentence by
+sentence** rather than deleting the whole burst at once; an image/file paste
+keeps its body reference and attachment together on one step by sharing the
+current sentence's key. `reset` rebuilds the
 timeline whenever the document arrives from outside the edit path (load, reload,
 conflict-adopt). `useUndoRedoShortcuts` (`src/ui/hooks/useUndoRedoShortcuts.ts`)
 binds ⌘/Ctrl+Z (undo) and ⌘/Ctrl+Shift+Z / Ctrl+Y (redo); the side menu also
@@ -685,8 +693,8 @@ title, settings, modal inputs) so their native character-level undo wins, but
 it **does** answer the shortcut inside the live-preview editor's
 `contenteditable` — that surface deliberately swallows the browser's native
 contenteditable undo (React owns its DOM), so without this the shortcut would
-be dead while the caret sits in a note. There it reverts the current editing
-session, exactly as the side menu's Undo button does.
+be dead while the caret sits in a note. There it reverts one sentence of the
+current editing burst, exactly as the side menu's Undo button does.
 
 ### Settings sync
 
