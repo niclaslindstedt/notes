@@ -124,6 +124,37 @@ describe("useUndoRedo", () => {
     expect(view.result.current.canUndo).toBe(false);
   });
 
+  it("walks a paragraph back sentence by sentence via per-sentence keys", () => {
+    // Mirrors how `useNotes.update` composes `edit:<id>:<sentence-count>`: the
+    // key holds steady while a sentence is typed (those records coalesce) and
+    // changes once it's finished, so each completed sentence is its own step.
+    const { view, applied } = mount(snap(""));
+    const type = (body: string, sentences: number) =>
+      act(() =>
+        view.result.current.record(
+          snap(body),
+          "Edited note",
+          `edit:x:${sentences}`,
+        ),
+      );
+    type("One", 0);
+    type("One.", 0);
+    type("One. ", 1); // first sentence finished — new checkpoint
+    type("One. Two", 1);
+    type("One. Two.", 1);
+    type("One. Two. ", 2); // second sentence finished
+    type("One. Two. Three", 2);
+
+    // Each finished sentence locks in the snapshot as it stood when it ended.
+    act(() => view.result.current.undo());
+    expect(tagsOf(applied[applied.length - 1]!)).toEqual(["One. Two."]);
+    act(() => view.result.current.undo());
+    expect(tagsOf(applied[applied.length - 1]!)).toEqual(["One."]);
+    act(() => view.result.current.undo());
+    expect(tagsOf(applied[applied.length - 1]!)).toEqual([""]);
+    expect(view.result.current.canUndo).toBe(false);
+  });
+
   it("does not coalesce edits to different keys", () => {
     const { view, applied } = mount(snap("a"));
     act(() => view.result.current.record(snap("ax"), "Edited note", "edit:a"));

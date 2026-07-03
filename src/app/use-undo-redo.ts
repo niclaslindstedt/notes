@@ -13,12 +13,14 @@
 // One adaptation for the notes domain: a note's body is edited continuously,
 // one keystroke at a time, so recording every `update` verbatim would flood
 // the timeline with a separate entry per character. Edits carry an optional
-// `mergeKey` (e.g. `edit:<noteId>`); when the newest entry shares the same
-// key, a fresh record *replaces* it in place rather than appending. A whole
-// editing session of one note therefore collapses to a single undo step,
-// while a `create` / `remove` (no key) always lands as its own step and
-// breaks the coalescing chain. The textarea's native undo still handles
-// character-level reverts *within* a session.
+// `mergeKey`; when the newest entry shares the same key, a fresh record
+// *replaces* it in place rather than appending. The edit key is
+// `edit:<noteId>:<completed-sentence-count>` (see `domain/sentence.ts`), so
+// keystrokes within the sentence being typed coalesce into one step while
+// each finished sentence locks in as its own checkpoint — undo walks a long
+// paragraph back sentence by sentence. A `create` / `remove` (no key) always
+// lands as its own step and breaks the coalescing chain. The textarea's
+// native undo still handles character-level reverts *within* a sentence.
 
 import { useCallback, useReducer, useRef } from "react";
 
