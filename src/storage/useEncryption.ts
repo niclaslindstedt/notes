@@ -195,7 +195,14 @@ export function useEncryption(
         if (snap && hydrated !== null) {
           onProgress?.("encrypting");
           onProgress?.("saving");
-          await inner.save(hydrated, snap.revision);
+          // Re-save **through the encryption wrapper** so the existing document
+          // lands as ciphertext at rest now — a raw `inner.save` here would leave
+          // it in plaintext (despite the mode reading "encrypted") until the next
+          // edit happened to go through the wrapped app adapter.
+          await withEncryption(inner, passwordRef).save(
+            hydrated,
+            snap.revision,
+          );
         }
         onProgress?.("finalizing");
       } else {
@@ -226,10 +233,19 @@ export function useEncryption(
       if (backend === "browser") {
         // Whole-document backend: read + decrypt and re-save as plaintext in one
         // pass, clearing the encrypted bytes only after the plaintext is written.
+        // The document lives in localStorage as one encrypted envelope, so the
+        // read must go **through the encryption wrapper** (which decrypts while
+        // the passphrase is still held) — reading the raw `inner` here would hand
+        // `hydrateForSwitch` the ciphertext, which parses to an empty document
+        // and then overwrites the notes with nothing. A plaintext leftover (mode
+        // was on but nothing was encrypted yet) passes straight through.
         onProgress?.("reading");
         onProgress?.("decrypting");
-        const snap = await inner.load();
-        const hydrated = snap ? await hydrateForSwitch(inner, snap.text) : null;
+        const encrypted = withEncryption(inner, passwordRef);
+        const snap = await encrypted.load();
+        const hydrated = snap
+          ? await hydrateForSwitch(encrypted, snap.text)
+          : null;
         passwordRef.current = null;
         if (snap && hydrated !== null) {
           onProgress?.("saving");

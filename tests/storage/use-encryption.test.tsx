@@ -7,6 +7,10 @@ import type {
   StoredSnapshot,
 } from "../../src/storage/adapter.ts";
 import { OfflineUnavailableError } from "../../src/storage/cache/index.ts";
+import {
+  decryptEnvelope,
+  isEncryptedEnvelope,
+} from "../../src/storage/crypto.ts";
 import { parse, serialize } from "../../src/storage/serialize.ts";
 import {
   hydrateForSwitch,
@@ -116,9 +120,15 @@ describe("useEncryption (browser backend)", () => {
     });
 
     expect(inner.saves).toHaveLength(1);
-    // Re-saved against the loaded revision; the body survives the round-trip.
+    // Re-saved against the loaded revision.
     expect(inner.saves[0]?.revision).toBe("r1");
-    expect(parse(inner.saves[0]!.text).notes[0]).toMatchObject({
+    // The bytes land encrypted at rest — not plaintext waiting for the next
+    // edit — and decrypt back to the original note.
+    const savedText = inner.saves[0]!.text;
+    expect(isEncryptedEnvelope(savedText)).toBe(true);
+    expect(
+      parse(await decryptEnvelope(savedText, "pw")).notes[0],
+    ).toMatchObject({
       id: "n1",
       title: "T",
       body: "b",
@@ -145,14 +155,21 @@ describe("useEncryption (browser backend)", () => {
     expect(result.current.encryption).toBe("plaintext");
   });
 
-  it("disableEncryption decrypts and re-saves as plaintext once a passphrase is held", async () => {
-    const inner = fakeAdapter({ initial: { text: "doc", revision: "r1" } });
+  it("disableEncryption decrypts and re-saves as plaintext without losing the notes", async () => {
+    const doc = serialize({
+      notes: [{ id: "n1", title: "T", body: "b", createdAt: 1, updatedAt: 2 }],
+      folders: [],
+    });
+    const inner = fakeAdapter({ initial: { text: doc, revision: "r1" } });
     const innerRef = { current: inner as StorageAdapter };
     const { result } = renderHook(() => useEncryption(innerRef, "browser"));
 
     await act(async () => {
       await result.current.enableEncryption("pw");
     });
+    // Enable actually encrypted the document at rest.
+    expect(isEncryptedEnvelope(inner.saves.at(-1)!.text)).toBe(true);
+
     await act(async () => {
       await result.current.disableEncryption();
     });
@@ -161,6 +178,15 @@ describe("useEncryption (browser backend)", () => {
     expect(result.current.locked).toBe(false);
     // Once to seal on enable, once to re-save plaintext on disable.
     expect(inner.saves).toHaveLength(2);
+    // Regression: disabling must decrypt the ciphertext first, not overwrite it
+    // with an empty document parsed from the raw envelope.
+    const finalText = inner.saves.at(-1)!.text;
+    expect(isEncryptedEnvelope(finalText)).toBe(false);
+    expect(parse(finalText).notes[0]).toMatchObject({
+      id: "n1",
+      title: "T",
+      body: "b",
+    });
   });
 
   it("disableEncryption refuses to run while locked (no passphrase held)", async () => {
