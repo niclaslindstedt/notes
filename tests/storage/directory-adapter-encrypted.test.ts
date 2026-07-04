@@ -197,6 +197,78 @@ describe("directory adapter — encrypted per-file", () => {
     expect([...got!.bytes]).toEqual([72, 101, 108, 108, 111]); // "Hello"
   });
 
+  it("opens a deferred note by its plaintext body after encryption is turned off", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const passwordRef = { current: "pw" as string | null };
+    const { note } = noteWithImage(1);
+    await encAdapter(store, att, passwordRef).save(
+      serialize({ notes: [note] }),
+    );
+
+    // A cold adapter renders the note deferred (body undefined) from the index.
+    const b = encAdapter(store, att, passwordRef);
+    const restored = parse((await b.load())?.text).notes;
+    const deferred = restored[0]!;
+    expect(deferred.body).toBeUndefined();
+
+    // Turning encryption off converts the note back to plaintext: the `.md` is
+    // written and the `.enc` removed.
+    await b.demigrateNote!(deferred);
+    expect([...store.files.keys()].some((p) => p.endsWith(".enc"))).toBe(false);
+    expect([...store.files.keys()].some((p) => p.endsWith(".md"))).toBe(true);
+
+    // Mid-conversion the passphrase is still held but the `.enc` is gone —
+    // opening the still-deferred note falls back to the plaintext `.md`.
+    expect(await b.fetchNoteBody!(deferred)).toContain(SECRET_BODY);
+
+    // Once the conversion finishes the passphrase is dropped. Regression: the
+    // deferred note must still open with its real body rather than coming back
+    // null (which left the editor showing a blank note that could be saved over
+    // the intact file).
+    passwordRef.current = null;
+    expect(await b.fetchNoteBody!(deferred)).toContain(SECRET_BODY);
+  });
+
+  it("keeps a still-deferred note's plaintext file intact when saving after encryption is turned off", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const passwordRef = { current: "pw" as string | null };
+    const n1: Note = { ...createNote(1), title: "One", body: "first body" };
+    const n2: Note = { ...createNote(2), title: "Two", body: "second body" };
+    await encAdapter(store, att, passwordRef).save(
+      serialize({ notes: [n1, n2] }),
+    );
+
+    // A cold adapter renders both notes deferred from the index.
+    const b = encAdapter(store, att, passwordRef);
+    const loaded = parse((await b.load())?.text).notes;
+    expect(loaded.every((n) => n.body === undefined)).toBe(true);
+
+    // Turn encryption off: convert both notes back to plaintext, then drop the
+    // passphrase (what `finishDisableEncryption` does).
+    for (const n of loaded) await b.demigrateNote!(n);
+    passwordRef.current = null;
+
+    // The user opens + edits ONE note; the other stays deferred in memory. A
+    // full-document save must not write the deferred note's body away as empty
+    // (regression: `noteToMarkdown`'s `?? ""` would have clobbered the file).
+    const edited = loaded.map((n) =>
+      n.id === loaded[0]!.id ? { ...n, body: "edited first" } : n,
+    );
+    await b.save(serialize({ notes: edited }));
+
+    // A fresh plaintext adapter reads both notes back with their real bodies.
+    const c = encAdapter(store, att, { current: null });
+    const after = parse((await c.load())?.text).notes;
+    expect(after.find((n) => n.id === loaded[1]!.id)?.body).toContain(
+      "second body",
+    );
+    expect(after.find((n) => n.id === loaded[0]!.id)?.body).toContain(
+      "edited first",
+    );
+  });
+
   it("reports each note to onDecryptNote in the no-index fallback", async () => {
     // With the index present an unlock decrypts nothing up front (bodies are
     // deferred). When the index is missing — a vault from before the index

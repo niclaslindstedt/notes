@@ -80,7 +80,6 @@ import {
 import type { FileEntry, FileStore } from "./file-store.ts";
 import {
   filesToSnapshot,
-  noteFilePath,
   noteFileStem,
   snapshotToFiles,
 } from "./markdown/codec.ts";
@@ -955,12 +954,25 @@ export function createDirectoryAdapter(
       // Remember the registry so the encryption migrate / demigrate paths can
       // resolve a note's physical folder directory the same way this save does.
       folderRegistry.rememberFolders(snapshot.folders ?? []);
-      for (const note of snapshot.notes) {
-        pathToNoteId.set(noteFilePath(note, snapshot.folders), note.id);
-      }
-      for (const file of snapshotToFiles(snapshot)) {
-        desired.set(file.path, { stored: file.text, source: file.text });
-      }
+      // `snapshotToFiles` maps note-by-note, so `files[i]` is `notes[i]`'s file.
+      const files = snapshotToFiles(snapshot);
+      snapshot.notes.forEach((note, i) => {
+        const { path, text: fileText } = files[i]!;
+        pathToNoteId.set(path, note.id);
+        if (note.body === undefined) {
+          // A deferred note (body never loaded) can reach a plaintext save when
+          // encryption is turned off before every note was opened: the in-memory
+          // document still carries index-only notes. `noteToMarkdown` renders a
+          // missing body as empty (`?? ""`), so writing one would clobber the
+          // real `.md` that `demigrateNote` already wrote. Keep it in `desired`
+          // (so it's never removed as an orphan) but skip the write — exactly as
+          // the encrypted branch does; the on-disk plaintext file is
+          // authoritative and left untouched.
+          desired.set(path, { source: DEFERRED_SOURCE, skip: true });
+        } else {
+          desired.set(path, { stored: fileText, source: fileText });
+        }
+      });
       supersededKind = "toMarkdown";
     }
 
@@ -1143,28 +1155,58 @@ export function createDirectoryAdapter(
   // doesn't see it as changed and needlessly re-upload it.
   async function fetchNoteBody(note: Note): Promise<string | null> {
     const keys = await ensureKeys();
-    if (!keys) return null;
-    const path = await encNotePath(keys, note.id);
-    // Serve an already-decrypted body from the session cache without a network
-    // read — so the background warm pass and a re-open are cheap, and a note
-    // warmed this session opens even after the backend goes offline.
-    const cached = encNoteCache.get(path);
-    let json: string;
-    if (cached) {
-      json = cached.json;
-    } else {
+    if (keys) {
+      const path = await encNotePath(keys, note.id);
+      // Serve an already-decrypted body from the session cache without a network
+      // read — so the background warm pass and a re-open are cheap, and a note
+      // warmed this session opens even after the backend goes offline.
+      const cached = encNoteCache.get(path);
+      if (cached) {
+        const decoded = encJsonToNote(cached.json);
+        return decoded ? (decoded.body ?? "") : null;
+      }
       const text = await store.read(path);
-      if (text === null) return null;
-      const opened = await openString(keys.contentKey, text);
-      json = new TextDecoder().decode(opened.bytes);
-      const rev = tracked.get(path)?.rev;
-      encNoteCache.set(path, { rev: rev ?? "", json });
-      // Re-track with the real enc-JSON so the note no longer looks "changed"
-      // versus the deferred sentinel it was tracked under at load time.
-      if (rev !== undefined) track(path, json, rev);
+      if (text !== null) {
+        const opened = await openString(keys.contentKey, text);
+        const json = new TextDecoder().decode(opened.bytes);
+        const rev = tracked.get(path)?.rev;
+        encNoteCache.set(path, { rev: rev ?? "", json });
+        // Re-track with the real enc-JSON so the note no longer looks "changed"
+        // versus the deferred sentinel it was tracked under at load time.
+        if (rev !== undefined) track(path, json, rev);
+        const decoded = encJsonToNote(json);
+        return decoded ? (decoded.body ?? "") : null;
+      }
+      // The `.enc` is gone: the note's encrypted form was already converted back
+      // to plaintext while encryption is being turned off (`demigrateNote` writes
+      // the `.md` before removing the `.enc`). Fall through to the plaintext copy.
     }
-    const decoded = encJsonToNote(json);
-    return decoded ? (decoded.body ?? "") : null;
+    // Plaintext fallback. A deferred note (loaded from the encrypted index) keeps
+    // `body === undefined` until opened; but once encryption is turned off its
+    // `.enc` is removed and the session passphrase dropped, so the encrypted read
+    // above can no longer resolve it. The body now lives in the note's plaintext
+    // `.md` — read it so the note opens with its real text instead of blank
+    // (an empty body would otherwise be savable straight over the intact file).
+    return readPlaintextNoteBody(note);
+  }
+
+  // Read one note's body from its plaintext `.md`, folder-aware (with a flat-path
+  // fallback for a note written before folders became physical). Returns null
+  // when no plaintext file is on disk. This is the deferred-body counterpart for
+  // notes that have been converted back to plaintext (turning encryption off).
+  async function readPlaintextNoteBody(note: Note): Promise<string | null> {
+    const folderPath = plaintextNotePath(note);
+    const flatPath = `${noteFileStem(note)}.md`;
+    const candidates =
+      folderPath === flatPath ? [flatPath] : [folderPath, flatPath];
+    for (const path of candidates) {
+      const text = await store.read(path);
+      if (text === null) continue;
+      const snap = filesToSnapshot([{ path, text }]);
+      const found = snap.notes.find((n) => n.id === note.id) ?? snap.notes[0];
+      if (found) return found.body ?? "";
+    }
+    return null;
   }
 
   // Per-note at-rest encryption status from the last load. Empty in plaintext
