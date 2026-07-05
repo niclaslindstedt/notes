@@ -177,18 +177,15 @@ make icons       # regenerate PWA icons from public/favicon.svg
   `.changes/unreleased/` (see "Releases and changelog"). The `changeset` CI
   job enforces this; opt out with the `no-changelog` label.
 
-### Watching a PR (self check-in tooling)
+### Watching a PR after you open it
 
-When asked to watch / babysit / autofix a PR, the harness guidance suggests a
-`send_later` tool for scheduling the periodic self check-in (webhooks don't
-deliver CI success, new pushes, or merge-conflict transitions, so you must
-re-poll). **`send_later` is not available in this environment** — don't waste a
-`ToolSearch` round looking for it. Use **`CronCreate`** instead (find it via
-`ToolSearch` for `CronCreate` if it isn't already loaded): schedule a recurring
-hourly job at an off-minute (e.g. `13 * * * *`) whose prompt re-checks the PR's
-CI status, mergeability, and new review comments, stays silent when nothing
-changed, and stops once the PR is merged or closed. Note `CronCreate` jobs are
-session-only and auto-expire after 7 days.
+Don't babysit a PR with polling. **Do not** schedule `send_later`, `CronCreate`
+jobs, `ScheduleWakeup`, or any other timed self-check-in to re-poll a PR's CI
+status or merge state — those just burn turns. Open the PR, confirm the checks
+you can see are green, then stop. CI failures and review comments are delivered
+to the session as webhook events, so you'll be woken when there's actually
+something to act on. React to those events when they arrive; otherwise consider
+the PR handed off.
 
 ## Releases and changelog
 
