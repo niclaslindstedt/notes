@@ -212,9 +212,12 @@ with the caret out of sight. A touch (or pen) `pointerdown` arms a reveal that
 the caret-placement effect consumes the next time the caret rolls onto a
 different line: it calls `scrollFocusedIntoView`
 (`src/ui/hooks/scrollFocusedIntoView.ts`), which waits for the visual viewport
-to settle, then centres the line. It is scoped to touch (a mouse never loses the
-caret to a keyboard) and gated on the active-line key so typing within a line
-never re-scrolls.
+to settle, then centres the line **by scrolling the editor's own scroll
+container** — not `Element.scrollIntoView`, which bubbles to the window / visual
+viewport on iOS and flings a line tapped near the top of the note above the
+sticky header (a first line vanishing off screen, caret and all). It is scoped
+to touch (a mouse never loses the caret to a keyboard) and gated on the
+active-line key so typing within a line never re-scrolls.
 
 Clicking the empty space below the note lands the caret on a blank line at the
 very bottom, **appending one when the document doesn't already end in a newline**
@@ -887,7 +890,15 @@ side: it scrolls a freshly-focused field or tapped line clear of the soft
 keyboard by re-centring it on every visual-viewport change until the
 keyboard-settling burst goes quiet — the keyboard animates in as a series of
 intermediate heights, so centring only on the first would leave the last line
-(which can't scroll any further up) behind the keyboard. The reveal glides
+(which can't scroll any further up) behind the keyboard. It centres by setting
+the **nearest scrollable ancestor's `scrollTop`** (the pure `centeredScrollTop`
+clamps to the container's scroll range), *not* `Element.scrollIntoView`: the
+latter walks up every scroll container and, on iOS, nudges the visual viewport
+too, so with the shell pinned to `--app-height` it drags the target past the top
+of its container and off screen — the bug where tapping the first line of a note
+hid it above the header. A clamped container scroll keeps an edge line resting at
+the band's top / bottom instead; when nothing is scrollable (the content already
+fits the band) it falls back to `Element.scrollIntoView`. The reveal glides
 (`behavior: "smooth"`, retargeted on each event so the burst reads as one
 continuous motion), falling back to an instant jump under
 `prefers-reduced-motion`. Used by the [live-preview editor](#markdown-editor)'s

@@ -1,43 +1,106 @@
-// Bring a freshly-focused field into view *after* the soft keyboard has taken
-// its space.
+// Bring a freshly-focused field or tapped line into view *after* the soft
+// keyboard has taken its space — by scrolling the element's own scroll
+// container, never the window.
 //
 // On mobile the browser runs its native "reveal the focused field" pass at
 // focus time — before the on-screen keyboard finishes animating in and
 // shrinking the visual viewport. A field that sits low inside a
 // `position: fixed` modal (the encryption passphrase at the bottom of
-// Settings → Storage) is still fully visible at that instant, so nothing
-// scrolls; the keyboard then slides up and covers it. `useViewportHeight`
-// already shrinks the modal to the post-keyboard viewport, but the scroll
-// container's position doesn't change on its own, so the field stays hidden
-// behind the keyboard.
+// Settings → Storage) or a line tapped in the lower half of the editor is
+// still fully visible at that instant, so nothing scrolls; the keyboard then
+// slides up and covers it. The app shell is sized to the *visual* viewport
+// (`--app-height`), so its scroll containers already end at the keyboard's top
+// once it settles — we just have to re-scroll the target into that shrunk band.
 //
-// Re-run the scroll once the viewport has actually shrunk: wait for the
-// `visualViewport` to change (the keyboard settling), then centre the field in
-// its scroll container.
+// Why we scroll the container by hand instead of `el.scrollIntoView`:
+// `Element.scrollIntoView` walks up *every* scrollable ancestor and, on iOS,
+// nudges the visual viewport as well. With the shell pinned to the visual
+// viewport, that bubbling drags the target *past the top of its scroll
+// container* — a line tapped near the top of a note is flung above the sticky
+// header and off screen, caret and all. Scrolling only the nearest scrollable
+// ancestor's `scrollTop` keeps the motion contained: the target is centred in
+// the visible band, and an edge element (the first / last line) simply clamps
+// to the top / bottom of that band instead of being thrown out of it. When no
+// scrollable ancestor exists (nothing to scroll, so the target already fits the
+// band) we fall back to the browser's own reveal.
 //
 // The keyboard doesn't arrive in one step. iOS animates it in and emits a
 // *burst* of `resize` (and `scroll`) events on the visual viewport as it
 // settles, each reporting an intermediate height. Revealing on only the first
-// one centres the line against a viewport that is still shrinking, so the last
-// line — which can't scroll any further up once the container clamps — slides
-// back behind the keyboard as the remaining events land, and nothing scrolls
-// it clear again. Re-run the reveal on *every* event until the viewport has
-// been quiet for a beat, then stop listening (so a later user scroll never
+// one centres the target against a viewport that is still shrinking, so the
+// last line — which can't scroll any further up once the container clamps —
+// slides back behind the keyboard as the remaining events land, and nothing
+// scrolls it clear again. Re-run the reveal on *every* event until the viewport
+// has been quiet for a beat, then stop listening (so a later user scroll never
 // yanks the view). A timeout backstops platforms that fire no event (desktop
 // focus, or a focus that opens no keyboard — where the element is already on
 // screen and centring is harmless).
 //
 // The reveal glides rather than snaps: each event re-issues a `smooth`
-// `scrollIntoView`, and the browser retargets the in-flight animation, so the
-// burst reads as one continuous motion that lands on the final centred
-// position rather than a jump. Users who ask for reduced motion get the
-// instant jump instead.
+// `scrollTo`, and the browser retargets the in-flight animation, so the burst
+// reads as one continuous motion that lands on the final centred position
+// rather than a jump. Users who ask for reduced motion get the instant jump
+// instead.
+
+// The `scrollTop` that centres an element within its scroll container, clamped
+// to the container's scroll range so an element near an edge rests at the band's
+// top / bottom rather than being pushed past it. Pure so the geometry is unit-
+// testable without a layout engine (jsdom does no layout).
+export function centeredScrollTop(
+  elTop: number,
+  elHeight: number,
+  viewTop: number,
+  scrollTop: number,
+  clientHeight: number,
+  scrollHeight: number,
+): number {
+  // Where the element sits within the scroller's scrolled content.
+  const offsetInContent = elTop - viewTop + scrollTop;
+  const centered = offsetInContent - (clientHeight - elHeight) / 2;
+  const max = Math.max(0, scrollHeight - clientHeight);
+  return Math.max(0, Math.min(centered, max));
+}
+
+// The nearest ancestor that can actually scroll vertically, or null when the
+// content fits (nothing to scroll). Walks up from the element's parent.
+function nearestScrollableAncestor(el: HTMLElement): HTMLElement | null {
+  let node = el.parentElement;
+  while (node) {
+    const overflowY = getComputedStyle(node).overflowY;
+    if (
+      (overflowY === "auto" || overflowY === "scroll") &&
+      node.scrollHeight > node.clientHeight
+    )
+      return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
 export function scrollFocusedIntoView(el: HTMLElement): void {
   const reduceMotion =
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   const behavior: ScrollBehavior = reduceMotion ? "auto" : "smooth";
   const reveal = () => {
-    if (el.isConnected) el.scrollIntoView({ block: "center", behavior });
+    if (!el.isConnected) return;
+    const scroller = nearestScrollableAncestor(el);
+    if (!scroller) {
+      // Nothing scrollable around it — the target already fits the band. Defer
+      // to the browser's own reveal rather than doing nothing.
+      el.scrollIntoView({ block: "center", behavior });
+      return;
+    }
+    const elRect = el.getBoundingClientRect();
+    const viewRect = scroller.getBoundingClientRect();
+    const top = centeredScrollTop(
+      elRect.top,
+      elRect.height,
+      viewRect.top,
+      scroller.scrollTop,
+      scroller.clientHeight,
+      scroller.scrollHeight,
+    );
+    scroller.scrollTo({ top, behavior });
   };
 
   const vv = window.visualViewport;
