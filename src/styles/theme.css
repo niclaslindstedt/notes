@@ -33,6 +33,11 @@
   --font-mono:
     "JetBrains Mono", "Fira Code", ui-monospace, "SF Mono", Menlo, Consolas,
     "Liberation Mono", monospace;
+
+  /* The framework components round with `rounded-md`; point it at the app's
+     one radius token so they match the `rounded-[var(--radius)]` idiom the
+     rest of the UI uses. */
+  --radius-md: var(--radius);
 }
 
 :root {
