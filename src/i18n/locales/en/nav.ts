@@ -32,6 +32,10 @@ const nav = {
   deleteNote: "Delete note",
   undo: "Undo",
   redo: "Redo",
+  // The thin chevron rail that folds the footer (Donate / About / Settings)
+  // away to hand its vertical space to the note list, and back.
+  collapseFooter: "Hide footer",
+  expandFooter: "Show footer",
   // The archive entry at the foot of the notes list and the page it opens.
   archive: "Archive",
   archiveHeading: "Archive",

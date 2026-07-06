@@ -111,6 +111,12 @@ const achievements = {
       learnMore:
         "Settings → Appearance → Sidebar decides whether folders pin above your notes or mix in among them, and whether the side menu sorts by name or by what you edited last.",
     },
+    spaceSaver: {
+      name: "Space saver",
+      condition: "Fold the side menu footer away to make more room for notes.",
+      learnMore:
+        "The thin chevron rail just above the footer folds the Donate, trophy, About and Settings rows out of view, handing that vertical space to your note list. Tap it again to bring the footer back — the choice is remembered across reloads.",
+    },
     marginalia: {
       name: "Marginalia",
       condition: "Adjust the editor's writing-column margins.",

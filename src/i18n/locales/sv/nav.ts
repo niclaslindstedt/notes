@@ -24,6 +24,8 @@ const nav: NavCatalog = {
   deleteNote: "Ta bort anteckning",
   undo: "Ångra",
   redo: "Gör om",
+  collapseFooter: "Dölj sidfot",
+  expandFooter: "Visa sidfot",
   archive: "Arkiv",
   archiveHeading: "Arkiv",
   archiveEmpty:

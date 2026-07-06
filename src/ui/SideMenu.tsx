@@ -6,6 +6,7 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 
+import { unlock } from "../achievements/index.ts";
 import {
   mixTopLevel,
   noteTitle,
@@ -46,6 +47,7 @@ import { SideMenuFooter } from "./SideMenuFooter.tsx";
 import {
   FolderEditRow,
   FolderRow,
+  FooterCollapseRail,
   NavItem,
   SectionHeader,
   SwipeToRemove,
@@ -102,6 +104,14 @@ const NOTE_DND_TYPE = "application/x-notes-note-id";
 // it with all its notes). A distinct type so a namespace drop can tell a folder
 // drag from a note drag.
 const FOLDER_DND_TYPE = "application/x-notes-folder-id";
+
+// The footer-collapse choice persists across reloads under this key. Read once
+// on mount; every toggle mirrors the boolean back as a string.
+const FOOTER_COLLAPSED_KEY = "notes/footer-collapsed";
+function readFooterCollapsed(): boolean {
+  if (typeof localStorage === "undefined") return false;
+  return localStorage.getItem(FOOTER_COLLAPSED_KEY) === "true";
+}
 
 type Props = {
   /** Notes to list, in display order (most-recently-edited first). */
@@ -219,6 +229,28 @@ export function SideMenu({
   // collapsed (so you always see where you are), and tapping the heading
   // expands the full switcher. View-local, like the folder expand state.
   const [namespacesCollapsed, setNamespacesCollapsed] = useState(true);
+
+  // Whether the footer (Donate / trophy / About / Settings) is folded away
+  // behind the collapse rail. Unlike the view-local state above, this choice is
+  // remembered across reloads, so it reads its initial value from localStorage
+  // and mirrors every toggle back. Offered on every viewport — the phone drawer
+  // gets the same control as the docked sidebar.
+  const [footerCollapsed, setFooterCollapsed] = useState(readFooterCollapsed);
+  const toggleFooter = () =>
+    setFooterCollapsed((v) => {
+      const next = !v;
+      // Folding the footer away to buy the note list more room is "Space saver".
+      if (next) unlock("spaceSaver");
+      if (typeof localStorage !== "undefined") {
+        try {
+          localStorage.setItem(FOOTER_COLLAPSED_KEY, String(next));
+        } catch {
+          // Ignore storage failures (private mode / quota) — the in-memory
+          // state still drives the UI for this session.
+        }
+      }
+      return next;
+    });
 
   // Desktop HTML5 drag state. `dragItem` gates the drop targets (so a stray
   // dragover from outside doesn't light them up) and records what's being
@@ -677,11 +709,22 @@ export function SideMenu({
         onArchiveDragLeave={() => setDropTarget(null)}
         onArchiveDrop={dropOnArchive}
       />
+      {/* Footer collapse rail — a thin, full-width chevron button seated just
+          above the footer that folds it away (and back), handing the freed
+          vertical space to the note list. Offered on every viewport, the phone
+          drawer included. */}
+      <FooterCollapseRail
+        collapsed={footerCollapsed}
+        label={
+          footerCollapsed ? t("nav.expandFooter") : t("nav.collapseFooter")
+        }
+        onClick={toggleFooter}
+      />
       {/* The relocated burger menu, pinned to the foot of the drawer: Donate,
           the trophy (achievements), an "About" dropdown that folds away the
           project links (What's new / source / privacy), and Settings pinned
-          last under the thumb. */}
-      <SideMenuFooter onClose={close} />
+          last under the thumb. Foldable away via the rail above. */}
+      {!footerCollapsed && <SideMenuFooter onClose={close} />}
     </>
   );
 
@@ -694,7 +737,7 @@ export function SideMenu({
     return (
       <nav
         aria-label={t("nav.label")}
-        className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-bottom:max(env(safe-area-inset-bottom),calc(1.25rem_-_var(--density-row-py)))] [padding-top:env(safe-area-inset-top)] ${
+        className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-bottom:calc(1.25rem_-_var(--density-row-py))] [padding-top:env(safe-area-inset-top)] ${
           onRight ? "order-last border-l border-line" : "border-r border-line"
         }`}
       >
@@ -752,7 +795,7 @@ export function SideMenu({
             ref={swipeClose.panelRef}
             aria-label={t("nav.label")}
             style={{ transform: `translateX(${swipeClose.offset}px)` }}
-            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl select-none [touch-action:pan-y] [padding-bottom:max(env(safe-area-inset-bottom),calc(1.25rem_-_var(--density-row-py)))] [padding-top:env(safe-area-inset-top)] ${
+            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl select-none [touch-action:pan-y] [padding-bottom:calc(1.25rem_-_var(--density-row-py))] [padding-top:env(safe-area-inset-top)] ${
               swipeClose.animating ? "transition-transform duration-200" : ""
             } ${
               onRight

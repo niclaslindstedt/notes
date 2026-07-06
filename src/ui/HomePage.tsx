@@ -143,8 +143,9 @@ export function HomePage() {
               overview lists notes as compact rows, roomier cards, or a bare
               file-explorer list of titles, and how the side menu orders your
               folders and notes (folders on top or mixed in, sorted by name or
-              by what you edited last); your preferences are remembered on the
-              device.
+              by what you edited last). You can also fold the side menu's footer
+              away to hand its space to the note list; your preferences are
+              remembered on the device.
             </li>
             <li>
               Use the app in <em>English</em> or <em>Swedish</em> — it follows
