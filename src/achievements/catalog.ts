@@ -216,6 +216,13 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     },
   },
   {
+    id: "spaceSaver",
+    tier: "intermediate",
+    glyph: PanelBottomGlyph,
+    learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
     id: "marginalia",
     tier: "intermediate",
     glyph: MoveGlyph,

@@ -1739,6 +1739,19 @@ left, viewport-spaced) because there is no room below it at the foot of the
 drawer. The dropdown's open state (`aboutOpen` / `aboutRef`) lives inside
 `SideMenuFooter`, so nothing of the footer leaks back into the drawer container.
 
+Seated just above the footer is the **footer collapse rail** (`FooterCollapseRail`
+in `src/ui/SideMenuRows.tsx`): a thin, full-width chevron button that folds the
+whole footer away, handing its vertical space to the note list, and taps back to
+restore it. The choice is drawer-owned view state (`footerCollapsed` in
+`SideMenu`) but — unlike the folder/namespace expand state — it is persisted to
+`localStorage` under `notes/footer-collapsed`, so it survives reloads; it applies
+on every viewport (docked sidebar and phone drawer alike). Folding it fires the
+**Space saver** [achievement](#achievements) (`unlock("spaceSaver")`). With the
+footer collapsed the drawer's own bottom padding — trimmed from the old
+`max(env(safe-area-inset-bottom), …)` to a plain `calc(1.25rem - var(--density-row-py))`
+so the footer/rail sit snug against the bottom rather than above a dead
+safe-area strip — is all that shows below the rail.
+
 A note row can be **dragged onto a folder** to file it, or onto the ungrouped
 root zone to take it out of one. On a pointer device this is native HTML5 drag
 (`NOTE_DND_TYPE` carries the note id; the highlight follows `dropTarget`, and a

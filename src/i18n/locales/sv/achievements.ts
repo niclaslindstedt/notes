@@ -105,6 +105,13 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Inställningar → Utseende → Sidofält avgör om mappar fästs ovanför anteckningarna eller blandas in bland dem, och om sidomenyn sorterar efter namn eller efter vad du senast ändrade.",
     },
+    spaceSaver: {
+      name: "Utrymmesspararen",
+      condition:
+        "Fäll ihop sidomenyns sidfot för att ge mer plats åt anteckningar.",
+      learnMore:
+        "Den tunna pilraden precis ovanför sidfoten fäller ihop raderna Donera, troféer, Om och Inställningar och ger det lodräta utrymmet till din anteckningslista. Tryck igen för att ta tillbaka sidfoten — valet kommer ihåg mellan omladdningar.",
+    },
     marginalia: {
       name: "Marginalanteckningar",
       condition: "Justera redigerarens skrivkolumnmarginaler.",
