@@ -5,9 +5,7 @@
 // The resolver lives in @niclaslindstedt/oss-framework; this wrapper binds
 // it to the app's bundled favicon, its default tint, and the dark badge
 // matching `public/favicon.svg`.
-import {
-  namespaceFaviconHref as frameworkNamespaceFaviconHref,
-} from "@niclaslindstedt/oss-framework/namespaces";
+import { namespaceFaviconHref as frameworkNamespaceFaviconHref } from "@niclaslindstedt/oss-framework/namespaces";
 
 import type { Namespace } from "../storage/namespaces.ts";
 

@@ -12,6 +12,8 @@ const namespace: NamespaceCatalog = {
   switchTo: "Byt till {name}",
   rename: "Byt namn",
   deleteAction: "Ta bort namnrymd",
+  deleteConfirm:
+    "Ta bort ”{name}” och alla dess anteckningar? Detta går inte att ångra.",
   nameRequired: "Ett namn krävs",
   defaultBadge: "Standard",
   noIcon: "Ingen ikon",
