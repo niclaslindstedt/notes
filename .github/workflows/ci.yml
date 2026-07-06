@@ -13,6 +13,14 @@ on:
 
 permissions:
   contents: read
+  packages: read
+
+# .npmrc authenticates the @niclaslindstedt scope against GitHub
+# Packages via ${GITHUB_PAT}, so every `npm ci` needs it in the
+# environment. A GITHUB_PAT repo secret (a PAT with read:packages)
+# takes precedence; the workflow token is the fallback.
+env:
+  GITHUB_PAT: ${{ secrets.GITHUB_PAT || secrets.GITHUB_TOKEN }}
 
 jobs:
   build:
