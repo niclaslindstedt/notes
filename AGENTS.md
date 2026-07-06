@@ -290,6 +290,65 @@ change out by labelling the PR `no-changelog`.
 
 ## Architecture summary
 
+### The shared framework
+
+The app consumes
+[`@niclaslindstedt/oss-framework`](https://github.com/niclaslindstedt/oss-framework)
+— the common foundation extracted from `notes` and `checklist` — for its
+generic components, hooks, and utilities: the UI primitives (`Modal`,
+`Button`, `Checkbox`, `SelectPicker`, `FloatingPanel`, `RowActionMenu`,
+`CipherGlyph`, `UnlockGate`, the settings `Section`/`Field`/`ToggleRow`,
+most of the icon set), the gesture/keyboard/layout hooks (`useEscapeKey`,
+`useMediaQuery`, `useRowSwipe`, `usePullToRefresh`,
+`useUndoRedoShortcuts`, the drawer/floating-button hooks,
+`useFloatingPosition`), the service-worker update lifecycle
+(`usePwaUpdate`), the changelog parser + "What's new" modal, the
+achievements engine UI (tour + unlock modals), the glyph/colour picker
+kit and favicon badge builder, and the `NamespacesModal`.
+
+The package is served from the **GitHub Packages** npm registry; `.npmrc`
+authenticates the `@niclaslindstedt` scope via the `GITHUB_PAT`
+environment variable (CI threads it through every `npm ci` — see the
+workflows). **The historical import paths still work**: each replaced
+module remains in the tree as a thin re-export shim or a wrapper that
+injects the app's translated labels (the framework components take
+labels-as-props with English defaults), so call sites — and the docs
+dictionary — keep pointing at the same files.
+
+**Deliberately NOT on the framework** (don't "migrate" these without a
+product decision):
+
+- **The theme system** (`src/theme/`, `src/styles/palettes.css`) — notes'
+  preset vocabulary (One Dark/Light, monokai, quietLight, excel, …) has
+  forked from the framework's (tokyoNight, nord, catppuccin, …); adopting
+  the framework's theme data would delete user-facing presets and
+  invalidate persisted appearance settings. notes' 11-slot palette is
+  bridged to the framework's 18-slot vocabulary by aliases in
+  `src/styles/theme.css` (meta/path/flag/pipe/success/positive/negative
+  resolve onto notes' own slots) so framework components paint correctly.
+- **The encryption core** (`src/storage/crypto*.ts`, `encrypting/`) —
+  notes' envelope tag is `notes.encrypted.v1`; the framework writes
+  `oss.encrypted.v1`. Swapping would make existing users' encrypted
+  documents unreadable.
+- **The i18n runtime** (`src/i18n/`) **and everything the React Native
+  app imports** — `native/` consumes `src/i18n/index.ts`,
+  `src/domain/note.ts`, `src/storage/adapter.ts`,
+  `src/storage/namespaces.ts`, and `src/app/use-notes.ts` directly, and
+  its Expo project installs neither the framework package nor
+  `react-dom`. Nothing in the transitive import closure of those modules
+  may import from `@niclaslindstedt/oss-framework` (that's why
+  `use-notes.ts` imports `unlock` from `achievements/bus.ts`, not the
+  barrel).
+- **The Markdown parser** (`src/domain/markdown.ts`) and the
+  live-preview editor — notes' parser has evolved past the framework's
+  (depth-based list-marker rotation) and the editor is coupled to
+  attachments and the undo timeline.
+- **The sync UI** (`SyncStatus`, `SyncDetailsModal`), **the search
+  feature** (`domain/search.ts`, `SearchModal`), **the side-menu shell**
+  (`SideMenu*`), and the storage plumbing (`oauth-pkce`, `http-utils`,
+  the adapters) — diverged enough that adoption is a real port, tracked
+  as follow-up candidates rather than shims.
+
 The source tree under `src/` is organized by concern, not by file type:
 
 - `src/app/` — the root component (`App.tsx`), the entry point

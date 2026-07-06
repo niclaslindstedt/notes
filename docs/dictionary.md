@@ -278,6 +278,7 @@ Honour these when naming a new file, key, or string.
 | **Dev mode** / **capture logs**                            | `useDevMode` (`src/dev/useDevMode.ts`). [→](overview.md#dev-mode)                                             |
 | **Logger** / **log buffer**                                | `createLogger`, `getLogs`, `setCaptureEnabled` (`src/dev/logger.ts`). [→](overview.md#logger)                |
 | **App version** / **build label**                          | `APP_VERSION`, `BUILD_LABEL` (`src/build-env.ts`). [→](overview.md#build-env)                                 |
+| **The framework** / **oss-framework** / **shared package** | `@niclaslindstedt/oss-framework` (npm dep; `.npmrc` + `GITHUB_PAT`). Shims/wrappers keep historical paths — see AGENTS.md "The shared framework". [→](overview.md#the-shared-framework) |
 
 ## The public pages
 

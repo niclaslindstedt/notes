@@ -2122,6 +2122,30 @@ diagnostics through it.
 `define` at build time (`__APP_VERSION__` / `__BUILD_LABEL__`) and re-exported
 typed.
 
+### The shared framework
+
+`@niclaslindstedt/oss-framework` — the npm package (GitHub Packages
+registry, authenticated through the `GITHUB_PAT` env variable via
+`.npmrc`) holding the components, hooks, and utilities `notes` and
+`checklist` used to grow in parallel. notes consumes it for the UI
+primitives (`Modal`, `Button`, `Checkbox`, `SelectPicker`,
+`FloatingPanel`, `RowActionMenu`, `CipherGlyph`, `UnlockGate`, the
+settings layout blocks, most icons), the gesture/keyboard hooks, the PWA
+update lifecycle, the changelog modal, the achievements modals, the
+glyph/colour picker kit, and the namespaces management dialog. Each
+replaced module still exists at its historical path as a **re-export
+shim** (implementation moved, import path unchanged) or a **wrapper**
+that injects the app's translated strings — framework components carry
+no i18n and take labels-as-props with English defaults. Tailwind scans
+the package (`@source` in `src/styles.css`) so its utility classes are
+emitted, and `src/styles/theme.css` aliases the framework's seven extra
+colour slots (meta/path/flag/pipe/success/positive/negative) onto notes'
+11-slot palette. What deliberately stays app-side — the theme system,
+the encryption core, the i18n runtime, the Markdown parser/editor, the
+sync UI, search, the side-menu shell, and everything the React Native
+app imports — is listed with reasons in AGENTS.md's "The shared
+framework" section.
+
 ## The public pages
 
 ### Home page

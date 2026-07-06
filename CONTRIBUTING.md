@@ -8,12 +8,18 @@ set up, the conventions the project follows, and how changes get reviewed.
 - [Node.js](https://nodejs.org/) 22+ (see `.nvmrc`)
 - npm 10+
 - `git`
+- A `GITHUB_PAT` environment variable holding a GitHub personal access
+  token with the `read:packages` scope — the
+  `@niclaslindstedt/oss-framework` dependency is served from the GitHub
+  Packages npm registry, which requires authentication even for public
+  packages (see `.npmrc`).
 
 ## Setup
 
 ```sh
 git clone https://github.com/niclaslindstedt/notes.git
 cd notes
+export GITHUB_PAT=<token with read:packages>
 npm ci
 npm run dev      # http://localhost:5173
 ```
