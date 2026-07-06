@@ -17,6 +17,19 @@
   --color-danger: var(--danger);
   --color-link: var(--link);
 
+  /* Extra slots the @niclaslindstedt/oss-framework components paint with
+     (status tones in the sync/logging/achievements UI). notes' palettes
+     carry 11 slots, not the framework's 18, so these resolve through the
+     aliases in `:root` below — every preset gets a sensible tone without
+     widening `palettes.css`. */
+  --color-meta: var(--meta);
+  --color-path: var(--path);
+  --color-flag: var(--flag);
+  --color-pipe: var(--pipe);
+  --color-success: var(--success);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+
   --font-mono:
     "JetBrains Mono", "Fira Code", ui-monospace, "SF Mono", Menlo, Consolas,
     "Liberation Mono", monospace;
@@ -28,6 +41,16 @@
      across every preset and the Custom-theme editor overrides them inline
      on <html>. "md" radius / "comfortable" density are the baseline. */
   --radius: 8px;
+  /* Aliases for the framework's 7 extra colour slots (see the @theme map
+     above). notes' reduced palette folds them onto its own 11 slots:
+     status tones ride the accent/danger pair, metadata rides muted. */
+  --meta: var(--muted);
+  --path: var(--fg);
+  --flag: var(--accent);
+  --pipe: var(--muted);
+  --success: var(--accent);
+  --positive: var(--accent);
+  --negative: var(--danger);
   /* Vertical padding of a navigation / menu row, driven by the density
      preference in the Custom theme (otherwise the comfortable default). */
   --density-row-py: 0.5rem;
