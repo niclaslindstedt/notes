@@ -13,5 +13,10 @@
    theme engine (`src/theme/`) sets `data-theme` plus the Custom overrides. */
 @import "tailwindcss";
 
+/* The @niclaslindstedt/oss-framework components paint with Tailwind
+   utilities (bg-surface, text-flag, …); scan the package so our build
+   emits the classes they use. */
+@source "../node_modules/@niclaslindstedt/oss-framework/dist";
+
 @import "./styles/theme.css";
 @import "./styles/palettes.css";

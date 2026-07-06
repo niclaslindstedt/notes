@@ -36,12 +36,19 @@ time using the `copy-feature` agent skill.
 
 - [Node.js](https://nodejs.org/) 22+ (see `.nvmrc`)
 - npm 10+
+- A `GITHUB_PAT` environment variable holding a GitHub personal access
+  token with the `read:packages` scope. The app depends on
+  [`@niclaslindstedt/oss-framework`](https://github.com/niclaslindstedt/oss-framework),
+  which is published to the GitHub Packages npm registry; `.npmrc`
+  authenticates the `@niclaslindstedt` scope through that variable
+  (GitHub Packages requires a token even for public packages).
 
 ## Install
 
 ```sh
 git clone https://github.com/niclaslindstedt/notes.git
 cd notes
+export GITHUB_PAT=<token with read:packages>
 npm ci
 ```
 

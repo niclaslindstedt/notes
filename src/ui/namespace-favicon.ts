@@ -2,47 +2,31 @@
 // namespace has picked an icon, that glyph (in the namespace's accent
 // colour) stands in for the bundled notes mark as the browser-tab favicon.
 // Without a glyph, the bundled `public/favicon.svg` is used unchanged.
+// The resolver lives in @niclaslindstedt/oss-framework; this wrapper binds
+// it to the app's bundled favicon, its default tint, and the dark badge
+// matching `public/favicon.svg`.
+import { namespaceFaviconHref as frameworkNamespaceFaviconHref } from "@niclaslindstedt/oss-framework/namespaces";
 
 import type { Namespace } from "../storage/namespaces.ts";
-import { isGlyphName, namespaceGlyphDataUri } from "./glyphs.ts";
+
+export { applyFaviconHref } from "@niclaslindstedt/oss-framework/namespaces";
 
 // The bundled mark's ink colour, used to tint a glyph that was given an icon
 // but no explicit colour so it still reads as "the app, re-badged".
 const DEFAULT_GLYPH_COLOR = "#34d399";
 
-/** The path to the bundled favicon, honouring the deploy slot's base path. */
-function bundledFavicon(): string {
-  return `${import.meta.env.BASE_URL}favicon.svg`;
-}
+// Background matching the bundled `public/favicon.svg`.
+const FAVICON_BG = "#1f2933";
 
 /**
  * The favicon `href` for a namespace: its glyph as a data URI when one is
- * chosen, otherwise the bundled favicon. A namespace with only a colour (no
- * glyph) keeps the bundled mark — the favicon is replaced only when a glyph
- * is picked.
+ * chosen, otherwise the bundled favicon (honouring the deploy slot's base
+ * path). A namespace with only a colour (no glyph) keeps the bundled mark.
  */
 export function namespaceFaviconHref(ns: Namespace | undefined): string {
-  if (ns && isGlyphName(ns.glyph)) {
-    return namespaceGlyphDataUri(ns.glyph, ns.color ?? DEFAULT_GLYPH_COLOR);
-  }
-  return bundledFavicon();
-}
-
-/**
- * Point the browser-tab favicon at `href`. Reuses the existing
- * `image/svg+xml` icon link from `index.html`, creating one only if it's
- * somehow absent.
- */
-export function applyFaviconHref(href: string): void {
-  if (typeof document === "undefined") return;
-  let link = document.head.querySelector<HTMLLinkElement>(
-    'link[rel="icon"][type="image/svg+xml"]',
+  return frameworkNamespaceFaviconHref(
+    ns,
+    `${import.meta.env.BASE_URL}favicon.svg`,
+    { defaultColor: DEFAULT_GLYPH_COLOR, badge: { background: FAVICON_BG } },
   );
-  if (!link) {
-    link = document.createElement("link");
-    link.rel = "icon";
-    link.type = "image/svg+xml";
-    document.head.appendChild(link);
-  }
-  link.href = href;
 }

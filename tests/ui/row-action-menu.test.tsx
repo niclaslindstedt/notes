@@ -9,10 +9,31 @@ afterEach(() => {
   cleanup();
   resetBus();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
+
+// The menu opens from a right-click only for desktop pointers (touch uses a
+// long press) — it reads `useDesktopPointer()`, which jsdom can't answer, so
+// stub `matchMedia` to report a fine pointer.
+function stubDesktopPointer() {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({
+      matches: true,
+      media: "",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      onchange: null,
+      dispatchEvent: vi.fn(),
+    })),
+  );
+}
 
 describe("RowActionMenu", () => {
   it("opens a menu of actions on right-click and fires the chosen one", () => {
+    stubDesktopPointer();
     const archive = vi.fn();
     const remove = vi.fn();
     render(
@@ -62,6 +83,7 @@ describe("RowActionMenu", () => {
   });
 
   it("commits the highlighted action via the keyboard", () => {
+    stubDesktopPointer();
     const archive = vi.fn();
     const remove = vi.fn();
     render(

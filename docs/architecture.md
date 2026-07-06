@@ -36,6 +36,21 @@ app  ──▶  ui  ──▶  domain
 - **`src/app/`** — `App.tsx` (the list ↔ editor shell), `main.tsx` (the entry
   point), and `use-notes.ts` (the store hook the component tree binds to).
 
+Below all of these sits **`@niclaslindstedt/oss-framework`** (GitHub
+Packages; `.npmrc` + `GITHUB_PAT`), the shared package extracted from
+`notes` and `checklist`. Generic UI primitives, gesture/keyboard hooks, the
+PWA update lifecycle, the changelog/achievements/namespaces dialogs, and
+the glyph kit are consumed from it; each replaced module keeps its
+historical path in `src/` as a re-export shim or a label-injecting wrapper.
+One hard rule rides on top of the layering: **nothing in the transitive
+import closure of the modules the React Native app shares**
+(`src/i18n/index.ts`, `src/domain/note.ts`, `src/storage/adapter.ts`,
+`src/storage/namespaces.ts`, `src/app/use-notes.ts`) **may import from the
+framework package** — the Expo project installs neither it nor
+`react-dom`. AGENTS.md's "The shared framework" section lists what stays
+app-side and why (theme fork, encryption envelope compatibility, the
+native closure, diverged parser/sync/search surfaces).
+
 ## State and persistence
 
 `use-notes.ts` holds the note list in React state and persists every change to

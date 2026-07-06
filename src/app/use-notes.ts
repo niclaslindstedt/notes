@@ -9,7 +9,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { unlock } from "../achievements/index.ts";
+import { unlock } from "../achievements/bus.ts";
 import { type Attachment, withAttachment } from "../domain/attachment.ts";
 import {
   archivedNotes,

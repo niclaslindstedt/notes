@@ -14,7 +14,7 @@ import {
   type MutableRefObject,
 } from "react";
 
-import { unlock } from "../achievements/index.ts";
+import { unlock } from "../achievements/bus.ts";
 import {
   DEFAULT_SAVE_FORMATTING,
   formatSnapshotForSave,

@@ -18,6 +18,7 @@ const namespace = {
   switchTo: "Switch to {name}",
   rename: "Rename",
   deleteAction: "Delete namespace",
+  deleteConfirm: "Delete “{name}” and all of its notes? This can't be undone.",
   nameRequired: "A name is required",
   defaultBadge: "Default",
   noIcon: "No icon",
