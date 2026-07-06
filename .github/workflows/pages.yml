@@ -26,6 +26,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  packages: read
 
 concurrency:
   group: pages
@@ -38,6 +39,9 @@ env:
   # the /branch/ slot from here, so regular deploys preserve the slot
   # until the next dispatch overwrites it.
   BRANCH_DEPLOY_REF: branch-deploy
+  # .npmrc authenticates the @niclaslindstedt scope against GitHub
+  # Packages via ${GITHUB_PAT}; needed by every `npm ci`.
+  GITHUB_PAT: ${{ secrets.GITHUB_PAT || secrets.GITHUB_TOKEN }}
 
 jobs:
   build:

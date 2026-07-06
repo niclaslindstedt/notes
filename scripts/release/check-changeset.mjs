@@ -56,6 +56,7 @@ const SKIP_PATTERNS = [
   /^\.prettierignore$/,
   /^\.gitignore$/,
   /^\.gitattributes$/,
+  /^\.npmrc$/,
   /^eslint\.config\.js$/,
   /^vite\.config\.ts$/,
   /^tsconfig.*\.json$/,

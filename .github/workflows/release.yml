@@ -46,6 +46,12 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  packages: read
+
+# .npmrc authenticates the @niclaslindstedt scope against GitHub
+# Packages via ${GITHUB_PAT}; needed by every `npm ci`.
+env:
+  GITHUB_PAT: ${{ secrets.GITHUB_PAT || secrets.GITHUB_TOKEN }}
 
 jobs:
   release:
