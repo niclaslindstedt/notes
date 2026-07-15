@@ -16,14 +16,14 @@ on:
   workflow_dispatch:
     inputs:
       platform:
-        description: "Platform(s) to build."
+        description: "Platform(s) to build. Defaults to android — each build spends EAS quota (15 Android + 15 iOS/month free), and iOS runs on the scarcer workers, so building iOS/all is an explicit opt-in."
         required: true
         type: choice
-        default: all
+        default: android
         options:
-          - all
           - android
           - ios
+          - all
       profile:
         description: "EAS build profile (see native/eas.json). preview → internal-distribution APK / iOS-simulator build; production → store-ready App Bundle / IPA."
         required: true
