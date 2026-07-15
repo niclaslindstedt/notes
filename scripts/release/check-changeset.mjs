@@ -48,6 +48,10 @@ const SKIP_PATTERNS = [
   // release train (native/RELEASING.md), not a change to the web app whose
   // CHANGELOG this guards.
   /^native\//,
+  // The notesd daemon (notesd/) is a separate Rust binary with its own
+  // build/version, not a user-visible change to the web app. Once the app
+  // grows a notesd backend adapter, THAT change ships its own fragment.
+  /^notesd\//,
   /^Makefile$/,
   /\.md$/,
   /^\.nvmrc$/,

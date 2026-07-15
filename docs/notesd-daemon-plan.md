@@ -1,10 +1,14 @@
 # `notesd` — a self-hosted daemon backend for notes
 
-> **Status: design / plan.** Nothing here is built yet. This document is the
-> agreed shape of the work so the implementation PRs have a spec to land
-> against. Security is the headline requirement — the whole reason to
-> self-host is that a home machine is more trustworthy than a third party, so
-> the self-hosted path has to be *water tight* or it defeats its own purpose.
+> **Status: the daemon is built** (roadmap phases 1–5). The Rust daemon lives
+> in [`../notesd/`](../notesd/README.md) — TLS + SPKI pin, per-device pairing,
+> the dumb file store, the revision index + fs-watch, SSE push, delta sync,
+> UPnP/mDNS, and the QR on startup, with unit + end-to-end TLS integration
+> tests. Still to come: the frontend `StorageAdapter` + pairing UI (phase 6)
+> and the cloud config plane (phase 7). Security is the headline requirement —
+> the whole reason to self-host is that a home machine is more trustworthy than
+> a third party, so the self-hosted path has to be *water tight* or it defeats
+> its own purpose.
 >
 > **Confirmed build decisions:** Rust · per-device revocable keys · UPnP-open
 > by default · monorepo `notesd/`.
@@ -387,19 +391,20 @@ also land, in the same PR as the code:
 
 ## Roadmap (incremental, each phase shippable)
 
-1. **Spec** — this document; freeze the wire protocol and pairing/QR payload.
-2. **Daemon MVP** — Rust: TLS self-signed + SPKI pin, single `--api-key`, file
-   store over the dumb folder, core REST (`rev`/`notes`/`put`/`delete`), QR on
-   start, `-f`/`--debug`/`--port`/`--api-key`, foreground only.
+1. **Spec** — this document; freeze the wire protocol and pairing/QR payload. ✅
+2. **Daemon MVP** — Rust: TLS self-signed + SPKI pin, `--api-key`, file store
+   over the dumb folder, core REST (`rev`/`notes`/`put`/`delete`), QR on start,
+   `-f`/`--debug`/`--port`/`--api-key`. ✅
 3. **Daemonisation & durability** — state dir, cert persistence, atomic
-   write-temp-rename + fsync, revision index, `notify` fs-watch.
+   write-temp-rename + fsync, revision index, `notify` fs-watch. ✅
 4. **Reachability** — UPnP mapping (default-on, with the loud warning) + mDNS
-   discovery.
-5. **Smart sync** — SSE push (`watch`), `since=` delta, `batch`, attachments.
+   discovery. ✅
+5. **Smart sync** — SSE push (`watch`), `since=` delta, `batch`, attachments,
+   per-device pairing + key revocation. ✅
 6. **Frontend adapter** — `src/storage/notesd/`, capability wiring, pairing UI
-   (QR scan), backend selection + settings.
+   (QR scan), backend selection + settings. ⏳
 7. **Config plane** — read/write `notesd.json` in Dropbox/Drive, encrypted
-   option, auto-discovery; per-device pairing tokens + key revocation.
-8. **Hardening & ship** — rate-limit/lockout, fuzzing, security review, the
-   full lockstep fan-out (achievement, i18n, `/home` + `/privacy`, docs,
-   changeset), packaging, release.
+   option, auto-discovery. ⏳
+8. **Hardening & ship** — rate-limit/lockout (done in the daemon), fuzzing,
+   security review, the full lockstep fan-out (achievement, i18n, `/home` +
+   `/privacy`, docs, changeset), packaging, release. ⏳
