@@ -82,7 +82,9 @@ export function HomePage() {
               note is tidied as it's saved — trailing spaces trimmed and a
               closing newline added, both optional in Settings. Long pasted
               links can be shortened in the preview so they don't sprawl across
-              the note — the full link is still saved and still opens.
+              the note — the full link is still saved and still opens. While the
+              app is open, hopping between notes drops you back at the exact
+              spot and cursor position you left each one at.
             </li>
             <li>
               Swipe a note right — in the overview or the side menu — to{" "}

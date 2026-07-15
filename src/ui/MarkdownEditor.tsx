@@ -18,6 +18,7 @@ import {
   hiddenAttachmentLines,
   INLINE_PLACEMENT,
 } from "../domain/attachment.ts";
+import { unlock } from "../achievements/index.ts";
 import {
   firstChangedLine,
   orderPoints,
@@ -28,6 +29,7 @@ import {
 import { classifyLines } from "../domain/markdown.ts";
 import type { Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
+import { getEditorPosition, setEditorPosition } from "./editor-position.ts";
 import { AttachmentsEndBlock } from "./attachments/AttachmentsEndBlock.tsx";
 import { AttachmentsProvider } from "./attachments/AttachmentsProvider.tsx";
 import {
@@ -112,6 +114,9 @@ type Props = {
   placement?: AttachmentPlacement;
   /** Trim bare URLs in the preview to this many characters either side (0 = off). */
   shortenLinkChars?: number;
+  /** The open note's id, keying its session-remembered caret / scroll position
+   *  so switching away and back reopens where you left off. */
+  noteId?: string;
   /** Imperative handle so the title field can hand focus down into the body. */
   ref?: Ref<MarkdownEditorHandle>;
 };
@@ -143,9 +148,14 @@ export function MarkdownEditor({
   onAttach,
   placement = INLINE_PLACEMENT,
   shortenLinkChars = 0,
+  noteId,
   ref,
 }: Props) {
   const t = useT();
+  // Where the caret / scroll were the last time this note was left this session
+  // (see `editor-position.ts`). Read once on mount — the editor is keyed by note
+  // id, so a different note remounts and re-reads its own remembered spot.
+  const [saved] = useState(() => (noteId ? getEditorPosition(noteId) : null));
   // Local source of truth, seeded from the note. App keys the editor by note
   // id, so a different note remounts rather than reconciling mid-edit.
   const [value, setValue] = useState(body);
@@ -157,8 +167,16 @@ export function MarkdownEditor({
     [value, placement],
   );
 
+  // A remembered caret reopens the note on that line (raw, focused); otherwise
+  // fall back to the mount behaviour — the last line when `focusOnMount`, no
+  // active line (fully formatted, keyboard down) for an existing note.
+  const savedCaret = saved?.caret ?? null;
   const [active, setActive] = useState<Active>(() => ({
-    index: focusOnMount ? Math.max(0, body.split("\n").length - 1) : null,
+    index: savedCaret
+      ? Math.min(savedCaret.line, body.split("\n").length - 1)
+      : focusOnMount
+        ? Math.max(0, body.split("\n").length - 1)
+        : null,
     key: 0,
   }));
 
@@ -178,8 +196,18 @@ export function MarkdownEditor({
   // The caret column to install after the active line (re)renders, or null when
   // the browser already left the caret where it belongs (a plain caret move).
   const pendingCaret = useRef<number | null>(
-    focusOnMount ? Math.max(0, (lines[lines.length - 1] ?? "").length) : null,
+    savedCaret
+      ? savedCaret.col
+      : focusOnMount
+        ? Math.max(0, (lines[lines.length - 1] ?? "").length)
+        : null,
   );
+
+  // The latest known caret (as a source point) and scroll offset, kept current
+  // as the user types / moves / scrolls so the unmount handler can stash them in
+  // the session position store — restored the next time this note is opened.
+  const lastCaret = useRef<SourcePoint | null>(savedCaret);
+  const lastScrollTop = useRef<number>(saved?.scrollTop ?? 0);
   // Guards so a caret we place programmatically doesn't re-enter the
   // `selectionchange` handler, and so IME composition isn't disturbed.
   const settingSel = useRef(false);
@@ -215,6 +243,7 @@ export function MarkdownEditor({
     setValue(next);
     onChange(next);
     pendingCaret.current = caret.col;
+    lastCaret.current = caret;
     setActive((a) => ({
       index: caret.line,
       key: a.index === caret.line ? a.key : a.key + 1,
@@ -225,6 +254,7 @@ export function MarkdownEditor({
   // new raw line). Remounts the active node so it renders that line's raw text.
   function activate(index: number, col: number) {
     pendingCaret.current = col;
+    lastCaret.current = { line: index, col };
     setActive((a) => ({ index, key: a.index === index ? a.key : a.key + 1 }));
   }
 
@@ -291,6 +321,36 @@ export function MarkdownEditor({
       settingSel.current = false;
     });
   }, [active, value]);
+
+  // Reopen the note where it was left this session. Runs after the caret-
+  // placement effect above (so a remembered caret is already placed and the
+  // surface focused — which raises the soft keyboard on phones), then restores
+  // the scroll offset. On mobile the keyboard shrinks the visual viewport after
+  // focus, so with a caret remembered we nudge its line into the smaller band —
+  // but only if the keyboard actually covers it (`ifHidden`), leaving the
+  // restored scroll alone when the caret is already on screen.
+  useLayoutEffect(() => {
+    if (!saved) return;
+    setScrollTop(rootRef.current?.parentElement, saved.scrollTop);
+    if (saved.caret) {
+      const el = activeElRef.current;
+      if (el) scrollFocusedIntoView(el, { ifHidden: true });
+      unlock("whereYouLeftOff");
+    }
+  }, [saved]);
+
+  // Stash the caret / scroll for this note as the editor unmounts — a note
+  // switch remounts it under a fresh `key`, and the mount effect above reads
+  // this back so you land exactly where you left off.
+  useEffect(() => {
+    return () => {
+      if (!noteId) return;
+      setEditorPosition(noteId, {
+        caret: lastCaret.current,
+        scrollTop: lastScrollTop.current,
+      });
+    };
+  }, [noteId]);
 
   // Scroll the line an undo / redo changed into view, now that the new value has
   // rendered so the target line's DOM exists. Runs after every value change but
@@ -518,15 +578,20 @@ export function MarkdownEditor({
 
     const lineEl = lineElementOf(root, sel.anchorNode);
     const L = lineIndexOf(lineEl);
-    if (L === null || L === cur) return;
-    // The caret entered a formatted line: map its DOM position to a source
-    // column, then make that line active (raw) at the same column.
+    if (L === null) return;
+    // Map the caret to a source column. Remember it even for a move *within* the
+    // active line (which never re-enters `commit` / `activate`), so an arrow /
+    // click that repositions the caret still updates the spot the unmount
+    // handler saves for the session.
     const pt = sourcePointFromDom(
       root,
       blocksRef.current,
       sel.anchorNode,
       sel.anchorOffset,
     );
+    if (pt) lastCaret.current = pt;
+    if (L === cur) return;
+    // The caret entered a different line: make that line active (raw) at the col.
     activate(L, pt?.col ?? 0);
   };
 
@@ -728,6 +793,11 @@ export function MarkdownEditor({
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div
         className={`min-h-0 flex-1 overscroll-contain ${wordWrap ? "overflow-y-auto" : "overflow-auto"}`}
+        onScroll={(e) => {
+          // Remember how far the note is scrolled so switching away and back
+          // reopens at the same offset (saved on unmount).
+          lastScrollTop.current = e.currentTarget.scrollTop;
+        }}
         onPointerDown={(e) => {
           // A touch (or pen) tap anywhere in the editor arms the reveal so the
           // line the caret lands on is scrolled clear of the soft keyboard; a
@@ -896,6 +966,14 @@ function scrollLineIntoView(root: HTMLElement | null, index: number): void {
     block: "center",
     behavior: reduceMotion ? "auto" : "smooth",
   });
+}
+
+// Restore a scroll container's offset when reopening a note. A plain helper
+// (rather than an inline `el.scrollTop = …` in the effect) so the value being
+// mutated isn't one the effect closes over — which the immutability lint rule
+// forbids — and so it degrades to a no-op assignment under jsdom.
+function setScrollTop(el: HTMLElement | null | undefined, top: number): void {
+  if (el) el.scrollTop = top;
 }
 
 // Whether a drag is carrying files (rather than dragged text) — the same

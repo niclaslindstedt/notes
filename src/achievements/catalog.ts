@@ -10,6 +10,7 @@ import type { Snapshot } from "../domain/note.ts";
 import {
   AccessibilityGlyph,
   ArchiveGlyph,
+  BookmarkGlyph,
   BoxesGlyph,
   BroadcastGlyph,
   BroomGlyph,
@@ -386,6 +387,15 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     tier: "intermediate",
     glyph: SearchGlyph,
     learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "whereYouLeftOff",
+    tier: "intermediate",
+    glyph: BookmarkGlyph,
+    learnMore: true,
+    // Fired when reopening a note restores the caret / scroll position it was
+    // left at earlier this session (see `src/ui/editor-position.ts`).
     trigger: { kind: "manual" },
   },
 

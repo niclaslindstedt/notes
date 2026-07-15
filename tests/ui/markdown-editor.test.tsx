@@ -4,6 +4,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MarkdownEditor } from "../../src/ui/MarkdownEditor.tsx";
+import {
+  getEditorPosition,
+  resetEditorPositions,
+  setEditorPosition,
+} from "../../src/ui/editor-position.ts";
 
 const editorProps = {
   wordWrap: true,
@@ -63,6 +68,7 @@ function beforeInput(inputType: string, data: string | null = null) {
 
 afterEach(() => {
   window.getSelection()?.removeAllRanges();
+  resetEditorPositions();
 });
 
 describe("MarkdownEditor", () => {
@@ -368,6 +374,38 @@ describe("MarkdownEditor", () => {
       } finally {
         open.mockRestore();
       }
+    });
+  });
+
+  describe("session position restore", () => {
+    it("reopens a note at the remembered caret line", () => {
+      // A position left earlier this session for this note id.
+      setEditorPosition("keep", { caret: { line: 0, col: 2 }, scrollTop: 0 });
+      // An existing note mounts with nothing focused (focusOnMount=false), yet
+      // the remembered caret reopens line 0 as the raw active line.
+      renderEditor("alpha\nbravo\ncharlie", {
+        noteId: "keep",
+        focusOnMount: false,
+      });
+      expect(rawLine()?.getAttribute("data-line-index")).toBe("0");
+      expect(rawLine()?.textContent).toBe("alpha");
+    });
+
+    it("opens fresh (no active line) for a note with no remembered position", () => {
+      renderEditor("alpha\nbravo", { noteId: "unseen", focusOnMount: false });
+      // focusOnMount=false and nothing remembered → fully formatted, no raw line.
+      expect(rawLine()).toBeNull();
+    });
+
+    it("stashes the caret when the editor unmounts", () => {
+      // Opens focused on the last line; type a character so an edit runs through
+      // the source engine and updates the remembered caret.
+      const { unmount } = renderEditor("alpha\nbravo", { noteId: "save" });
+      caretIn(rawLine()!, 5);
+      beforeInput("insertText", "!");
+      unmount();
+      // The unmount handler wrote the last caret (line 1) into the store.
+      expect(getEditorPosition("save")?.caret?.line).toBe(1);
     });
   });
 

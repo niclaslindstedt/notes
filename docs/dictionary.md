@@ -83,6 +83,7 @@ Honour these when naming a new file, key, or string.
 | **Editor margin** / **writing column width** / **word wrap** / **spell-check toggle** | `EditorSettings`, `EditorMargin`, `editorMarginMaxWidth` (`src/theme/themes.ts`); `EditorSection` (`src/ui/settings/EditorSection.tsx`). [→](overview.md#editor-settings) |
 | **Format on save** / **trim trailing spaces** / **trailing newline** / **tidy on save** | `SaveFormatting`, `formatBody`, `formatSnapshotForSave` (`src/domain/note.ts`); applied in `performSave` (`src/app/use-notes-sync.ts`); the `trimTrailingSpaces` / `trailingNewline` editor settings. [→](overview.md#format-on-save) |
 | **Copy button** / **copy glyph** / **copy note** / **copy scope** / **copy with front matter** | `CopyNoteButton` (`src/ui/CopyNoteButton.tsx`); `buildCopyText` (`src/ui/copy-note.ts`); `CopyScope` (`src/domain/note.ts`). [→](overview.md#copy-button) |
+| **Editor position memory** / **pick up where you left off** / **remember the caret & scroll** / **restore caret / scroll when switching notes** | `EditorPosition`, `getEditorPosition` / `setEditorPosition`, `offsetToPoint` / `pointToOffset` (`src/ui/editor-position.ts`); mount-restore + unmount-save in `MarkdownEditor` / `PlainEditor`; keyboard-aware reveal via `scrollFocusedIntoView(el, { ifHidden })`; the `whereYouLeftOff` achievement. [→](overview.md#editor-position-memory) |
 
 ## The note model and operations
 

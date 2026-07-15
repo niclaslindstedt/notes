@@ -506,6 +506,38 @@ case reuses the [markdown codec](#markdown-codec)'s `noteToMarkdown` so a copied
 note is byte-identical to its on-disk file. Copying is the **Copycat**
 achievement (fired via `unlock("copycat")`).
 
+### Editor position memory
+
+`src/ui/editor-position.ts` — a **session-scoped** memory of where the caret sat
+and how far the editor was scrolled in each note, so switching away and back
+reopens the note exactly where you left it (same line and column, same scroll
+offset) instead of at the top with no caret. It is a plain module-level
+`Map<noteId, EditorPosition>` — deliberately **in-memory only**, never
+`localStorage`: it remembers *where you were looking this session*, transient
+view state that resets on a fresh load, unlike the persisted note document or the
+per-reload [active-note cursor](#active-note-cursor). The caret is stored as a
+source `(line, column)` `SourcePoint`, one shape both editors share; the plain
+textarea converts to/from a flat character offset with the pure `offsetToPoint` /
+`pointToOffset` helpers (both clamp, so a point saved against a body that later
+changed can never overshoot).
+
+Both editors (`MarkdownEditor` and the Markdown-off `PlainEditor`) key their copy
+by the note id (threaded from `Editor` as `noteId`) and are keyed by note id in
+`App`, so a switch remounts them: on **mount** each reads its remembered spot and,
+when a caret was stored, seeds the active line + caret column and focuses the
+surface (which raises the soft keyboard on phones so the caret lands in place),
+then restores the scroll offset; on **unmount** each writes the latest caret
+(tracked on every edit / caret move / `selectionchange`) and scroll offset back.
+A note that was only viewed, never given a caret this visit, stores `caret: null`
+— then only the scroll is restored and the note stays fully formatted (keyboard
+down). On mobile the keyboard shrinks the visual viewport *after* focus, so with a
+caret restored the editor nudges the caret's line into the smaller band via
+[`scrollFocusedIntoView`](#viewport-height)'s `ifHidden` mode — which only scrolls
+when the keyboard actually covers the caret, leaving the restored scroll untouched
+otherwise. Landing back where you left off (a restore that replaces a remembered
+caret) unlocks the **Right where you left off** achievement
+(`unlock("whereYouLeftOff")`).
+
 ## The note model and operations
 
 ### Note
