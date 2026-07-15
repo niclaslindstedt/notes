@@ -76,7 +76,7 @@ export function NoteList({
   const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
   // The bare file-explorer listing wants its rows packed tight, like files in a
   // tree; cards and rows keep the roomier gap that suits their chrome.
-  const listGap = useAppearance().listLayout === "list" ? "gap-0.5" : "gap-2";
+  const listGap = useAppearance().listLayout === "list" ? "gap-0.5" : "gap-1.5";
   // The folder under the finger during a touch long-press drag (the desktop
   // path uses `dropTarget` below); either lights up the matching section.
   const activeDropKey = useNoteDropKey();
