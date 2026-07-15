@@ -39,7 +39,10 @@ import {
   lineIndexOf,
   placeCaret,
 } from "./contenteditable-caret.ts";
-import { scrollFocusedIntoView } from "./hooks/scrollFocusedIntoView.ts";
+import {
+  bufferedScrollTop,
+  scrollFocusedIntoView,
+} from "./hooks/scrollFocusedIntoView.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
@@ -285,6 +288,12 @@ export function MarkdownEditor({
       revealPending.current = false;
       lastRevealKey.current = active.key;
       scrollFocusedIntoView(el);
+    } else {
+      // Desktop / hardware-keyboard edit: no soft keyboard to clear, so just
+      // keep the caret's line off the container's edges with a one-line buffer.
+      // A no-op unless the edit (an Enter at the foot of the viewport) pushed
+      // the caret against or past an edge.
+      scrollCaretLineIntoView(rootRef.current, el);
     }
     // Let the selectionchange this fires settle, then re-arm the handler.
     queueMicrotask(() => {
@@ -903,6 +912,41 @@ function scrollLineIntoView(root: HTMLElement | null, index: number): void {
 function carriesFiles(e: ReactDragEvent): boolean {
   const types = e.dataTransfer?.types;
   return types ? Array.from(types).includes("Files") : false;
+}
+
+// Keep the caret's line clear of the editor's top and bottom edges by a
+// one-line buffer, so an edit that lands the caret at the foot of the viewport
+// — pressing Enter on the bottom line — scrolls it back with a blank line of
+// breathing room instead of tucking it against (or past) the edge, where the
+// browser leaves it because we intercept the edit and re-place the caret
+// ourselves (no native reveal). A line already inside the buffered band leaves
+// the view untouched, so ordinary mid-note typing never jumps. `root` is the
+// contenteditable; its parent is the `overflow-y-auto` scroller and the only
+// scrollable ancestor, so scrolling its `scrollTop` stays contained to the note.
+function scrollCaretLineIntoView(
+  root: HTMLElement | null,
+  line: HTMLElement | null,
+): void {
+  if (!root || !line) return;
+  const scroller = root.parentElement;
+  if (!scroller) return;
+  const lineRect = line.getBoundingClientRect();
+  const viewRect = scroller.getBoundingClientRect();
+  const top = bufferedScrollTop(
+    lineRect.top,
+    lineRect.height,
+    viewRect.top,
+    scroller.scrollTop,
+    scroller.clientHeight,
+    scroller.scrollHeight,
+    lineRect.height,
+  );
+  // Absolute target (not a relative nudge) so a call issued mid-animation
+  // retargets the in-flight scroll instead of compounding onto it.
+  if (Math.abs(top - scroller.scrollTop) < 1) return;
+  const reduceMotion =
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  scroller.scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
 }
 
 // `contenteditable="plaintext-only"` where supported (Chrome/Safari), else the

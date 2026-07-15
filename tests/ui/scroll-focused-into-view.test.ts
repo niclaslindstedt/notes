@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  bufferedScrollTop,
   centeredScrollTop,
   scrollFocusedIntoView,
 } from "../../src/ui/hooks/scrollFocusedIntoView.ts";
@@ -102,6 +103,46 @@ describe("centeredScrollTop", () => {
   it("clamps to the bottom so a last line rests at the band's foot", () => {
     const max = 2000 - 400;
     expect(centeredScrollTop(1990, 20, 0, 1600, 400, 2000)).toBe(max);
+  });
+});
+
+describe("bufferedScrollTop", () => {
+  // Band 400 tall, line 20 tall, one-line buffer (20).
+  it("leaves the view alone when the line sits inside the buffered band", () => {
+    // Line at content offset 100, band showing content 0..400 → well clear of
+    // both edges, so scrollTop is returned unchanged.
+    expect(bufferedScrollTop(100, 20, 0, 0, 400, 2000, 20)).toBe(0);
+  });
+
+  it("pulls the content up so the line clears the bottom edge by one line", () => {
+    // Line pressed to the very foot of the band (top 380, bottom 400). Its
+    // bottom (400) plus the 20 buffer must sit at the band foot, so scrollTop
+    // advances by 20: bottom 400 + buffer 20 - clientHeight 400 = 20.
+    expect(bufferedScrollTop(380, 20, 0, 0, 400, 2000, 20)).toBe(20);
+  });
+
+  it("keeps a whole extra line of breathing room below the caret", () => {
+    // Line just off the bottom edge (top 395): after scrolling, the gap beneath
+    // it is a full line height, never a sliver.
+    const top = bufferedScrollTop(395, 20, 0, 0, 400, 2000, 20);
+    expect(top).toBe(35); // 395 + 20 + 20 - 400
+  });
+
+  it("pushes the content down so a hoisted caret clears the top edge", () => {
+    // A merge lands the line at the band top (top 0) while scrolled to 500 →
+    // push down so the buffer sits above it: topInContent 500 - buffer 20 = 480.
+    expect(bufferedScrollTop(0, 20, 0, 500, 400, 2000, 20)).toBe(480);
+  });
+
+  it("clamps to the bottom of the scroll range at the last line", () => {
+    const max = 2000 - 400;
+    // The final line can't gain a buffer without scrolling past the content end;
+    // the clamp rests it at the foot instead.
+    expect(bufferedScrollTop(390, 20, 0, 1590, 400, 2000, 20)).toBe(max);
+  });
+
+  it("clamps to zero at the top of the scroll range", () => {
+    expect(bufferedScrollTop(5, 20, 0, 0, 400, 2000, 20)).toBe(0);
   });
 });
 

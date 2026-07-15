@@ -219,6 +219,19 @@ sticky header (a first line vanishing off screen, caret and all). It is scoped
 to touch (a mouse never loses the caret to a keyboard) and gated on the
 active-line key so typing within a line never re-scrolls.
 
+**Typing keeps the caret on screen with a one-line buffer.** Because every edit
+is intercepted and the caret re-placed programmatically, the browser runs no
+native "keep the caret visible" pass — so on desktop, pressing Enter on the
+bottom line would push the new line off the foot of the viewport. The same
+caret-placement effect that handles the touch reveal falls through, on any
+non-touch edit, to `scrollCaretLineIntoView` (`src/ui/MarkdownEditor.tsx`), which
+keeps the caret's line clear of the container's top and bottom edges by a
+one-line-height buffer via the pure `bufferedScrollTop`
+(`src/ui/hooks/scrollFocusedIntoView.ts`). It scrolls the editor's own container
+to an **absolute** target (so a call issued mid-animation retargets rather than
+compounds) and is a no-op whenever the line already sits inside the buffered
+band, so ordinary mid-note typing never jumps the view.
+
 Clicking the empty space below the note lands the caret on a blank line at the
 very bottom, **appending one when the document doesn't already end in a newline**
 so a note that ends in an image gains a fresh line to type on. That appended

@@ -61,6 +61,36 @@ export function centeredScrollTop(
   return Math.max(0, Math.min(centered, max));
 }
 
+// The `scrollTop` that keeps a line clear of its scroll container's top and
+// bottom edges by a `buffer` gap (typically one line height), so the caret
+// never rests against — or slips past — either edge. Returns the current
+// `scrollTop` unchanged when the line already sits inside the buffered band (so
+// ordinary mid-note typing never moves the view), and clamps to the scroll
+// range at the extremes. Pure so the geometry is unit-testable without a layout
+// engine (jsdom does no layout).
+export function bufferedScrollTop(
+  elTop: number,
+  elHeight: number,
+  viewTop: number,
+  scrollTop: number,
+  clientHeight: number,
+  scrollHeight: number,
+  buffer: number,
+): number {
+  const topInContent = elTop - viewTop + scrollTop;
+  const bottomInContent = topInContent + elHeight;
+  const max = Math.max(0, scrollHeight - clientHeight);
+  // Below the buffered band's foot (pressing Enter at the bottom) → pull the
+  // content up so the buffer gap sits beneath the line.
+  if (bottomInContent + buffer > scrollTop + clientHeight)
+    return Math.max(0, Math.min(bottomInContent + buffer - clientHeight, max));
+  // Above the buffered band's head (a merge that hoists the caret up) → push the
+  // content down so the buffer gap sits above the line.
+  if (topInContent - buffer < scrollTop)
+    return Math.max(0, Math.min(topInContent - buffer, max));
+  return scrollTop;
+}
+
 // The nearest ancestor that can actually scroll vertically, or null when the
 // content fits (nothing to scroll). Walks up from the element's parent.
 function nearestScrollableAncestor(el: HTMLElement): HTMLElement | null {

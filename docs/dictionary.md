@@ -70,6 +70,7 @@ Honour these when naming a new file, key, or string.
 | **Active line** / **raw line** / **the line I'm editing**  | `ActiveLine` + `active` state (`data-raw`) in `MarkdownEditor` (`src/ui/MarkdownEditor.tsx`). [→](overview.md#markdown-editor) |
 | **Edit engine** / **replaceRange** / **splice the source** / **line editing** | `replaceRange`, `orderPoints`, `SourcePoint` (`src/domain/line-edit.ts`). [→](overview.md#markdown-editor) |
 | **Contenteditable caret helpers** / **place the caret** / **caret column** | `placeCaret`, `offsetWithin`, `lineElementOf`, `lineIndexOf` (`src/ui/contenteditable-caret.ts`). [→](overview.md#selection-mapping) |
+| **Follow the cursor** / **keep the caret visible** / **cursor scrolls off screen** / **caret buffer while typing** | `scrollCaretLineIntoView` (`src/ui/MarkdownEditor.tsx`); `bufferedScrollTop` (`src/ui/hooks/scrollFocusedIntoView.ts`). [→](overview.md#markdown-editor) |
 | **Rendered line** / **formatted line** / **live preview**  | `RenderedLine` (`src/ui/MarkdownLine.tsx`); `markdownLineClass` (`src/ui/markdown-line-class.ts`). [→](overview.md#rendered-line) |
 | **Markdown parser** / **classify lines** / **inline formatting** | `classifyLines`, `parseInline`, `LineBlock`, `InlineNode` (`src/domain/markdown.ts`). [→](overview.md#markdown-parser) |
 | **Clickable link** / **open a link** / **link in the editor** | the `link` case in `renderInline` (`src/ui/MarkdownLine.tsx`); opens on click instead of placing the caret. [→](overview.md#rendered-line) |
