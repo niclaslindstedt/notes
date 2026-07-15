@@ -1,0 +1,83 @@
+name: Native build
+
+# Manual-only. The maintainer dispatches this to build the React Native
+# (Expo) app under native/ with EAS Build — and, optionally, submit the
+# result to the App Store / Google Play with EAS Submit. It is deliberately
+# NOT wired to push/PR triggers: EAS build minutes cost money, so a build
+# only ever runs when a human asks for one.
+#
+# Authentication is via an EXPO_TOKEN repo secret (a personal access token
+# from https://expo.dev/accounts/[account]/settings/access-tokens). Store
+# submission additionally needs the store credentials described in
+# native/RELEASING.md (Apple App Store Connect / a Google Play service
+# account key) configured on the EAS project.
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Platform(s) to build. Defaults to android — each build spends EAS quota (15 Android + 15 iOS/month free), and iOS runs on the scarcer workers, so building iOS/all is an explicit opt-in."
+        required: true
+        type: choice
+        default: android
+        options:
+          - android
+          - ios
+          - all
+      profile:
+        description: "EAS build profile (see native/eas.json). preview → internal-distribution APK / iOS-simulator build; production → store-ready App Bundle / IPA."
+        required: true
+        type: choice
+        default: preview
+        options:
+          - development
+          - preview
+          - production
+      submit:
+        description: "Also submit the finished build to the stores (EAS Submit). Only meaningful with the production profile; requires store credentials on the EAS project."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: native
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      # Installs the pinned eas-cli and authenticates it with EXPO_TOKEN so
+      # the eas commands below run non-interactively.
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # The native app pins exact versions and tracks no lockfile
+      # (native/.gitignore), so `npm install` — not `npm ci` — is correct.
+      # It only needs its own deps: the shared core it imports from ../src
+      # is framework-free and dependency-light (React only, pinned here).
+      - name: Install dependencies
+        run: npm install
+
+      # No submit: fire the build and return. --no-wait lets the runner exit
+      # while EAS builds in the cloud, so we don't pay for idle Actions
+      # minutes. Track progress on https://expo.dev.
+      - name: EAS build
+        if: ${{ !inputs.submit }}
+        run: eas build --non-interactive --no-wait --platform ${{ inputs.platform }} --profile ${{ inputs.profile }}
+
+      # Submit requested: the runner must stay up until the build finishes so
+      # --auto-submit can hand the artifact to EAS Submit.
+      - name: EAS build + submit
+        if: ${{ inputs.submit }}
+        run: eas build --non-interactive --platform ${{ inputs.platform }} --profile ${{ inputs.profile }} --auto-submit

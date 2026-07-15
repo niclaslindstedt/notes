@@ -30,13 +30,16 @@ source mark (`../public/favicon.svg`) — see "Artwork" below.
 - A **Mac is not required** — EAS builds iOS in the cloud and manages the
   signing certificates for you.
 
-Link this project to an EAS project (writes `extra.eas.projectId` and
-`owner` into `app.json`):
+This project is **already linked** to its EAS project — the id lives in
+[`app.json`](app.json) under `extra.eas.projectId`
+(`19f8db84-52f4-4b20-9eb0-b578721147c0`), so `eas build` / `eas submit`
+resolve it without any further `eas init`. If you ever need to re-link (new
+account, new project), run it from this directory:
 
 ```sh
 cd native
 npm install
-eas init
+eas init --id <projectId>
 ```
 
 ## 1. Set the marketing version
@@ -65,6 +68,11 @@ If the brand mark in `favicon.svg` changes, re-run the script to keep these in
 sync.
 
 ## 3. Build
+
+You can build **locally** with the `eas` commands below, or **from CI** with
+the manual GitHub Actions workflow — see
+["Building from CI"](#building-from-ci) at the end. Either way the actual
+build runs in the EAS cloud.
 
 ```sh
 # Android App Bundle (.aab) for Play
@@ -130,3 +138,35 @@ the `preview` profile (Android APK / iOS simulator build) instead.
 Bump `expo.version` (step 1), `eas build --platform all --profile production`,
 then `eas submit --platform all --profile production --latest`. Build numbers
 auto-increment, so no manual bookkeeping per store.
+
+## Building from CI
+
+[`.github/workflows/native-build.yml`](../.github/workflows/native-build.yml)
+runs EAS Build (and, optionally, EAS Submit) from GitHub Actions. It is
+**manual-only** (`workflow_dispatch`) — EAS build minutes cost money, so a
+build only ever runs when a maintainer dispatches one. There is no
+push/PR trigger.
+
+**One-time setup.** Add a repo secret **`EXPO_TOKEN`** — a personal access
+token from
+<https://expo.dev/accounts/[account]/settings/access-tokens> — so the
+workflow can authenticate to EAS non-interactively. Store submission
+(`submit: true`) additionally needs the store credentials from steps 4–5
+configured on the EAS project (Apple App Store Connect credentials managed by
+EAS; a Google Play service-account key uploaded to EAS or committed as
+described above).
+
+**Dispatch it** from the *Actions → Native build* tab (or `gh workflow run
+native-build.yml`) with:
+
+- **platform** — `all` / `android` / `ios`.
+- **profile** — `development` / `preview` / `production` (the profiles in
+  [`eas.json`](eas.json)). `preview` produces internal-distribution builds
+  (Android APK / iOS-simulator); `production` produces store-ready artifacts.
+- **submit** — when `true`, the workflow builds and then hands the artifact to
+  EAS Submit (`--auto-submit`). Only meaningful with the `production` profile.
+
+Without submit the workflow uses `--no-wait`: it kicks off the cloud build and
+the runner exits immediately (so it doesn't burn Actions minutes idling),
+and you track progress on <https://expo.dev>. With submit it waits for the
+build to finish so it can upload it.
