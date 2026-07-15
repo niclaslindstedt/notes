@@ -5,10 +5,14 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Editor } from "../../src/ui/NoteEditor.tsx";
 import type { Note } from "../../src/domain/note.ts";
 import { DEFAULT_EDITOR_SETTINGS } from "../../src/theme/themes.ts";
+import { resetEditorPositions } from "../../src/ui/editor-position.ts";
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  // The editor remembers each note's caret / scroll for the session in a
+  // module-level store; drop it so one case's unmount never seeds the next.
+  resetEditorPositions();
 });
 
 function note(overrides: Partial<Note> = {}): Note {

@@ -207,6 +207,13 @@ const achievements = {
       learnMore:
         "The magnifier on the side-menu action bar searches every note's title and body at once. It's plain text and fuzzy by default — type a rough abbreviation and it still finds the note — and also takes wildcards (recipe*, dr?ft) or a /regex/. On encrypted backends it searches the same preview the note index already holds, so it works without unlocking every note.",
     },
+    whereYouLeftOff: {
+      name: "Right where you left off",
+      condition:
+        "Reopen a note and land back at the caret and scroll you left.",
+      learnMore:
+        "While the app is open it remembers where the caret sat and how far you'd scrolled in each note, so hopping between notes drops you back exactly where you were — same line, same place on screen — instead of at the top. On a phone the keyboard comes back up with the caret already in place. It's per-session: a fresh reload starts each note clean.",
+    },
 
     // ── Pro ───────────────────────────────────────────────────────────
     localVault: {

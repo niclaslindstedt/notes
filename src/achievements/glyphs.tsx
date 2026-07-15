@@ -290,6 +290,16 @@ export function FlaskGlyph({ className }: IconProps) {
   );
 }
 
+// A bookmark — the "pick up where you left off" glyph (a note reopens at the
+// caret and scroll position you left it at this session).
+export function BookmarkGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
+    </Svg>
+  );
+}
+
 // An arrow cursor — the desktop right-click menu glyph (the gesture that, on a
 // computer, replaces the touch swipe on a note row).
 export function MousePointerGlyph({ className }: IconProps) {

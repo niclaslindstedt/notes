@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { unlock } from "../achievements/index.ts";
 import { type Attachment } from "../domain/attachment.ts";
 import { firstChangedLine } from "../domain/line-edit.ts";
 import { isBlank, type Folder, type Note } from "../domain/note.ts";
@@ -14,6 +15,12 @@ import { useT } from "../i18n/index.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { CipherGlyph } from "./CipherGlyph.tsx";
 import { CopyNoteButton } from "./CopyNoteButton.tsx";
+import {
+  getEditorPosition,
+  offsetToPoint,
+  pointToOffset,
+  setEditorPosition,
+} from "./editor-position.ts";
 import { SelectPicker } from "./form/SelectPicker.tsx";
 import { useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
@@ -209,6 +216,7 @@ export function Editor({
             maxWidth={maxWidth}
             focusOnMount={false}
             note={note}
+            noteId={note.id}
             attachments={note.attachments}
             canAttach={canAttach}
             onAttach={onAttach}
@@ -228,6 +236,7 @@ export function Editor({
             disableAutocorrect={editor.disableAutocorrect}
             maxWidth={maxWidth}
             focusOnMount={false}
+            noteId={note.id}
           />
         )}
       </div>
@@ -399,6 +408,7 @@ function PlainEditor({
   disableAutocorrect,
   maxWidth,
   focusOnMount = true,
+  noteId,
 }: {
   body: string;
   onChange: (body: string) => void;
@@ -409,10 +419,22 @@ function PlainEditor({
   disableAutocorrect: boolean;
   maxWidth: string;
   focusOnMount?: boolean;
+  /** Keys this note's session-remembered caret / scroll (see `editor-position.ts`). */
+  noteId?: string;
 }) {
   const t = useT();
   const [value, setValue] = useState(body);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Where the caret / scroll were the last time this note was left this session,
+  // read once on mount (the editor is keyed by note id, so it remounts per note).
+  const [saved] = useState(() => (noteId ? getEditorPosition(noteId) : null));
+  // Latest caret offset / scroll, kept current so the unmount handler can stash
+  // them for the next open.
+  const lastOffset = useRef<number>(
+    saved?.caret ? pointToOffset(body, saved.caret) : 0,
+  );
+  const lastScrollTop = useRef<number>(saved?.scrollTop ?? 0);
 
   // Adopt an out-of-band change to this note's body — a live cloud pull while
   // the note is open. Our own keystrokes echo back through `onChange` to the
@@ -456,6 +478,35 @@ function PlainEditor({
     el.setSelectionRange(el.value.length, el.value.length);
   }, [focusOnMount]);
 
+  // Reopen the note where it was left this session: with a caret remembered,
+  // place it (focusing the textarea raises the soft keyboard on phones so the
+  // caret lands in the right spot); then restore the scroll offset. The textarea
+  // owns its own caret reveal, so the browser keeps the caret clear of the
+  // keyboard within the smaller viewport.
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el || !saved) return;
+    if (saved.caret) {
+      const offset = pointToOffset(el.value, saved.caret);
+      el.focus();
+      el.setSelectionRange(offset, offset);
+      unlock("whereYouLeftOff");
+    }
+    setScrollTop(el, saved.scrollTop);
+  }, [saved]);
+
+  // Stash the caret / scroll for this note as the editor unmounts — a note
+  // switch remounts it, and the mount effect above reads this back.
+  useEffect(() => {
+    return () => {
+      if (!noteId) return;
+      setEditorPosition(noteId, {
+        caret: offsetToPoint(valueRef.current, lastOffset.current),
+        scrollTop: lastScrollTop.current,
+      });
+    };
+  }, [noteId]);
+
   // Ctrl/Cmd+A pressed while the textarea doesn't hold focus — the opening
   // state of an existing note — would otherwise select the whole page (title
   // and chrome included) instead of the note body.
@@ -477,6 +528,14 @@ function PlainEditor({
       onChange={(e) => {
         setValue(e.target.value);
         onChange(e.target.value);
+        lastOffset.current = e.target.selectionStart;
+      }}
+      onSelect={(e) => {
+        // Track the caret so switching away and back restores it.
+        lastOffset.current = e.currentTarget.selectionStart;
+      }}
+      onScroll={(e) => {
+        lastScrollTop.current = e.currentTarget.scrollTop;
       }}
       placeholder={t("app.startWriting")}
       style={maxWidth === "none" ? undefined : { maxWidth }}
@@ -485,6 +544,14 @@ function PlainEditor({
       }`}
     />
   );
+}
+
+// Restore the textarea's scroll offset when reopening a note. A plain helper
+// (rather than an inline `el.scrollTop = …` in the effect) keeps the value being
+// mutated out of the effect's closure — which the immutability lint rule forbids
+// — and degrades to a harmless assignment under jsdom, which has no layout.
+function setScrollTop(el: HTMLElement, top: number): void {
+  el.scrollTop = top;
 }
 
 // Scroll a plain textarea so the source line at `index` is on screen — the

@@ -202,6 +202,13 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Förstoringsglaset på sidomenyns åtgärdsrad söker igenom varje antecknings titel och brödtext på en gång. Den är vanlig text och luddig som standard — skriv en grov förkortning så hittar den ändå anteckningen — och tar även jokertecken (recipe*, dr?ft) eller ett /regex/. På krypterade lagringsbackender söker den i samma förhandsvisning som anteckningsindexet redan har, så den fungerar utan att låsa upp varje anteckning.",
     },
+    whereYouLeftOff: {
+      name: "Precis där du var",
+      condition:
+        "Öppna en anteckning igen och hamna vid markören och rullningen du lämnade.",
+      learnMore:
+        "Så länge appen är öppen kommer den ihåg var markören satt och hur långt du rullat i varje anteckning, så att hoppa mellan anteckningar tar dig tillbaka precis dit du var — samma rad, samma plats på skärmen — i stället för till toppen. På en telefon kommer tangentbordet upp igen med markören redan på plats. Det gäller per session: en ny omladdning börjar varje anteckning på nytt.",
+    },
 
     // ── Proffs ────────────────────────────────────────────────────────
     localVault: {

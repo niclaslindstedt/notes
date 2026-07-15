@@ -107,7 +107,17 @@ function nearestScrollableAncestor(el: HTMLElement): HTMLElement | null {
   return null;
 }
 
-export function scrollFocusedIntoView(el: HTMLElement): void {
+// `ifHidden` restores-scroll-friendly mode: only scroll when the target is
+// actually outside the visible band, leaving an already-visible element (and
+// any scroll position just restored around it) exactly where it is. Used when
+// reopening a note at a remembered scroll offset — the caret is only nudged if
+// the soft keyboard ends up covering it, never re-centred when it's already in
+// view.
+export function scrollFocusedIntoView(
+  el: HTMLElement,
+  opts: { ifHidden?: boolean } = {},
+): void {
+  const { ifHidden = false } = opts;
   const reduceMotion =
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   const behavior: ScrollBehavior = reduceMotion ? "auto" : "smooth";
@@ -115,13 +125,22 @@ export function scrollFocusedIntoView(el: HTMLElement): void {
     if (!el.isConnected) return;
     const scroller = nearestScrollableAncestor(el);
     if (!scroller) {
-      // Nothing scrollable around it — the target already fits the band. Defer
+      // Nothing scrollable around it — the target already fits the band. In
+      // ifHidden mode that means it's on screen, so leave it; otherwise defer
       // to the browser's own reveal rather than doing nothing.
+      if (ifHidden) return;
       el.scrollIntoView({ block: "center", behavior });
       return;
     }
     const elRect = el.getBoundingClientRect();
     const viewRect = scroller.getBoundingClientRect();
+    // Already fully within the visible band: preserve the current scroll.
+    if (
+      ifHidden &&
+      elRect.top >= viewRect.top &&
+      elRect.bottom <= viewRect.bottom
+    )
+      return;
     const top = centeredScrollTop(
       elRect.top,
       elRect.height,
