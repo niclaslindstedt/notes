@@ -86,13 +86,13 @@ export function NoteCard({
   // short note shouldn't have its one line dimmed. A cheap content heuristic
   // (line count or length) stands in for measuring the clamped overflow.
   const fade =
-    cards && (preview.length > 180 || preview.split("\n").length > 5);
+    cards && (preview.length > 150 || preview.split("\n").length > 4);
   return (
     <button
       type="button"
       onClick={onOpen}
       className={`w-full rounded-[var(--radius)] border border-line bg-surface text-left transition-colors hover:bg-surface-2 ${
-        cards ? "px-4 py-3.5" : "px-4 py-3"
+        cards ? "px-4 py-3" : "px-4 py-2.5"
       }`}
     >
       <p className="flex items-center gap-1.5 font-medium text-fg-bright">
@@ -113,7 +113,7 @@ export function NoteCard({
       {preview &&
         (cards ? (
           <p
-            className="mt-1.5 max-h-[8.5rem] overflow-hidden text-sm leading-relaxed whitespace-pre-line text-muted"
+            className="mt-1 max-h-[6.5rem] overflow-hidden text-sm leading-snug whitespace-pre-line text-muted"
             style={
               fade
                 ? {
