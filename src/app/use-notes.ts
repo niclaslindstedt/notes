@@ -113,6 +113,10 @@ export function useNotes(
   adapter: StorageAdapter,
   formatting?: SaveFormatting,
   activeNoteId: string | null = null,
+  // Fired when the active backend surfaces `EncryptedRemoteError` on load —
+  // encryption was turned on from another device. The caller adopts the
+  // encrypted mode and shows the unlock gate.
+  onEncryptedRemote?: () => void,
 ): NotesStore {
   // The undo timeline is built after the sync engine (it needs the engine's
   // `setDoc` / `scheduleSave` to apply a stepped-to snapshot), but the
@@ -121,7 +125,12 @@ export function useNotes(
   // it exists.
   const resetHistory = useRef<(seed: Snapshot) => void>(() => {});
 
-  const sync = useNotesSync({ active: adapter, resetHistory, formatting });
+  const sync = useNotesSync({
+    active: adapter,
+    resetHistory,
+    formatting,
+    onEncryptedRemote,
+  });
   const notes = sync.doc.notes;
 
   // Latest document, read from the mutation callbacks so a rapid

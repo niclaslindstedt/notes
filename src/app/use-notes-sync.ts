@@ -25,6 +25,7 @@ import { createLogger } from "../dev/logger.ts";
 import {
   AuthError,
   ConflictError,
+  EncryptedRemoteError,
   RateLimitError,
   type StorageAdapter,
   type StoredSnapshot,
@@ -163,8 +164,16 @@ export function useNotesSync(deps: {
   // this engine — it needs the engine's `setDoc` / `scheduleSave` — so it
   // passes an empty ref here and fills it once the timeline exists.
   resetHistory?: MutableRefObject<(seed: Snapshot) => void>;
+  // Called when a load surfaces `EncryptedRemoteError` — the backend holds
+  // encrypted notes but this device is in plaintext mode (another device turned
+  // encryption on). The owner adopts the encrypted mode and drops into the
+  // unlock gate. Read through a ref so a fresh identity doesn't re-arm the load
+  // effect.
+  onEncryptedRemote?: () => void;
 }): NotesSync {
   const { active, resetHistory } = deps;
+  const onEncryptedRemoteRef = useRef(deps.onEncryptedRemote);
+  onEncryptedRemoteRef.current = deps.onEncryptedRemote;
 
   // Latest format-on-save settings, read from the save callbacks without
   // re-subscribing them to every render.
@@ -459,6 +468,13 @@ export function useNotesSync(deps: {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
+        if (err instanceof EncryptedRemoteError) {
+          // The backend is encrypted but this device is plaintext — hand off to
+          // the owner, which flips to encrypted mode and shows the unlock gate.
+          log.info("initial load: backend encrypted — adopting + locking");
+          onEncryptedRemoteRef.current?.();
+          return;
+        }
         log.warn("initial load failed", err);
         if (isOfflineError(err)) setOffline(true);
         setLoaded(true);
@@ -500,6 +516,12 @@ export function useNotesSync(deps: {
       stored = await adapterRef.current.load(lastStoredRef.current);
     } catch (err) {
       if (saveGeneration.current !== generation) return;
+      if (err instanceof EncryptedRemoteError) {
+        // Another device turned encryption on while we were running plaintext.
+        log.info("reload: backend encrypted — adopting + locking");
+        onEncryptedRemoteRef.current?.();
+        return;
+      }
       log.warn("reload failed", err);
       if (isOfflineError(err)) setOffline(true);
       return;

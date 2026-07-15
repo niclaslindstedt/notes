@@ -252,3 +252,54 @@ describe("useEncryption (browser backend)", () => {
     await expect(result.current.unseal("hello")).resolves.toBe("hello");
   });
 });
+
+describe("useEncryption — adopting an encrypted backend from another device", () => {
+  it("adoptEncryptedRemote flips to encrypted+locked and flags the remote reason", () => {
+    const inner = fakeAdapter();
+    const innerRef = { current: inner as StorageAdapter };
+    const { result } = renderHook(() => useEncryption(innerRef, "dropbox"));
+    // Starts plaintext, unlocked, and not from a remote handoff.
+    expect(result.current.encryption).toBe("plaintext");
+    expect(result.current.locked).toBe(false);
+    expect(result.current.fromRemote).toBe(false);
+
+    act(() => result.current.adoptEncryptedRemote());
+
+    // Now encrypted with no passphrase held → the unlock gate shows, and it
+    // knows the lock came from discovering the remote is encrypted.
+    expect(result.current.encryption).toBe("encrypted");
+    expect(result.current.locked).toBe(true);
+    expect(result.current.fromRemote).toBe(true);
+    // Persisted so a reload stays locked instead of silently plaintext again.
+    expect(localStorage.getItem("notes:encryption")).toBe("encrypted");
+  });
+
+  it("clears the remote-reason flag once the passphrase lands", async () => {
+    const inner = fakeAdapter({ initial: { text: "doc" } });
+    const innerRef = { current: inner as StorageAdapter };
+    const { result } = renderHook(() => useEncryption(innerRef, "dropbox"));
+
+    act(() => result.current.adoptEncryptedRemote());
+    expect(result.current.fromRemote).toBe(true);
+
+    await act(async () => {
+      await result.current.unlock("pw");
+    });
+    expect(result.current.locked).toBe(false);
+    expect(result.current.fromRemote).toBe(false);
+  });
+
+  it("adoptEncryptedRemote is a no-op once a passphrase is already held", async () => {
+    localStorage.setItem("notes:encryption", "encrypted");
+    const inner = fakeAdapter({ initial: { text: "doc" } });
+    const innerRef = { current: inner as StorageAdapter };
+    const { result } = renderHook(() => useEncryption(innerRef, "dropbox"));
+    await act(async () => {
+      await result.current.unlock("pw");
+    });
+    expect(result.current.locked).toBe(false);
+    // Already unlocked — adopting must not re-lock the session.
+    act(() => result.current.adoptEncryptedRemote());
+    expect(result.current.locked).toBe(false);
+  });
+});

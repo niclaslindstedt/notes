@@ -138,7 +138,12 @@ export function App() {
     canRedo,
     undoScrollSeq,
     sync,
-  } = useNotes(seedAdapter ?? storage.adapter, formatting, editingId);
+  } = useNotes(
+    seedAdapter ?? storage.adapter,
+    formatting,
+    editingId,
+    storage.adoptEncryptedRemote,
+  );
   // Persist the open note per namespace so it survives a reload / upgrade. The
   // active-namespace pointer is itself per-device, so the pair stays consistent.
   useEffect(() => {
@@ -495,7 +500,9 @@ export function App() {
   // unlock gate so the encrypted notes never render. The gate still wears the
   // user's theme (appearance settings are plaintext).
   if (storage.locked) {
-    return <UnlockGate storage={storage} />;
+    return (
+      <UnlockGate storage={storage} fromRemote={storage.encryptionFromRemote} />
+    );
   }
 
   const syncSlot = (

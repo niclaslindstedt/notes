@@ -53,7 +53,7 @@ import type {
   StorageAdapter,
   StoredSnapshot,
 } from "./adapter.ts";
-import { ConflictError } from "./adapter.ts";
+import { ConflictError, EncryptedRemoteError } from "./adapter.ts";
 import type { AttachmentStore } from "./attachment-store.ts";
 import {
   attachmentPath,
@@ -791,6 +791,20 @@ export function createDirectoryAdapter(
       if (folderRegistry.readOk())
         lastLoad = { key: fingerprint, snapshot: result };
       return result;
+    }
+
+    // Plaintext mode (no passphrase held), but the folder holds encrypted note
+    // files — another device turned encryption on. This device can't read them
+    // and mustn't write plaintext next to them, so signal the app to adopt the
+    // encrypted mode and lock behind the unlock gate rather than returning a
+    // misleading empty / plaintext-only document. Keyed off `*.enc` presence
+    // (not the salts sidecar, which lingers after encryption is turned off) so a
+    // legitimately-plaintext folder never trips it.
+    if (entries.some((e) => isEncNotePath(e.path))) {
+      log.warn(
+        `${options.id} load: encrypted notes present but no passphrase — locking`,
+      );
+      throw new EncryptedRemoteError();
     }
 
     const reuse = reusableFiles(previous, entries);

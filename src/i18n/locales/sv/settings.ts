@@ -199,6 +199,8 @@ const settings: SettingsCatalog = {
   unlock: {
     title: "Anteckningarna är låsta",
     hint: "Ange din lösenfras för att låsa upp och läsa dina anteckningar på den här enheten.",
+    hintRemote:
+      "Kryptering aktiverades från en annan enhet. Ange lösenfrasen du valde där för att låsa upp dina anteckningar på den här enheten.",
     passphrase: "Lösenfras",
     unlock: "Lås upp",
     statusAria: "Upplåsningsförlopp",

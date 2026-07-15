@@ -265,6 +265,12 @@ const achievements = {
       learnMore:
         "Each note becomes its own encrypted file and each attachment its own encrypted blob, compressed and opaquely named. A green lock fills in note-by-note as the background migration seals them — when every note is locked, you're here.",
     },
+    keyHandoff: {
+      name: "Key handoff",
+      condition: "Open the app on a device after encrypting from another.",
+      learnMore:
+        "Encryption travels with your notes. Turn it on with one device and the next device to sync the same folder notices the encrypted notes, locks itself, and asks for the passphrase you set — so a plaintext device can never quietly sit alongside your sealed notes.",
+    },
     themeWizard: {
       name: "Theme wizard",
       condition: "Build your own custom theme.",

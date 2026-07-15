@@ -223,3 +223,19 @@ export class RateLimitError extends Error {
     this.name = "RateLimitError";
   }
 }
+
+// Thrown by a file/cloud backend's `load()` when the store on disk holds
+// encrypted note files (`*.enc`) but this device is running in plaintext mode
+// with no passphrase held — the fingerprint of "another device turned on
+// encryption." A plaintext-mode device can neither read those notes nor safely
+// write alongside them (that would strand plaintext copies in the same folder),
+// so instead of silently returning an empty (or plaintext-only) document, the
+// adapter raises this. The sync engine catches it and asks the app to adopt the
+// encrypted mode and drop into the unlock gate, so encryption enabled on one
+// device is enforced on every device that syncs the same folder.
+export class EncryptedRemoteError extends Error {
+  constructor() {
+    super("Storage holds encrypted notes; a passphrase is required");
+    this.name = "EncryptedRemoteError";
+  }
+}

@@ -17,9 +17,13 @@ import { UNLOCK_STEP_MESSAGE_KEY } from "./encryption-progress.ts";
 
 type Props = {
   storage: UseStorageBackend;
+  // True when the gate appeared because the backend was found encrypted
+  // (encryption turned on from another device), not a plain reload of a store
+  // this device already had encrypted. Swaps the hint to explain the handoff.
+  fromRemote?: boolean;
 };
 
-export function UnlockGate({ storage }: Props) {
+export function UnlockGate({ storage, fromRemote = false }: Props) {
   const t = useT();
   return (
     <FrameworkUnlockGate
@@ -44,7 +48,9 @@ export function UnlockGate({ storage }: Props) {
       }
       labels={{
         title: t("settings.unlock.title"),
-        hint: t("settings.unlock.hint"),
+        hint: fromRemote
+          ? t("settings.unlock.hintRemote")
+          : t("settings.unlock.hint"),
         passphrase: t("settings.unlock.passphrase"),
         unlock: t("settings.unlock.unlock"),
         error: t("settings.unlock.wrong"),

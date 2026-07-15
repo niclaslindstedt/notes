@@ -76,6 +76,19 @@ export function ShieldGlyph({ className }: IconProps) {
   );
 }
 
+// A key — the passphrase handed across devices (encryption enabled on one
+// device asking to be unlocked on another).
+export function KeyGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <circle cx="8" cy="8" r="4" />
+      <path d="M11 11l8 8" />
+      <path d="M16 16l2-2" />
+      <path d="M18.5 18.5l1.5-1.5" />
+    </Svg>
+  );
+}
+
 // ── Tier glyphs ───────────────────────────────────────────────────────────
 
 // ── Per-achievement glyphs ─────────────────────────────────────────────────
