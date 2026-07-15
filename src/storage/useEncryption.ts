@@ -105,6 +105,13 @@ export interface UseEncryption {
   /** True while a file/cloud backend's background de-encryption queue drains. */
   disabling: boolean;
   /**
+   * True when this session's locked state was triggered by discovering the
+   * backend is encrypted (another device turned encryption on), rather than a
+   * plain reload of a store this device already knew was encrypted. Lets the
+   * unlock gate explain *why* it appeared. Reset once unlocked.
+   */
+  fromRemote: boolean;
+  /**
    * Wrap a single-document adapter (the browser store) in the session's
    * whole-document encryption envelope so a folder seed / mirror round-trips the
    * same bytes the steady-state app does. A no-op when encryption is off.
@@ -117,6 +124,14 @@ export interface UseEncryption {
   disableEncryption: (onProgress?: EncryptionProgress) => Promise<void>;
   finishDisableEncryption: () => void;
   unlock: (candidate: string, onProgress?: EncryptionProgress) => Promise<void>;
+  /**
+   * Adopt an encrypted backend discovered on load: flip the device's mode to
+   * `encrypted` without a passphrase so `locked` goes true and the unlock gate
+   * appears. Idempotent — a no-op once already encrypted. This is how
+   * encryption turned on from one device is enforced on every device that syncs
+   * the same folder.
+   */
+  adoptEncryptedRemote: () => void;
 }
 
 export function useEncryption(
@@ -129,6 +144,11 @@ export function useEncryption(
   // mode stays `encrypted` (and the passphrase held) until the last note is
   // plaintext, then `finishDisableEncryption` flips it.
   const [disabling, setDisabling] = useState(false);
+  // True when the current locked state came from discovering the backend is
+  // encrypted (another device enabled it) rather than a plain reload of a store
+  // this device already had in `encrypted` mode. Drives the unlock gate's copy;
+  // cleared once the passphrase lands.
+  const [fromRemote, setFromRemote] = useState(false);
   // Session-only passphrase. Never persisted — lost on reload by design.
   const [password, setPassword] = useState<string | null>(null);
   // A stable ref the per-file directory adapters read at call time, so the
@@ -148,6 +168,9 @@ export function useEncryption(
   const applyPassword = useCallback((next: string | null) => {
     passwordRef.current = next;
     setPassword(next);
+    // A passphrase landing (unlock) or being dropped clears the "why am I
+    // locked" hint — the next lock decides its own reason.
+    if (next !== null) setFromRemote(false);
   }, []);
 
   // Seal/unseal the offline cache so localStorage holds one whole-document
@@ -266,6 +289,17 @@ export function useEncryption(
     [backend, applyPassword, innerRef],
   );
 
+  const adoptEncryptedRemote = useCallback(() => {
+    // Already encrypted (or unlocked this session) — nothing to adopt.
+    if (getEncryption() === "encrypted" || passwordRef.current !== null) return;
+    log.info("adopt: backend is encrypted — locking for the passphrase");
+    persistEncryption("encrypted");
+    setEncryptionState("encrypted");
+    setFromRemote(true);
+    // `password` stays null → `locked` becomes true → the unlock gate shows.
+    unlockAchievement("keyHandoff");
+  }, []);
+
   const finishDisableEncryption = useCallback(() => {
     log.info("disable encryption: queue drained — finalising");
     persistEncryption("plaintext");
@@ -324,10 +358,12 @@ export function useEncryption(
     encryption,
     locked,
     disabling,
+    fromRemote,
     wrapBrowserForActive,
     enableEncryption,
     disableEncryption,
     finishDisableEncryption,
     unlock,
+    adoptEncryptedRemote,
   };
 }

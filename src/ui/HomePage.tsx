@@ -184,7 +184,10 @@ export function HomePage() {
               from a small encrypted index, and each note&apos;s text is
               decrypted the moment you open it, so an opened note downloads only
               its own body and attachments and stays readable offline once
-              you&apos;ve opened it.
+              you&apos;ve opened it. Turn encryption on from one device and
+              every other device syncing the same folder notices, locks itself,
+              and asks for the same passphrase before it will show or write your
+              notes — so no device is left holding them in the clear.
             </li>
           </ul>
         </Section>

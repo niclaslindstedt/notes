@@ -128,6 +128,12 @@ export interface UseStorageBackend {
   /** True when encryption is on but no passphrase is held yet (needs unlock). */
   locked: boolean;
   /**
+   * True when the locked state was triggered by discovering the backend is
+   * encrypted (encryption was turned on from another device) rather than a
+   * plain reload of an already-encrypted store. Lets the unlock gate say so.
+   */
+  encryptionFromRemote: boolean;
+  /**
    * On a file/cloud backend, true while the background de-encryption queue is
    * draining (mode is still `encrypted` and the passphrase still held until the
    * last note is back to plaintext). Drives the reverse conversion and keeps the
@@ -169,6 +175,13 @@ export interface UseStorageBackend {
   finishDisableEncryption: () => void;
   /** Supply the passphrase for an already-encrypted store; throws if wrong. */
   unlock: (password: string, onProgress?: EncryptionProgress) => Promise<void>;
+  /**
+   * Adopt an encrypted backend discovered on load — flip this device to
+   * `encrypted` (no passphrase) so it locks behind the unlock gate. Called by
+   * the sync engine when a load surfaces `EncryptedRemoteError`, so encryption
+   * enabled on one device is enforced on every device sharing the folder.
+   */
+  adoptEncryptedRemote: () => void;
   /** Namespaces known on this device (default always first). */
   namespaces: Namespace[];
   /** The active namespace's slug. */
@@ -247,11 +260,13 @@ export function useStorageBackend(): UseStorageBackend {
     encryption,
     locked,
     disabling,
+    fromRemote,
     wrapBrowserForActive,
     enableEncryption,
     disableEncryption,
     finishDisableEncryption,
     unlock,
+    adoptEncryptedRemote,
   } = useEncryption(innerRef, backend);
   // Persist + activate a backend in one call (localStorage preference + the
   // re-render). Handed to the folder hook, whose connect / disconnect verbs
@@ -481,6 +496,7 @@ export function useStorageBackend(): UseStorageBackend {
     folderReconnectNeeded,
     encryption,
     locked,
+    encryptionFromRemote: fromRemote,
     encryptionDisabling: disabling,
     selectBrowser,
     connectFolder,
@@ -494,6 +510,7 @@ export function useStorageBackend(): UseStorageBackend {
     disableEncryption,
     finishDisableEncryption,
     unlock,
+    adoptEncryptedRemote,
     namespaces,
     activeNamespace,
     switchNamespace,

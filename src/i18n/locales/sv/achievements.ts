@@ -267,6 +267,13 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Varje anteckning blir sin egen krypterade fil och varje bilaga sin egen krypterade blob, komprimerad och med ogenomskinligt namn. Ett grönt lås fylls i anteckning för anteckning medan bakgrundsmigreringen förseglar dem — när varje anteckning är låst är du här.",
     },
+    keyHandoff: {
+      name: "Nyckelöverlämning",
+      condition:
+        "Öppna appen på en enhet efter att ha krypterat från en annan.",
+      learnMore:
+        "Krypteringen följer med dina anteckningar. Aktivera den på en enhet, så märker nästa enhet som synkar samma mapp de krypterade anteckningarna, låser sig själv och ber om lösenfrasen du valde — så att en enhet utan kryptering aldrig i tysthet kan ligga bredvid dina förseglade anteckningar.",
+    },
     themeWizard: {
       name: "Tematrollkarl",
       condition: "Bygg ditt eget anpassade tema.",

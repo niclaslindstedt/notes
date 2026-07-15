@@ -200,6 +200,8 @@ const settings = {
   unlock: {
     title: "Notes are locked",
     hint: "Enter your passphrase to unlock and read your notes on this device.",
+    hintRemote:
+      "Encryption was turned on from another device. Enter the passphrase you set there to unlock your notes on this device.",
     passphrase: "Passphrase",
     unlock: "Unlock",
     statusAria: "Unlock progress",

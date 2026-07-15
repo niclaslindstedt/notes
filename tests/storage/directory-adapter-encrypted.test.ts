@@ -12,12 +12,14 @@ import {
   type AttachmentEntry,
   type AttachmentStore,
 } from "../../src/storage/attachment-store.ts";
+import { EncryptedRemoteError } from "../../src/storage/adapter.ts";
 import {
   INDEX_FILE_NAME,
   KEY_PARAMS_FILE,
   createDirectoryAdapter,
   type DirectoryCrypto,
 } from "../../src/storage/directory-adapter.ts";
+import { snapshotToFiles } from "../../src/storage/markdown/codec.ts";
 import type { FileEntry, FileStore } from "../../src/storage/file-store.ts";
 import { parse, serialize } from "../../src/storage/serialize.ts";
 
@@ -250,23 +252,21 @@ describe("directory adapter — encrypted per-file", () => {
     for (const n of loaded) await b.demigrateNote!(n);
     passwordRef.current = null;
 
-    // The user opens + edits ONE note; the other stays deferred in memory. A
-    // full-document save must not write the deferred note's body away as empty
-    // (regression: `noteToMarkdown`'s `?? ""` would have clobbered the file).
+    // The user opens + edits n1; n2 stays deferred in memory. A full-document
+    // save must not write the deferred note's body away as empty (regression:
+    // `noteToMarkdown`'s `?? ""` would have clobbered the file). Resolve notes
+    // by id, not load order — the encrypted load returns them in opaque-filename
+    // order, so a positional `loaded[0]`/`loaded[1]` assumption would be flaky.
     const edited = loaded.map((n) =>
-      n.id === loaded[0]!.id ? { ...n, body: "edited first" } : n,
+      n.id === n1.id ? { ...n, body: "edited first" } : n,
     );
     await b.save(serialize({ notes: edited }));
 
     // A fresh plaintext adapter reads both notes back with their real bodies.
     const c = encAdapter(store, att, { current: null });
     const after = parse((await c.load())?.text).notes;
-    expect(after.find((n) => n.id === loaded[1]!.id)?.body).toContain(
-      "second body",
-    );
-    expect(after.find((n) => n.id === loaded[0]!.id)?.body).toContain(
-      "edited first",
-    );
+    expect(after.find((n) => n.id === n2.id)?.body).toContain("second body");
+    expect(after.find((n) => n.id === n1.id)?.body).toContain("edited first");
   });
 
   it("reports each note to onDecryptNote in the no-index fallback", async () => {
@@ -1166,6 +1166,84 @@ describe("directory adapter — legacy notes.json split", () => {
 
     // Idempotent — nothing to split now.
     expect(await b.splitLegacyBlob!()).toBe(false);
+  });
+});
+
+describe("directory adapter — cross-device encryption enforcement", () => {
+  it("throws EncryptedRemoteError when loaded in plaintext mode over an encrypted vault", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const { note } = noteWithImage(1);
+    // One device encrypts the vault.
+    await encAdapter(store, att, { current: "pw" }).save(
+      serialize({ notes: [note] }),
+    );
+    expect([...store.files.keys()].some((p) => p.endsWith(".enc"))).toBe(true);
+
+    // A second device with no passphrase (plaintext mode) must not read it as an
+    // empty document — it signals the app to lock instead.
+    const plaintext = encAdapter(store, att, { current: null });
+    await expect(plaintext.load()).rejects.toBeInstanceOf(EncryptedRemoteError);
+  });
+
+  it("does not throw for a genuinely plaintext folder (only the salts sidecar lingers)", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    // A folder that was encrypted and then fully turned off leaves the salts
+    // sidecar behind but no `.enc` files. A plaintext-mode load must succeed.
+    store.files.set(KEY_PARAMS_FILE, { text: "{}", rev: 1 });
+    const plain: Note = { ...createNote(1), title: "Plain", body: "hi" };
+    for (const f of snapshotToFiles({ notes: [plain] })) {
+      store.files.set(f.path, { text: f.text, rev: 2 });
+    }
+    const adapter = encAdapter(store, att, { current: null });
+    const loaded = parse((await adapter.load())?.text).notes;
+    expect(loaded.map((n) => n.title)).toEqual(["Plain"]);
+  });
+
+  it("adopts a plaintext note left by another device into the encrypted vault", async () => {
+    const store = memoryStore();
+    const att = memoryAttachments();
+    const passwordRef = { current: "pw" as string | null };
+    const n1: Note = { ...createNote(1), title: "Encrypted", body: "sealed" };
+    await encAdapter(store, att, passwordRef).save(serialize({ notes: [n1] }));
+
+    // Another device (before it locked) dropped a plaintext `.md` in the folder.
+    const n2: Note = { ...createNote(2), title: "FromMobile", body: "plain" };
+    for (const f of snapshotToFiles({ notes: [n2] })) {
+      store.files.set(f.path, { text: f.text, rev: 999 });
+    }
+
+    // The encrypted device loads both: n1 encrypted (deferred), n2 merged as a
+    // plaintext remnant marked "pending" so the migration can adopt it.
+    const b = encAdapter(store, att, passwordRef);
+    const loaded = parse((await b.load())?.text).notes;
+    expect(loaded.map((n) => n.title).sort()).toEqual([
+      "Encrypted",
+      "FromMobile",
+    ]);
+    const status = b.getEncryptionStatus!();
+    expect(status.get(n2.id)).toBe("pending");
+
+    // Adopting it (what the background migration does) seals it and removes the
+    // plaintext file, so nothing is left in the clear beside the sealed notes.
+    const adopted = loaded.find((n) => n.id === n2.id)!;
+    expect(await b.migrateNote!(adopted)).toBe(true);
+    expect([...store.files.keys()].some((p) => p.endsWith(".md"))).toBe(false);
+    expect(
+      [...store.files.keys()].filter((p) => p.endsWith(".enc")),
+    ).toHaveLength(2);
+
+    // A fresh encrypted load reads both notes as fully encrypted now.
+    const c = encAdapter(store, att, { current: "pw" });
+    const after = parse((await c.load())?.text).notes;
+    expect(after.map((n) => n.title).sort()).toEqual([
+      "Encrypted",
+      "FromMobile",
+    ]);
+    expect(
+      after.every((n) => c.getEncryptionStatus!().get(n.id) !== "pending"),
+    );
   });
 });
 

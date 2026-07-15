@@ -1622,6 +1622,40 @@ and the *first* unlock after enabling encryption would fall back to decrypting
 every note (the slow path lazy decryption exists to avoid) instead of rendering
 instantly from the index.
 
+### Cross-device encryption enforcement
+
+Encryption is a **per-device** preference (`notes:encryption` in
+[backend-preference](#backend-preference)), so turning it on for one device
+doesn't automatically flip the others — yet leaving a second device in plaintext
+mode is worse than a nuisance: it can't read the `.enc` notes at all, and any
+note it writes lands as a plaintext `.md` sitting in the clear right beside the
+sealed ones. So the file/cloud backends **enforce** encryption across every
+device that syncs the same folder, in two directions:
+
+- **Adopt inbound plaintext (the encrypted device).** When an encrypted device
+  loads and finds a plaintext `.md` another device left behind,
+  `readEncryptedSnapshot` merges it into the document marked `pending`, and the
+  background [encryption migration](#encryption-migration) then seals it
+  (`migrateNote`) and removes the plaintext — so a note created on a
+  not-yet-locked device is quietly pulled into the vault rather than lingering
+  unencrypted.
+- **Lock the plaintext device (the other device).** When a device running in
+  plaintext mode loads a folder that holds `.enc` files, the
+  [directory adapter](#directory-adapter)'s `load` raises `EncryptedRemoteError`
+  (`src/storage/adapter.ts`) instead of returning a misleading empty /
+  plaintext-only document. It keys off the presence of `*.enc` files, **not** the
+  `.keyparams.json` salts sidecar (which lingers after encryption is turned off),
+  so a genuinely-plaintext folder never trips it. The [sync engine](#sync-engine)
+  catches it — on the first load and on every later reload / live pull — and
+  calls `onEncryptedRemote`, wired to `adoptEncryptedRemote`
+  (`src/storage/useEncryption.ts`): it flips this device's mode to `encrypted`
+  with no passphrase held, so `locked` goes true and the [unlock gate](#unlock-gate)
+  appears. The gate reads its "encryption was turned on from another device"
+  copy off the `encryptionFromRemote` flag the same hook exposes. Entering the
+  shared passphrase then unlocks the device (and, via the adopt path above,
+  absorbs any plaintext notes it had created before it locked). This is the
+  **Key handoff** achievement (fired from `adoptEncryptedRemote`).
+
 ### Offline cache
 
 `withLocalCache` (`src/storage/cache/index.ts`) mirrors a cloud backend's bytes

@@ -25,6 +25,7 @@ import {
   GlobeGlyph,
   ImageGlyph,
   ImportGlyph,
+  KeyGlyph,
   LayersGlyph,
   LockGlyph,
   MedalGlyph,
@@ -479,6 +480,15 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     learnMore: true,
     // Fired when the background migration finishes sealing every note + all its
     // attachments at rest (the green lock on every note).
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "keyHandoff",
+    tier: "expert",
+    glyph: KeyGlyph,
+    learnMore: true,
+    // Fired when this device discovers the backend is encrypted (encryption was
+    // turned on from another device) and locks itself for the passphrase.
     trigger: { kind: "manual" },
   },
   {
