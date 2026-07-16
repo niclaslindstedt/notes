@@ -82,11 +82,6 @@ export function NoteCard({
   }
 
   const preview = cards ? notePreviewBlock(note) : notePreview(note);
-  // Only fade the tail when there's plausibly more text below the clamp — a
-  // short note shouldn't have its one line dimmed. A cheap content heuristic
-  // (line count or length) stands in for measuring the clamped overflow.
-  const fade =
-    cards && (preview.length > 150 || preview.split("\n").length > 4);
   return (
     <button
       type="button"
@@ -112,19 +107,14 @@ export function NoteCard({
       </p>
       {preview &&
         (cards ? (
-          <p
-            className="mt-1 max-h-[6.5rem] overflow-hidden text-sm leading-snug whitespace-pre-line text-muted"
-            style={
-              fade
-                ? {
-                    maskImage:
-                      "linear-gradient(to bottom, #000 65%, transparent)",
-                    WebkitMaskImage:
-                      "linear-gradient(to bottom, #000 65%, transparent)",
-                  }
-                : undefined
-            }
-          >
+          // Clamp the excerpt to a fixed five lines. `line-clamp` cuts on a
+          // clean line boundary and truncates with an ellipsis only when the
+          // body actually overflows; a shorter note keeps its natural height.
+          // This deliberately replaces an earlier `max-height` + `mask-image`
+          // fade: a CSS mask over an overflow-clamped flex item mis-measures on
+          // iOS WebKit and left phantom space *after* the one long card, which
+          // read as an uneven gap between cards. Don't reintroduce the mask.
+          <p className="mt-1 line-clamp-5 text-sm leading-snug whitespace-pre-line text-muted">
             {preview}
           </p>
         ) : (

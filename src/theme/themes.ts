@@ -250,8 +250,8 @@ export const LINK_SHORTEN_LENGTHS: readonly number[] = [0, 8, 12, 16, 24];
 
 // How the overview lays each note out. `rows` is the compact list — title plus
 // a one-line excerpt; `cards` is the taller, roomier treatment — title plus a
-// multi-line excerpt that clamps its height and fades its tail out, so the list
-// reads more like a wall of cards than a dense index; `list` is the densest of
+// multi-line excerpt clamped to a fixed number of lines (ellipsis on overflow),
+// so the list reads more like a wall of cards than a dense index; `list` is the densest of
 // the three — a bare file-explorer listing of titles only, each note a single
 // icon-and-name row with no excerpt, so the overview reads like a file tree. A
 // device/user preference that rides alongside the appearance settings (it

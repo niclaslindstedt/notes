@@ -82,9 +82,12 @@ note, a left-swipe latches a trash button that needs a second tap to delete
 The preview body honours the [note-list layout](#note-list-layout)
 (`Appearance.listLayout`): in **rows** it's a single truncated line
 (`notePreview`); in **cards** it's a multi-line excerpt (`notePreviewBlock`)
-that keeps the note's line breaks, clamps its height, and fades its tail out
-with a CSS mask gradient when there's more text below the clamp (a cheap
-content-length heuristic decides whether to fade, so a short note isn't dimmed);
+that keeps the note's line breaks and clamps to a fixed number of lines with
+`line-clamp` — a clean line-boundary cut that truncates with an ellipsis only
+when the body overflows, so a short note keeps its natural height and every long
+card is the same height (this replaced an earlier `max-height` + CSS-mask fade,
+whose mask over an overflow-clamped flex item mis-measured on iOS WebKit and
+left phantom space after a long card);
 in **list** there's no preview at all — `NoteCard` returns early to a bare
 file-explorer row of a document glyph plus the title.
 
