@@ -57,7 +57,7 @@ jobs:
 
       # Installs the pinned eas-cli and authenticates it with EXPO_TOKEN so
       # the eas commands below run non-interactively.
-      - uses: expo/expo-github-action@v8
+      - uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
