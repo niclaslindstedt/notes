@@ -228,6 +228,12 @@ const achievements = {
       learnMore:
         "Connect Dropbox or Google Drive and your notes sync to your own cloud storage, so they follow you to every device you sign in on.",
     },
+    selfHoster: {
+      name: "Self-hoster",
+      condition: "Pair with your own notesd server.",
+      learnMore:
+        "Run the notesd daemon on your own computer and pair the app to it — your notes sync over your network to a server you control, with no cloud and no accounts. The connection is pinned to the daemon's own certificate. Available only in the installed app.",
+    },
     freshPull: {
       name: "Fresh pull",
       condition: "Reload your notes from the backend.",

@@ -223,6 +223,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Anslut Dropbox eller Google Drive så synkas dina anteckningar till din egen molnlagring, så att de följer dig till varje enhet du loggar in på.",
     },
+    selfHoster: {
+      name: "Egen värd",
+      condition: "Parkoppla med din egen notesd-server.",
+      learnMore:
+        "Kör notesd-tjänsten på din egen dator och parkoppla appen till den — dina anteckningar synkas över ditt nätverk till en server du styr, utan moln och utan konton. Anslutningen är låst till tjänstens eget certifikat. Endast tillgängligt i den installerade appen.",
+    },
     freshPull: {
       name: "Färskt drag",
       condition: "Ladda om dina anteckningar från backend.",

@@ -14,14 +14,16 @@
 
 import { useCallback, useMemo } from "react";
 
+import { createPinnedFetch } from "../platform/native-bridge.ts";
 import type { StorageAdapter } from "./adapter.ts";
-import type { BackendId } from "./backend-preference.ts";
+import type { BackendId, NotesdConfig } from "./backend-preference.ts";
 import { localCacheKey, withLocalCache } from "./cache/index.ts";
 import type { DirectoryCrypto } from "./directory-adapter.ts";
 import { type DropboxAuth, createDropboxAdapter } from "./dropbox/index.ts";
 import { createGdriveAdapter } from "./gdrive/index.ts";
 import { createFolderAdapter } from "./folder/index.ts";
 import { BrowserLocalStorageAdapter } from "./local/index.ts";
+import { createNotesdAdapter } from "./notesd/index.ts";
 
 // The resolved active backend, computed once per change so the document
 // adapter and the root settings / namespace stores are built from the same
@@ -30,6 +32,7 @@ export type BackendSelection =
   | { kind: "dropbox"; auth: DropboxAuth }
   | { kind: "gdrive"; token: string }
   | { kind: "folder"; handle: FileSystemDirectoryHandle }
+  | { kind: "notesd"; config: NotesdConfig }
   | { kind: "browser" };
 
 export interface BackendSelectionDeps {
@@ -41,6 +44,8 @@ export interface BackendSelectionDeps {
   gdriveToken: string | null;
   /** Persist a silently-refreshed Dropbox access token back to storage. */
   rememberDropboxAccessToken: (accessToken: string) => void;
+  /** The paired notesd daemon config, null until a daemon is paired. */
+  notesdConfig: NotesdConfig | null;
   /** The picked folder handle + whether the boot probe has resolved it. */
   folderHandle: FileSystemDirectoryHandle | null;
   folderHandleLoaded: boolean;
@@ -74,6 +79,7 @@ export function useBackendSelection(
     dropboxRefresh,
     gdriveToken,
     rememberDropboxAccessToken,
+    notesdConfig,
     folderHandle,
     folderHandleLoaded,
     markFolderPermissionLost,
@@ -98,6 +104,9 @@ export function useBackendSelection(
     if (backend === "gdrive" && gdriveToken) {
       return { kind: "gdrive", token: gdriveToken };
     }
+    if (backend === "notesd" && notesdConfig) {
+      return { kind: "notesd", config: notesdConfig };
+    }
     // Folder backend: only once the boot probe has resolved with a live,
     // permission-granted handle. While probing, or after a revoked grant,
     // fall through to the browser store so editing keeps working.
@@ -111,6 +120,7 @@ export function useBackendSelection(
     dropboxRefresh,
     gdriveToken,
     rememberDropboxAccessToken,
+    notesdConfig,
     folderHandle,
     folderHandleLoaded,
   ]);
@@ -159,6 +169,17 @@ export function useBackendSelection(
             onPermissionLost: markFolderPermissionLost,
             crypto: directoryCrypto,
           });
+        // notesd stores one document blob per namespace over an SPKI-pinned
+        // fetch — the browser backend's shape, over the network. Whole-document
+        // encryption is applied one level up in `useStorageBackend` (the same
+        // branch as the browser backend), so there is no per-file crypto or
+        // offline cache wrapper here.
+        case "notesd":
+          return createNotesdAdapter(
+            selection.config,
+            createPinnedFetch(selection.config.spkiPin),
+            namespace,
+          );
         case "browser":
           return new BrowserLocalStorageAdapter(
             globalThis.localStorage,

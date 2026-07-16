@@ -159,6 +159,17 @@ const settings = {
     dropboxUnconnected: "Sign in to keep your notes in your own Dropbox.",
     gdriveConnected: "Your notes sync to a folder in your Google Drive.",
     gdriveUnconnected: "Sign in to keep your notes in your own Google Drive.",
+    backendNotesd: "Self-hosted",
+    notesdConnected:
+      "Your notes sync to your own notesd server — no cloud, no accounts.",
+    notesdUnconnected:
+      "Run the notesd daemon on your own computer and pair this app to sync privately over your network. Available only in the installed app.",
+    notesdPair: "Pair a server…",
+    notesdPairHint:
+      "Start notesd on your computer, then paste the pairing code it prints (notesd://…) or scan its QR.",
+    notesdPairPlaceholder: "notesd://pair?…",
+    notesdPairSubmit: "Pair",
+    notesdPairing: "Pairing…",
     encryptionTitle: "Encryption",
     encryptionOn: "Encryption is on",
     encryptionOff: "Encryption is off",

@@ -158,6 +158,17 @@ const settings: SettingsCatalog = {
       "Dina anteckningar synkas till en mapp i din Google Drive.",
     gdriveUnconnected:
       "Logga in för att behålla dina anteckningar i din egen Google Drive.",
+    backendNotesd: "Egen server",
+    notesdConnected:
+      "Dina anteckningar synkas till din egen notesd-server — inget moln, inga konton.",
+    notesdUnconnected:
+      "Kör notesd-tjänsten på din egen dator och parkoppla appen för att synka privat över ditt nätverk. Endast tillgängligt i den installerade appen.",
+    notesdPair: "Parkoppla en server…",
+    notesdPairHint:
+      "Starta notesd på din dator och klistra in parkopplingskoden den skriver ut (notesd://…) eller skanna dess QR-kod.",
+    notesdPairPlaceholder: "notesd://pair?…",
+    notesdPairSubmit: "Parkoppla",
+    notesdPairing: "Parkopplar…",
     encryptionTitle: "Kryptering",
     encryptionOn: "Kryptering är på",
     encryptionOff: "Kryptering är av",

@@ -86,7 +86,7 @@ export type NoteEncStatus = "encrypted" | "pending";
 export type StorageAdapter = {
   // Stable identifier so device-local settings (auth tokens, last-used
   // adapter) can be keyed per backend.
-  readonly id: "browser" | "folder" | "dropbox" | "gdrive";
+  readonly id: "browser" | "folder" | "dropbox" | "gdrive" | "notesd";
 
   // Human-readable label for the settings UI.
   readonly label: string;
