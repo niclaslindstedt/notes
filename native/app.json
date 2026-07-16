@@ -15,10 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "se.niclaslindstedt.notes",
-      "entitlements": {
-        "com.apple.developer.ubiquity-kvstore-identifier": "$(TeamIdentifierPrefix)se.niclaslindstedt.notes"
-      }
+      "bundleIdentifier": "se.niclaslindstedt.notes"
     },
     "android": {
       "package": "se.niclaslindstedt.notes",
@@ -30,6 +27,7 @@
     "web": {
       "bundler": "metro"
     },
+    "plugins": ["./plugins/with-web-bundle.js"],
     "extra": {
       "eas": {
         "projectId": "19f8db84-52f4-4b20-9eb0-b578721147c0"

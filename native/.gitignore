@@ -9,6 +9,11 @@ web-build/
 ios/
 android/
 
+# The embedded web bundle, produced by `make build-native` (relative-base,
+# service-worker-free copy of the web app) and copied into the binary at
+# prebuild. Generated, never tracked.
+web/
+
 # Secrets — never commit store credentials
 play-service-account.json
 *.p8

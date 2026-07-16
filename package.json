@@ -9,6 +9,7 @@
     "dev:seed": "vite --mode seed",
     "build": "vite build",
     "build:seed": "vite build --mode seed",
+    "build:native": "VITE_TARGET=native vite build --outDir native/web --emptyOutDir",
     "preview": "vite preview",
     "preview:seed": "npm run build:seed && vite preview",
     "test": "vitest run",

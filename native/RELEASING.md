@@ -1,10 +1,12 @@
 # Releasing the native app to the App Store and Google Play
 
 This is the step-by-step for shipping the Expo app in this directory to
-**Apple's App Store** and **Google Play**. It builds the real native binary
-with [EAS Build](https://docs.expo.dev/build/introduction/) and uploads it
-with [EAS Submit](https://docs.expo.dev/submit/introduction/) — we do **not**
-wrap the web PWA in a web-view shell.
+**Apple's App Store** and **Google Play**. It builds the native binary with
+[EAS Build](https://docs.expo.dev/build/introduction/) and uploads it with
+[EAS Submit](https://docs.expo.dev/submit/introduction/). The app is a **thin
+WebView wrapper** that embeds the compiled web PWA and loads it offline; see
+[`README.md`](README.md). Run `make build-native` (from the repo root) before
+`eas build` / `expo prebuild` so the embedded bundle in `native/web/` exists.
 
 Both store identities are already wired in [`app.json`](app.json):
 
@@ -25,7 +27,7 @@ source mark (`../public/favicon.svg`) — see "Artwork" below.
 
 - **Expo account** — free. `npm i -g eas-cli` then `eas login`.
 - **Apple Developer Program** — $99/year, identity verification (can take a
-  day or two). Needed for the iCloud key-value entitlement this app declares.
+  day or two).
 - **Google Play Developer account** — one-time $25, identity verification.
 - A **Mac is not required** — EAS builds iOS in the cloud and manages the
   signing certificates for you.
@@ -106,8 +108,10 @@ the `preview` profile (Android APK / iOS simulator build) instead.
 4. Complete the Play Console listing: short + full description, 512×512 icon,
    1024×500 feature graphic, ≥2 phone screenshots, content-rating
    questionnaire, and the **Data safety** form. Declare: no data collected by
-   us; cloud sync only when the user opts into a backend (iCloud on iOS).
-   Point the privacy-policy URL at `https://notes.niclaslindstedt.se/privacy`.
+   us; notes live on-device by default, and cloud sync happens only when the
+   user opts into a backend (their own Dropbox / Google Drive, or a
+   self-hosted notesd server). Point the privacy-policy URL at
+   `https://notes.niclaslindstedt.se/privacy`.
 
 ## 5. Apple App Store submission
 
@@ -123,15 +127,20 @@ the `preview` profile (Android APK / iOS simulator build) instead.
 3. Complete the App Store Connect listing: description, keywords, screenshots
    for the required device sizes (6.7", 6.5", and iPad since
    `ios.supportsTablet` is true), the **App Privacy** "nutrition label" (no
-   tracking; iCloud sync is the user's own iCloud), and the privacy-policy
-   URL above. Then submit for review.
+   tracking; any cloud sync is into the user's own Dropbox / Google Drive or
+   self-hosted server), and the privacy-policy URL above. Then submit for
+   review.
 
    > **Guideline 4.2 ("minimum functionality").** Apple scrutinizes apps that
-   > feel like a wrapped website. This app is genuinely native (React Native
-   > views, on-device + iCloud storage, offline-first), so lead with that in
-   > the review notes. The web-only features not yet ported (the Markdown
-   > preview, cloud backends, themes, namespaces — see [`README.md`](README.md))
-   > don't block a release, but a fuller feature set lowers rejection risk.
+   > feel like a wrapped website, and this app **is** a WebView wrapper — so
+   > 4.2 rejection risk is real and must be addressed head-on in the review
+   > notes. Lead with what makes it more than a bookmark: it ships the whole
+   > app **bundled for offline use** (no network required — a genuine
+   > local-first native experience, not a thin shell over a live URL), and it
+   > adds **native capabilities the web can't**: real haptics and
+   > **SPKI-pinned HTTPS** for connecting to a user's self-hosted notesd
+   > server. Those native integrations are the "minimum functionality"
+   > argument; state them explicitly.
 
 ## 6. Subsequent releases
 
