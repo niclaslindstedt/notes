@@ -711,6 +711,19 @@ the identical `body`, a `body` that differs from the editor's local value can
 only be another writer's edit, so it's adopted (and the active line clamped)
 without disturbing in-progress typing.
 
+A backend that advertises the **`watch`** capability opts out of this interval
+poll entirely (the loop early-returns on `capabilities.has("watch")`) and drives
+reconciliation from a push channel instead: `useNotesSync` subscribes to
+`adapter.watch(onRemoteChange)` for the life of the active adapter, and
+`applyRemoteSnapshot` adopts each pushed `StoredSnapshot` under the same
+stand-down set `refresh` uses — dropping the update (rather than clobbering) if
+anything is unsaved, and no-opping when the etag hasn't actually moved (our own
+write echoing back, or a sibling namespace's revision bump). It still fires the
+`liveSync` trophy when a pushed change lands. Today only [notesd](#notesd-backend)
+advertises `watch`; its shim polls the daemon's cheap `GET /v1/rev` and re-loads
+only when the aggregate revision moves, so a self-hosted device does a full
+document download on an actual change rather than every 10s.
+
 ### Save hold
 
 `holdSaves` / `releaseSaves` (`src/app/use-notes-sync.ts`) — arming a hold while
@@ -1432,6 +1445,18 @@ at-rest encryption composes one level up in `withEncryption` (the same branch as
 the browser backend in `useStorageBackend`). `save` sends the last revision as
 `If-Match`; the daemon's `409` becomes a `ConflictError` carrying the current
 bytes — the ordinary keep-mine/keep-theirs flow.
+
+It is the one backend that advertises the **`watch`** capability, so
+cross-device edits arrive by push rather than the whole-document
+[live pull](#live-pull). The daemon's true push channel is its `GET /v1/events`
+SSE stream, but the pinned transport (`createPinnedFetch`) is request/response
+only — SSE can't ride it as-is — so `watch` is a **shim**: it polls the O(1)
+`GET /v1/rev` aggregate revision on a short cadence and, when it moves, re-loads
+`document.json` and hands the fresh snapshot to the sync engine, which adopts it
+under its usual guards (see [Live pull](#live-pull)). A real
+streaming-over-bridge transport is a tracked follow-up; until then the shim gives
+low-latency, download-only-on-change sync within the SPKI-pinned transport, with
+no plaintext fallback.
 
 The transport is what makes it **native-only**. `useBackendSelection` builds the
 adapter with `createPinnedFetch(spkiPin)` from `src/platform/native-bridge.ts`,
