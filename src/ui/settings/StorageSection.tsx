@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 
+import { isNative, qr } from "../../platform/native-bridge.ts";
 import { useT } from "../../i18n/index.ts";
 import type { BackendId } from "../../storage/backend-preference.ts";
 import {
@@ -334,10 +335,12 @@ function PairNotesdForm({
   const t = useT();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Turn the field into a connect request. A `notesd://` value is always parsed
-  // in full; otherwise, with a known daemon, a bare value is its pairing token.
+  // Turn a raw string into a connect request. A `notesd://` value is always
+  // parsed in full; otherwise, with a known daemon, a bare value is its pairing
+  // token.
   const resolve = (raw: string): NotesdConnectRequest => {
     const trimmed = raw.trim();
     if (trimmed.startsWith("notesd://")) {
@@ -354,13 +357,14 @@ function PairNotesdForm({
     return resolvePairing(parsePairingUri(trimmed)); // force a parse error
   };
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  // Redeem a raw pairing string (pasted or scanned) — the one code path both
+  // the paste form and the QR scanner feed into.
+  const pair = async (raw: string) => {
     if (busy) return;
     setError(null);
     let request: NotesdConnectRequest;
     try {
-      request = resolve(value);
+      request = resolve(raw);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       return;
@@ -373,6 +377,29 @@ function PairNotesdForm({
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    void pair(value);
+  };
+
+  // Open the native camera, read the daemon's QR, and pair with the decoded
+  // code. Native-only; a dismissed scanner (null) leaves the form untouched.
+  const scan = async () => {
+    if (busy || scanning) return;
+    setError(null);
+    setScanning(true);
+    try {
+      const decoded = await qr.scan();
+      if (decoded === null) return;
+      setValue(decoded);
+      await pair(decoded);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -399,12 +426,24 @@ function PairNotesdForm({
         <Button
           type="submit"
           variant="primary"
-          disabled={busy || !value.trim()}
+          disabled={busy || scanning || !value.trim()}
         >
           <BusyLabel busy={busy}>
             {t("settings.storage.notesdPairSubmit")}
           </BusyLabel>
         </Button>
+        {isNative() && (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => void scan()}
+            disabled={busy || scanning}
+          >
+            <BusyLabel busy={scanning}>
+              {t("settings.storage.notesdScan")}
+            </BusyLabel>
+          </Button>
+        )}
       </div>
       {error && (
         <p

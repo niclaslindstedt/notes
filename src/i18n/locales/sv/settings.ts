@@ -168,6 +168,7 @@ const settings: SettingsCatalog = {
       "Starta notesd på din dator och klistra in parkopplingskoden den skriver ut (notesd://…) eller skanna dess QR-kod.",
     notesdPairPlaceholder: "notesd://pair?…",
     notesdPairSubmit: "Parkoppla",
+    notesdScan: "Skanna QR",
     notesdPairing: "Parkopplar…",
     notesdDiscovered: "Hittade i din {source}:",
     notesdKnownHint:

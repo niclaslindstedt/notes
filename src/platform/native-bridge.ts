@@ -13,13 +13,16 @@
 //   { v: 1, type: "haptics.vibrate", pattern }
 //   { v: 1, type: "pinnedFetch.request",
 //     id, url, method, headers, bodyBase64 | null, spkiPin }
+//   { v: 1, type: "qr.scan.request", id }
 //
 // native → web (injected by native as
-// `window.__NOTES_NATIVE__.resolve(payload)`, since react-native-webview's
-// native→web channel is script injection, not postMessage):
+// `window.__NOTES_NATIVE__.resolve(payload)` / `.resolveQr(payload)`, since
+// react-native-webview's native→web channel is script injection, not
+// postMessage):
 //
-//   { id, ok, status, statusText, headers, bodyBase64 | null,
-//     error?: { name, message } }
+//   resolve:   { id, ok, status, statusText, headers, bodyBase64 | null,
+//                error?: { name, message } }
+//   resolveQr: { id, value: string | null, error?: { name, message } }
 //
 // Bodies are base64 because both channels are string-only and notesd payloads
 // carry binary (encrypted) envelopes.
@@ -40,12 +43,24 @@ interface PinnedFetchReply {
   error?: { name?: string; message?: string };
 }
 
+interface QrScanReply {
+  id: string;
+  // The decoded QR text, or null when the user dismissed the scanner without
+  // reading a code.
+  value?: string | null;
+  error?: { name?: string; message?: string };
+}
+
 declare global {
   interface Window {
     ReactNativeWebView?: ReactNativeWebView;
     // Installed by this module; called by the native side to deliver a
-    // `pinnedFetch` reply back into the page.
-    __NOTES_NATIVE__?: { resolve(payload: PinnedFetchReply): void };
+    // `pinnedFetch` reply (`resolve`) or a `qr.scan` reply (`resolveQr`) back
+    // into the page.
+    __NOTES_NATIVE__?: {
+      resolve(payload: PinnedFetchReply): void;
+      resolveQr(payload: QrScanReply): void;
+    };
   }
 }
 
@@ -105,8 +120,15 @@ interface Pending {
 
 const pending = new Map<string, Pending>();
 
+interface PendingQr {
+  resolve: (value: string | null) => void;
+  reject: (error: Error) => void;
+}
+
+const pendingQr = new Map<string, PendingQr>();
+
 // Install the native→web receiver once, eagerly, so it is ready before any
-// `pinnedFetch` reply arrives. Harmless on the web (never invoked).
+// `pinnedFetch` / `qr.scan` reply arrives. Harmless on the web (never invoked).
 if (typeof window !== "undefined") {
   window.__NOTES_NATIVE__ = {
     resolve(payload: PinnedFetchReply) {
@@ -132,6 +154,18 @@ if (typeof window !== "undefined") {
           headers: payload.headers ?? {},
         }),
       );
+    },
+    resolveQr(payload: QrScanReply) {
+      const entry = pendingQr.get(payload.id);
+      if (!entry) return;
+      pendingQr.delete(payload.id);
+      if (payload.error) {
+        const err = new Error(payload.error.message ?? "qr.scan failed");
+        err.name = payload.error.name ?? "QrScanError";
+        entry.reject(err);
+        return;
+      }
+      entry.resolve(payload.value ?? null);
     },
   };
 }
@@ -202,3 +236,33 @@ export function createPinnedFetch(spkiPin: string): typeof fetch {
   return ((input: RequestInfo | URL, init?: RequestInit) =>
     pinnedFetch(input, init, spkiPin)) as typeof fetch;
 }
+
+// ---------------------------------------------------------------------------
+// QR camera scan
+// ---------------------------------------------------------------------------
+
+export const qr = {
+  /**
+   * Open the native camera and read a single QR code, resolving to its decoded
+   * text — the natural way to pair a notesd daemon, whose startup QR carries a
+   * `notesd://pair?…` code. Resolves to `null` when the user dismisses the
+   * scanner without reading a code; rejects when the camera is unavailable or
+   * permission is denied.
+   *
+   * Only usable inside the native wrapper (a WebView cannot reliably reach the
+   * camera on iOS); rejects on the plain web, where the paste field is the only
+   * pairing path.
+   */
+  scan(): Promise<string | null> {
+    if (!isNative()) {
+      return Promise.reject(
+        new Error("qr.scan is only available in the native wrapper"),
+      );
+    }
+    const id = crypto.randomUUID();
+    return new Promise<string | null>((resolve, reject) => {
+      pendingQr.set(id, { resolve, reject });
+      post({ v: PROTOCOL_VERSION, type: "qr.scan.request", id });
+    });
+  },
+};

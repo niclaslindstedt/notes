@@ -3,15 +3,16 @@
 // `native/web/` and copied in at prebuild by `plugins/with-web-bundle.js`).
 //
 // Everything the user sees is the web app running offline from local files.
-// The only things this shell adds are the two capabilities a WebView can't
+// The only things this shell adds are the capabilities a WebView can't
 // provide, routed over the bridge in `bridge/on-message.ts`:
-//   1. real haptics (iOS WKWebView ignores `navigator.vibrate`), and
-//   2. SPKI-pinned HTTPS for a self-hosted notesd daemon.
+//   1. real haptics (iOS WKWebView ignores `navigator.vibrate`),
+//   2. SPKI-pinned HTTPS for a self-hosted notesd daemon, and
+//   3. a QR camera scan (the `QrScanner` overlay) for pairing that daemon.
 //
 // See `native/README.md` for the message protocol and the web-side seam in
 // `src/platform/native-bridge.ts`.
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Platform, StyleSheet } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -19,6 +20,7 @@ import * as FileSystem from "expo-file-system";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { handleBridgeMessage } from "./bridge/on-message";
+import QrScanner from "./QrScanner";
 
 // Where the embedded bundle's entry point lives on each platform. Android
 // keeps it under the APK's `assets/`; iOS under the app bundle, whose file URL
@@ -33,6 +35,20 @@ function indexUri(): string {
 export default function WebViewHost() {
   const webView = useRef<WebView>(null);
   const bundleDir = FileSystem.bundleDirectory ?? undefined;
+  // The in-flight QR-scan request id, set when the web app asks to scan and
+  // cleared once the camera overlay resolves.
+  const [scanId, setScanId] = useState<string | null>(null);
+
+  // Deliver a scan result back into the page and tear the overlay down. Bodies
+  // stay tiny (a decoded string) so no base64 dance is needed.
+  const resolveScan = (id: string, value: string | null) => {
+    webView.current?.injectJavaScript(
+      `window.__NOTES_NATIVE__ && window.__NOTES_NATIVE__.resolveQr(${JSON.stringify(
+        { id, value },
+      )}); true;`,
+    );
+    setScanId(null);
+  };
 
   return (
     <SafeAreaProvider>
@@ -58,10 +74,14 @@ export default function WebViewHost() {
           onMessage={(event: WebViewMessageEvent) => {
             void handleBridgeMessage(event.nativeEvent.data, {
               inject: (script) => webView.current?.injectJavaScript(script),
+              scanQr: (id) => setScanId(id),
             });
           }}
           style={styles.web}
         />
+        {scanId !== null && (
+          <QrScanner onResult={(value) => resolveScan(scanId, value)} />
+        )}
       </SafeAreaView>
     </SafeAreaProvider>
   );

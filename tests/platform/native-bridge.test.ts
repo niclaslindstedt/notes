@@ -6,6 +6,7 @@ import {
   haptics,
   isNative,
   pinnedFetch,
+  qr,
 } from "../../src/platform/native-bridge.ts";
 
 type PostMessage = ReturnType<typeof vi.fn>;
@@ -35,6 +36,14 @@ function replyFromNative(payload: Record<string, unknown>): void {
       __NOTES_NATIVE__: { resolve(p: Record<string, unknown>): void };
     }
   ).__NOTES_NATIVE__.resolve(payload);
+}
+
+function replyQrFromNative(payload: Record<string, unknown>): void {
+  (
+    window as unknown as {
+      __NOTES_NATIVE__: { resolveQr(p: Record<string, unknown>): void };
+    }
+  ).__NOTES_NATIVE__.resolveQr(payload);
 }
 
 afterEach(() => {
@@ -130,6 +139,41 @@ describe("pinnedFetch", () => {
     });
 
     await expect(promise).rejects.toThrow(/certificate pin mismatch/);
+  });
+});
+
+describe("qr.scan", () => {
+  it("rejects on the web (no camera bridge)", async () => {
+    await expect(qr.scan()).rejects.toThrow(
+      /only available in the native wrapper/,
+    );
+  });
+
+  it("posts a scan request and resolves the decoded code", async () => {
+    const post = installWebView();
+    const promise = qr.scan();
+    const msg = lastMessage(post);
+    expect(msg).toMatchObject({ v: 1, type: "qr.scan.request" });
+
+    replyQrFromNative({ id: msg.id, value: "notesd://pair?x=1" });
+    await expect(promise).resolves.toBe("notesd://pair?x=1");
+  });
+
+  it("resolves null when the scanner is dismissed", async () => {
+    const post = installWebView();
+    const promise = qr.scan();
+    replyQrFromNative({ id: lastMessage(post).id, value: null });
+    await expect(promise).resolves.toBeNull();
+  });
+
+  it("propagates a native error", async () => {
+    const post = installWebView();
+    const promise = qr.scan();
+    replyQrFromNative({
+      id: lastMessage(post).id,
+      error: { name: "CameraDenied", message: "permission denied" },
+    });
+    await expect(promise).rejects.toThrow(/permission denied/);
   });
 });
 

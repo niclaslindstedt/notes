@@ -10,6 +10,12 @@ import { pinnedFetch, type PinnedResponse } from "../../modules/pinned-fetch";
 export interface NativeReply {
   /** Run a snippet in the WebView (react-native-webview's native→web channel). */
   inject: (script: string) => void;
+  /**
+   * Open the camera overlay to read a QR code for pairing. The host resolves
+   * the request back into the page itself (via `resolveQr`) once the scan
+   * finishes or is dismissed, so the pure message handler stays UI-free.
+   */
+  scanQr: (id: string) => void;
 }
 
 interface HapticsMessage {
@@ -27,7 +33,12 @@ interface PinnedFetchMessage {
   spkiPin: string;
 }
 
-type BridgeMessage = HapticsMessage | PinnedFetchMessage;
+interface QrScanMessage {
+  type: "qr.scan.request";
+  id: string;
+}
+
+type BridgeMessage = HapticsMessage | PinnedFetchMessage | QrScanMessage;
 
 export async function handleBridgeMessage(
   raw: string,
@@ -47,6 +58,9 @@ export async function handleBridgeMessage(
       return;
     case "pinnedFetch.request":
       await handlePinnedFetch(message, reply);
+      return;
+    case "qr.scan.request":
+      reply.scanQr(message.id);
       return;
     default:
       return;

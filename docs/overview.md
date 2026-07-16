@@ -1472,8 +1472,15 @@ single-use token; `parsePairingUri` validates it and normalises the pin to
 standard base64, `pairNotesd` redeems the token over the pinned fetch
 (`POST /v1/pair`) for a per-device key, stores the config
 (`getNotesdConfig`/`setNotesdConfig` in `backend-preference.ts`), and unlocks the
-**Self-hoster** achievement. The pair UI is `PairNotesdForm` in `StorageSection`
-(paste-a-code today; an in-app QR camera scan is a tracked follow-up).
+**Self-hoster** achievement. The pair UI is `PairNotesdForm` in `StorageSection`:
+paste the code, or — in the installed app — tap **Scan QR** to read the daemon's
+startup QR with the camera. The scan is bridged natively: `qr.scan()`
+(`src/platform/native-bridge.ts`) posts a `qr.scan.request`, `WebViewHost`
+mounts the `QrScanner` (`expo-camera`) overlay and injects the decoded string
+back via `resolveQr`, and the form feeds it through the same
+`parsePairingUri → resolvePairing → pairNotesd` path as a pasted code. The
+button only renders under `isNative()`; on the plain web `qr.scan()` rejects and
+paste is the only path.
 
 Like the folder/cloud backends, notesd syncs its **appearance settings** and
 **namespace registry** across paired devices: `createNotesdSettingsStore` and
