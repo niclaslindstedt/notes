@@ -20,7 +20,7 @@ import {
   getNotesdConfig,
   setNotesdConfig,
 } from "./backend-preference.ts";
-import { type NotesdPairing, pairingEndpoint } from "./notesd/pairing.ts";
+import type { NotesdConnectRequest } from "./notesd/pairing.ts";
 
 const log = createLogger("notesd");
 
@@ -33,11 +33,14 @@ export interface NotesdBackend {
   /** The paired daemon config, or null when none is paired. */
   notesdConfig: NotesdConfig | null;
   /**
-   * Pair with a daemon from a parsed `notesd://pair` URI: redeem the one-time
-   * token for a per-device key (or adopt the static key), store the config, and
-   * switch to the notesd backend. Rejects off-native or on a failed redeem.
+   * Pair with a daemon from a resolved connect request (a scanned/pasted
+   * `notesd://pair` URI, or a cloud-discovered daemon plus a credential):
+   * redeem the one-time token for a per-device key (or adopt the static key),
+   * store the config, and switch to the notesd backend. Resolves to the stored
+   * config so the caller can publish it to the config plane. Rejects off-native
+   * or on a failed redeem.
    */
-  pairNotesd: (pairing: NotesdPairing) => Promise<void>;
+  pairNotesd: (request: NotesdConnectRequest) => Promise<NotesdConfig>;
   /** Forget the paired daemon and fall back to the browser store. */
   unpairNotesd: () => void;
 }
@@ -60,22 +63,22 @@ export function useNotesdBackend({
   );
 
   const pairNotesd = useCallback(
-    async (pairing: NotesdPairing) => {
+    async (request: NotesdConnectRequest): Promise<NotesdConfig> => {
       if (!isNative()) {
         throw new Error(
           "The self-hosted backend is only available in the app.",
         );
       }
-      const endpoint = pairingEndpoint(pairing);
-      const pinned = createPinnedFetch(pairing.fingerprint);
+      const { endpoint, fingerprint, name } = request;
+      const pinned = createPinnedFetch(fingerprint);
 
       let deviceKey: string;
-      if (pairing.token) {
+      if (request.token) {
         // Redeem the single-use pairing token for this device's own key.
         const res = await pinned(`${endpoint}/v1/pair`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: pairing.token, label: deviceLabel() }),
+          body: JSON.stringify({ token: request.token, label: deviceLabel() }),
         });
         if (!res.ok) {
           throw new Error(`Pairing was rejected (${res.status}).`);
@@ -83,9 +86,9 @@ export function useNotesdBackend({
         const body = (await res.json()) as { key?: string };
         if (!body.key) throw new Error("The daemon returned no device key.");
         deviceKey = body.key;
-      } else if (pairing.key) {
-        // `--api-key` mode: the QR carries the static key directly.
-        deviceKey = pairing.key;
+      } else if (request.key) {
+        // `--api-key` mode: the code carries the static key directly.
+        deviceKey = request.key;
       } else {
         throw new Error("The pairing code carries no credential.");
       }
@@ -93,14 +96,15 @@ export function useNotesdBackend({
       const config: NotesdConfig = {
         endpoint,
         deviceKey,
-        spkiPin: pairing.fingerprint,
-        name: pairing.name,
+        spkiPin: fingerprint,
+        name,
       };
       setNotesdConfig(config);
       setNotesdConfigState(config);
       selectBackend("notesd");
       unlockAchievement("selfHoster");
-      log.info(`paired with ${pairing.name}`);
+      log.info(`paired with ${name}`);
+      return config;
     },
     [selectBackend],
   );

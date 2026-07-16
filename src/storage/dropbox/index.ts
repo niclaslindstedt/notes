@@ -31,6 +31,10 @@ import {
   type NamespaceRegistryStore,
 } from "../namespace-store.ts";
 import { fileSettingsStore, type SettingsStore } from "../settings-store.ts";
+import {
+  fileConfigPlaneStore,
+  type ConfigPlaneStore,
+} from "../notesd/config-plane.ts";
 import { readErrorBody } from "../http-utils.ts";
 import { dropboxError } from "./errors.ts";
 import { type AuthedFetch, listAllFiles } from "./list.ts";
@@ -190,6 +194,18 @@ export function createDropboxNamespaceStore(
   fetchImpl: FetchImpl = fetch,
 ): NamespaceRegistryStore {
   return fileNamespaceStore(
+    createDropboxFileStore(createAuthedFetch(auth, fetchImpl), ""),
+  );
+}
+
+// notesd config-plane store for the Dropbox backend: `/notesd.json` at the
+// app-folder root, listing the self-hosted daemons this user has paired so
+// other devices can discover them (see `notesd/config-plane.ts`).
+export function createDropboxConfigPlaneStore(
+  auth: string | DropboxAuth,
+  fetchImpl: FetchImpl = fetch,
+): ConfigPlaneStore {
+  return fileConfigPlaneStore(
     createDropboxFileStore(createAuthedFetch(auth, fetchImpl), ""),
   );
 }

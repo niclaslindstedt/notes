@@ -60,10 +60,12 @@ import {
 import { type FolderActiveRef, useFolderBackend } from "./useFolderBackend.ts";
 import { useCloudBackend } from "./useCloudBackend.ts";
 import { useNotesdBackend } from "./useNotesdBackend.ts";
+import { useNotesdDiscovery } from "./useNotesdDiscovery.ts";
 import { useNamespaceMigration } from "./useNamespaceMigration.ts";
 import { useBackendSelection } from "./useBackendSelection.ts";
 import { isNative } from "../platform/native-bridge.ts";
-import type { NotesdPairing } from "./notesd/pairing.ts";
+import type { NotesdConnectRequest } from "./notesd/pairing.ts";
+import type { PublishedDaemon } from "./notesd/config-plane.ts";
 
 const log = createLogger("storage");
 
@@ -161,10 +163,20 @@ export interface UseStorageBackend {
   notesdAvailable: boolean;
   /** Whether a notesd daemon is currently paired. */
   notesdConnected: boolean;
-  /** Pair with a daemon from a parsed `notesd://pair` URI and switch to it. */
-  pairNotesd: (pairing: NotesdPairing) => Promise<void>;
+  /** Pair with a daemon (from a pasted URI or a discovered entry) and switch to it. */
+  pairNotesd: (request: NotesdConnectRequest) => Promise<void>;
   /** Forget the paired daemon and fall back to the browser store. */
   unpairNotesd: () => void;
+  /**
+   * Daemons discovered in the connected cloud's `notesd.json` (config plane),
+   * so a device can pair with a known daemon without its QR — empty unless a
+   * cloud backend is connected and this is the native app.
+   */
+  notesdDiscovered: PublishedDaemon[];
+  /** The cloud discovery reads from ("Dropbox" / "Google Drive"), or null. */
+  notesdDiscoverySource: "Dropbox" | "Google Drive" | null;
+  /** Re-read the config plane on demand. */
+  refreshNotesdDiscovery: () => void;
   /**
    * Turn encryption on with a fresh passphrase, re-wrapping stored bytes.
    * `onProgress` (optional) fires once per phase so the UI can show progress.
@@ -335,9 +347,41 @@ export function useStorageBackend(): UseStorageBackend {
 
   // The notesd (self-hosted daemon) concern: the paired config + pair / unpair
   // verbs. Native-only — the pinned fetch it rides rejects on the plain web.
-  const { notesdConfig, pairNotesd, unpairNotesd } = useNotesdBackend({
-    selectBackend,
+  const {
+    notesdConfig,
+    pairNotesd: rawPairNotesd,
+    unpairNotesd,
+  } = useNotesdBackend({ selectBackend });
+
+  // The notesd config plane: discover daemons your other devices published to
+  // the connected cloud, and publish this device's pairings there. Native-only.
+  const {
+    discoveredDaemons: notesdDiscovered,
+    discoverySource: notesdDiscoverySource,
+    refreshDiscovery: refreshNotesdDiscovery,
+    publishDaemon: publishNotesdDaemon,
+  } = useNotesdDiscovery({
+    dropboxToken,
+    dropboxRefresh,
+    rememberDropboxAccessToken,
+    gdriveToken,
+    enabled: isNative(),
   });
+
+  // Pair, then publish the daemon's non-secret discovery record (name, endpoint,
+  // pin) to the connected cloud so other devices can find it. Publishing is
+  // best-effort inside the hook and never blocks the pairing.
+  const pairNotesd = useCallback(
+    async (request: NotesdConnectRequest) => {
+      const config = await rawPairNotesd(request);
+      await publishNotesdDaemon({
+        name: config.name,
+        endpoint: config.endpoint,
+        fingerprint: config.spkiPin,
+      });
+    },
+    [rawPairNotesd, publishNotesdDaemon],
+  );
 
   // Resolve the active backend once, and get the factory that builds an
   // adapter for any namespace on it. Both the root stores below and the
@@ -543,6 +587,9 @@ export function useStorageBackend(): UseStorageBackend {
     notesdConnected: backend === "notesd" && notesdConfig !== null,
     pairNotesd,
     unpairNotesd,
+    notesdDiscovered,
+    notesdDiscoverySource,
+    refreshNotesdDiscovery,
     enableEncryption,
     disableEncryption,
     finishDisableEncryption,

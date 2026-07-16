@@ -30,6 +30,10 @@ import {
   type NamespaceRegistryStore,
 } from "../namespace-store.ts";
 import { fileSettingsStore, type SettingsStore } from "../settings-store.ts";
+import {
+  fileConfigPlaneStore,
+  type ConfigPlaneStore,
+} from "../notesd/config-plane.ts";
 import { readErrorBody } from "../http-utils.ts";
 import {
   DRIVE_FILES_API,
@@ -121,6 +125,16 @@ export function createGdriveNamespaceStore(
   fetchImpl: FetchImpl = fetch,
 ): NamespaceRegistryStore {
   return fileNamespaceStore(createGdriveFileStore(token, fetchImpl, ""));
+}
+
+// notesd config-plane store for the Google Drive backend: `notesd.json` in the
+// `notes/` app folder, beside `settings.json` — the paired-daemon discovery
+// list (see `notesd/config-plane.ts`).
+export function createGdriveConfigPlaneStore(
+  token: string,
+  fetchImpl: FetchImpl = fetch,
+): ConfigPlaneStore {
+  return fileConfigPlaneStore(createGdriveFileStore(token, fetchImpl, ""));
 }
 
 function createGdriveFileStore(

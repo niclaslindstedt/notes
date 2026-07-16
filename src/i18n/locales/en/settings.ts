@@ -170,6 +170,10 @@ const settings = {
     notesdPairPlaceholder: "notesd://pair?…",
     notesdPairSubmit: "Pair",
     notesdPairing: "Pairing…",
+    notesdDiscovered: "Found in your {source}:",
+    notesdKnownHint:
+      "Enter a fresh pairing code from “{name}” — start notesd and copy the code it shows.",
+    notesdTokenPlaceholder: "Pairing token or notesd:// code",
     encryptionTitle: "Encryption",
     encryptionOn: "Encryption is on",
     encryptionOff: "Encryption is off",
