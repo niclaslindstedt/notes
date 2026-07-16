@@ -1419,6 +1419,38 @@ refresh token — expiry forces re-auth), caches folder ids in memory, and treat
 most rate limits as 403-with-reason (quota exhaustion is not transient). Built
 on the [directory adapter](#directory-adapter).
 
+### notesd backend
+
+`createNotesdAdapter` (`src/storage/notesd/index.ts`) syncs to a user-run
+**notesd** daemon (the Rust binary in `notesd/`) — the self-hosted alternative
+to the cloud backends. Unlike Dropbox/Drive it is **not** built on the directory
+adapter: the daemon serves a flat folder with no attachment-listing endpoint, so
+this adapter stores the **whole serialized snapshot as one file per namespace**
+(`document.json`, `document-<slug>.json`), the browser backend's shape over the
+network. Image attachments therefore ride inline in the document, and
+at-rest encryption composes one level up in `withEncryption` (the same branch as
+the browser backend in `useStorageBackend`). `save` sends the last revision as
+`If-Match`; the daemon's `409` becomes a `ConflictError` carrying the current
+bytes — the ordinary keep-mine/keep-theirs flow.
+
+The transport is what makes it **native-only**. `useBackendSelection` builds the
+adapter with `createPinnedFetch(spkiPin)` from `src/platform/native-bridge.ts`,
+which routes the request through the app wrapper's native `pinned-fetch` module
+so the daemon's self-signed certificate is validated against the SPKI pin from
+the pairing code. On the plain web that pinned fetch rejects, so
+`useStorageBackend` reports `notesdAvailable` (i.e. `isNative()`) false and the
+storage picker never offers the option there.
+
+Pairing (`useNotesdBackend`, `src/storage/notesd/pairing.ts`): the daemon prints
+a `notesd://pair?…` QR/paste code carrying its address(es), SPKI pin, and a
+single-use token; `parsePairingUri` validates it and normalises the pin to
+standard base64, `pairNotesd` redeems the token over the pinned fetch
+(`POST /v1/pair`) for a per-device key, stores the config
+(`getNotesdConfig`/`setNotesdConfig` in `backend-preference.ts`), and unlocks the
+**Self-hoster** achievement. The pair UI is `PairNotesdForm` in `StorageSection`
+(paste-a-code today; an in-app QR camera scan is a tracked follow-up). Namespace
+registry and appearance settings stay per-device in this first version.
+
 ### Directory adapter
 
 `createDirectoryAdapter` (`src/storage/directory-adapter.ts`) over a `FileStore`

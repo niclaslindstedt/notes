@@ -2,6 +2,10 @@ import { useMemo, useState, type FormEvent } from "react";
 
 import { useT } from "../../i18n/index.ts";
 import type { BackendId } from "../../storage/backend-preference.ts";
+import {
+  type NotesdPairing,
+  parsePairingUri,
+} from "../../storage/notesd/pairing.ts";
 import type {
   EncryptionProgress,
   UseStorageBackend,
@@ -40,6 +44,10 @@ export function StorageSection({ storage, conversion }: Props) {
     folderAvailable,
     folderConnected,
     folderReconnectNeeded,
+    notesdAvailable,
+    notesdConnected,
+    pairNotesd,
+    unpairNotesd,
     encryption,
     selectBrowser,
     connectFolder,
@@ -54,6 +62,8 @@ export function StorageSection({ storage, conversion }: Props) {
   } = storage;
 
   const [gdriveError, setGdriveError] = useState<string | null>(null);
+  // Opening the notesd panel with no daemon paired reveals the pair form.
+  const [pairing, setPairing] = useState(false);
 
   const backendOptions: {
     value: BackendId;
@@ -76,6 +86,16 @@ export function StorageSection({ storage, conversion }: Props) {
       label: t("settings.storage.backendGoogleDrive"),
       disabled: !gdriveConfigured,
     },
+    // Self-hosted is native-only: the SPKI-pinned fetch it needs exists only in
+    // the app wrapper, so the option simply isn't offered on the plain web.
+    ...(notesdAvailable
+      ? [
+          {
+            value: "notesd" as const,
+            label: t("settings.storage.backendNotesd"),
+          },
+        ]
+      : []),
   ];
 
   const connectGdriveWithCapture = async () => {
@@ -93,7 +113,10 @@ export function StorageSection({ storage, conversion }: Props) {
     if (next === "browser") selectBrowser();
     else if (next === "folder") void connectFolder();
     else if (next === "dropbox") connectDropbox();
-    else void connectGdriveWithCapture();
+    else if (next === "gdrive") void connectGdriveWithCapture();
+    // notesd doesn't auto-connect on pick — it reveals the pair form (a QR /
+    // paste flow), and only switches backend once pairing succeeds.
+    else if (next === "notesd") setPairing(!notesdConnected);
   };
 
   return (
@@ -231,6 +254,31 @@ export function StorageSection({ storage, conversion }: Props) {
             )}
           </div>
         )}
+
+        {backend === "notesd" && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-muted">
+              {notesdConnected
+                ? t("settings.storage.notesdConnected")
+                : t("settings.storage.notesdUnconnected")}
+            </p>
+            {notesdConnected && !pairing ? (
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" onClick={unpairNotesd}>
+                  {t("common.disconnect")}
+                </Button>
+                <span className="text-xs text-accent">
+                  {t("common.connected")}
+                </span>
+              </div>
+            ) : (
+              <PairNotesdForm
+                onPair={pairNotesd}
+                onDone={() => setPairing(false)}
+              />
+            )}
+          </div>
+        )}
       </Section>
 
       <EncryptionSection
@@ -240,6 +288,75 @@ export function StorageSection({ storage, conversion }: Props) {
         onDisable={disableEncryption}
       />
     </>
+  );
+}
+
+// The notesd pairing form: paste the `notesd://pair` code the daemon prints
+// (or a QR-scanned value), validate it, redeem it, and switch to the backend.
+// Paste-only for now; an in-app QR camera scan is a tracked follow-up.
+function PairNotesdForm({
+  onPair,
+  onDone,
+}: {
+  onPair: (pairing: NotesdPairing) => Promise<void>;
+  onDone: () => void;
+}) {
+  const t = useT();
+  const [uri, setUri] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    setError(null);
+    let pairing: NotesdPairing;
+    try {
+      pairing = parsePairingUri(uri);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    setBusy(true);
+    try {
+      await onPair(pairing);
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-2">
+      <p className="text-xs text-muted">
+        {t("settings.storage.notesdPairHint")}
+      </p>
+      <textarea
+        value={uri}
+        onChange={(e) => setUri(e.target.value)}
+        placeholder={t("settings.storage.notesdPairPlaceholder")}
+        aria-label={t("settings.storage.notesdPair")}
+        rows={2}
+        className="rounded-[var(--radius)] border border-line bg-surface-2 px-2 py-1.5 font-mono text-xs break-all text-fg outline-none focus:border-accent"
+      />
+      <div className="flex items-center gap-2">
+        <Button type="submit" variant="primary" disabled={busy || !uri.trim()}>
+          <BusyLabel busy={busy}>
+            {t("settings.storage.notesdPairSubmit")}
+          </BusyLabel>
+        </Button>
+      </div>
+      {error && (
+        <p
+          role="alert"
+          className="rounded-[var(--radius)] border border-danger/50 px-2 py-1.5 text-xs break-words text-danger"
+        >
+          {error}
+        </p>
+      )}
+    </form>
   );
 }
 

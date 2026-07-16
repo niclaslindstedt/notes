@@ -59,8 +59,11 @@ import {
 } from "./useEncryption.ts";
 import { type FolderActiveRef, useFolderBackend } from "./useFolderBackend.ts";
 import { useCloudBackend } from "./useCloudBackend.ts";
+import { useNotesdBackend } from "./useNotesdBackend.ts";
 import { useNamespaceMigration } from "./useNamespaceMigration.ts";
 import { useBackendSelection } from "./useBackendSelection.ts";
+import { isNative } from "../platform/native-bridge.ts";
+import type { NotesdPairing } from "./notesd/pairing.ts";
 
 const log = createLogger("storage");
 
@@ -151,6 +154,17 @@ export interface UseStorageBackend {
   disconnectDropbox: () => void;
   connectGdrive: () => Promise<void>;
   disconnectGdrive: () => void;
+  /**
+   * Whether the self-hosted (notesd) backend is offerable here — only inside
+   * the native wrapper, whose pinned fetch can reach a self-signed daemon.
+   */
+  notesdAvailable: boolean;
+  /** Whether a notesd daemon is currently paired. */
+  notesdConnected: boolean;
+  /** Pair with a daemon from a parsed `notesd://pair` URI and switch to it. */
+  pairNotesd: (pairing: NotesdPairing) => Promise<void>;
+  /** Forget the paired daemon and fall back to the browser store. */
+  unpairNotesd: () => void;
   /**
    * Turn encryption on with a fresh passphrase, re-wrapping stored bytes.
    * `onProgress` (optional) fires once per phase so the UI can show progress.
@@ -319,6 +333,12 @@ export function useStorageBackend(): UseStorageBackend {
     disconnectGdrive,
   } = useCloudBackend({ selectBackend });
 
+  // The notesd (self-hosted daemon) concern: the paired config + pair / unpair
+  // verbs. Native-only — the pinned fetch it rides rejects on the plain web.
+  const { notesdConfig, pairNotesd, unpairNotesd } = useNotesdBackend({
+    selectBackend,
+  });
+
   // Resolve the active backend once, and get the factory that builds an
   // adapter for any namespace on it. Both the root stores below and the
   // active-document adapter switch on this single selection.
@@ -328,6 +348,7 @@ export function useStorageBackend(): UseStorageBackend {
     dropboxRefresh,
     gdriveToken,
     rememberDropboxAccessToken,
+    notesdConfig,
     folderHandle,
     folderHandleLoaded,
     markFolderPermissionLost,
@@ -355,6 +376,9 @@ export function useStorageBackend(): UseStorageBackend {
           selection.handle,
           markFolderPermissionLost,
         );
+      // notesd keeps its namespace registry per-device in v1 (like the browser
+      // backend); syncing it over the daemon is a tracked follow-up.
+      case "notesd":
       case "browser":
         return null;
     }
@@ -404,6 +428,9 @@ export function useStorageBackend(): UseStorageBackend {
           selection.handle,
           markFolderPermissionLost,
         );
+      // notesd keeps appearance settings per-device in v1 (like the browser
+      // backend); syncing settings.json over the daemon is a tracked follow-up.
+      case "notesd":
       case "browser":
         return null;
     }
@@ -415,7 +442,13 @@ export function useStorageBackend(): UseStorageBackend {
   // the whole-document `withEncryption` wrapper.
   const adapter = useMemo<StorageAdapter>(() => {
     if (locked) return lockedAdapter(backend);
-    if (encryption === "encrypted" && selection.kind === "browser") {
+    // The single-document backends — the browser store and notesd — seal the
+    // whole blob here; the file/cloud backends encrypt per-file inside the
+    // directory adapter instead.
+    if (
+      encryption === "encrypted" &&
+      (selection.kind === "browser" || selection.kind === "notesd")
+    ) {
       return withEncryption(inner, passwordRef);
     }
     return inner;
@@ -506,6 +539,10 @@ export function useStorageBackend(): UseStorageBackend {
     disconnectDropbox,
     connectGdrive,
     disconnectGdrive,
+    notesdAvailable: isNative(),
+    notesdConnected: backend === "notesd" && notesdConfig !== null,
+    pairNotesd,
+    unpairNotesd,
     enableEncryption,
     disableEncryption,
     finishDisableEncryption,

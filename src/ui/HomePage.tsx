@@ -168,6 +168,15 @@ export function HomePage() {
               Drive (see below).
             </li>
             <li>
+              In the installed app, optionally sync to your own{" "}
+              <span className="text-fg-bright">self-hosted server</span> — run
+              the small <code className="text-fg-bright">notesd</code> daemon on
+              a computer you own and pair the app to it over your own network,
+              with no cloud provider and no accounts involved. The connection is
+              locked to that daemon&apos;s own certificate. This backend is
+              available only in the app, not the website.
+            </li>
+            <li>
               With a folder or cloud backend connected, edits made on one device
               show up on your others on their own — notes checks the backend for
               changes every few seconds and pulls them in while you read, even

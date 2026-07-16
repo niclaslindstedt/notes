@@ -4,6 +4,10 @@ dev-dist
 node_modules
 package-lock.json
 
+# The notesd daemon is a Rust crate; its build output (target/) contains
+# generated JSON that Prettier would otherwise try to reformat.
+notesd/target
+
 # The native wrapper's embedded web bundle (generated) and its native-code
 # modules (Swift / Kotlin / Gradle — not Prettier's remit).
 native/web

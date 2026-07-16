@@ -21,6 +21,7 @@ function deps(over: Partial<BackendSelectionDeps> = {}): BackendSelectionDeps {
     dropboxRefresh: null,
     gdriveToken: null,
     rememberDropboxAccessToken: vi.fn(),
+    notesdConfig: null,
     folderHandle: null,
     folderHandleLoaded: false,
     markFolderPermissionLost: vi.fn(),

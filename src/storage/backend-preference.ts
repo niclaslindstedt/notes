@@ -8,7 +8,21 @@ import { createLogger } from "../dev/logger.ts";
 
 const log = createLogger("backend-pref");
 
-export type BackendId = "browser" | "folder" | "dropbox" | "gdrive";
+export type BackendId = "browser" | "folder" | "dropbox" | "gdrive" | "notesd";
+
+// Everything needed to reach and trust a paired notesd daemon, stored
+// per-device (like the cloud tokens). `spkiPin` validates the daemon's
+// self-signed TLS cert; `deviceKey` is this device's bearer credential.
+export type NotesdConfig = {
+  /** `https://host:port` base URL. */
+  endpoint: string;
+  /** Per-device bearer key minted at pairing. */
+  deviceKey: string;
+  /** SPKI pin, `sha256:<base64>`, passed to the native pinned fetch. */
+  spkiPin: string;
+  /** Daemon display name, for the backend list. */
+  name: string;
+};
 
 // Whether stored bytes are wrapped in the AES-GCM envelope before being
 // handed to the adapter. Defaults to "plaintext" — encryption is an explicit
@@ -21,6 +35,7 @@ const DROPBOX_TOKEN_KEY = "notes:dropbox:token";
 // key so a legacy install (access token only) round-trips unchanged.
 const DROPBOX_REFRESH_KEY = "notes:dropbox:refresh";
 const GDRIVE_TOKEN_KEY = "notes:gdrive:token";
+const NOTESD_CONFIG_KEY = "notes:notesd:config";
 const ENCRYPTION_KEY = "notes:encryption";
 
 function read(key: string): string | null {
@@ -55,6 +70,7 @@ export function getBackend(): BackendId {
   if (raw === "dropbox") return "dropbox";
   if (raw === "gdrive") return "gdrive";
   if (raw === "folder") return "folder";
+  if (raw === "notesd") return "notesd";
   // Any unknown / missing value falls through to the browser backend.
   return "browser";
 }
@@ -97,6 +113,33 @@ export function setGdriveToken(token: string): void {
 
 export function clearGdriveToken(): void {
   clear(GDRIVE_TOKEN_KEY);
+}
+
+export function getNotesdConfig(): NotesdConfig | null {
+  const raw = read(NOTESD_CONFIG_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<NotesdConfig>;
+    if (
+      typeof parsed.endpoint === "string" &&
+      typeof parsed.deviceKey === "string" &&
+      typeof parsed.spkiPin === "string" &&
+      typeof parsed.name === "string"
+    ) {
+      return parsed as NotesdConfig;
+    }
+  } catch {
+    // fall through to null on a corrupt blob
+  }
+  return null;
+}
+
+export function setNotesdConfig(config: NotesdConfig): void {
+  write(NOTESD_CONFIG_KEY, JSON.stringify(config));
+}
+
+export function clearNotesdConfig(): void {
+  clear(NOTESD_CONFIG_KEY);
 }
 
 export function getEncryption(): EncryptionMode {
