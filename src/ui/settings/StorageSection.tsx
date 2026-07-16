@@ -3,9 +3,11 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useT } from "../../i18n/index.ts";
 import type { BackendId } from "../../storage/backend-preference.ts";
 import {
-  type NotesdPairing,
+  type NotesdConnectRequest,
   parsePairingUri,
+  resolvePairing,
 } from "../../storage/notesd/pairing.ts";
+import type { PublishedDaemon } from "../../storage/notesd/config-plane.ts";
 import type {
   EncryptionProgress,
   UseStorageBackend,
@@ -48,6 +50,8 @@ export function StorageSection({ storage, conversion }: Props) {
     notesdConnected,
     pairNotesd,
     unpairNotesd,
+    notesdDiscovered,
+    notesdDiscoverySource,
     encryption,
     selectBrowser,
     connectFolder,
@@ -272,10 +276,29 @@ export function StorageSection({ storage, conversion }: Props) {
                 </span>
               </div>
             ) : (
-              <PairNotesdForm
-                onPair={pairNotesd}
-                onDone={() => setPairing(false)}
-              />
+              <div className="flex flex-col gap-3">
+                {notesdDiscovered.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs text-muted">
+                      {t("settings.storage.notesdDiscovered", {
+                        source: notesdDiscoverySource ?? "",
+                      })}
+                    </p>
+                    {notesdDiscovered.map((daemon) => (
+                      <PairNotesdForm
+                        key={daemon.fingerprint}
+                        known={daemon}
+                        onPair={pairNotesd}
+                        onDone={() => setPairing(false)}
+                      />
+                    ))}
+                  </div>
+                )}
+                <PairNotesdForm
+                  onPair={pairNotesd}
+                  onDone={() => setPairing(false)}
+                />
+              </div>
             )}
           </div>
         )}
@@ -294,32 +317,57 @@ export function StorageSection({ storage, conversion }: Props) {
 // The notesd pairing form: paste the `notesd://pair` code the daemon prints
 // (or a QR-scanned value), validate it, redeem it, and switch to the backend.
 // Paste-only for now; an in-app QR camera scan is a tracked follow-up.
+//
+// Two modes: manual (paste a full `notesd://pair` code) and — when `known` is a
+// daemon discovered via the cloud config plane — its endpoint and pin are
+// already known, so the field takes just the credential (a fresh pairing token,
+// or a full code, which wins if pasted).
 function PairNotesdForm({
+  known,
   onPair,
   onDone,
 }: {
-  onPair: (pairing: NotesdPairing) => Promise<void>;
+  known?: PublishedDaemon;
+  onPair: (request: NotesdConnectRequest) => Promise<void>;
   onDone: () => void;
 }) {
   const t = useT();
-  const [uri, setUri] = useState("");
+  const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Turn the field into a connect request. A `notesd://` value is always parsed
+  // in full; otherwise, with a known daemon, a bare value is its pairing token.
+  const resolve = (raw: string): NotesdConnectRequest => {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("notesd://")) {
+      return resolvePairing(parsePairingUri(trimmed));
+    }
+    if (known) {
+      return {
+        name: known.name,
+        endpoint: known.endpoint,
+        fingerprint: known.fingerprint,
+        token: trimmed,
+      };
+    }
+    return resolvePairing(parsePairingUri(trimmed)); // force a parse error
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (busy) return;
     setError(null);
-    let pairing: NotesdPairing;
+    let request: NotesdConnectRequest;
     try {
-      pairing = parsePairingUri(uri);
+      request = resolve(value);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       return;
     }
     setBusy(true);
     try {
-      await onPair(pairing);
+      await onPair(request);
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -331,18 +379,28 @@ function PairNotesdForm({
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">
       <p className="text-xs text-muted">
-        {t("settings.storage.notesdPairHint")}
+        {known
+          ? t("settings.storage.notesdKnownHint", { name: known.name })
+          : t("settings.storage.notesdPairHint")}
       </p>
       <textarea
-        value={uri}
-        onChange={(e) => setUri(e.target.value)}
-        placeholder={t("settings.storage.notesdPairPlaceholder")}
-        aria-label={t("settings.storage.notesdPair")}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={
+          known
+            ? t("settings.storage.notesdTokenPlaceholder")
+            : t("settings.storage.notesdPairPlaceholder")
+        }
+        aria-label={known ? known.name : t("settings.storage.notesdPair")}
         rows={2}
         className="rounded-[var(--radius)] border border-line bg-surface-2 px-2 py-1.5 font-mono text-xs break-all text-fg outline-none focus:border-accent"
       />
       <div className="flex items-center gap-2">
-        <Button type="submit" variant="primary" disabled={busy || !uri.trim()}>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={busy || !value.trim()}
+        >
           <BusyLabel busy={busy}>
             {t("settings.storage.notesdPairSubmit")}
           </BusyLabel>

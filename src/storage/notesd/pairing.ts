@@ -142,3 +142,31 @@ export function pairingEndpoint(p: Pick<NotesdPairing, "lan" | "wan">): string {
   if (!hostPort) throw new PairingParseError("pairing has no address");
   return `https://${hostPort}`;
 }
+
+/**
+ * A resolved request to connect to a daemon: a single base `endpoint` plus the
+ * pin and a credential. Both entry points produce one of these — a scanned/
+ * pasted `notesd://pair` URI (via {@link resolvePairing}) and a cloud-discovered
+ * daemon (endpoint + pin already known, the user supplies the credential) — so
+ * `useNotesdBackend` has one pairing path.
+ */
+export interface NotesdConnectRequest {
+  name: string;
+  /** `https://host:port`. */
+  endpoint: string;
+  /** SPKI pin, `sha256:<base64>`. */
+  fingerprint: string;
+  token?: string;
+  key?: string;
+}
+
+/** Collapse a parsed pairing URI to its resolved connect request. */
+export function resolvePairing(p: NotesdPairing): NotesdConnectRequest {
+  return {
+    name: p.name,
+    endpoint: pairingEndpoint(p),
+    fingerprint: p.fingerprint,
+    token: p.token,
+    key: p.key,
+  };
+}

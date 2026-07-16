@@ -45,6 +45,21 @@ connection notesd needs. The installed app can, through a small native module.
 That is why **Self-hosted** appears in the app's storage picker but not on the
 website, and it is one of the reasons to install the app.
 
+## Finding your server on your other devices
+
+Pairing once is enough per device, but you shouldn't have to hunt down the QR
+again for each one. If you also have Dropbox or Google Drive connected, pairing
+publishes your server's **address and certificate fingerprint** (never a key) to
+a small `notesd.json` in that cloud folder. Your other devices read it and show
+the server in **Settings → Self-hosted** ready to pair — you just supply a fresh
+pairing code to mint that device's own key. Config comes from the cloud; your
+notes still come straight from home.
+
+Nothing secret is ever put in the cloud: the fingerprint is a public-key hash
+and the address is just where the server lives, so neither grants access without
+a key. That's a deliberate choice — it keeps each device's key private and
+revocable.
+
 ## What syncs today
 
 The pairing syncs your **note document** (all your notes, including any inline

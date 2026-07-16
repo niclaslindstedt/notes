@@ -1451,6 +1451,21 @@ standard base64, `pairNotesd` redeems the token over the pinned fetch
 (paste-a-code today; an in-app QR camera scan is a tracked follow-up). Namespace
 registry and appearance settings stay per-device in this first version.
 
+**Config plane** (`src/storage/notesd/config-plane.ts`, `useNotesdDiscovery`):
+so a daemon can be found on your *other* devices without its QR, pairing
+publishes a small `notesd.json` to whichever cloud backend
+(Dropbox/Drive) is connected — a list of `{name, endpoint, fingerprint}` at the
+app-folder root, written via `createDropboxConfigPlaneStore` /
+`createGdriveConfigPlaneStore` (a root `FileStore`, the same pattern as the
+settings/namespace stores). It is **credential-free by design**: never a device
+key or token, so per-device keys stay per-device and there is nothing sensitive
+for the provider to read (the pin is a public-key fingerprint, the endpoint just
+an address), which is why the file is plaintext. `useNotesdDiscovery` reads it
+from the connected cloud tokens (independent of the active `selection`, since
+notesd is the active document store) and `StorageSection` lists the discovered
+daemons; picking one pre-fills its address+pin so pairing only needs a fresh
+credential — the device still redeems its own, preserving the model.
+
 ### Directory adapter
 
 `createDirectoryAdapter` (`src/storage/directory-adapter.ts`) over a `FileStore`

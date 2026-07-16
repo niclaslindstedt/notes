@@ -169,6 +169,10 @@ const settings: SettingsCatalog = {
     notesdPairPlaceholder: "notesd://pair?…",
     notesdPairSubmit: "Parkoppla",
     notesdPairing: "Parkopplar…",
+    notesdDiscovered: "Hittade i din {source}:",
+    notesdKnownHint:
+      "Ange en ny parkopplingskod från ”{name}” — starta notesd och kopiera koden den visar.",
+    notesdTokenPlaceholder: "Parkopplingstoken eller notesd://-kod",
     encryptionTitle: "Kryptering",
     encryptionOn: "Kryptering är på",
     encryptionOff: "Kryptering är av",
