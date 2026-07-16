@@ -21,10 +21,12 @@ import { useCallback, useEffect, useState } from "react";
 // Aliased: this module's `unlock` arg would otherwise shadow the achievement.
 import { unlock as unlockAchievement } from "../achievements/index.ts";
 import { createLogger } from "../dev/logger.ts";
-import type { BackendId } from "./backend-preference.ts";
+import { createPinnedFetch } from "../platform/native-bridge.ts";
+import type { BackendId, NotesdConfig } from "./backend-preference.ts";
 import { deleteDropboxNamespace } from "./dropbox/index.ts";
 import { deleteGdriveNamespace } from "./gdrive/index.ts";
 import { deleteLocalNamespace } from "./local/index.ts";
+import { deleteNotesdNamespace } from "./notesd/index.ts";
 import type { NamespaceRegistryStore } from "./namespace-store.ts";
 import {
   type Namespace,
@@ -82,13 +84,21 @@ export interface NamespaceRegistryDeps {
   dropboxToken: string | null;
   gdriveToken: string | null;
   folderHandle: FileSystemDirectoryHandle | null;
+  /** The paired notesd daemon config, null unless a daemon is the active backend. */
+  notesdConfig: NotesdConfig | null;
 }
 
 export function useNamespaceRegistry(
   deps: NamespaceRegistryDeps,
 ): NamespaceRegistry {
-  const { namespaceStore, backend, dropboxToken, gdriveToken, folderHandle } =
-    deps;
+  const {
+    namespaceStore,
+    backend,
+    dropboxToken,
+    gdriveToken,
+    folderHandle,
+    notesdConfig,
+  } = deps;
 
   // The namespaces known on this device and which one is active. The list is
   // seeded from localStorage (and reconciled against the backend's
@@ -211,6 +221,12 @@ export function useNamespaceRegistry(
           await deleteDropboxNamespace(dropboxToken, slug);
         } else if (backend === "gdrive" && gdriveToken) {
           await deleteGdriveNamespace(gdriveToken, slug);
+        } else if (backend === "notesd" && notesdConfig) {
+          await deleteNotesdNamespace(
+            notesdConfig,
+            createPinnedFetch(notesdConfig.spkiPin),
+            slug,
+          );
         }
       } catch (err) {
         log.warn(`removeNamespace: data delete failed for ${slug}`, err);
@@ -227,6 +243,7 @@ export function useNamespaceRegistry(
       backend,
       dropboxToken,
       gdriveToken,
+      notesdConfig,
       activeNamespace,
       folderHandle,
       pushNamespaces,

@@ -36,6 +36,11 @@ import {
 } from "../adapter.ts";
 import type { NotesdConfig } from "../backend-preference.ts";
 import { DEFAULT_NAMESPACE_SLUG } from "../namespaces.ts";
+import {
+  NAMESPACES_FILE_NAME,
+  type NamespaceRegistryStore,
+} from "../namespace-store.ts";
+import { SETTINGS_FILE_NAME, type SettingsStore } from "../settings-store.ts";
 import { notesdError } from "./errors.ts";
 
 const log = createLogger("notesd");
@@ -196,4 +201,87 @@ export function createNotesdAdapter(
       };
     },
   };
+}
+
+// A root store (`settings.json` / `namespaces.json`) over the daemon's
+// `GET/PUT /v1/settings/{name}` endpoint. The daemon reserves both names (its
+// `RESERVED` / `ALLOWED_SETTINGS` lists), keeping them out of note listings, so
+// appearance settings and the namespace registry sync across every paired
+// device — the way they already do on the folder/cloud backends via their
+// root-scoped `FileStore`. These files are app-wide plaintext JSON (theme/font
+// choices and namespace names aren't secret, and stay readable behind the
+// unlock gate), so unlike the document adapter they carry no whole-document
+// encryption. `fetchImpl` must be the same SPKI-pinned fetch the adapter uses.
+function createNotesdRootStore(
+  config: NotesdConfig,
+  fetchImpl: FetchImpl,
+  name: string,
+): { load(): Promise<string | null>; save(text: string): Promise<void> } {
+  const url = `${config.endpoint}/v1/settings/${name}`;
+  const authHeader = { Authorization: `Bearer ${config.deviceKey}` };
+  return {
+    async load(): Promise<string | null> {
+      const res = await fetchImpl(url, {
+        method: "GET",
+        headers: { ...authHeader },
+      });
+      if (res.status === 404) return null;
+      if (!res.ok) throw await notesdError(`load ${name}`, res);
+      return res.text();
+    },
+    async save(text: string): Promise<void> {
+      const res = await fetchImpl(url, {
+        method: "PUT",
+        headers: { ...authHeader, "Content-Type": "application/json" },
+        body: text,
+      });
+      if (!res.ok) throw await notesdError(`save ${name}`, res);
+    },
+  };
+}
+
+/**
+ * The notesd backend's root settings store — `settings.json` served by the
+ * daemon at `/v1/settings/settings.json`, so appearance settings travel with
+ * the daemon and land on every paired device (the notesd counterpart of
+ * {@link createDropboxSettingsStore} / the folder settings store).
+ */
+export function createNotesdSettingsStore(
+  config: NotesdConfig,
+  fetchImpl: FetchImpl,
+): SettingsStore {
+  return createNotesdRootStore(config, fetchImpl, SETTINGS_FILE_NAME);
+}
+
+/**
+ * The notesd backend's root namespace-registry store — `namespaces.json` served
+ * by the daemon at `/v1/settings/namespaces.json`, so the list of namespaces
+ * created on one paired device appears on the others.
+ */
+export function createNotesdNamespaceStore(
+  config: NotesdConfig,
+  fetchImpl: FetchImpl,
+): NamespaceRegistryStore {
+  return createNotesdRootStore(config, fetchImpl, NAMESPACES_FILE_NAME);
+}
+
+/**
+ * Delete a namespace's document on the daemon (`DELETE /v1/notes/document-…`),
+ * so removing a namespace on this device doesn't orphan its bytes on the shared
+ * daemon — the notesd counterpart of {@link deleteDropboxNamespace}. The default
+ * namespace (`document.json`) is never deleted. A 404 means it's already gone.
+ */
+export async function deleteNotesdNamespace(
+  config: NotesdConfig,
+  fetchImpl: FetchImpl,
+  namespace: string,
+): Promise<void> {
+  if (namespace === DEFAULT_NAMESPACE_SLUG) return;
+  const url = `${config.endpoint}/v1/notes/${documentRef(namespace)}`;
+  const res = await fetchImpl(url, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${config.deviceKey}` },
+  });
+  if (res.status === 404) return;
+  if (!res.ok) throw await notesdError(`delete ${namespace}`, res);
 }

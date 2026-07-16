@@ -63,7 +63,11 @@ import { useNotesdBackend } from "./useNotesdBackend.ts";
 import { useNotesdDiscovery } from "./useNotesdDiscovery.ts";
 import { useNamespaceMigration } from "./useNamespaceMigration.ts";
 import { useBackendSelection } from "./useBackendSelection.ts";
-import { isNative } from "../platform/native-bridge.ts";
+import { createPinnedFetch, isNative } from "../platform/native-bridge.ts";
+import {
+  createNotesdNamespaceStore,
+  createNotesdSettingsStore,
+} from "./notesd/index.ts";
 import type { NotesdConnectRequest } from "./notesd/pairing.ts";
 import type { PublishedDaemon } from "./notesd/config-plane.ts";
 
@@ -420,9 +424,16 @@ export function useStorageBackend(): UseStorageBackend {
           selection.handle,
           markFolderPermissionLost,
         );
-      // notesd keeps its namespace registry per-device in v1 (like the browser
-      // backend); syncing it over the daemon is a tracked follow-up.
+      // notesd serves `namespaces.json` from the daemon (`/v1/settings/...`)
+      // over the SPKI-pinned fetch, so the namespace list travels with the
+      // daemon and lands on every paired device.
       case "notesd":
+        return createNotesdNamespaceStore(
+          selection.config,
+          createPinnedFetch(selection.config.spkiPin),
+        );
+      // The browser backend keeps its registry in localStorage and has no
+      // separate store.
       case "browser":
         return null;
     }
@@ -446,6 +457,7 @@ export function useStorageBackend(): UseStorageBackend {
     dropboxToken,
     gdriveToken,
     folderHandle,
+    notesdConfig,
   });
 
   // The active namespace's adapter — rebuilt when the namespace or backend
@@ -472,9 +484,15 @@ export function useStorageBackend(): UseStorageBackend {
           selection.handle,
           markFolderPermissionLost,
         );
-      // notesd keeps appearance settings per-device in v1 (like the browser
-      // backend); syncing settings.json over the daemon is a tracked follow-up.
+      // notesd serves `settings.json` from the daemon (`/v1/settings/...`) over
+      // the SPKI-pinned fetch, so appearance settings sync across paired devices.
       case "notesd":
+        return createNotesdSettingsStore(
+          selection.config,
+          createPinnedFetch(selection.config.spkiPin),
+        );
+      // The browser backend keeps settings in localStorage (the appearance
+      // store's cache is its home) and has no separate store.
       case "browser":
         return null;
     }

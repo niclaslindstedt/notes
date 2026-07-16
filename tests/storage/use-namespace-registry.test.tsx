@@ -59,6 +59,7 @@ const browserDeps = (
   dropboxToken: null,
   gdriveToken: null,
   folderHandle: null,
+  notesdConfig: null,
   ...over,
 });
 
