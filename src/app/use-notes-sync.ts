@@ -636,6 +636,11 @@ export function useNotesSync(deps: {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const id = setInterval(() => {
+      // A backend that advertises `watch` pushes its own change events (see the
+      // watch subscription below), so the interval poll would be redundant — and
+      // for the whole-document notesd backend, a wasteful full download every
+      // tick. Let watch drive the pulls instead.
+      if (adapterRef.current.capabilities.has("watch")) return;
       if (
         !shouldLivePull({
           backendId: adapterRef.current.id,
@@ -659,6 +664,52 @@ export function useNotesSync(deps: {
     }, LIVE_PULL_INTERVAL_MS);
     return () => clearInterval(id);
   }, []);
+
+  // Adopt a snapshot a watch-capable backend pushed out of band. The same
+  // "never replace unsaved text" stand-down as `refresh`: if anything is unsaved
+  // we drop the pushed copy rather than clobber it — the queued save then
+  // collides with the moved remote and surfaces the conflict flow, so nothing is
+  // lost. When the etag is unchanged (our own write echoing back, or a sibling
+  // namespace's aggregate-revision bump the shim relayed) there's nothing to do.
+  const applyRemoteSnapshot = useCallback(
+    (stored: StoredSnapshot) => {
+      if (
+        dirtyRef.current ||
+        inFlight.current ||
+        saveHeld.current ||
+        pendingDoc.current !== null ||
+        saveTimer.current !== null ||
+        retryTimer.current !== null ||
+        conflictRef.current !== null
+      ) {
+        return;
+      }
+      const prevRevision = revisionRef.current;
+      if (stored.revision !== undefined && stored.revision === prevRevision) {
+        return;
+      }
+      revisionRef.current = stored.revision;
+      lastStoredRef.current = stored;
+      setOffline(stored.offline ?? false);
+      const reloaded = parse(stored.text);
+      setDoc(reloaded);
+      resetHistory?.current(reloaded);
+      // Another device's edit arriving on its own — the "live sync" trophy.
+      unlock("liveSync");
+    },
+    [setDoc, resetHistory],
+  );
+
+  // Subscribe to a watch-capable backend's push channel for the life of the
+  // active adapter, mirroring the load effect's `active` dependency so a backend
+  // or namespace swap re-subscribes against the new adapter.
+  const applyRemoteRef = useRef(applyRemoteSnapshot);
+  applyRemoteRef.current = applyRemoteSnapshot;
+  useEffect(() => {
+    if (!active.capabilities.has("watch") || !active.watch) return;
+    log.info("subscribing to backend watch");
+    return active.watch((snapshot) => applyRemoteRef.current(snapshot));
+  }, [active]);
 
   const saveNow = useCallback(() => {
     flushSave();

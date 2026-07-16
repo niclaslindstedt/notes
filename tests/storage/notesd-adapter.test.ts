@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthError, ConflictError } from "../../src/storage/adapter.ts";
 import type { NotesdConfig } from "../../src/storage/backend-preference.ts";
@@ -16,19 +16,30 @@ const CONFIG: NotesdConfig = {
 // content hash so a changed body changes the revision.
 function fakeDaemon(opts: { unauthorized?: boolean } = {}) {
   let body: string | null = null;
+  // Aggregate revision counter served by `GET /v1/rev`, bumped on every write —
+  // the O(1) probe the adapter's `watch` shim polls.
+  let rev = 0;
   const etagOf = (text: string) =>
     `e${[...text].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7)}`;
-  const calls: { method: string; ifMatch: string | null }[] = [];
+  const calls: { method: string; url: string; ifMatch: string | null }[] = [];
 
   const fetchImpl = (async (
-    _url: string | URL | Request,
+    url: string | URL | Request,
     init?: RequestInit,
   ) => {
     const method = init?.method ?? "GET";
+    const path = String(url);
     const headers = new Headers(init?.headers);
-    calls.push({ method, ifMatch: headers.get("If-Match") });
+    calls.push({ method, url: path, ifMatch: headers.get("If-Match") });
 
     if (opts.unauthorized) return new Response("nope", { status: 401 });
+
+    if (method === "GET" && path.endsWith("/v1/rev")) {
+      return new Response(JSON.stringify({ rev }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     if (method === "GET") {
       if (body === null) return new Response("", { status: 404 });
@@ -47,6 +58,7 @@ function fakeDaemon(opts: { unauthorized?: boolean } = {}) {
         });
       }
       body = next;
+      rev += 1;
       return new Response(JSON.stringify({ etag: etagOf(next) }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -55,7 +67,14 @@ function fakeDaemon(opts: { unauthorized?: boolean } = {}) {
     return new Response("", { status: 405 });
   }) as typeof fetch;
 
-  return { fetchImpl, calls, etagOf, current: () => body };
+  // Move the document from "another device", bumping the aggregate revision the
+  // way a real write would — without going through the adapter under test.
+  const externalWrite = (text: string) => {
+    body = text;
+    rev += 1;
+  };
+
+  return { fetchImpl, calls, etagOf, current: () => body, externalWrite };
 }
 
 describe("createNotesdAdapter", () => {
@@ -111,5 +130,68 @@ describe("createNotesdAdapter", () => {
     const { fetchImpl } = fakeDaemon({ unauthorized: true });
     const a = createNotesdAdapter(CONFIG, fetchImpl);
     await expect(a.load()).rejects.toBeInstanceOf(AuthError);
+  });
+
+  describe("watch", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("advertises the capability and exposes a watch method", () => {
+      const { fetchImpl } = fakeDaemon();
+      const a = createNotesdAdapter(CONFIG, fetchImpl);
+      expect(a.capabilities.has("watch")).toBe(true);
+      expect(typeof a.watch).toBe("function");
+    });
+
+    it("delivers a fresh snapshot when the aggregate revision moves", async () => {
+      vi.useFakeTimers();
+      const daemon = fakeDaemon();
+      const a = createNotesdAdapter(CONFIG, daemon.fetchImpl);
+      await a.save("v1");
+
+      const seen: string[] = [];
+      const unsubscribe = a.watch!((snap) => seen.push(snap.text));
+
+      // The opening probe only seeds the baseline — no delivery yet.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(seen).toEqual([]);
+
+      // Another device moves the document; the next probe sees the bumped
+      // revision, re-loads, and delivers the fresh bytes.
+      daemon.externalWrite("v2");
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(seen).toEqual(["v2"]);
+
+      // A tick with no change delivers nothing.
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(seen).toEqual(["v2"]);
+
+      unsubscribe();
+    });
+
+    it("stops probing after unsubscribe", async () => {
+      vi.useFakeTimers();
+      const daemon = fakeDaemon();
+      const a = createNotesdAdapter(CONFIG, daemon.fetchImpl);
+      await a.save("v1");
+
+      const seen: string[] = [];
+      const unsubscribe = a.watch!((snap) => seen.push(snap.text));
+      await vi.advanceTimersByTimeAsync(0);
+      unsubscribe();
+
+      const revCallsBefore = daemon.calls.filter((c) =>
+        c.url.endsWith("/v1/rev"),
+      ).length;
+      daemon.externalWrite("v2");
+      await vi.advanceTimersByTimeAsync(20000);
+
+      const revCallsAfter = daemon.calls.filter((c) =>
+        c.url.endsWith("/v1/rev"),
+      ).length;
+      expect(revCallsAfter).toBe(revCallsBefore);
+      expect(seen).toEqual([]);
+    });
   });
 });
