@@ -169,6 +169,7 @@ const settings = {
       "Start notesd on your computer, then paste the pairing code it prints (notesd://…) or scan its QR.",
     notesdPairPlaceholder: "notesd://pair?…",
     notesdPairSubmit: "Pair",
+    notesdScan: "Scan QR",
     notesdPairing: "Pairing…",
     notesdDiscovered: "Found in your {source}:",
     notesdKnownHint:
