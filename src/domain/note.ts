@@ -220,9 +220,9 @@ export function notePreview(note: Note): string {
 // A multi-line preview of the body, used by the card layout of the overview
 // (see `notePreview` for the single-line row layout). Keeps the note's line
 // breaks so the excerpt reads like the note itself — every non-empty line is
-// trimmed and runs of blank lines are collapsed away — and the card clamps the
-// height and fades the tail out in CSS. Attachment markdown is stripped the
-// same way as the one-line preview.
+// trimmed and runs of blank lines are collapsed away — and the card clamps it
+// to a fixed number of lines (ellipsis on overflow) in CSS. Attachment markdown
+// is stripped the same way as the one-line preview.
 export function notePreviewBlock(note: Note): string {
   // Deferred (body not loaded): the stored preview is already this block form.
   if (note.body === undefined) return note.preview ?? "";
