@@ -34,8 +34,10 @@ paste that code (or scan the QR). That is the whole setup.
   that device, which the daemon can revoke on its own without affecting your
   other devices. The key is held only on the device.
 - **Your bytes, your machine.** The daemon stores whatever the app sends and
-  nothing else. Turn on at-rest encryption and it only ever sees an encrypted
-  blob.
+  nothing else — one Markdown file per note, its images as real files beside
+  them, exactly the layout the folder backend writes. Turn on at-rest encryption
+  and every note and every image is sealed individually before it leaves the
+  device; the daemon only ever sees opaque blobs.
 
 ## Why the app only
 
@@ -62,8 +64,11 @@ revocable.
 
 ## What syncs today
 
-The pairing syncs your **note document** (all your notes, including any inline
-image attachments) for the default namespace. Appearance settings, additional
-namespaces, and separately-stored attachments stay on the device for now; those
-are tracked follow-ups. Everything else about the app — the editor, themes,
+The pairing syncs **everything a folder or cloud backend does**: all your notes
+across **every namespace** (each in its own subfolder), your **image
+attachments** as real files beside the notes, and your **appearance settings**
+and **namespace list**, so a theme or a namespace you create on one paired
+device shows up on the others. Because the daemon lays its folder out exactly
+like the folder backend, you can even open that same folder directly with the
+web app's folder backend. Everything else about the app — the editor, themes,
 search, encryption — works exactly as it does on any other backend.

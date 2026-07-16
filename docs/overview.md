@@ -1436,24 +1436,32 @@ on the [directory adapter](#directory-adapter).
 
 `createNotesdAdapter` (`src/storage/notesd/index.ts`) syncs to a user-run
 **notesd** daemon (the Rust binary in `notesd/`) — the self-hosted alternative
-to the cloud backends. Unlike Dropbox/Drive it is **not** built on the directory
-adapter: the daemon serves a flat folder with no attachment-listing endpoint, so
-this adapter stores the **whole serialized snapshot as one file per namespace**
-(`document.json`, `document-<slug>.json`), the browser backend's shape over the
-network. Image attachments therefore ride inline in the document, and
-at-rest encryption composes one level up in `withEncryption` (the same branch as
-the browser backend in `useStorageBackend`). `save` sends the last revision as
-`If-Match`; the daemon's `409` becomes a `ConflictError` carrying the current
-bytes — the ordinary keep-mine/keep-theirs flow.
+to the cloud backends. Like Dropbox/Drive it is built on the
+[directory adapter](#directory-adapter): the daemon serves its folder
+as a **generic blob store** (`GET /v1/blobs?prefix=&etag=` to list a folder,
+`GET/PUT/DELETE /v1/blob/{*path}` to move one file), so a `NotesdFileStore` moves
+one note's Markdown and a `NotesdAttachmentStore` moves one image's bytes, each
+scoped to the namespace's `notes/` / `attachments/` subfolder
+(`namespaceNotesFolder` / `namespaceAttachmentsFolder`) exactly as the folder
+backend lays them out — which is what lets the same daemon folder be opened
+directly by the web folder backend. **Image attachments are therefore real files
+under `attachments/`, not inline in the note**, and at-rest encryption composes
+**per file inside** the directory adapter via the injected `DirectoryCrypto`
+(the same branch as the folder/cloud backends in `useStorageBackend`, *not* the
+whole-document `withEncryption` the browser store uses). The daemon's per-file
+etag is the revision the directory adapter tracks; its own list+write conflict
+detection drives keep-mine/keep-theirs.
 
 It is the one backend that advertises the **`watch`** capability, so
 cross-device edits arrive by push rather than the whole-document
-[live pull](#live-pull). The daemon's true push channel is its `GET /v1/events`
-SSE stream, but the pinned transport (`createPinnedFetch`) is request/response
-only — SSE can't ride it as-is — so `watch` is a **shim**: it polls the O(1)
-`GET /v1/rev` aggregate revision on a short cadence and, when it moves, re-loads
-`document.json` and hands the fresh snapshot to the sync engine, which adopts it
-under its usual guards (see [Live pull](#live-pull)). A real
+[live pull](#live-pull). The directory adapter has no `watch` of its own, so
+`createNotesdAdapter` **bolts one on** (spreading the adapter and adding the
+capability). The daemon's true push channel is its `GET /v1/events` SSE stream,
+but the pinned transport (`createPinnedFetch`) is request/response only — SSE
+can't ride it as-is — so `watch` is a **shim**: it polls the O(1) `GET /v1/rev`
+aggregate revision on a short cadence and, when it moves, re-loads through the
+directory adapter and hands the fresh snapshot to the sync engine, which adopts
+it under its usual guards (see [Live pull](#live-pull)). A real
 streaming-over-bridge transport is a tracked follow-up; until then the shim gives
 low-latency, download-only-on-change sync within the SPKI-pinned transport, with
 no plaintext fallback.
@@ -1489,11 +1497,11 @@ Like the folder/cloud backends, notesd syncs its **appearance settings** and
 endpoint (both names are on the daemon's reserved list, kept off note listings),
 and `useStorageBackend` returns them from the `notesd` case instead of `null`. So
 a theme change or a new namespace made on one paired device lands on the others.
-Removing a namespace deletes its `document-<slug>.json` on the daemon too
-(`deleteNotesdNamespace`, a `DELETE /v1/notes/…`) so no orphaned document is left
-behind. Attachments still ride inline in the document (the whole-snapshot shape)
-rather than as externalised files — switching to `createDirectoryAdapter` over a
-daemon attachment-listing endpoint is a tracked follow-up.
+Removing a namespace deletes its whole subfolder on the daemon too
+(`deleteNotesdNamespace` lists `<slug>/` via `GET /v1/blobs?prefix=` and deletes
+each note and attachment blob) so no orphaned bytes are left behind; the daemon
+prunes the now-empty folders. The default namespace shares the folder root with
+the settings files and has no subtree of its own, so it is never deleted.
 
 **Config plane** (`src/storage/notesd/config-plane.ts`, `useNotesdDiscovery`):
 so a daemon can be found on your *other* devices without its QR, pairing

@@ -9,7 +9,11 @@
 //! - `PUT /v1/notes/{ref}` with `If-Match` — write; `409` + current bytes on an
 //!   etag mismatch (`save()` → `ConflictError`, driving keep-mine/keep-theirs).
 //! - `POST /v1/batch` — coalesce a burst of writes/deletes into one round trip.
-//! - `GET/PUT /v1/attachments/{note}/{file}` — lazy attachment bytes.
+//! - `GET /v1/blobs?prefix=&etag=` — list every file under a folder prefix
+//!   (`notes/`, `attachments/`, `<slug>/notes/`, …), the listing the directory
+//!   adapter's `FileStore` / `AttachmentStore` scope per namespace.
+//! - `GET/PUT/DELETE /v1/blob/{*path}` — read/write/delete one file at any
+//!   namespace-scoped relative path (a note or an externalised attachment).
 //! - `GET/PUT /v1/settings/{name}` — `settings.json` / `namespaces.json`.
 //! - `GET /v1/events` — an SSE stream of change events (`watch()`), the push
 //!   the cloud backends structurally can't offer.
@@ -60,9 +64,10 @@ pub fn router(state: AppState) -> Router {
             get(get_note).put(put_note).delete(delete_note),
         )
         .route("/v1/batch", post(batch))
+        .route("/v1/blobs", get(list_blobs))
         .route(
-            "/v1/attachments/{note}/{file}",
-            get(get_attachment).put(put_attachment),
+            "/v1/blob/{*path}",
+            get(get_blob).put(put_blob).delete(delete_blob),
         )
         .route("/v1/settings/{name}", get(get_settings).put(put_settings))
         .route("/v1/events", get(events))
@@ -266,15 +271,49 @@ async fn batch(
     ))
 }
 
-// -- attachments ------------------------------------------------------------
+// -- blobs (notes + attachments, namespace-scoped) --------------------------
 
-async fn get_attachment(
+#[derive(Deserialize)]
+struct BlobListQuery {
+    /// Folder path the listing is scoped to (`notes/`, `attachments/`,
+    /// `<slug>/notes/`, …). Absent lists the whole folder.
+    prefix: Option<String>,
+    /// `0` skips the content hash — an attachment listing wants only paths and
+    /// shouldn't read every image's bytes. Any other value (or absent) includes
+    /// the etag the note listing keys its per-file revision off.
+    etag: Option<u8>,
+}
+
+async fn list_blobs(
     State(state): State<AppState>,
-    Path((note, file)): Path<(String, String)>,
+    Query(q): Query<BlobListQuery>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let prefix = q.prefix.unwrap_or_default();
+    let with_etag = q.etag.unwrap_or(1) != 0;
+    let blobs: Vec<_> = state
+        .store
+        .list_blobs(&prefix, with_etag)?
+        .into_iter()
+        .map(|m| {
+            if with_etag {
+                json!({ "path": m.reference, "etag": m.etag })
+            } else {
+                json!({ "path": m.reference })
+            }
+        })
+        .collect();
+    Ok(Json(json!({ "blobs": blobs })))
+}
+
+async fn get_blob(
+    State(state): State<AppState>,
+    Path(path): Path<String>,
 ) -> Result<Response, AppError> {
-    match state.store.read_attachment(&note, &file)? {
+    match state.store.read_blob(&path)? {
         Some(bytes) => {
+            let etag = crate::secret::sha256_hex(&bytes);
             let mut headers = HeaderMap::new();
+            headers.insert(header::ETAG, etag.parse().unwrap());
             headers.insert(
                 header::CONTENT_TYPE,
                 "application/octet-stream".parse().unwrap(),
@@ -285,13 +324,35 @@ async fn get_attachment(
     }
 }
 
-async fn put_attachment(
+async fn put_blob(
     State(state): State<AppState>,
-    Path((note, file)): Path<(String, String)>,
+    Path(path): Path<String>,
     body: Bytes,
 ) -> Result<Response, AppError> {
-    state.store.write_attachment(&note, &file, &body)?;
-    Ok(StatusCode::NO_CONTENT.into_response())
+    let etag = state.store.write_blob(&path, &body)?;
+    state.index.record_write(&path, &etag);
+    Ok(Json(json!({
+        "path": path,
+        "etag": etag,
+        "rev": state.index.current_rev(),
+    }))
+    .into_response())
+}
+
+async fn delete_blob(
+    State(state): State<AppState>,
+    Path(path): Path<String>,
+) -> Result<Response, AppError> {
+    let existed = state.store.delete_blob(&path)?;
+    if existed {
+        state.index.record_delete(&path);
+    }
+    Ok(Json(json!({
+        "path": path,
+        "deleted": existed,
+        "rev": state.index.current_rev(),
+    }))
+    .into_response())
 }
 
 // -- settings ---------------------------------------------------------------

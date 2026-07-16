@@ -32,7 +32,8 @@ function fakeDaemon(opts: { unauthorized?: boolean } = {}) {
     init?: RequestInit,
   ) => {
     const method = init?.method ?? "GET";
-    const path = new URL(String(url)).pathname;
+    const parsed = new URL(String(url));
+    const path = parsed.pathname;
     const headers = new Headers(init?.headers);
     calls.push({
       method,
@@ -42,6 +43,18 @@ function fakeDaemon(opts: { unauthorized?: boolean } = {}) {
     });
 
     if (opts.unauthorized) return new Response("nope", { status: 401 });
+
+    // Blob listing: return every stored `/v1/blob/<key>` whose key starts with
+    // the requested prefix (used by `deleteNotesdNamespace`).
+    if (method === "GET" && path === "/v1/blobs") {
+      const prefix = parsed.searchParams.get("prefix") ?? "";
+      const blobs = [...files.keys()]
+        .filter((p) => p.startsWith("/v1/blob/"))
+        .map((p) => p.slice("/v1/blob/".length))
+        .filter((p) => p.startsWith(prefix))
+        .map((p) => ({ path: p }));
+      return new Response(JSON.stringify({ blobs }), { status: 200 });
+    }
 
     if (method === "GET") {
       const stored = files.get(path);
@@ -117,29 +130,47 @@ describe("createNotesdNamespaceStore", () => {
 });
 
 describe("deleteNotesdNamespace", () => {
-  it("deletes a non-default namespace's document ref", async () => {
+  it("deletes every blob under the namespace's subfolder", async () => {
     const daemon = fakeDaemon();
-    // Seed the namespace document the way the adapter would have written it.
-    daemon.files.set("/v1/notes/document-work.json", "doc");
+    // Seed the namespace's notes + attachments the way the adapter would.
+    daemon.files.set("/v1/blob/work/notes/a-1.md", "note");
+    daemon.files.set("/v1/blob/work/attachments/a-1/pic.png", "img");
+    // A different namespace's file must be left untouched.
+    daemon.files.set("/v1/blob/notes/keep-me.md", "keep");
 
     await deleteNotesdNamespace(CONFIG, daemon.fetchImpl, "work");
-    expect(daemon.files.has("/v1/notes/document-work.json")).toBe(false);
 
-    const del = daemon.calls.find((c) => c.method === "DELETE");
-    expect(del?.path).toBe("/v1/notes/document-work.json");
-    expect(del?.auth).toBe("Bearer device-key-123");
+    expect(daemon.files.has("/v1/blob/work/notes/a-1.md")).toBe(false);
+    expect(daemon.files.has("/v1/blob/work/attachments/a-1/pic.png")).toBe(
+      false,
+    );
+    expect(daemon.files.has("/v1/blob/notes/keep-me.md")).toBe(true);
+
+    const deletes = daemon.calls
+      .filter((c) => c.method === "DELETE")
+      .map((c) => c.path)
+      .sort();
+    expect(deletes).toEqual([
+      "/v1/blob/work/attachments/a-1/pic.png",
+      "/v1/blob/work/notes/a-1.md",
+    ]);
+    expect(daemon.calls.every((c) => c.auth === "Bearer device-key-123")).toBe(
+      true,
+    );
   });
 
-  it("never deletes the default namespace's document.json", async () => {
+  it("never touches the default namespace (shares the folder root)", async () => {
     const daemon = fakeDaemon();
     await deleteNotesdNamespace(CONFIG, daemon.fetchImpl, "default");
     expect(daemon.calls).toHaveLength(0);
   });
 
-  it("treats an already-gone namespace (404) as success", async () => {
+  it("treats an already-empty namespace as success", async () => {
     const daemon = fakeDaemon();
     await expect(
       deleteNotesdNamespace(CONFIG, daemon.fetchImpl, "gone"),
     ).resolves.toBeUndefined();
+    // Listed the subtree, found nothing to delete.
+    expect(daemon.calls.every((c) => c.method === "GET")).toBe(true);
   });
 });

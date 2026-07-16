@@ -169,16 +169,18 @@ export function useBackendSelection(
             onPermissionLost: markFolderPermissionLost,
             crypto: directoryCrypto,
           });
-        // notesd stores one document blob per namespace over an SPKI-pinned
-        // fetch — the browser backend's shape, over the network. Whole-document
-        // encryption is applied one level up in `useStorageBackend` (the same
-        // branch as the browser backend), so there is no per-file crypto or
-        // offline cache wrapper here.
+        // notesd is a directory backend over an SPKI-pinned fetch: each
+        // namespace's notes and attachments live as individual files in their
+        // own `notes/` / `attachments/` subfolder, and encryption composes per
+        // file *inside* the directory adapter via `directoryCrypto` — exactly
+        // like the folder backend (which, being on-device, likewise needs no
+        // offline-cache mirror).
         case "notesd":
           return createNotesdAdapter(
             selection.config,
             createPinnedFetch(selection.config.spkiPin),
             namespace,
+            directoryCrypto,
           );
         case "browser":
           return new BrowserLocalStorageAdapter(
