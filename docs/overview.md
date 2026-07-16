@@ -1473,8 +1473,20 @@ standard base64, `pairNotesd` redeems the token over the pinned fetch
 (`POST /v1/pair`) for a per-device key, stores the config
 (`getNotesdConfig`/`setNotesdConfig` in `backend-preference.ts`), and unlocks the
 **Self-hoster** achievement. The pair UI is `PairNotesdForm` in `StorageSection`
-(paste-a-code today; an in-app QR camera scan is a tracked follow-up). Namespace
-registry and appearance settings stay per-device in this first version.
+(paste-a-code today; an in-app QR camera scan is a tracked follow-up).
+
+Like the folder/cloud backends, notesd syncs its **appearance settings** and
+**namespace registry** across paired devices: `createNotesdSettingsStore` and
+`createNotesdNamespaceStore` (`src/storage/notesd/index.ts`) read/write
+`settings.json` / `namespaces.json` over the daemon's `GET/PUT /v1/settings/{name}`
+endpoint (both names are on the daemon's reserved list, kept off note listings),
+and `useStorageBackend` returns them from the `notesd` case instead of `null`. So
+a theme change or a new namespace made on one paired device lands on the others.
+Removing a namespace deletes its `document-<slug>.json` on the daemon too
+(`deleteNotesdNamespace`, a `DELETE /v1/notes/…`) so no orphaned document is left
+behind. Attachments still ride inline in the document (the whole-snapshot shape)
+rather than as externalised files — switching to `createDirectoryAdapter` over a
+daemon attachment-listing endpoint is a tracked follow-up.
 
 **Config plane** (`src/storage/notesd/config-plane.ts`, `useNotesdDiscovery`):
 so a daemon can be found on your *other* devices without its QR, pairing
