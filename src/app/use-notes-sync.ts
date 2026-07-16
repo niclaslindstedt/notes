@@ -195,6 +195,13 @@ export function useNotesSync(deps: {
   // has sat untouched for the full interval. 0 ⇒ "never edited", so a device
   // that's only viewing still receives pulls.
   const lastEditRef = useRef(0);
+  // Monotonic count of user edits (every `scheduleSave`). The async backend
+  // load captures this at launch and re-checks it on completion: if it moved,
+  // the user edited while the read was in flight, so adopting the loaded
+  // (pre-edit) document would silently revert that edit — the "toggle a
+  // checkbox on open and watch it uncheck itself" race. The load keeps the
+  // local edit instead. See the load effect below.
+  const editSeqRef = useRef(0);
 
   // Seed from the adapter's synchronous fast path so the first paint shows
   // stored data instead of a flash of empty list.
@@ -378,6 +385,9 @@ export function useNotesSync(deps: {
       // Stamp the edit so the live-pull loop holds off until the note has been
       // quiet for the full window — this is the keystroke that resets it.
       lastEditRef.current = Date.now();
+      // Record that a user edit happened, so an in-flight backend load that
+      // resolves after this can tell it must not clobber the edit.
+      editSeqRef.current += 1;
       pendingDoc.current = next;
       setDirty(true);
       if (saveHeld.current) return;
@@ -454,10 +464,25 @@ export function useNotesSync(deps: {
     setDoc(seeded);
     resetHistory?.current(seeded);
     let cancelled = false;
+    // Snapshot the edit counter before the read starts. If the user edits (e.g.
+    // toggles a checklist line in a note) while the load is in flight, this
+    // moves and the completion handler keeps the local document instead of
+    // overwriting it with the pre-edit bytes it read.
+    const editSeqAtLoad = editSeqRef.current;
     void active
       .load()
       .then((stored) => {
         if (cancelled) return;
+        // A user edit raced the load. The on-screen document already reflects
+        // it (and `scheduleSave` has queued it for persistence), while `stored`
+        // is the pre-edit document we began reading before the edit — adopting
+        // it would revert the edit in front of the user. Keep the local
+        // document; just mark the load resolved so downstream gating un-blocks.
+        if (editSeqRef.current !== editSeqAtLoad) {
+          log.info("load: local edit raced the read — keeping local edits");
+          setLoaded(true);
+          return;
+        }
         revisionRef.current = stored?.revision;
         lastStoredRef.current = stored ?? undefined;
         setOffline(stored?.offline ?? false);
