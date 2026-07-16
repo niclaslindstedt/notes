@@ -4,6 +4,12 @@ dev-dist
 node_modules
 package-lock.json
 
+# The native wrapper's embedded web bundle (generated) and its native-code
+# modules (Swift / Kotlin / Gradle — not Prettier's remit).
+native/web
+native/modules/**/ios
+native/modules/**/android
+
 # Prose and hand-authored docs are managed by humans / the maintenance
 # skills, not reflowed by Prettier.
 **/*.md

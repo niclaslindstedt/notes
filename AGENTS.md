@@ -9,11 +9,14 @@ this repo. `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, `GEMINI.md`, and
 `notes` is a local-first PWA for taking notes that works great on mobile and
 desktop. It runs entirely in the browser and is served as static files —
 there is **no backend**. Notes are persisted to `localStorage`. A React
-Native (Expo) app lives under [`native/`](native/README.md) — a thin
-presentation layer that imports the platform-agnostic core (`src/domain/`,
-the `use-notes*` app hooks, the storage contract) verbatim and supplies its
-own native views; that core is kept framework-free precisely so it can be
-reused there unchanged.
+Native (Expo) app lives under [`native/`](native/README.md) — a **thin
+WebView wrapper** that embeds the compiled web app (built by `make
+build-native`) and loads it offline from local files. It adds only the two
+capabilities a WebView can't provide: native haptics and SPKI-pinned HTTPS
+for the self-hosted **notesd** backend, bridged over `postMessage` through
+[`src/platform/native-bridge.ts`](src/platform/native-bridge.ts). It no
+longer imports the web source or ships its own storage backends — the
+embedded app runs its own `localStorage`.
 
 Mobile is the primary testing device. Every visible change should be checked
 at a phone viewport first.
@@ -330,15 +333,13 @@ product decision):
   notes' envelope tag is `notes.encrypted.v1`; the framework writes
   `oss.encrypted.v1`. Swapping would make existing users' encrypted
   documents unreadable.
-- **The i18n runtime** (`src/i18n/`) **and everything the React Native
-  app imports** — `native/` consumes `src/i18n/index.ts`,
-  `src/domain/note.ts`, `src/storage/adapter.ts`,
-  `src/storage/namespaces.ts`, and `src/app/use-notes.ts` directly, and
-  its Expo project installs neither the framework package nor
-  `react-dom`. Nothing in the transitive import closure of those modules
-  may import from `@niclaslindstedt/oss-framework` (that's why
-  `use-notes.ts` imports `unlock` from `achievements/bus.ts`, not the
-  barrel).
+- **The i18n runtime** (`src/i18n/`) — a dependency-free runtime ported
+  from checklist, diverged enough from the framework's that adopting it is
+  a real port rather than a shim. (Historically this and the rest of the
+  web core also had to stay framework-free because the native app imported
+  them directly; the native app is now a WebView wrapper that embeds the
+  compiled bundle and imports no web source, so that constraint no longer
+  applies — but the divergence reason stands on its own.)
 - **The Markdown parser** (`src/domain/markdown.ts`) and the
   live-preview editor — notes' parser has evolved past the framework's
   (depth-based list-marker rotation) and the editor is coupled to
@@ -384,6 +385,11 @@ The source tree under `src/` is organized by concern, not by file type:
 - `src/styles/` — the CSS-variable token system (`theme.css`).
 - `src/pwa/` — service-worker registration and update lifecycle
   (`usePwaUpdate.ts`), standalone/install detection (`standalone.ts`).
+- `src/platform/` — the seam to the native WebView wrapper
+  (`native-bridge.ts`): `isNative()` detection, `haptics.vibrate` (native
+  else `navigator.vibrate`), and `pinnedFetch`/`createPinnedFetch` (an
+  SPKI-pinned `fetch` routed through native for the notesd backend). Inert
+  on the plain web; only lights up inside `native/`.
 - `src/i18n/` — the i18n layer (ported from checklist): a dependency-free,
   typed `t()` runtime (`index.ts`) over per-language catalog modules under
   `locales/<lang>/` (English `en/` is bundled + is the `Catalog`/`MessageKey`
@@ -391,8 +397,8 @@ The source tree under `src/` is organized by concern, not by file type:
   active language rides a React context provided by `LanguageRoot` (mounted
   around the app shell in `main.tsx`), backed by a plaintext localStorage
   mirror (`language-preference.ts`) so first paint renders in the right
-  language; `locale.ts` is the framework-free code/`bcp47`/detection helper
-  the React Native app shares. English and Swedish ship today. The
+  language; `locale.ts` is a framework-free code/`bcp47`/detection helper.
+  English and Swedish ship today. The
   English-only public pages (`HomePage`/`PrivacyPage`) render outside
   `LanguageRoot` and are intentionally not translated.
 - `src/achievements/` — the achievements feature: a `catalog.ts` of
@@ -415,7 +421,7 @@ The source tree under `src/` is organized by concern, not by file type:
 
 Dependency direction: `app → ui → domain`, `app → storage → domain`.
 Nothing in `domain/` may import from `ui/`, `storage/`, `app/`, or touch
-the DOM. This keeps `domain/` portable to the planned React Native app.
+the DOM. This keeps `domain/` pure and trivially testable (no I/O, no DOM).
 
 ### Where new code goes
 
@@ -428,6 +434,7 @@ the DOM. This keeps `domain/` portable to the planned React Native app.
 | Top-level state / a new view             | `src/app/`                         |
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |
 | PWA / service-worker behaviour           | `src/pwa/`                         |
+| A native-wrapper capability (bridge)     | `src/platform/native-bridge.ts` + `native/` |
 | A new achievement / its unlock trigger   | `src/achievements/catalog.ts`      |
 | A user-facing string / its translation   | `src/i18n/locales/{en,sv}/<ns>.ts` |
 

@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump
+.PHONY: build build-native test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump
 
 install:
 	npm ci
@@ -14,6 +14,12 @@ dev-seed:
 
 build:
 	npm run build
+
+# Build the app for embedding in the native WebView wrapper: relative asset
+# base, no service worker, output to native/web/ (copied into the binary at
+# prebuild). See native/README.md.
+build-native:
+	npm run build:native
 
 preview:
 	npm run preview

@@ -1,10 +1,7 @@
-// Native entry point. Polyfills must load before anything that reaches for
-// `crypto.randomUUID` (the shared id source in ../../src/domain/note.ts), so
-// they are imported first, ahead of the app.
-import "./src/polyfills";
-
+// Native entry point. The app is a thin WebView shell around the compiled web
+// PWA embedded in the binary — see native/README.md and WebViewHost.tsx.
 import { registerRootComponent } from "expo";
 
-import App from "./src/App";
+import WebViewHost from "./src/WebViewHost";
 
-registerRootComponent(App);
+registerRootComponent(WebViewHost);

@@ -1,107 +1,94 @@
-# notes — React Native app
+# notes — native app (thin WebView wrapper)
 
-A React Native (Expo) front-end for **notes**, sharing the entire
-platform-agnostic core with the web PWA. This is a separate Expo project that
-lives alongside the web app; today it runs in Expo Go and the simulators, and
+A **thin** React Native (Expo) shell around the **notes** web PWA. It embeds a
+compiled copy of the web app and loads it offline from local files inside a
+single full-screen WebView. Everything the user sees is the web app; the
+wrapper exists only to add the two capabilities a WebView can't provide.
+
 [`RELEASING.md`](RELEASING.md) is the step-by-step for building and submitting
-it to the App Store and Google Play via EAS.
+to the App Store and Google Play via EAS.
 
-## How it reuses the web app
+## Why a wrapper (and why it's thin)
 
-The web app's architecture (see [`../CLAUDE.md`](../CLAUDE.md)) keeps a clean
-split between platform-agnostic logic and the DOM presentation layer. The
-native app imports the logic verbatim from `../src` and supplies its own
-React Native views in `native/src/`:
+The web app is a local-first PWA that already runs great on mobile. Shipping it
+through the stores as a native binary buys two things the browser/WebView
+can't do on its own:
 
-| Layer | Source | Shared with web? |
-|---|---|---|
-| Note model + pure operations | `../src/domain/note.ts` | ✅ verbatim |
-| App state, edits, undo/redo, persistence engine | `../src/app/use-notes*.ts`, `use-undo-redo.ts` | ✅ verbatim |
-| Storage contract, serialize, migrations, namespaces | `../src/storage/{adapter,serialize,migrations,namespaces}.ts` | ✅ verbatim |
-| **Local storage backend** | `native/src/storage/asyncStorageAdapter.ts` | ⛔ native (AsyncStorage) |
-| **iCloud storage backend (iOS only)** | `native/src/storage/icloudStorageAdapter.ts` | ⛔ native (iCloud KVS) |
-| **Presentation** | `native/src/components/`, `native/src/App.tsx` | ⛔ native (`View`/`Text`/…) |
-| **Theme tokens** | `native/src/theme.ts` | ⛔ native (no CSS variables) |
+1. **Haptics** — iOS WKWebView ignores `navigator.vibrate` entirely.
+2. **SPKI-pinned HTTPS** — the self-hosted [`notesd`](../notesd/README.md)
+   daemon serves a self-signed TLS certificate that no public CA vouches for;
+   reaching it safely requires pinning its SPKI SHA-256 fingerprint, which a
+   browser can't do but native code can.
 
-The shared core required **no refactoring** to be consumed here: every web
-global it touches (`localStorage`, `navigator`) is already behind a `typeof
-… === "undefined"` guard, so on React Native it transparently falls back
-(single default namespace, empty `loadSync`). The only runtime shim is a
-`crypto.randomUUID` polyfill — see `native/src/polyfills.ts`.
+Everything else — the UI, storage (`localStorage`), Markdown editor, themes,
+cloud backends, achievements — is the web app, unchanged. There is **no**
+duplicated presentation layer and **no** native storage backend anymore.
 
-The `AsyncStorageAdapter` implements the same `StorageAdapter` contract as the
-web's `BrowserLocalStorageAdapter`, so `useNotes` drives it unchanged. It does
-not advertise the synchronous `loadSync` capability (AsyncStorage has no sync
-read); `useNotesSync` already tolerates that by seeding empty and loading in
-its mount effect.
+## How it's built and loaded
 
-## iCloud backend (iOS only)
+```
+make build-native          # from the repo root: VITE_TARGET=native vite build → native/web/
+cd native && npx expo prebuild   # copies native/web/ into the binary (see plugins/with-web-bundle.js)
+```
 
-On iOS the app offers a second backend, **iCloud**
-(`native/src/storage/icloudStorageAdapter.ts`), which stores the document in
-Apple's iCloud key-value store (`NSUbiquitousKeyValueStore`, via
-`react-native-icloudstore`) so it syncs across the signed-in user's devices
-with no accounts, OAuth, or network code of our own. It implements the same
-`StorageAdapter` contract as the on-device backend and advertises the `watch`
-capability — when another device pushes an edit, iCloud fires a change event,
-the adapter re-reads its key, and `App.tsx` calls `reload()` so the new state
-appears live.
+- `make build-native` builds the web app with a **relative asset base**
+  (`./assets/...`, so it resolves under a `file://` origin) and the **service
+  worker disabled** (offline is already guaranteed by the local bundle; app
+  updates ride store releases). Output goes to `native/web/` (git-ignored).
+- The Expo config plugin [`plugins/with-web-bundle.js`](plugins/with-web-bundle.js)
+  copies `native/web/` into the binary at prebuild: `assets/web/` on Android
+  (loaded from `file:///android_asset/web/index.html`) and a bundle folder
+  reference on iOS (loaded from `bundleDirectory/web/index.html`).
+- [`src/WebViewHost.tsx`](src/WebViewHost.tsx) renders the WebView and wires
+  the message bridge.
 
-The backend is **only exposed on iOS**: `native/src/storage/backends.ts` is
-the single platform gate — `availableBackends()` appends iCloud only when
-`Platform.OS === "ios"`, and the iCloud adapter module (which pulls the
-iOS-only native dependency) is required lazily so it never loads on Android or
-web. The choice is persisted per device in AsyncStorage
-(`backendPreference.ts`) and surfaced as a **Storage** picker in the menu
-sheet, which renders only when more than one backend is available — i.e. only
-on iOS. The on-device default is unchanged everywhere.
+## The web ↔ native bridge
 
-> iCloud key-value sync needs the
-> `com.apple.developer.ubiquity-kvstore-identifier` entitlement (declared in
-> `app.json` under `ios.entitlements`) and a native build — it is inert in
-> Expo Go, which can't load the custom native module. Selecting it there
-> simply falls back to "no data" reads until the app runs as a dev/standalone
-> build signed with the entitlement.
+The web side lives in [`../src/platform/native-bridge.ts`](../src/platform/native-bridge.ts);
+the native side is [`src/bridge/on-message.ts`](src/bridge/on-message.ts) plus
+the [`pinned-fetch`](modules/pinned-fetch) native module. Messages are JSON:
 
-## What's implemented
+```
+web → native  (window.ReactNativeWebView.postMessage(JSON.stringify(msg))):
+  { v: 1, type: "haptics.vibrate", pattern }
+  { v: 1, type: "pinnedFetch.request", id, url, method, headers, bodyBase64|null, spkiPin }
 
-The core note-taking flows, all backed by the shared hook:
+native → web  (injected as window.__NOTES_NATIVE__.resolve(payload)):
+  { id, ok, status, statusText, headers, bodyBase64|null, error?: { name, message } }
+```
 
-- Browse the note list (newest-edited first; each row shows the title — the
-  first non-empty line — over a one-line preview), tap to open.
-- Write a new note from the floating **+** button; abandoned, never-typed
-  notes drop themselves the same way the web app discards them.
-- Edit a note in a full-screen text editor; every keystroke persists through
-  the shared `update` verb (a run of edits coalesces into one undo step).
-- Delete a note from the editor's header.
-- Undo / Redo across the whole-document timeline, from the menu sheet.
-- On iOS, switch the active note store between **This device** and **iCloud**.
+Bodies are base64 because both channels are string-only and notesd payloads
+carry binary (encrypted) envelopes.
 
-### Not yet ported (web-only for now)
+- **Haptics** → `expo-haptics` (iOS light impact) / `Vibration` (Android,
+  honours the pattern). The web app calls `haptics.vibrate()`, which falls
+  back to `navigator.vibrate` outside the wrapper.
+- **Pinned fetch** → the [`pinned-fetch`](modules/pinned-fetch) local Expo
+  module performs an HTTPS request whose server certificate is trusted **iff**
+  its SPKI SHA-256 matches the pin, bypassing the system CA store (iOS: a
+  `URLSession` trust-evaluation delegate; Android: an `HttpsURLConnection`
+  with a pin-only `X509TrustManager`). The future notesd `StorageAdapter`
+  (web-side, plan phase 6) will consume this via `createPinnedFetch(pin)`.
 
-The live Markdown-preview editor (the native editor is a plain text field for
-now), cloud backends (Dropbox / Google Drive), at-rest encryption + unlock
-gate, the full theme engine (presets / custom colours / fonts), namespaces,
-settings UI, achievements, and the changelog modal. These layers are either
-DOM/CSS-bound or depend on browser-only APIs; they can grow into `native/`
-incrementally without touching the shared core.
+> **Status:** the pinned-fetch native module can only be exercised
+> end-to-end once the web-side notesd adapter and a running daemon exist. The
+> web seam is unit-tested (`tests/platform/native-bridge.test.ts`); the native
+> module is validated manually against a known-good / known-bad pin.
 
 ## Running it
 
-> Requires the native app's own dependencies. From this directory:
+Because the app embeds native modules (WebView + pinning), it needs a **dev
+client / prebuild** — it does not run in Expo Go.
 
 ```sh
 cd native
-npm install          # or: npx expo install (to align versions with the SDK)
-npx expo start       # then press i / a, or scan the QR with Expo Go
+npm install
+make build-native   # (from repo root) produce native/web/ first
+npx expo prebuild
+npx expo run:ios     # or: npx expo run:android
 ```
 
-Metro is configured (`metro.config.js`) to watch the repo root so the
-shared modules in `../src` are transformed and hot-reloaded as part of the
-app. `react` and `react-native` are pinned to this app's `node_modules` so
-the shared hooks bind to the same React instance the renderer uses.
-
-Type-check the native app (includes the shared core it imports):
+Type-check the native shell:
 
 ```sh
 npm run typecheck

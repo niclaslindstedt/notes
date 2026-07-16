@@ -27,6 +27,8 @@ export function usePwaUpdate(): PwaUpdate {
   return useFrameworkPwaUpdate({
     base,
     cacheId: cacheIdForBase(base),
-    enabled: !import.meta.env.DEV,
+    // No service worker exists in the native WebView build (VitePWA is
+    // disabled there), so never try to register one.
+    enabled: !import.meta.env.DEV && !__NATIVE__,
   });
 }

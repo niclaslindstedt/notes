@@ -17,6 +17,8 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
+import { haptics } from "../platform/native-bridge.ts";
+
 // Drop-target keys carried in the `data-note-drop` attribute. The dragged item
 // reads the key under the finger and the provider hands it to `onDrop`, which
 // resolves it to an action:
@@ -190,7 +192,7 @@ export function useTouchNoteDrag(
       document.addEventListener("touchmove", blockScroll.current, {
         passive: false,
       });
-      navigator.vibrate?.(8);
+      haptics.vibrate(8);
       actions?.begin({ kind, id, title }, x, y);
       hitTest(x, y);
     },
