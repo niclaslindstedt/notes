@@ -110,11 +110,16 @@ export function NoteCard({
           // Clamp the excerpt to a fixed five lines. `line-clamp` cuts on a
           // clean line boundary and truncates with an ellipsis only when the
           // body actually overflows; a shorter note keeps its natural height.
-          // This deliberately replaces an earlier `max-height` + `mask-image`
-          // fade: a CSS mask over an overflow-clamped flex item mis-measures on
-          // iOS WebKit and left phantom space *after* the one long card, which
-          // read as an uneven gap between cards. Don't reintroduce the mask.
-          <p className="mt-1 line-clamp-5 text-sm leading-snug whitespace-pre-line text-muted">
+          //
+          // `contain-layout` is load-bearing, not decoration: on iOS WebKit a
+          // `-webkit-line-clamp` box still reserves its FULL un-clamped content
+          // height for layout, so a long preview (e.g. a deferred note whose
+          // stored preview keeps its blank lines) inflates the card to hundreds
+          // of px of empty space while only painting five lines — which reads as
+          // a huge, uneven gap before the next card. Layout containment isolates
+          // the box so the card sizes to the clamped five lines. Chromium never
+          // showed the bug; don't drop the containment.
+          <p className="mt-1 line-clamp-5 contain-layout text-sm leading-snug whitespace-pre-line text-muted">
             {preview}
           </p>
         ) : (

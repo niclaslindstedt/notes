@@ -3,4 +3,4 @@ type: Fixed
 title: Even spacing between note cards
 ---
 
-The overview now clamps a card's preview with `line-clamp` instead of a `max-height` CSS-mask fade, fixing an uneven gap that appeared after a long card on iOS.
+Note cards in the overview are evenly spaced again: a long preview no longer inflates its card with empty space on iOS, which had read as a large uneven gap before the next card.

@@ -83,11 +83,15 @@ The preview body honours the [note-list layout](#note-list-layout)
 (`Appearance.listLayout`): in **rows** it's a single truncated line
 (`notePreview`); in **cards** it's a multi-line excerpt (`notePreviewBlock`)
 that keeps the note's line breaks and clamps to a fixed number of lines with
-`line-clamp` — a clean line-boundary cut that truncates with an ellipsis only
-when the body overflows, so a short note keeps its natural height and every long
-card is the same height (this replaced an earlier `max-height` + CSS-mask fade,
-whose mask over an overflow-clamped flex item mis-measured on iOS WebKit and
-left phantom space after a long card);
+`line-clamp` (plus `contain: layout`) — a clean line-boundary cut that truncates
+with an ellipsis only when the body overflows, so a short note keeps its natural
+height and every long card is the same height. The `contain: layout` is
+load-bearing: without it iOS WebKit lets a `-webkit-line-clamp` box reserve its
+full un-clamped content height, inflating a long card (e.g. a deferred note whose
+stored preview keeps blank lines) with empty space that reads as a large uneven
+gap before the next card; layout containment isolates the box so the card sizes
+to the clamped lines. (This whole clamp replaced an even earlier `max-height` +
+CSS-mask fade, whose mask compounded the same iOS mis-measurement.)
 in **list** there's no preview at all — `NoteCard` returns early to a bare
 file-explorer row of a document glyph plus the title.
 
