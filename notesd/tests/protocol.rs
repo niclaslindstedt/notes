@@ -229,6 +229,247 @@ async fn delete_note_lifecycle() {
     assert_eq!(gone.status(), StatusCode::NOT_FOUND);
 }
 
+// -- blobs (namespace-scoped notes + attachments) ---------------------------
+
+#[tokio::test]
+async fn blob_roundtrip_at_a_nested_path() {
+    let (base, key, client, _notes, _state) = boot().await;
+
+    // Write a note file the directory adapter's FileStore would produce:
+    // `notes/<stem>.md` under the default namespace's notes folder.
+    let put = client
+        .put(format!("{base}/v1/blob/notes/hello-abc.md"))
+        .header("authorization", bearer(&key))
+        .body("# hello")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(put.status(), StatusCode::OK);
+    let body: serde_json::Value = put.json().await.unwrap();
+    assert_eq!(body["path"], "notes/hello-abc.md");
+    assert_eq!(body["etag"].as_str().unwrap().len(), 64);
+
+    // Read it back as raw bytes.
+    let got = client
+        .get(format!("{base}/v1/blob/notes/hello-abc.md"))
+        .header("authorization", bearer(&key))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(got.status(), StatusCode::OK);
+    assert_eq!(got.bytes().await.unwrap().as_ref(), b"# hello");
+
+    // Delete it; a second delete reports it already gone.
+    let del = client
+        .delete(format!("{base}/v1/blob/notes/hello-abc.md"))
+        .header("authorization", bearer(&key))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        del.json::<serde_json::Value>().await.unwrap()["deleted"],
+        true
+    );
+    let again = client
+        .delete(format!("{base}/v1/blob/notes/hello-abc.md"))
+        .header("authorization", bearer(&key))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        again.json::<serde_json::Value>().await.unwrap()["deleted"],
+        false
+    );
+}
+
+#[tokio::test]
+async fn dotfile_sidecars_round_trip_and_list_but_traversal_does_not() {
+    let (base, key, client, _notes, _state) = boot().await;
+
+    // The encryption sidecars the directory adapter keeps in the notes folder.
+    for path in ["notes/.keyparams.json", "notes/.index.bin"] {
+        let put = client
+            .put(format!("{base}/v1/blob/{path}"))
+            .header("authorization", bearer(&key))
+            .body("sidecar")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            put.status(),
+            StatusCode::OK,
+            "sidecar {path} must be writable"
+        );
+    }
+
+    // They read back and appear in the notes listing (so the adapter tracks them).
+    let got = client
+        .get(format!("{base}/v1/blob/notes/.keyparams.json"))
+        .header("authorization", bearer(&key))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(got.bytes().await.unwrap().as_ref(), b"sidecar");
+
+    let list: serde_json::Value = client
+        .get(format!("{base}/v1/blobs?prefix=notes/"))
+        .header("authorization", bearer(&key))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let paths: Vec<&str> = list["blobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["path"].as_str().unwrap())
+        .collect();
+    assert!(paths.contains(&"notes/.keyparams.json"));
+    assert!(paths.contains(&"notes/.index.bin"));
+
+    // A leading dot is fine, but `..` traversal is still rejected.
+    let traverse = client
+        .put(format!("{base}/v1/blob/notes/..keyparams"))
+        .header("authorization", bearer(&key))
+        .body("x")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(traverse.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn blob_listing_scopes_to_prefix_and_isolates_namespaces() {
+    let (base, key, client, _notes, _state) = boot().await;
+
+    // Two namespaces' notes + one default-namespace attachment.
+    for (path, bytes) in [
+        ("notes/a-1.md", "a"),
+        ("notes/b-2.md", "b"),
+        ("work/notes/c-3.md", "c"),
+        ("attachments/a-1/pic.png", "img"),
+    ] {
+        client
+            .put(format!("{base}/v1/blob/{path}"))
+            .header("authorization", bearer(&key))
+            .body(bytes)
+            .send()
+            .await
+            .unwrap();
+    }
+
+    // The default namespace's notes listing sees only `notes/…`, not the work
+    // namespace's notes nor the attachments — and carries a content etag.
+    let list: serde_json::Value = client
+        .get(format!("{base}/v1/blobs?prefix=notes/"))
+        .header("authorization", bearer(&key))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let paths: Vec<&str> = list["blobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["path"].as_str().unwrap())
+        .collect();
+    assert_eq!(paths, vec!["notes/a-1.md", "notes/b-2.md"]);
+    assert_eq!(
+        list["blobs"][0]["etag"].as_str().unwrap().len(),
+        64,
+        "note listing carries the per-file etag"
+    );
+
+    // The work namespace is scoped by its own prefix.
+    let work: serde_json::Value = client
+        .get(format!("{base}/v1/blobs?prefix=work/notes/"))
+        .header("authorization", bearer(&key))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let work_paths: Vec<&str> = work["blobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["path"].as_str().unwrap())
+        .collect();
+    assert_eq!(work_paths, vec!["work/notes/c-3.md"]);
+
+    // The attachment listing (etag=0) returns paths without hashing bytes.
+    let att: serde_json::Value = client
+        .get(format!("{base}/v1/blobs?prefix=attachments/&etag=0"))
+        .header("authorization", bearer(&key))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(att["blobs"][0]["path"], "attachments/a-1/pic.png");
+    assert!(
+        att["blobs"][0].get("etag").is_none(),
+        "etag=0 omits the content hash"
+    );
+}
+
+#[tokio::test]
+async fn blob_delete_prunes_empty_folders() {
+    let (base, key, client, notes, _state) = boot().await;
+
+    client
+        .put(format!("{base}/v1/blob/work/notes/x-1.md"))
+        .header("authorization", bearer(&key))
+        .body("x")
+        .send()
+        .await
+        .unwrap();
+    assert!(notes.path().join("work/notes/x-1.md").exists());
+
+    client
+        .delete(format!("{base}/v1/blob/work/notes/x-1.md"))
+        .header("authorization", bearer(&key))
+        .send()
+        .await
+        .unwrap();
+    // The now-empty `work/notes` and `work` folders are pruned, but the folder
+    // root survives.
+    assert!(!notes.path().join("work").exists());
+    assert!(notes.path().exists());
+}
+
+#[tokio::test]
+async fn blob_cannot_clobber_reserved_settings() {
+    let (base, key, client, _notes, _state) = boot().await;
+    let resp = client
+        .put(format!("{base}/v1/blob/settings.json"))
+        .header("authorization", bearer(&key))
+        .body("{}")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn blob_path_traversal_is_rejected() {
+    let (base, key, client, _notes, _state) = boot().await;
+    let resp = client
+        .put(format!("{base}/v1/blob/notes/..%2f..%2fetc%2fpasswd"))
+        .header("authorization", bearer(&key))
+        .body("x")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
 // -- security ---------------------------------------------------------------
 
 #[tokio::test]

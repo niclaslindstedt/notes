@@ -504,13 +504,10 @@ export function useStorageBackend(): UseStorageBackend {
   // the whole-document `withEncryption` wrapper.
   const adapter = useMemo<StorageAdapter>(() => {
     if (locked) return lockedAdapter(backend);
-    // The single-document backends — the browser store and notesd — seal the
-    // whole blob here; the file/cloud backends encrypt per-file inside the
-    // directory adapter instead.
-    if (
-      encryption === "encrypted" &&
-      (selection.kind === "browser" || selection.kind === "notesd")
-    ) {
+    // Only the single-document browser store seals the whole blob here; the
+    // file/cloud backends and notesd encrypt per file inside the directory
+    // adapter instead.
+    if (encryption === "encrypted" && selection.kind === "browser") {
       return withEncryption(inner, passwordRef);
     }
     return inner;

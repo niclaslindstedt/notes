@@ -79,9 +79,10 @@ because they may be ciphertext.
 | `GET /v1/notes?since=N` | Every note changed since rev `N` (bodies inline) + refs deleted since `N`. `since=0` is a full load. |
 | `GET /v1/notes/{ref}` | One note's raw bytes (lazy fetch). |
 | `PUT /v1/notes/{ref}` | Write; honours `If-Match: <etag>` → `409` + current bytes on mismatch. |
-| `DELETE /v1/notes/{ref}` | Delete a note (and its attachments). |
+| `DELETE /v1/notes/{ref}` | Delete a note. |
 | `POST /v1/batch` | Coalesce many writes/deletes into one round trip (per-item results). |
-| `GET/PUT /v1/attachments/{note}/{file}` | Attachment bytes. |
+| `GET /v1/blobs?prefix=&etag=` | List every file under a folder prefix (`notes/`, `attachments/`, `<slug>/notes/`, …) as `{path, etag}`; `etag=0` omits the hash. The directory adapter's per-namespace `FileStore` / `AttachmentStore` scope on this. |
+| `GET/PUT/DELETE /v1/blob/{*path}` | Read/write/delete one file at any namespace-scoped relative path — a note or an externalised attachment. |
 | `GET/PUT /v1/settings/{name}` | `settings.json` / `namespaces.json`. |
 | `GET /v1/events` | SSE stream of `{rev, changed, deleted}` change events — the push. |
 | `POST /v1/pair` | Redeem a one-time pairing token → a per-device key. |
