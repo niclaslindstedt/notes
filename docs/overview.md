@@ -695,6 +695,16 @@ since a mobile browser throttles background timers and may evict the page
 before an armed save ever fires; foregrounding pulls the latest via
 `refresh`.
 
+The mount/swap load guards the reverse race: with a cloud backend the async
+`load()` round-trips for hundreds of milliseconds behind the instant
+`loadSync` paint, and a checkbox toggled (or any edit made) in that window
+would otherwise be reverted when the read resolves with the pre-edit
+document. A monotonic edit counter (`editSeqRef`, bumped by every
+`scheduleSave`) is snapshotted before the read starts; if it has moved by the
+time the read resolves, a user edit interleaved, so the load keeps the local
+(already-queued-for-save) document instead of adopting the stale bytes it
+read, and just marks itself resolved.
+
 ### Live pull
 
 The live-sync loop in `useNotesSync` (`src/app/use-notes-sync.ts`) — a
