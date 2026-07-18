@@ -73,8 +73,7 @@ export type AdapterCapability =
 // attachments — is being sealed or unsealed right now. `note` is the note file
 // itself; `attachment` is one of its pasted images / files.
 export type NoteConversionStep =
-  | { phase: "note" }
-  | { phase: "attachment"; filename: string };
+  { phase: "note" } | { phase: "attachment"; filename: string };
 
 export type NoteConversionProgress = (step: NoteConversionStep) => void;
 

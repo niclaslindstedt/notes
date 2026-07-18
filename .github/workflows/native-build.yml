@@ -49,15 +49,15 @@ jobs:
       run:
         working-directory: native
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
 
       # Installs the pinned eas-cli and authenticates it with EXPO_TOKEN so
       # the eas commands below run non-interactively.
-      - uses: expo/expo-github-action@v8
+      - uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}

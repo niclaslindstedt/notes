@@ -60,12 +60,7 @@ import { StorageSection } from "./StorageSection.tsx";
 // capture off, so the Logs tab can never outlive its data).
 
 type TabId =
-  | "general"
-  | "appearance"
-  | "editor"
-  | "storage"
-  | "developer"
-  | "logs";
+  "general" | "appearance" | "editor" | "storage" | "developer" | "logs";
 
 type IconComponent = ComponentType<{ className?: string }>;
 
