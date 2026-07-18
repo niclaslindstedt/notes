@@ -13,6 +13,49 @@ predate the pipeline.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-18
+
+### Added
+
+- **Fold the side menu footer away for more note-list room** — A thin chevron rail now sits just above the side menu footer. Tap it to fold
+  the Donate, trophy, About and Settings rows away, handing that vertical space to
+  your note list so more notes fit on screen; tap it again to bring the footer
+  back. The choice is remembered across reloads, and the footer now sits snug
+  against the bottom of the drawer instead of floating above a dead strip.
+- **Pick up where you left off** — Switching between notes now returns you to the exact caret position and scroll offset you left each note at — same line, same place on screen — for as long as the app stays open; on a phone the keyboard comes back up with the caret already placed.
+- **Encryption enforced across devices** — Turn on at-rest encryption from one device and every other device syncing the same folder now locks and asks for the same passphrase, while plaintext notes left by another device are pulled into the encrypted vault automatically.
+- **Self-hosted sync (notesd)** — In the installed app you can now pair with your own self-hosted notesd server and sync your notes privately over your network, with no cloud and no accounts. [Learn more](feature:notesd)
+- **Discover your self-hosted server across devices** — Pairing a notesd server now publishes its address and certificate pin to your connected Dropbox or Google Drive, so your other devices find it in Settings without re-scanning the QR. [Learn more](feature:notesd)
+- **Self-hosted settings & namespace sync** — The self-hosted (notesd) backend now syncs your appearance settings and namespace list across every paired device, the way the folder and cloud backends already do.
+- **Scan a notesd pairing QR** — In the installed app you can now pair a self-hosted notesd server by scanning the QR code it prints with your camera, instead of pasting the code by hand.
+- **Self-hosted attachments & full-folder sync** — The self-hosted (notesd) backend now stores each note as its own Markdown file with its images as real files beside them and syncs every namespace, so pasted attachments and all your namespaces travel between paired devices — and the daemon's folder opens directly in the web folder backend. [Learn more](feature:notesd)
+
+### Changed
+
+- **Clearer nested-list bullets** — Nested bulleted lists in the live preview now draw `•`, `-`, and `+` by level, using characters the app font renders so the markers stay crisp and centred on every device.
+- **Smoother scroll into focus** — Tapping a line or field on mobile now glides it clear of the soft keyboard instead of snapping, respecting the reduced-motion preference.
+- **Undo a paragraph sentence by sentence** — Undo in the note editor now steps back one finished sentence at a time instead of wiping a whole typing burst in one go, so a long paragraph can be walked back sentence by sentence — while the sentence you're still typing stays whole until you move on to the next.
+- **Undo/redo scrolls to the change** — Undo and redo now scroll the editor to the part of the note being reverted or re-applied, so a change that happened off screen is revealed instead of shifting out of sight.
+- **Shared UI foundation** — Dialogs, pickers, gestures, and the update prompt now come from the shared oss-framework package — full-screen sheets can be swiped down to close, and deleting a namespace asks for confirmation in a proper dialog.
+- **Tighter note list** — The overview's cards now sit closer together with a more compact excerpt, so more notes fit on screen and the page scrolls less.
+- **Self-hosted live sync** — Self-hosted (notesd) devices now receive another device's edits by watching the daemon's revision instead of re-downloading the whole document every few seconds.
+
+### Fixed
+
+- **Select all on desktop** — Ctrl/Cmd+A pressed before clicking into the note body now selects the whole note — ready to be typed over, cut, or copied — instead of the browser selecting the entire page, title included.
+- Google Drive sync now reads every page of large folders, so namespaces with more than 100 notes or attachments no longer sync incompletely.
+- **Tapped line hidden by the keyboard** — Tapping a line near the bottom of a note on mobile now scrolls it clear of the soft keyboard instead of leaving it hidden behind it, even for the very last line.
+- **Undo/redo keyboard shortcuts inside the editor** — ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z / Ctrl+Y now undo and redo while the caret is in a note, instead of doing nothing.
+- **Typed text no longer disappears around cloud saves** — Automatic pulls (foregrounding the app, opening a note, the live-sync poll) now stand down while an edit is still unsaved or a save is in flight, so text typed while Dropbox/Drive/folder sync is saving can no longer vanish from the screen.
+- **Trailing divider renders when you leave the note** — A horizontal rule (or heading, list, or quote) typed on the last line now renders formatted as soon as the editor loses focus, instead of staying raw markdown until you tap back in.
+- **Undo and redo are scoped to the open note** — Undo/redo (the buttons and ⌘/Ctrl+Z / ⌘/Ctrl+Y) now walk the history of the note you're actually looking at, so switching notes no longer reverts edits in a different one, and erasing what you typed before typing something else is now its own step instead of being swallowed by the next edit.
+- **Turning off encryption no longer wipes your notes** — On the This-device backend, disabling encryption now decrypts the stored document before re-saving it as plaintext, instead of overwriting your notes with an empty document.
+- **Turning off encryption on a synced folder or cloud no longer blanks notes** — On the local-folder, Dropbox, and Google Drive backends, turning encryption off now keeps every note's text: an unopened note no longer opens blank afterwards, and editing one note can no longer save empty files over the others.
+- **Tapped line pushed off the top by the keyboard** — Tapping a line near the top of a note on mobile no longer flings it above the header and out of sight when the soft keyboard opens — the reveal now scrolls only the editor, keeping the caret comfortably in view.
+- **Editor keeps the cursor on screen** — Typing at the foot of the editor — pressing Enter on the bottom line — now scrolls the note so the caret stays visible with a blank line of breathing room beneath it, instead of letting it slip off screen.
+- **Edits stick on open** — Editing a note right after opening it no longer risks the change silently reverting when a slow cloud read finishes — an edit made while the backend load is still in flight is now kept instead of overwritten.
+- **Even spacing between note cards** — Note cards in the overview are evenly spaced again: a long preview no longer inflates its card with empty space on iOS, which had read as a large uneven gap before the next card.
+
 ## [1.3.0] - 2026-07-01
 
 ### Added
