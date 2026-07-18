@@ -73,10 +73,13 @@ versions with the commands above — the shape holds, the numbers drift):
   ```
 - **TypeScript major** → confirm `typescript-eslint`'s `typescript` peer
   still spans it. Bumping the `@typescript-eslint/*` pair to latest `8.x`
-  (above) covers this — `8.61`'s peer is `>=4.8.4 <6.1.0`, which spans
-  TS `6.0.x` but **not** `6.1+`, so keep the `typescript` caret on the
-  `6.0` line rather than letting it float to a TS minor the plugin
-  doesn't yet allow.
+  (above) covers this — as of `8.64` the peer is still `>=4.8.4 <6.1.0`,
+  which spans TS `6.0.x` but **not** `6.1+` or `7.x`. The grouped dev-deps
+  PR will happily propose a TS caret the plugin can't accept (seen: it
+  bumped `typescript` to `^7.0.2` while the newest typescript-eslint
+  capped at `<6.1.0`) — **hold `typescript` on the highest line the plugin
+  allows** (the `6.0` line) rather than taking the group's number. Do not
+  bump TS ahead of typescript-eslint's peer.
 
 Then resolve cleanly. A stale lock produces misleading ERESOLVE traces,
 so wipe both:

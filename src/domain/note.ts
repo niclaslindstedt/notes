@@ -319,8 +319,7 @@ export function sortFoldersBy(
 // note. `allNotes` is the full note set (used for a folder's modified time);
 // `folders` and `loose` are the already-filtered, display-ordered inputs.
 export type TopLevelItem =
-  | { kind: "folder"; folder: Folder }
-  | { kind: "note"; note: Note };
+  { kind: "folder"; folder: Folder } | { kind: "note"; note: Note };
 
 export function mixTopLevel(
   folders: readonly Folder[],
