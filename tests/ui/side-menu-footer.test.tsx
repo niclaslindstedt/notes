@@ -106,4 +106,17 @@ describe("SideMenuFooter", () => {
     // label is the quiet "open" copy when nothing is unseen.
     expect(screen.getByRole("menuitem", { name: "Achievements" })).toBeTruthy();
   });
+
+  // Edge-to-edge PWA: the drawer reserves no bottom safe-area inset, so the
+  // footer owns its own breathing room and carries an extra 10px below the last
+  // row (Settings) to stay a comfortable thumb reach above the screen edge.
+  it("carries an extra 10px of thumb clearance below its last row", () => {
+    renderFooter();
+    const footer = screen
+      .getByRole("menuitem", { name: "Settings" })
+      .closest('[class*="padding-bottom:calc(1.25rem"]');
+    expect(footer?.className).toContain(
+      "padding-bottom:calc(1.25rem_-_var(--density-row-py)_+_10px)",
+    );
+  });
 });

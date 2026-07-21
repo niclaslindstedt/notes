@@ -737,7 +737,7 @@ export function SideMenu({
     return (
       <nav
         aria-label={t("nav.label")}
-        className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-bottom:env(safe-area-inset-bottom)] [padding-top:env(safe-area-inset-top)] ${
+        className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-top:env(safe-area-inset-top)] ${
           onRight ? "order-last border-l border-line" : "border-r border-line"
         }`}
       >
@@ -795,7 +795,7 @@ export function SideMenu({
             ref={swipeClose.panelRef}
             aria-label={t("nav.label")}
             style={{ transform: `translateX(${swipeClose.offset}px)` }}
-            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl select-none [touch-action:pan-y] [padding-bottom:env(safe-area-inset-bottom)] [padding-top:env(safe-area-inset-top)] ${
+            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl select-none [touch-action:pan-y] [padding-top:env(safe-area-inset-top)] ${
               swipeClose.animating ? "transition-transform duration-200" : ""
             } ${
               onRight
