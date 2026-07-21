@@ -1941,15 +1941,22 @@ restore it. The choice is drawer-owned view state (`footerCollapsed` in
 `SideMenu`) but — unlike the folder/namespace expand state — it is persisted to
 `localStorage` under `notes/footer-collapsed`, so it survives reloads; it applies
 on every viewport (docked sidebar and phone drawer alike). Folding it fires the
-**Space saver** [achievement](#achievements) (`unlock("spaceSaver")`). The
-drawer's own bottom breathing room lives on the footer, not the drawer: the
+**Space saver** [achievement](#achievements) (`unlock("spaceSaver")`).
+
+The drawer renders **edge to edge** — the installed iOS PWA paints under the
+home indicator (a `@supports (-webkit-touch-callout: none)` /
+`display-mode: standalone` rule in `theme.css` forces the root to `100vh`;
+without it iOS letterboxes a percentage-height root and leaves a dead black
+band below the shell that the footer/rail would float above). Because of that
+the drawer reserves **no** bottom safe-area inset (its `<nav>` pads only the
+top), and all the bottom breathing room lives on the footer instead: the
 `SideMenuFooter` container carries a `calc(1.25rem - var(--density-row-py))`
-bottom padding (matching its top), while the drawer pads its bottom by only
-`env(safe-area-inset-bottom)` (zero on devices without a home indicator). So
-with the footer collapsed nothing but that safe-area inset sits below the rail
-— it rests flush against the bottom, its own symmetric padding its breathing
-room — and expanded, the footer keeps the same gap beneath **Settings** it
-always had.
+top padding and a `calc(1.25rem - var(--density-row-py) + 10px)` bottom padding
+— the extra 10px keeps the last row (**Settings**) a comfortable thumb reach
+above the screen edge rather than sitting on it. The action bar's `mt-auto`
+pins the action bar / rail / footer flush to the foot of the drawer, so with
+the footer collapsed the rail rests snug against the bottom with nothing below
+it, and expanded the footer's own padding is the gap beneath **Settings**.
 
 A note row can be **dragged onto a folder** to file it, or onto the ungrouped
 root zone to take it out of one. On a pointer device this is native HTML5 drag

@@ -83,6 +83,29 @@ body {
   overscroll-behavior: none;
 }
 
+/* Installed iOS PWA edge-to-edge: iOS only extends the page under the home
+   indicator when the *root* element carries a fixed `100vh` height. With a
+   percentage height (the `height: 100%` above — or `100svh`, or any percentage)
+   the document stops at the letterboxed viewport and iOS paints the remainder
+   as a dead black band below the shell, so the app never reaches the physical
+   bottom of the screen and the side-menu footer/rail float above that band.
+   Forcing the root to `100vh` in the standalone PWA lets the shell paint the
+   full height; `#app` and the fixed overlays then fill it because `--app-height`
+   (the visual viewport, mirrored by useViewportHeight) now spans edge to edge,
+   and the side-menu footer carries its own bottom breathing room (see
+   SideMenuFooter) so it stays a comfortable thumb reach without a safe-area
+   lift. Scoped to iOS via the -webkit-touch-callout probe (no other engine
+   supports it) so Android/desktop keep the percentage-height shell, and to
+   `display-mode: standalone` so a normal iOS Safari tab is untouched. */
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) {
+    html,
+    body {
+      height: 100vh;
+    }
+  }
+}
+
 body {
   background: var(--page-bg);
   color: var(--fg);

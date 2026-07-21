@@ -33,6 +33,12 @@ const ABOUT_PLACEMENT: FloatingPlacement = {
 // privacy), and Settings pinned last under the thumb. Self-contained — the only
 // thing it borrows from the drawer is the `onClose` that retracts it behind a
 // modal; the About dropdown's open state lives here.
+//
+// The drawer reserves no bottom safe-area inset any more (it renders edge to
+// edge — see theme.css), so the footer owns its own bottom breathing room: it
+// matches its top padding and then carries an extra 10px so the last row
+// (Settings) stays a comfortable thumb reach above the screen edge / home
+// indicator instead of sitting right on it.
 export function SideMenuFooter({ onClose }: { onClose: () => void }) {
   const t = useT();
   const dispatch = useModalDispatch();
@@ -51,7 +57,7 @@ export function SideMenuFooter({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="flex flex-col border-t border-line [padding-top:calc(1.25rem_-_var(--density-row-py))] [padding-bottom:calc(1.25rem_-_var(--density-row-py))]">
+      <div className="flex flex-col border-t border-line [padding-top:calc(1.25rem_-_var(--density-row-py))] [padding-bottom:calc(1.25rem_-_var(--density-row-py)_+_10px)]">
         {donateUrl && (
           <MenuLink
             icon={<HeartIcon className="h-5 w-5 text-danger" />}
