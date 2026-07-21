@@ -1941,11 +1941,15 @@ restore it. The choice is drawer-owned view state (`footerCollapsed` in
 `SideMenu`) but — unlike the folder/namespace expand state — it is persisted to
 `localStorage` under `notes/footer-collapsed`, so it survives reloads; it applies
 on every viewport (docked sidebar and phone drawer alike). Folding it fires the
-**Space saver** [achievement](#achievements) (`unlock("spaceSaver")`). With the
-footer collapsed the drawer's own bottom padding — trimmed from the old
-`max(env(safe-area-inset-bottom), …)` to a plain `calc(1.25rem - var(--density-row-py))`
-so the footer/rail sit snug against the bottom rather than above a dead
-safe-area strip — is all that shows below the rail.
+**Space saver** [achievement](#achievements) (`unlock("spaceSaver")`). The
+drawer's own bottom breathing room lives on the footer, not the drawer: the
+`SideMenuFooter` container carries a `calc(1.25rem - var(--density-row-py))`
+bottom padding (matching its top), while the drawer pads its bottom by only
+`env(safe-area-inset-bottom)` (zero on devices without a home indicator). So
+with the footer collapsed nothing but that safe-area inset sits below the rail
+— it rests flush against the bottom, its own symmetric padding its breathing
+room — and expanded, the footer keeps the same gap beneath **Settings** it
+always had.
 
 A note row can be **dragged onto a folder** to file it, or onto the ungrouped
 root zone to take it out of one. On a pointer device this is native HTML5 drag
