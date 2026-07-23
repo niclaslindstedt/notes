@@ -28,7 +28,7 @@
     "@fontsource/source-serif-4": "^5.2.9",
     "@niclaslindstedt/oss-framework": "^2.3.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react-dom": "^19.2.8",
     "workbox-window": "^7.4.1"
   },
   "devDependencies": {
