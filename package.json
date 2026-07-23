@@ -25,7 +25,7 @@
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.5",
     "@fontsource/opendyslexic": "^5.2.5",
-    "@fontsource/source-serif-4": "^5.2.9",
+    "@fontsource/source-serif-4": "^5.3.0",
     "@niclaslindstedt/oss-framework": "^2.3.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
