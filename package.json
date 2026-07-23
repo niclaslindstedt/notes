@@ -23,7 +23,7 @@
   "author": "Niclas Lindstedt <niclas@agilator.se>",
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
-    "@fontsource/jetbrains-mono": "^5.2.5",
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/opendyslexic": "^5.2.5",
     "@fontsource/source-serif-4": "^5.2.9",
     "@niclaslindstedt/oss-framework": "^2.3.0",
