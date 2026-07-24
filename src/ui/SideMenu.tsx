@@ -734,16 +734,19 @@ export function SideMenu({
   // inner border (on whichever edge faces the content) is all the framing it
   // needs. It docks on the same side the floating button rests on.
   //
-  // The top padding subtracts the first section header's own `pt-3` (0.75rem)
-  // from the safe-area inset so the drawer's first row lands at the same
-  // `max(0.75rem, env(safe-area-inset-top))` as the main content's sticky
-  // header — the two panels line up along their top edge. Both nav variants
+  // The top padding drops the drawer's first section header a touch below the
+  // safe-area inset so its small-caps label lines up with the vertically
+  // centred buttons in the main content's sticky header (which sit a little
+  // below that header's own top edge) instead of poking above them. It adds
+  // 0.375rem to the inset and subtracts the section header's own `pt-3`
+  // (0.75rem), so the first row's net top lands at
+  // `max(1.125rem, env(safe-area-inset-top) + 0.375rem)`. Both nav variants
   // (docked and drawer) share the formula.
   if (pinned) {
     return (
       <nav
         aria-label={t("nav.label")}
-        className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-top:max(0px,calc(env(safe-area-inset-top)_-_0.75rem))] ${
+        className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-top:max(0.375rem,calc(env(safe-area-inset-top)_-_0.375rem))] ${
           onRight ? "order-last border-l border-line" : "border-r border-line"
         }`}
       >
@@ -801,7 +804,7 @@ export function SideMenu({
             ref={swipeClose.panelRef}
             aria-label={t("nav.label")}
             style={{ transform: `translateX(${swipeClose.offset}px)` }}
-            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl select-none [touch-action:pan-y] [padding-top:max(0px,calc(env(safe-area-inset-top)_-_0.75rem))] ${
+            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl select-none [touch-action:pan-y] [padding-top:max(0.375rem,calc(env(safe-area-inset-top)_-_0.375rem))] ${
               swipeClose.animating ? "transition-transform duration-200" : ""
             } ${
               onRight
