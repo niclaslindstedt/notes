@@ -733,11 +733,17 @@ export function SideMenu({
   // it out as a flex sibling of the main view, so a fixed width and a single
   // inner border (on whichever edge faces the content) is all the framing it
   // needs. It docks on the same side the floating button rests on.
+  //
+  // The top padding subtracts the first section header's own `pt-3` (0.75rem)
+  // from the safe-area inset so the drawer's first row lands at the same
+  // `max(0.75rem, env(safe-area-inset-top))` as the main content's sticky
+  // header — the two panels line up along their top edge. Both nav variants
+  // (docked and drawer) share the formula.
   if (pinned) {
     return (
       <nav
         aria-label={t("nav.label")}
-        className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-top:env(safe-area-inset-top)] ${
+        className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-top:max(0px,calc(env(safe-area-inset-top)_-_0.75rem))] ${
           onRight ? "order-last border-l border-line" : "border-r border-line"
         }`}
       >
@@ -795,7 +801,7 @@ export function SideMenu({
             ref={swipeClose.panelRef}
             aria-label={t("nav.label")}
             style={{ transform: `translateX(${swipeClose.offset}px)` }}
-            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl select-none [touch-action:pan-y] [padding-top:env(safe-area-inset-top)] ${
+            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl select-none [touch-action:pan-y] [padding-top:max(0px,calc(env(safe-area-inset-top)_-_0.75rem))] ${
               swipeClose.animating ? "transition-transform duration-200" : ""
             } ${
               onRight
