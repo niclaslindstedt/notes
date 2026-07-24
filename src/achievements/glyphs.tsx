@@ -334,6 +334,18 @@ export function MousePointerGlyph({ className }: IconProps) {
   );
 }
 
+// A keyboard with a downward chevron — the "swipe down to dismiss the
+// keyboard" glyph (pull the note down from its top to put the keyboard away).
+export function KeyboardDownGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="2" y="4" width="20" height="9" rx="2" />
+      <path d="M6 7h.01M10 7h.01M14 7h.01M18 7h.01M8 10h8" />
+      <path d="m8 17 4 4 4-4" />
+    </Svg>
+  );
+}
+
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;

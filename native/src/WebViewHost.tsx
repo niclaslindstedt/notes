@@ -66,6 +66,11 @@ export default function WebViewHost() {
           allowingReadAccessToURL={
             Platform.OS === "ios" ? bundleDir : undefined
           }
+          // Drop the iOS keyboard accessory bar (the "< > ✓" strip WKWebView
+          // floats above the keyboard). It ate a row of space above the note,
+          // and the web app now dismisses the keyboard with a downward pull
+          // from the top of the note instead (see `useSwipeDownDismiss`).
+          hideKeyboardAccessoryView
           // localStorage is the web app's entire persistence layer, so it must
           // stay on (Android gates it behind this flag).
           domStorageEnabled

@@ -948,6 +948,25 @@ note is being drag-filed into a folder — that gesture reports itself through
 downward can't arm a refresh at the same time (see
 [note drag](#note-drag-touch--pointer)).
 
+### Swipe down to dismiss keyboard
+
+`useSwipeDownDismiss` (`src/ui/hooks/useSwipeDownDismiss.ts`) — the mobile
+gesture that puts the soft keyboard away: with a note open, pulling it down past
+its top edge blurs whatever editable element holds focus, which lowers the
+keyboard. The hook returns touch-handler props spread onto the editor's scroll
+container — the live-preview surface in `MarkdownEditor.tsx` and the fallback
+`textarea` in `NoteEditor.tsx` (`PlainEditor`) — and arms only when that
+container is already at its top (`scrollTop <= 0`), so scrolling up through a
+long note is untouched; it ignores mostly-horizontal drags and fires once per
+gesture. Pull-to-refresh stands down while a note is open, so this is the sole
+consumer of the editor's top overscroll. A mouse never produces touch events, so
+it's inert on desktop. First use fires the `swipeAway` achievement.
+
+This replaces the on-screen affordance the iOS keyboard accessory bar used to
+provide: in the native WebView wrapper that bar is now hidden with
+`hideKeyboardAccessoryView` on the `WebView` (`native/src/WebViewHost.tsx`),
+reclaiming the row of space it floated above the keyboard.
+
 ### Pinned sidebar
 
 `pinned` (`src/ui/nav-context.ts`), backed by `useMediaQuery`

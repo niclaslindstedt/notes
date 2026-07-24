@@ -46,6 +46,7 @@ import {
   scrollFocusedIntoView,
 } from "./hooks/scrollFocusedIntoView.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
+import { useSwipeDownDismiss } from "./hooks/useSwipeDownDismiss.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
 import { RenderedLine } from "./MarkdownLine.tsx";
 import {
@@ -787,6 +788,11 @@ export function MarkdownEditor({
   // beforeinput interception keeps edits line-clean.
   const editableMode = useMemo(() => supportsPlaintextOnly(), []);
 
+  // Pull the note down from its top to dismiss the soft keyboard (the on-screen
+  // affordance the hidden iOS accessory bar used to give); fires the achievement
+  // the first time it lowers the keyboard.
+  const swipeDismiss = useSwipeDownDismiss(() => unlock("swipeAway"));
+
   const widthStyle =
     maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" };
   const wrapClass = wordWrap
@@ -807,6 +813,9 @@ export function MarkdownEditor({
           // reopens at the same offset (saved on unmount).
           lastScrollTop.current = e.currentTarget.scrollTop;
         }}
+        onTouchStart={swipeDismiss.onTouchStart}
+        onTouchMove={swipeDismiss.onTouchMove}
+        onTouchEnd={swipeDismiss.onTouchEnd}
         onPointerDown={(e) => {
           // A touch (or pen) tap anywhere in the editor arms the reveal so the
           // line the caret lands on is scrolled clear of the soft keyboard; a

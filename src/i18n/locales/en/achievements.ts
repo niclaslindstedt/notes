@@ -117,6 +117,12 @@ const achievements = {
       learnMore:
         "The thin chevron rail just above the footer folds the Donate, trophy, About and Settings rows out of view, handing that vertical space to your note list. Tap it again to bring the footer back — the choice is remembered across reloads.",
     },
+    swipeAway: {
+      name: "Swipe away",
+      condition: "Pull a note down from its top to tuck the keyboard away.",
+      learnMore:
+        "With a note open, dragging down past its top edge dismisses the soft keyboard — the space the old accessory bar above the keyboard used to take is gone, and this pull is how you put it away. It only arms at the very top, so scrolling up through a long note is untouched.",
+    },
     marginalia: {
       name: "Marginalia",
       condition: "Adjust the editor's writing-column margins.",

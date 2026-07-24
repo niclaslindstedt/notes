@@ -112,6 +112,13 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Den tunna pilraden precis ovanför sidfoten fäller ihop raderna Donera, troféer, Om och Inställningar och ger det lodräta utrymmet till din anteckningslista. Tryck igen för att ta tillbaka sidfoten — valet kommer ihåg mellan omladdningar.",
     },
+    swipeAway: {
+      name: "Svep bort",
+      condition:
+        "Dra en anteckning nedåt från toppen för att fälla ner tangentbordet.",
+      learnMore:
+        "Med en anteckning öppen fäller ett drag nedåt förbi dess överkant ner det mjuka tangentbordet — utrymmet som den gamla raden ovanför tangentbordet tog upp är borta, och det här draget är hur du lägger undan det. Det aktiveras bara högst upp, så att bläddra uppåt i en lång anteckning påverkas inte.",
+    },
     marginalia: {
       name: "Marginalanteckningar",
       condition: "Justera redigerarens skrivkolumnmarginaler.",

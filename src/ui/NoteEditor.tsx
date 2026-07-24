@@ -24,6 +24,7 @@ import {
 import { SelectPicker } from "./form/SelectPicker.tsx";
 import { useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
+import { useSwipeDownDismiss } from "./hooks/useSwipeDownDismiss.ts";
 import { ArrowLeftIcon, FolderIcon, SpinnerIcon } from "./icons.tsx";
 import {
   MarkdownEditor,
@@ -517,6 +518,10 @@ function PlainEditor({
     el.select();
   });
 
+  // Pull the note down from its top to dismiss the soft keyboard — the textarea
+  // is its own scroll container, so the gesture reads its scrollTop directly.
+  const swipeDismiss = useSwipeDownDismiss(() => unlock("swipeAway"));
+
   return (
     <textarea
       ref={textareaRef}
@@ -525,6 +530,9 @@ function PlainEditor({
       spellCheck={!disableSpellcheck}
       autoCorrect={disableAutocorrect ? "off" : "on"}
       autoCapitalize={disableAutocorrect ? "off" : "sentences"}
+      onTouchStart={swipeDismiss.onTouchStart}
+      onTouchMove={swipeDismiss.onTouchMove}
+      onTouchEnd={swipeDismiss.onTouchEnd}
       onChange={(e) => {
         setValue(e.target.value);
         onChange(e.target.value);
