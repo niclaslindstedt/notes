@@ -60,7 +60,12 @@ import { StorageSection } from "./StorageSection.tsx";
 // capture off, so the Logs tab can never outlive its data).
 
 type TabId =
-  "general" | "appearance" | "editor" | "storage" | "developer" | "logs";
+  | "general"
+  | "appearance"
+  | "editor"
+  | "storage"
+  | "developer"
+  | "logs";
 
 type IconComponent = ComponentType<{ className?: string }>;
 
@@ -213,6 +218,10 @@ export function SettingsModal({ open, onClose, storage, conversion }: Props) {
 
 // Footer pinned below the tab content on every tab. Reset sits on the left;
 // Cancel + Save group on the right, mirroring checklist's settings dialog.
+// The dialog paints edge to edge in the installed iOS PWA (see theme.css), so
+// the footer reserves the home-indicator inset itself — its top padding plus
+// env(safe-area-inset-bottom) — keeping the Save row a comfortable thumb reach
+// above the screen edge instead of sitting right on it.
 const SettingsFooter = memo(function SettingsFooter({
   t,
   onReset,
@@ -225,7 +234,7 @@ const SettingsFooter = memo(function SettingsFooter({
   onSave: () => void;
 }) {
   return (
-    <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-line bg-surface-3 px-4 py-3">
+    <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-line bg-surface-3 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
       <Button variant="secondary" onClick={onReset}>
         {t("common.resetToDefaults")}
       </Button>
