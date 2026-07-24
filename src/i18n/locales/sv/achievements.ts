@@ -117,7 +117,7 @@ const achievements: AchievementsCatalog = {
       condition:
         "Dra en anteckning nedåt från toppen för att fälla ner tangentbordet.",
       learnMore:
-        "Med en anteckning öppen fäller ett drag nedåt förbi dess överkant ner det mjuka tangentbordet — utrymmet som den gamla raden ovanför tangentbordet tog upp är borta, och det här draget är hur du lägger undan det. Det aktiveras bara högst upp, så att bläddra uppåt i en lång anteckning påverkas inte.",
+        "Med en anteckning öppen fäller ett drag nedåt förbi dess överkant ner det mjuka tangentbordet — ett snabbt sätt att lägga undan det utan att sträcka dig efter tangentbordets egen Klar-knapp. Det aktiveras bara högst upp, så att bläddra uppåt i en lång anteckning påverkas inte.",
     },
     marginalia: {
       name: "Marginalanteckningar",

@@ -121,7 +121,7 @@ const achievements = {
       name: "Swipe away",
       condition: "Pull a note down from its top to tuck the keyboard away.",
       learnMore:
-        "With a note open, dragging down past its top edge dismisses the soft keyboard — the space the old accessory bar above the keyboard used to take is gone, and this pull is how you put it away. It only arms at the very top, so scrolling up through a long note is untouched.",
+        "With a note open, dragging down past its top edge dismisses the soft keyboard — a quick way to put it away without reaching for the keyboard's own Done button. It only arms at the very top, so scrolling up through a long note is untouched.",
     },
     marginalia: {
       name: "Marginalia",

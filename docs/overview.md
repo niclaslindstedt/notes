@@ -962,10 +962,17 @@ gesture. Pull-to-refresh stands down while a note is open, so this is the sole
 consumer of the editor's top overscroll. A mouse never produces touch events, so
 it's inert on desktop. First use fires the `swipeAway` achievement.
 
-This replaces the on-screen affordance the iOS keyboard accessory bar used to
-provide: in the native WebView wrapper that bar is now hidden with
-`hideKeyboardAccessoryView` on the `WebView` (`native/src/WebViewHost.tsx`),
-reclaiming the row of space it floated above the keyboard.
+This is the on-screen way to put the keyboard down now that the iOS keyboard
+accessory bar isn't relied on. In the **native WebView wrapper** that bar is
+hidden outright with `hideKeyboardAccessoryView` on the `WebView`
+(`native/src/WebViewHost.tsx`), reclaiming the row of space it floated above the
+keyboard. In the **iOS PWA** (Safari "Add to Home Screen") that same bar is
+drawn by iOS for any focused text field and there is no web API to remove it —
+`tabindex` can drop its ‹ › field-navigation arrows but not the bar's height,
+and `inputmode="none"` (the only thing that suppresses the whole strip) also
+suppresses the system keyboard, so it's unusable for a text editor. So on the
+PWA the swipe-down gesture is an *alternative* to the bar's Done button rather
+than a replacement for the bar.
 
 ### Pinned sidebar
 
