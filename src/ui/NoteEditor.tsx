@@ -4,7 +4,9 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 import { unlock } from "../achievements/index.ts";
@@ -76,6 +78,12 @@ function FolderPicker({
   );
 }
 
+// What counts as a tab stop inside the header's action cluster — enough to find
+// the leftmost one, which is where the body hands focus to (and takes it back
+// from on Shift+Tab).
+const FOCUSABLE =
+  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 export function Editor({
   note,
   editor,
@@ -123,6 +131,10 @@ export function Editor({
   // mount — typing the title doesn't re-route focus mid-session.
   const titleFirst = useRef(isBlank(note)).current;
   const bodyRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  // The header's action cluster (folder picker, copy, sync), which the body
+  // hands focus on to — see `firstAction`.
+  const actionsRef = useRef<HTMLDivElement>(null);
   // Handle on the live-preview editor so the title can hand focus down into the
   // body even when no line is active yet (the body has no textarea until then).
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null);
@@ -143,6 +155,30 @@ export function Editor({
       return;
     }
     markdownEditorRef.current?.focus();
+  }
+
+  // The editor's tab order is spelled out by hand as back → title → body →
+  // folder / copy / sync, because that's the order you actually work in: name
+  // the note, write it, and only then reach for the toolbar. Document order
+  // can't say that — the header (and its buttons) precede the body — so the
+  // two editing surfaces are kept out of the browser's sequential order
+  // (`tabIndex={-1}`) and focus is moved here instead: Tab in the title drops
+  // into the body, Tab in the body climbs to the first header action, and both
+  // are reversible with Shift+Tab. Nothing tabs back into the body from the
+  // toolbar, so tabbing on past the sync glyph leaves the editor for good.
+  function firstAction(): HTMLElement | null {
+    return actionsRef.current?.querySelector<HTMLElement>(FOCUSABLE) ?? null;
+  }
+
+  function onBodyTab(backwards: boolean) {
+    if (backwards) titleRef.current?.focus();
+    else firstAction()?.focus();
+  }
+
+  function onActionsKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    if (e.key !== "Tab" || !e.shiftKey || e.target !== firstAction()) return;
+    e.preventDefault();
+    focusBody();
   }
 
   return (
@@ -176,16 +212,24 @@ export function Editor({
           )}
         </button>
         <TitleField
+          fieldRef={titleRef}
           value={note.title}
           onChange={onTitleChange}
           onSettle={onTitleSettle}
-          onEnter={focusBody}
+          onFocusBody={focusBody}
           focusOnMount={titleFirst}
           onMultilineChange={setTitleMultiline}
           disableSpellcheck={editor.disableSpellcheck}
           disableAutocorrect={editor.disableAutocorrect}
         />
-        <div className="flex shrink-0 items-center gap-2">
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions --
+            the handler only redirects Shift+Tab back into the body; the actions
+            themselves are the interactive elements. */}
+        <div
+          ref={actionsRef}
+          onKeyDown={onActionsKeyDown}
+          className="flex shrink-0 items-center gap-2"
+        >
           {folders.length > 0 && (
             <FolderPicker
               folders={folders}
@@ -225,11 +269,13 @@ export function Editor({
               filesAtEnd: editor.filesAtEnd,
             }}
             shortenLinkChars={editor.shortenLinkChars}
+            onTabOut={onBodyTab}
           />
         ) : (
           <PlainEditor
             body={note.body ?? ""}
             onChange={onChange}
+            onTabOut={onBodyTab}
             undoScrollSeq={undoScrollSeq}
             wordWrap={editor.wordWrap}
             disableSpellcheck={editor.disableSpellcheck}
@@ -252,29 +298,34 @@ export function Editor({
 // the copy/sync buttons, and once it wraps the header top-aligns so those stay
 // pinned to the first line (the field reports the transition via
 // onMultilineChange). It is *not* part of the body, so
-// backspacing at the start of the body never reaches it. Enter / Arrow-Down
-// hand focus down to the body (and so the field never holds a literal newline).
+// backspacing at the start of the body never reaches it. Enter / Arrow-Down /
+// Tab hand focus down to the body (and so the field never holds a literal
+// newline).
 function TitleField({
+  fieldRef,
   value,
   onChange,
   onSettle,
-  onEnter,
+  onFocusBody,
   focusOnMount,
   onMultilineChange,
   disableSpellcheck,
   disableAutocorrect,
 }: {
+  /** Held by the editor, which hands focus back here on Shift+Tab in the body. */
+  fieldRef: RefObject<HTMLTextAreaElement | null>;
   value: string;
   onChange: (title: string) => void;
   onSettle: () => void;
-  onEnter: () => void;
+  /** Leave the title for the note body — Enter, Arrow-Down, or Tab. */
+  onFocusBody: () => void;
   focusOnMount: boolean;
   onMultilineChange: (multiline: boolean) => void;
   disableSpellcheck: boolean;
   disableAutocorrect: boolean;
 }) {
   const t = useT();
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const ref = fieldRef;
   const [draft, setDraft] = useState(value);
 
   // The title is a textarea, not an input, so a long title wraps onto further
@@ -297,7 +348,7 @@ function TitleField({
     const lineHeight =
       parseFloat(getComputedStyle(el).lineHeight) || scrollHeight;
     onMultilineRef.current(scrollHeight > lineHeight * 1.5);
-  }, []);
+  }, [ref]);
   useLayoutEffect(resize, [draft, resize]);
 
   // Title edits are buffered locally and only pushed upward — which schedules a
@@ -348,7 +399,7 @@ function TitleField({
     if (!el) return;
     el.focus();
     el.select();
-  }, [focusOnMount]);
+  }, [focusOnMount, ref]);
 
   // Clicking (or tabbing) into the title selects the whole thing, so it can be
   // renamed by just typing — no manual drag-select or erase first. The browser
@@ -387,9 +438,13 @@ function TitleField({
         }
       }}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === "ArrowDown") {
+        // Tab leaves for the note itself, not the header's buttons: naming a
+        // note and then writing it is one motion, and the toolbar is the tab
+        // stop *after* the body (see the tab-order note in `Editor`).
+        const tabbingOut = e.key === "Tab" && !e.shiftKey;
+        if (e.key === "Enter" || e.key === "ArrowDown" || tabbingOut) {
           e.preventDefault();
-          onEnter();
+          onFocusBody();
         }
       }}
       className="min-w-0 flex-1 resize-none appearance-none overflow-hidden border-0 bg-transparent p-0 font-[inherit] text-lg font-bold leading-tight text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60"
@@ -409,6 +464,7 @@ function PlainEditor({
   maxWidth,
   focusOnMount = true,
   noteId,
+  onTabOut,
 }: {
   body: string;
   onChange: (body: string) => void;
@@ -421,6 +477,8 @@ function PlainEditor({
   focusOnMount?: boolean;
   /** Keys this note's session-remembered caret / scroll (see `editor-position.ts`). */
   noteId?: string;
+  /** Tab / Shift+Tab in the body — see the tab-order note in `Editor`. */
+  onTabOut: (backwards: boolean) => void;
 }) {
   const t = useT();
   const [value, setValue] = useState(body);
@@ -534,6 +592,16 @@ function PlainEditor({
         // Track the caret so switching away and back restores it.
         lastOffset.current = e.currentTarget.selectionStart;
       }}
+      onKeyDown={(e) => {
+        // Tab moves on rather than indenting; the editor owns where to (see the
+        // tab-order note in `Editor`).
+        if (e.key !== "Tab") return;
+        e.preventDefault();
+        onTabOut(e.shiftKey);
+      }}
+      // Held out of the browser's sequential tab order — the title tabs into
+      // it and `onTabOut` tabs out (see the tab-order note in `Editor`).
+      tabIndex={-1}
       onScroll={(e) => {
         lastScrollTop.current = e.currentTarget.scrollTop;
       }}

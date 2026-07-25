@@ -15,6 +15,7 @@ const editorProps = {
   disableSpellcheck: false,
   disableAutocorrect: false,
   maxWidth: "none",
+  onTabOut: () => {},
 } as const;
 
 function renderEditor(body: string, extra?: Record<string, unknown>) {
@@ -305,6 +306,34 @@ describe("MarkdownEditor", () => {
       } finally {
         other.remove();
       }
+    });
+  });
+
+  describe("tab order", () => {
+    it("reports Tab up instead of indenting, and stays out of the tab order", () => {
+      // The host places the editor between the title and the header actions —
+      // document order can't, so the surface itself is never a tab stop.
+      const onTabOut = vi.fn();
+      renderEditor("one", { onTabOut });
+      expect(surface().tabIndex).toBe(-1);
+
+      fireEvent.keyDown(surface(), { key: "Tab" });
+      expect(onTabOut).toHaveBeenLastCalledWith(false);
+
+      fireEvent.keyDown(surface(), { key: "Tab", shiftKey: true });
+      expect(onTabOut).toHaveBeenLastCalledWith(true);
+    });
+
+    it("leaves Tab alone on a tab stop inside the note", () => {
+      // An attachment thumbnail is its own tab stop; its Tab bubbles through
+      // the surface's handler and must keep the browser's own behaviour.
+      const onTabOut = vi.fn();
+      const { container } = renderEditor("one", { onTabOut });
+      const inner = document.createElement("button");
+      container.querySelector('[data-line-index="0"]')!.append(inner);
+
+      fireEvent.keyDown(inner, { key: "Tab" });
+      expect(onTabOut).not.toHaveBeenCalled();
     });
   });
 
