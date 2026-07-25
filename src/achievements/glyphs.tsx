@@ -271,6 +271,19 @@ export function BroomGlyph({ className }: IconProps) {
 
 // A paperclip — the file-attachment glyph (paste or drop a non-image file
 // into a note and it rides along as a downloadable attachment).
+// A page with a question mark: a file in the notes folder the app can't match
+// to a note, waiting on the user to say what it is.
+export function FileQuestionGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M10 12.5a2 2 0 1 1 2.8 1.8c-.5.3-.8.8-.8 1.4v.3" />
+      <path d="M12 19h.01" />
+    </Svg>
+  );
+}
+
 export function PaperclipGlyph({ className }: IconProps) {
   return (
     <Svg className={className}>

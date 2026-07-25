@@ -241,6 +241,13 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "När två enheter ändrar samma anteckningar medan de är åtskilda lyfter appen fram krocken och låter dig behålla dina eller ta deras — inga redigeringar tyst förlorade.",
     },
+    straggler: {
+      name: "Eftersläntraren",
+      condition:
+        "Avgör vad som ska hända med en fil som inte är en anteckning.",
+      learnMore:
+        "Din anteckningsmapp är en riktig mapp som du kan skriva i, så det hamnar saker där som inte är anteckningar. Appen tar aldrig bort dem bakom ryggen på dig — den visar vad den hittat och låter dig importera, ta bort eller lämna filen i fred.",
+    },
     pictureThis: {
       name: "En bild säger mer",
       condition: "Klistra in eller släpp en bild i en anteckning.",

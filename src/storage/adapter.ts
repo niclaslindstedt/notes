@@ -41,7 +41,12 @@ export type AdapterCapability =
   // The backend stores image attachments as files (a folder / cloud backend).
   // The editor gates paste / drop of images on this so the local browser
   // backend, which has nowhere to put a file, doesn't accept them.
-  | "attachments";
+  | "attachments"
+  // The backend keeps the document as real files in a folder the user can also
+  // write to by hand, so a load can turn up files the app doesn't own —
+  // `getOrphans` / `readOrphan` / `removeOrphan` are implemented. The local
+  // browser backend owns its whole storage key and so never reports orphans.
+  | "orphans";
 
 // Higher-order wrappers and the capability surface. Two adapters —
 // `withLocalCache` (`./cache/`) and `withEncryption` (`./encrypting/`) — wrap
@@ -81,6 +86,27 @@ export type NoteConversionProgress = (step: NoteConversionStep) => void;
 // note and all its attachments are sealed, "pending" while an in-progress
 // migration still has a plaintext remnant. Drives the green lock in the UI.
 export type NoteEncStatus = "encrypted" | "pending";
+
+// Why a file in the notes folder couldn't be matched to a note:
+//
+//   - `unreadable` — a `.md` file with no frontmatter or no `id:`. Almost
+//     always hand-authored in the synced folder (or written by another tool):
+//     it looks like a note, but nothing ties it to one.
+//   - `foreign` — a file whose extension this app doesn't own at all (not
+//     `.md`, not `.enc`, and not one of the sidecars it writes).
+//
+// Both used to be invisible: an `unreadable` file was skipped by the codec and
+// then **deleted** by the next save (it was tracked from the listing but absent
+// from the desired set), and a `foreign` one was ignored outright. They are
+// surfaced now so the user decides, and the save leaves them alone until then.
+export type OrphanReason = "unreadable" | "foreign";
+
+/** A file in the notes folder that the last load couldn't match to a note. */
+export type OrphanFile = {
+  /** Path relative to the namespace's notes root, e.g. `shopping.md`. */
+  path: string;
+  reason: OrphanReason;
+};
 
 export type StorageAdapter = {
   // Stable identifier so device-local settings (auth tokens, last-used
@@ -178,6 +204,21 @@ export type StorageAdapter = {
   // per-file encrypted form, atomically. Idempotent (no-op once split). Returns
   // true when it performed the split.
   splitLegacyBlob?(): Promise<boolean>;
+
+  // Files in the notes folder the last load couldn't match to a note (see
+  // `OrphanFile`). Empty when everything on disk is accounted for. The adapter
+  // also refuses to delete these on save, so an unrecognised file survives
+  // until the user decides what to do with it. Present iff `capabilities`
+  // carries `"orphans"`.
+  getOrphans?(): OrphanFile[];
+
+  // Read one orphan's raw text so the UI can preview it, and — when the user
+  // adopts it — turn its contents into a note. Null when the file is gone.
+  readOrphan?(path: string): Promise<string | null>;
+
+  // Delete one orphan from the backend, and stop reporting it. The only path by
+  // which an unrecognised file is ever removed: it takes an explicit decision.
+  removeOrphan?(path: string): Promise<void>;
 
   // Optional subscription to per-note upload progress: the set of note ids whose
   // file is currently being written to the backend. The adapter emits the full

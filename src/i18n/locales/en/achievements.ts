@@ -246,6 +246,12 @@ const achievements = {
       learnMore:
         "When two devices edit the same notes while apart, the app surfaces the clash and lets you keep yours or take theirs — no edits silently lost.",
     },
+    straggler: {
+      name: "Straggler",
+      condition: "Decide what to do with a file that isn't a note.",
+      learnMore:
+        "Your notes folder is a real folder you can write to, so things end up in it that aren't notes. The app never deletes them behind your back — it shows you what it found and lets you import it, remove it, or leave it be.",
+    },
     pictureThis: {
       name: "Picture this",
       condition: "Paste or drop an image into a note.",

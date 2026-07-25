@@ -45,7 +45,13 @@ import {
 import type { EncNoteCacheEntry } from "./crypto-session.ts";
 import { encJsonToNote, noteToEncJson } from "./enc-note-codec.ts";
 import type { FileStore } from "./file-store.ts";
-import { noteFileStem, noteToMarkdown } from "./markdown/codec.ts";
+import {
+  archivedPath,
+  isArchivedPath,
+  noteFileStem,
+  noteToMarkdown,
+  unarchivedPath,
+} from "./markdown/codec.ts";
 import { parse } from "./serialize.ts";
 import type { Note } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
@@ -65,7 +71,14 @@ export type MigrationConverterDeps = {
   // The crypto session: keys are derived once per passphrase and the ref
   // derivers + note cache are kept coherent with `save` by sharing this session.
   ensureKeys: () => Promise<SessionKeys | null>;
-  encNotePath: (keys: SessionKeys, noteId: string) => Promise<string>;
+  // A note's encrypted path. `archived` selects the `archived/` subdirectory,
+  // matching where `save` files the note — pass the note's own flag so a
+  // conversion lands (and looks) in the right place.
+  encNotePath: (
+    keys: SessionKeys,
+    noteId: string,
+    archived?: boolean,
+  ) => Promise<string>;
   attBlobPath: (
     keys: SessionKeys,
     noteId: string,
@@ -137,12 +150,20 @@ export function createMigrationConverters(
     // a plaintext copy stranded on disk.
     const folderPath = plaintextNotePath(note);
     const flatPath = `${stem}.md`;
-    const mdPath =
-      (await store.read(folderPath)) !== null
-        ? folderPath
-        : (await store.read(flatPath)) !== null
-          ? flatPath
-          : null;
+    // Where it should be, then the places an older build could have left it:
+    // outside `archived/` (written before the archive directory existed) and
+    // flat at the notes root (before folders were physical).
+    let mdPath: string | null = null;
+    for (const candidate of new Set([
+      folderPath,
+      unarchivedPath(folderPath),
+      flatPath,
+    ])) {
+      if ((await store.read(candidate)) !== null) {
+        mdPath = candidate;
+        break;
+      }
+    }
     // Already migrated (no plaintext note file left)?
     if (mdPath === null) {
       setEncStatus(note.id, "encrypted");
@@ -167,7 +188,7 @@ export function createMigrationConverters(
 
     // 2. Write + verify the encrypted note file.
     onStep?.({ phase: "note" });
-    const encPath = await encNotePath(keys, note.id);
+    const encPath = await encNotePath(keys, note.id, note.archived);
     const source = noteToEncJson(note);
     const rev = await store.write(
       encPath,
@@ -210,9 +231,21 @@ export function createMigrationConverters(
   ): Promise<boolean> {
     const keys = await ensureKeys();
     if (!keys) return false;
-    const encPath = await encNotePath(keys, note.id);
+    const wantedPath = await encNotePath(keys, note.id, note.archived);
+    // Where the ciphertext should be — then, failing that, the other side of the
+    // `archived/` boundary. A note archived by a build that filed everything at
+    // the notes root still has its `.enc` there, and reading only the wanted
+    // path would report "already demigrated" and strand it forever.
+    const legacyPath = isArchivedPath(wantedPath)
+      ? unarchivedPath(wantedPath)
+      : archivedPath(wantedPath);
+    let encPath = wantedPath;
+    let encText = await store.read(wantedPath);
+    if (encText === null) {
+      encText = await store.read(legacyPath);
+      if (encText !== null) encPath = legacyPath;
+    }
     // Already demigrated (no encrypted note file left)?
-    const encText = await store.read(encPath);
     if (encText === null) {
       deleteEncStatus(note.id);
       return false;
@@ -251,7 +284,9 @@ export function createMigrationConverters(
     // directory rather than flat at the notes root.
     onStep?.({ phase: "note" });
     const mdPath = plaintextNotePath(full);
-    const text = noteToMarkdown(full, mdPath.includes("/") ? 1 : 0);
+    // One `../` per directory the file is nested under the notes root, so an
+    // archived and/or grouped note's attachment references still resolve.
+    const text = noteToMarkdown(full, mdPath.split("/").length - 1);
     const rev = await store.write(mdPath, text);
     track(mdPath, text, rev);
     const readBack = await store.read(mdPath);

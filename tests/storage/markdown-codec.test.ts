@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { createNote, editNote, type Note } from "../../src/domain/note.ts";
 import {
+  createNote,
+  editNote,
+  type Folder,
+  type Note,
+} from "../../src/domain/note.ts";
+import {
+  ARCHIVED_DIR,
   filesToSnapshot,
   noteFileStem,
+  noteFilePath,
+  parseFiles,
   parseNote,
   snapshotToFiles,
 } from "../../src/storage/markdown/codec.ts";
@@ -97,6 +105,62 @@ describe("markdown codec", () => {
     ]);
     expect(result.notes).toHaveLength(1);
     expect(result.notes[0]!.id).toBe("aaa111");
+  });
+
+  it("reports the paths it skipped so they can be surfaced as orphans", () => {
+    const good = snapshotToFiles({ notes: [note("aaa111", "Keep me")] })[0]!;
+    const result = parseFiles([
+      { path: "junk.md", text: "no frontmatter here" },
+      good,
+      { path: "half.md", text: "---\ntitle: no id\n---\n\nbody\n" },
+    ]);
+    expect(result.snapshot.notes).toHaveLength(1);
+    expect(result.unreadable).toEqual(["junk.md", "half.md"]);
+  });
+});
+
+describe("markdown codec — the archive directory", () => {
+  it("files an archived note under archived/ and an active one at the root", () => {
+    const active = note("aaa111", "Current");
+    const archived: Note = { ...note("bbb222", "Old"), archived: true };
+    const paths = snapshotToFiles({ notes: [active, archived] }).map(
+      (f) => f.path,
+    );
+    expect(paths[0]).toBe(`${noteFileStem(active)}.md`);
+    expect(paths[1]).toBe(`${ARCHIVED_DIR}/${noteFileStem(archived)}.md`);
+  });
+
+  it("nests an archived note inside its folder directory", () => {
+    const n: Note = { ...note("a", "Soup"), archived: true, folderId: "f1" };
+    const folder: Folder = { id: "f1", name: "Recipes", createdAt: 0 };
+    expect(noteFilePath(n, [folder])).toBe(
+      `${ARCHIVED_DIR}/recipes/${noteFileStem(n)}.md`,
+    );
+  });
+
+  it("points attachment references up one level per directory", () => {
+    const withImage: Note = {
+      ...note("a", "Trip", "![shot.png](attachments/shot.png)"),
+      archived: true,
+      folderId: "f1",
+    };
+    const folder: Folder = { id: "f1", name: "Travel", createdAt: 0 };
+    const file = snapshotToFiles({ notes: [withImage], folders: [folder] })[0]!;
+    // `archived/travel/<stem>.md` → three levels up to reach the namespace
+    // root, where `attachments/` sits beside `notes/`.
+    expect(file.text).toContain(
+      `../../../attachments/${noteFileStem(withImage)}/shot.png`,
+    );
+    expect(parseNote(file.text)?.body).toBe(
+      "![shot.png](attachments/shot.png)",
+    );
+  });
+
+  it("keeps the archived flag authoritative in the frontmatter, not the path", () => {
+    const n: Note = { ...note("a", "Old"), archived: true };
+    const file = snapshotToFiles({ notes: [n] })[0]!;
+    expect(file.text).toContain("archived: true");
+    expect(parseNote(file.text)?.archived).toBe(true);
   });
 });
 

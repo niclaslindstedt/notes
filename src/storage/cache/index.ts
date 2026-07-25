@@ -393,6 +393,20 @@ export function withLocalCache(
       ? () => inner.getEncryptionStatus!()
       : undefined,
 
+    // Orphans are a property of the remote folder, so they pass straight
+    // through. An offline load leaves the inner adapter's last set in place
+    // rather than clearing it — the files are still out there — and the actions
+    // simply fail while the backend is unreachable, which is the honest answer.
+    getOrphans: inner.getOrphans ? () => inner.getOrphans!() : undefined,
+
+    readOrphan: inner.readOrphan
+      ? (path) => inner.readOrphan!(path)
+      : undefined,
+
+    removeOrphan: inner.removeOrphan
+      ? (path) => inner.removeOrphan!(path)
+      : undefined,
+
     refreshIndex: inner.refreshIndex
       ? (notes) => inner.refreshIndex!(notes)
       : undefined,

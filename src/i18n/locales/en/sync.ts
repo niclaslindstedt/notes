@@ -87,6 +87,25 @@ const sync = {
     keepMine: "Keep this device's copy",
     keepTheirs: "Keep the other copy",
   },
+
+  // Unmatched-files prompt (`OrphanFilesModal`): files sitting in the notes
+  // folder that don't belong to any note. Nothing is deleted without an answer
+  // here, so the copy leads with what the file is, not with a cleanup pitch.
+  orphans: {
+    title: "Files that aren't notes",
+    hint: "These files are in your notes folder, but they don't belong to any note. Nothing has been changed or deleted — pick what should happen to each.",
+    reasonUnreadable:
+      "A markdown file with no note details — probably written by hand.",
+    reasonForeign: "Not a file type this app stores notes in.",
+    peek: "Preview",
+    hide: "Hide",
+    loading: "Reading…",
+    empty: "This file is empty.",
+    adopt: "Import as note",
+    discard: "Delete file",
+    ignore: "Never ask again",
+    later: "Leave for now",
+  },
 } as const;
 
 export type SyncCatalog = Widen<typeof sync>;

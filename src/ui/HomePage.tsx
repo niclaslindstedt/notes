@@ -177,6 +177,17 @@ export function HomePage() {
               available only in the app, not the website.
             </li>
             <li>
+              Your notes stay browsable in the folder they sync to: one plain
+              markdown file per note, with the ones you&apos;ve archived filed
+              into an <code className="text-fg-bright">archived/</code>{" "}
+              subfolder, so what you see on disk matches what you see in the
+              app. Because it is a real folder, you can drop your own files into
+              it — and if notes finds something there it can&apos;t match to a
+              note, it shows you the file and asks whether to import it as a
+              note, delete it, or leave it alone. It never deletes a file you
+              put there on its own.
+            </li>
+            <li>
               With a folder or cloud backend connected, edits made on one device
               show up on your others on their own — notes checks the backend for
               changes every few seconds and pulls them in while you read, even

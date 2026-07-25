@@ -50,6 +50,7 @@
 import type {
   AdapterCapability,
   NoteEncStatus,
+  OrphanFile,
   StorageAdapter,
   StoredSnapshot,
 } from "./adapter.ts";
@@ -65,9 +66,13 @@ import {
   decryptEnvelope,
   isEncryptedEnvelope,
 } from "./crypto.ts";
-import { createCryptoSession } from "./crypto-session.ts";
+import { KEY_PARAMS_FILE, createCryptoSession } from "./crypto-session.ts";
 import { encJsonToNote, noteToEncJson } from "./enc-note-codec.ts";
-import { createFolderRegistry, injectFolders } from "./folder-registry.ts";
+import {
+  FOLDERS_FILE_NAME,
+  createFolderRegistry,
+  injectFolders,
+} from "./folder-registry.ts";
 import { createMigrationConverters } from "./migration-converters.ts";
 import { openBytes, openString, sealString } from "./crypto-binary.ts";
 import {
@@ -79,9 +84,14 @@ import {
 } from "./note-index.ts";
 import type { FileEntry, FileStore } from "./file-store.ts";
 import {
+  ARCHIVED_DIR,
+  archivedPath,
   filesToSnapshot,
+  isArchivedPath,
   noteFileStem,
+  parseFiles,
   snapshotToFiles,
+  unarchivedPath,
 } from "./markdown/codec.ts";
 import { parse, serialize } from "./serialize.ts";
 import { mimeForFilename } from "../domain/attachment.ts";
@@ -100,13 +110,11 @@ function shortRev(rev: string | undefined): string {
 // Single-file location for the legacy whole-document AES-GCM envelope.
 export const BLOB_FILE_NAME = "notes.json";
 // The KDF-salts file is owned by the crypto session (it derives the keys from
-// it); re-exported here so the encryption representation's path set stays
-// importable from this module.
-export { KEY_PARAMS_FILE } from "./crypto-session.ts";
-// The folder registry sidecar is owned by the folder registry (it reads and
-// writes it); re-exported here so the encryption representation's path set stays
-// importable from this module.
-export { FOLDERS_FILE_NAME } from "./folder-registry.ts";
+// it); the folder registry sidecar by the folder registry. Both are re-exported
+// here so the encryption representation's path set stays importable from this
+// module, and both are imported above so this module can name them itself (a
+// bare `export … from` would not bind them locally).
+export { KEY_PARAMS_FILE, FOLDERS_FILE_NAME };
 // Suffix of an encrypted per-note file. The stem is the opaque keyed-HMAC ref.
 const ENC_SUFFIX = ".enc";
 // The encrypted note-index sidecar (see ./note-index.ts): one sealed file
@@ -210,6 +218,30 @@ function isEncNotePath(path: string): boolean {
 // nor removed on a representation switch, so it is handled separately.
 function isOwnedPath(path: string): boolean {
   return isMarkdownPath(path) || isEncNotePath(path) || path === BLOB_FILE_NAME;
+}
+
+// The sidecars this adapter writes beside the notes. Not notes, but not
+// strangers either — they must never be reported as orphans. Kept as one set so
+// adding a sidecar can't accidentally start flagging it at the user.
+const SIDECAR_FILES: ReadonlySet<string> = new Set([
+  FOLDERS_FILE_NAME,
+  KEY_PARAMS_FILE,
+  INDEX_FILE_NAME,
+  BLOB_FILE_NAME,
+]);
+
+// Files under the notes root that belong to neither the document nor this
+// adapter's own bookkeeping: anything that isn't a note file and isn't a
+// sidecar. A `.md` that *is* a note file but fails to parse is a separate case
+// the read paths report (see `parseFiles`), since only parsing can tell.
+function isForeignPath(path: string): boolean {
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  // A dotfile the OS or the sync client dropped in (`.DS_Store`, `.gitignore`,
+  // Dropbox's conflict markers) is noise the user didn't put there on purpose;
+  // flagging it would make the modal a nag rather than a safety net.
+  if (name.startsWith(".")) return false;
+  if (SIDECAR_FILES.has(name)) return false;
+  return !isOwnedPath(path);
 }
 
 // A cheap, stable content hash (djb2) used only to tell "did this note's
@@ -370,6 +402,37 @@ export function createDirectoryAdapter(
     };
   }
 
+  // Files the last load found in the notes folder but couldn't match to a note:
+  // a `.md` that doesn't parse as one, or a file whose extension this adapter
+  // doesn't own. Two things read it. The UI drains it through `getOrphans` to
+  // ask the user what to do; and `plan` / the representation supersede subtract
+  // it from their removals, so an unrecognised file is never deleted as a
+  // side-effect of an unrelated save. That second part is the safety property:
+  // before this, a hand-authored `.md` dropped into the synced folder was
+  // tracked from the listing, absent from the desired set, and therefore
+  // silently deleted by the next save the user happened to trigger.
+  let orphans: OrphanFile[] = [];
+  let orphanPaths: ReadonlySet<string> = new Set();
+
+  function setOrphans(found: readonly OrphanFile[]): void {
+    orphans = [...found].sort((a, b) => a.path.localeCompare(b.path));
+    orphanPaths = new Set(orphans.map((o) => o.path));
+    if (orphans.length > 0) {
+      log.warn(`${options.id} load: ${orphans.length} unmatched file(s)`, {
+        paths: orphans.map((o) => o.path),
+      });
+    }
+  }
+
+  // The `foreign` half of the orphan set, derivable from the listing alone (no
+  // reads). The `unreadable` half needs the file contents, so each load path
+  // folds its own parse failures in on top of this.
+  function foreignOrphans(entries: readonly FileEntry[]): OrphanFile[] {
+    return entries
+      .filter((e) => isForeignPath(e.path))
+      .map((e) => ({ path: e.path, reason: "foreign" as const }));
+  }
+
   // Per-note at-rest encryption status from the last encrypted load (the
   // `NoteEncStatus` type is shared with the adapter contract): a note is
   // "encrypted" once its `.enc` file exists and none of its attachments linger
@@ -410,11 +473,17 @@ export function createDirectoryAdapter(
 
   log.info(`${options.id}: directory adapter created`);
 
+  // The path a note's encrypted file lives at. The opaque ref is keyed on the
+  // note id alone, so archiving a note *moves* its file into `archived/` without
+  // changing its name — the relocation pass below can therefore transfer the
+  // ciphertext byte-for-byte, with no need to re-seal (or even hold) the body.
   async function encNotePath(
     keys: SessionKeys,
     noteId: string,
+    archived?: boolean,
   ): Promise<string> {
-    return `${await cachedRef(keys, "note", noteId)}${ENC_SUFFIX}`;
+    const name = `${await cachedRef(keys, "note", noteId)}${ENC_SUFFIX}`;
+    return archived ? `${ARCHIVED_DIR}/${name}` : name;
   }
 
   async function attBlobPath(
@@ -512,8 +581,14 @@ export function createDirectoryAdapter(
       for (const file of files) {
         track(file.path, file.text, revisions.get(file.path));
       }
-      return serialize(filesToSnapshot(files));
+      const { snapshot, unreadable } = parseFiles(files);
+      setOrphans([
+        ...foreignOrphans(entries),
+        ...unreadable.map((path) => ({ path, reason: "unreadable" as const })),
+      ]);
+      return serialize(snapshot);
     }
+    setOrphans(foreignOrphans(entries));
     if (entries.some((e) => e.path === BLOB_FILE_NAME)) {
       const blob = await store.read(BLOB_FILE_NAME);
       if (blob !== null) {
@@ -568,6 +643,7 @@ export function createDirectoryAdapter(
     // the passphrase so the document survives; the next save rewrites it
     // per-file. Otherwise nothing is stored.
     if (encPaths.length === 0 && mdPaths.length === 0) {
+      setOrphans(foreignOrphans(entries));
       if (entries.some((e) => e.path === BLOB_FILE_NAME)) {
         const blob = await store.read(BLOB_FILE_NAME);
         const password = crypto?.passwordRef.current;
@@ -592,7 +668,8 @@ export function createDirectoryAdapter(
     const indexByPath = new Map<string, IndexEntry>(
       await Promise.all(
         indexEntries.map(
-          async (entry) => [await encNotePath(keys, entry.id), entry] as const,
+          async (entry) =>
+            [await encNotePath(keys, entry.id, entry.archived), entry] as const,
         ),
       ),
     );
@@ -695,6 +772,7 @@ export function createDirectoryAdapter(
     // Plaintext remnants from an in-progress migration: merge any note not yet
     // present from the encrypted set, so the document stays complete (and the
     // migration is resumable) mid-flight.
+    const unreadable: string[] = [];
     if (mdPaths.length > 0) {
       const files = await Promise.all(
         mdPaths.map(async (path) => ({
@@ -703,13 +781,19 @@ export function createDirectoryAdapter(
         })),
       );
       for (const f of files) track(f.path, f.text, revisions.get(f.path));
-      for (const note of filesToSnapshot(files).notes) {
+      const parsed = parseFiles(files);
+      unreadable.push(...parsed.unreadable);
+      for (const note of parsed.snapshot.notes) {
         if (!seen.has(note.id)) {
           notes.push(note);
           status.set(note.id, "pending");
         }
       }
     }
+    setOrphans([
+      ...foreignOrphans(entries),
+      ...unreadable.map((path) => ({ path, reason: "unreadable" as const })),
+    ]);
 
     // Attachments are read on demand, not here. A fully-migrated vault (no
     // plaintext note remnants) already carries each encrypted note's attachment
@@ -740,7 +824,7 @@ export function createDirectoryAdapter(
         notes.map(async (note) =>
           noteToIndexEntry(
             note,
-            revisions.get(await encNotePath(keys, note.id)),
+            revisions.get(await encNotePath(keys, note.id, note.archived)),
           ),
         ),
       );
@@ -839,7 +923,14 @@ export function createDirectoryAdapter(
       const known = tracked.get(path);
       if (!known || known.hash !== hashText(d.source)) toWrite.push(path);
     }
-    const toRemove = [...tracked.keys()].filter((path) => !desired.has(path));
+    // Never remove a file the load couldn't match to a note. It is tracked (the
+    // listing found it) and absent from `desired` (no note claims it), which is
+    // exactly the shape of a deleted note — so without this guard an unrelated
+    // save would delete the user's hand-authored file. It goes only when they
+    // say so, through `removeOrphan`.
+    const toRemove = [...tracked.keys()].filter(
+      (path) => !desired.has(path) && !orphanPaths.has(path),
+    );
 
     const conflicts: string[] = [];
     for (const path of [...toWrite, ...toRemove]) {
@@ -859,6 +950,41 @@ export function createDirectoryAdapter(
     if (remoteRev === baseRev) return true;
     if (producedRevs.get(path)?.includes(remoteRev)) return true;
     return false;
+  }
+
+  // Copy a deferred note's file to the path the document now wants it at, when
+  // the only difference is the `archived/` prefix — the note was archived or
+  // restored on a device that never opened it, so its body isn't in memory to
+  // re-write. The bytes are moved verbatim (the encrypted filename is a keyed
+  // HMAC of the note id alone, and a plaintext file's contents don't encode its
+  // own location), so no re-seal and no body are needed. Only the write happens
+  // here: the old path is already in the plan's removals, which run after, so a
+  // crash in between leaves both copies and the next load reconciles rather than
+  // losing the note. Returns the revision each relocated path landed at.
+  //
+  // Almost always a no-op — it touches the backend only for a note whose
+  // archived state changed while its body was still deferred.
+  async function relocateDeferred(
+    desired: Map<string, DesiredFile>,
+    current: ReadonlyMap<string, string>,
+  ): Promise<Map<string, string | undefined>> {
+    const moved = new Map<string, string | undefined>();
+    for (const [path, d] of desired) {
+      if (!d.skip || current.has(path)) continue;
+      const from = isArchivedPath(path)
+        ? unarchivedPath(path)
+        : archivedPath(path);
+      if (!current.has(from)) continue;
+      const bytes = await store.read(from);
+      if (bytes === null) continue;
+      const rev = await store.write(path, bytes);
+      track(path, d.source, rev);
+      const cached = encNoteCache.get(from);
+      if (cached) encNoteCache.set(path, { rev: rev ?? "", json: cached.json });
+      moved.set(path, rev);
+      log.info(`${options.id} save: relocated ${from} -> ${path}`);
+    }
+    return moved;
   }
 
   async function writeFiles(
@@ -936,7 +1062,7 @@ export function createDirectoryAdapter(
       const snapshot = parse(text);
       snapshotForAttachments = snapshot;
       for (const note of snapshot.notes) {
-        const path = await encNotePath(keys, note.id);
+        const path = await encNotePath(keys, note.id, note.archived);
         if (note.body === undefined) {
           // Deferred note (never opened this session): its body isn't in memory
           // to seal, so it must not be written — that would clobber the real
@@ -998,6 +1124,9 @@ export function createDirectoryAdapter(
       .map((e) => e.path)
       .filter((path) => {
         if (!isOwnedPath(path) || desired.has(path)) return false;
+        // Same guard as `plan`'s removals: a `.md` that doesn't parse as a note
+        // isn't a superseded representation, it's someone's file.
+        if (orphanPaths.has(path)) return false;
         if (supersededKind === "toEncrypted") {
           return isMarkdownPath(path) || path === BLOB_FILE_NAME;
         }
@@ -1026,6 +1155,15 @@ export function createDirectoryAdapter(
       });
     }
 
+    // Archiving or restoring a note moves its file between the notes root and
+    // `archived/`. For a note we hold in full that's just a write at the new
+    // path plus the removal of the old one, both already planned. For a
+    // **deferred** note it can't be: its body was never loaded, so there is
+    // nothing to write (`skip`) — yet the old path is tracked and unwanted, so
+    // the removal below would delete the only copy. Transfer the bytes instead;
+    // the planned removal of the old path then completes an ordinary move.
+    const relocated = await relocateDeferred(desired, current);
+
     // Spin a per-note glyph while each changed note's file is actually being
     // pushed to the backend. Cleared in `finally` so a failed write (conflict,
     // offline, throttle) doesn't leave a note stuck "uploading".
@@ -1039,6 +1177,9 @@ export function createDirectoryAdapter(
     } finally {
       setUploading(uploadingNoteIds, false);
     }
+    // Fold the relocations in so the post-save revision map covers them and the
+    // next save bases on the revision the move actually produced.
+    for (const [path, rev] of relocated) written.set(path, rev);
 
     // Write the new attachment blobs BEFORE deleting any superseded files, then
     // verify the new note ciphertext decrypts — so an interruption never leaves
@@ -1121,7 +1262,7 @@ export function createDirectoryAdapter(
         snapshotForAttachments.notes.map(async (note) =>
           noteToIndexEntry(
             note,
-            revisions.get(await encNotePath(keys, note.id)),
+            revisions.get(await encNotePath(keys, note.id, note.archived)),
           ),
         ),
       );
@@ -1170,7 +1311,7 @@ export function createDirectoryAdapter(
   async function fetchNoteBody(note: Note): Promise<string | null> {
     const keys = await ensureKeys();
     if (keys) {
-      const path = await encNotePath(keys, note.id);
+      const path = await encNotePath(keys, note.id, note.archived);
       // Serve an already-decrypted body from the session cache without a network
       // read — so the background warm pass and a re-open are cheap, and a note
       // warmed this session opens even after the backend goes offline.
@@ -1211,8 +1352,13 @@ export function createDirectoryAdapter(
   async function readPlaintextNoteBody(note: Note): Promise<string | null> {
     const folderPath = plaintextNotePath(note);
     const flatPath = `${noteFileStem(note)}.md`;
-    const candidates =
-      folderPath === flatPath ? [flatPath] : [folderPath, flatPath];
+    // Where the note *should* be, then the two places an older build may have
+    // left it: outside `archived/` (written before the archive directory
+    // existed) and flat at the notes root (written before folders were
+    // physical). Reading is cheap and finding it beats opening a note blank.
+    const candidates = [
+      ...new Set([folderPath, unarchivedPath(folderPath), flatPath]),
+    ];
     for (const path of candidates) {
       const text = await store.read(path);
       if (text === null) continue;
@@ -1227,6 +1373,36 @@ export function createDirectoryAdapter(
   // mode (no locks shown).
   function getEncryptionStatus(): Map<string, NoteEncStatus> {
     return new Map(encStatus);
+  }
+
+  // -- Orphans ---------------------------------------------------------------
+
+  function getOrphans(): OrphanFile[] {
+    return orphans.map((o) => ({ ...o }));
+  }
+
+  // Read an orphan's raw text, so the UI can preview it and — if the user adopts
+  // it — build a note from it. Scoped to paths the last load actually reported
+  // as orphans, so this can't be turned into a general read of any file under
+  // the notes root.
+  async function readOrphan(path: string): Promise<string | null> {
+    if (!orphanPaths.has(path)) return null;
+    return store.read(path);
+  }
+
+  // Delete one orphan, on an explicit decision. Also drops it from the orphan
+  // set so it isn't re-offered before the next load, and from `tracked` so the
+  // save planner doesn't carry a phantom entry for a file that's gone.
+  async function removeOrphan(path: string): Promise<void> {
+    if (!orphanPaths.has(path)) return;
+    await store.remove(path);
+    tracked.delete(path);
+    producedRevs.delete(path);
+    uncertain.delete(path);
+    setOrphans(orphans.filter((o) => o.path !== path));
+    // The listing changed underneath the memo, so the next load must re-read
+    // rather than serve the snapshot built when this file was still there.
+    lastLoad = null;
   }
 
   // Rebuild + seal the note index from the given snapshot's notes, best-effort.
@@ -1251,7 +1427,10 @@ export function createDirectoryAdapter(
     }
     const entries = await Promise.all(
       notes.map(async (note) =>
-        noteToIndexEntry(note, revisions.get(await encNotePath(keys, note.id))),
+        noteToIndexEntry(
+          note,
+          revisions.get(await encNotePath(keys, note.id, note.archived)),
+        ),
       ),
     );
     await sealWriteIndex(keys, entries);
@@ -1286,6 +1465,9 @@ export function createDirectoryAdapter(
 
   const capabilities = new Set<AdapterCapability>();
   if (attachments) capabilities.add("attachments");
+  // Every directory-backed store is a folder the user can also write to by hand,
+  // so all of them can turn up files the app doesn't own.
+  capabilities.add("orphans");
 
   return {
     id: options.id,
@@ -1297,6 +1479,9 @@ export function createDirectoryAdapter(
     fetchAttachment,
     fetchNoteBody,
     getEncryptionStatus,
+    getOrphans,
+    readOrphan,
+    removeOrphan,
     refreshIndex,
     migrateNote,
     demigrateNote,

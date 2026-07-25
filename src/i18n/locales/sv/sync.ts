@@ -71,6 +71,22 @@ const sync: SyncCatalog = {
     keepMine: "Behåll den här enhetens kopia",
     keepTheirs: "Behåll den andra kopian",
   },
+
+  orphans: {
+    title: "Filer som inte är anteckningar",
+    hint: "De här filerna ligger i din anteckningsmapp men hör inte till någon anteckning. Ingenting har ändrats eller tagits bort — välj vad som ska hända med varje fil.",
+    reasonUnreadable:
+      "En markdown-fil utan anteckningsuppgifter — troligen skriven för hand.",
+    reasonForeign: "Ingen filtyp som appen sparar anteckningar i.",
+    peek: "Förhandsgranska",
+    hide: "Dölj",
+    loading: "Läser…",
+    empty: "Filen är tom.",
+    adopt: "Importera som anteckning",
+    discard: "Ta bort filen",
+    ignore: "Fråga aldrig igen",
+    later: "Lämna tills vidare",
+  },
 };
 
 export default sync;
