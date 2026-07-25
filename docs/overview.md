@@ -199,7 +199,8 @@ goes active when the caret lands on it — observed via a `selectionchange`
 listener that maps the caret's DOM position to a source `(line, col)`, makes that
 line raw, and restores the caret there — or when the title hands focus down
 through the editor's imperative `focus()` handle (`MarkdownEditorHandle`, consumed
-by `focusBody` in `App`) on Enter / Arrow-Down. A brand-new empty note shows the
+by `focusBody` in `App`) on Enter / Arrow-Down / Tab (see
+[Editor tab order](#editor-tab-order)). A brand-new empty note shows the
 "Start writing" placeholder (a non-editable overlay span).
 
 **Leaving the body clears the active line.** When focus moves out of the editor
@@ -354,12 +355,39 @@ wraps the header top-aligns so those stay pinned to the first line (the field
 reports the one-line↔multi-line transition up via `onMultilineChange`). Opening
 an existing note focuses nothing, so the soft keyboard stays down until the user
 taps where to type — only a brand-new note opens with the title focused, ready
-to be named. Enter and
-Arrow-Down hand focus down to the body, so the field never holds a literal
+to be named. Enter,
+Arrow-Down and Tab hand focus down to the body (see
+[Editor tab order](#editor-tab-order)), so the field never holds a literal
 newline. Edits route through `useNotes().retitle` → `retitleNote`
 (`src/domain/note.ts`). On file/cloud backends the [save hold](#save-hold) keeps
 the file from being created under the throwaway default title until the real
 title settles.
+
+### Editor tab order
+
+`Editor` (`src/ui/NoteEditor.tsx`) spells out the editor's keyboard tab order by
+hand: **back button → title → body → folder picker / copy / sync**. That is the
+order the work happens in — name the note, write it, and only then reach for the
+toolbar — but document order can't express it, because the header (and every
+button in it) precedes the body. So the two editing surfaces (the live-preview
+[editor](#markdown-editor)'s contenteditable root and the plain-textarea
+fallback) sit out of the browser's sequential order with `tabIndex={-1}`, and
+focus is moved explicitly instead:
+
+- Tab in the title focuses the body (the same `focusBody` hand-down as Enter /
+  Arrow-Down; the [live-preview editor](#markdown-editor) opens a line at the end
+  through its imperative handle).
+- Tab in the body focuses the first header action — the folder picker when the
+  note has folders to file into, otherwise the [copy button](#copy-button).
+  Both surfaces report the keystroke up through an `onTabOut(backwards)` prop
+  rather than acting themselves, and only when the caret is on the surface: an
+  attachment thumbnail inside the note is its own tab stop and its Tab bubbles
+  through the same handler.
+- Shift+Tab reverses both hops (body → title, first header action → body).
+
+Keeping the surfaces out of the natural order is what makes the sequence a
+straight line: nothing tabs back *into* the body from the toolbar, so tabbing on
+past the sync glyph leaves the editor instead of cycling around the header.
 
 ### Editor settings
 

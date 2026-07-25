@@ -121,6 +121,43 @@ describe("Editor", () => {
     expect(screen.queryByDisplayValue("the body")).toBeNull();
   });
 
+  it("tabs from the title straight into the body, not the header buttons", () => {
+    renderEditor();
+    const title = screen.getByDisplayValue("My note") as HTMLTextAreaElement;
+    const body = screen.getByDisplayValue("the body") as HTMLTextAreaElement;
+    title.focus();
+
+    fireEvent.keyDown(title, { key: "Tab" });
+    expect(document.activeElement).toBe(body);
+  });
+
+  it("tabs from the body up to the header actions, and back on Shift+Tab", () => {
+    renderEditor({ syncSlot: <button type="button">Sync</button> });
+    const title = screen.getByDisplayValue("My note") as HTMLTextAreaElement;
+    const body = screen.getByDisplayValue("the body") as HTMLTextAreaElement;
+    body.focus();
+
+    fireEvent.keyDown(body, { key: "Tab" });
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Copy note" }),
+    );
+
+    fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(body);
+
+    fireEvent.keyDown(body, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(title);
+  });
+
+  it("keeps the editing surface out of the browser's own tab order", () => {
+    // The body sits after the header in the DOM; it's reached by the handlers
+    // above instead, so tabbing on past the last header action leaves the
+    // editor rather than dropping back into the note.
+    renderEditor();
+    const body = screen.getByDisplayValue("the body") as HTMLTextAreaElement;
+    expect(body.tabIndex).toBe(-1);
+  });
+
   it("hides the folder picker when there are no folders", () => {
     renderEditor({ folders: [] });
     expect(screen.queryByLabelText("Move to folder")).toBeNull();

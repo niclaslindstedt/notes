@@ -16,6 +16,7 @@ const editorProps = {
   disableSpellcheck: false,
   disableAutocorrect: false,
   maxWidth: "none",
+  onTabOut: () => {},
 } as const;
 
 describe("extractSourceRange", () => {

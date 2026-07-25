@@ -120,6 +120,10 @@ type Props = {
   /** The open note's id, keying its session-remembered caret / scroll position
    *  so switching away and back reopens where you left off. */
   noteId?: string;
+  /** Tab (or Shift+Tab) pressed on the editing surface. The editor is held out
+   *  of the browser's own tab order (see the `tabIndex` on the surface), so its
+   *  host decides where focus goes next — `backwards` is Shift+Tab. */
+  onTabOut: (backwards: boolean) => void;
   /** Imperative handle so the title field can hand focus down into the body. */
   ref?: Ref<MarkdownEditorHandle>;
 };
@@ -152,6 +156,7 @@ export function MarkdownEditor({
   placement = INLINE_PLACEMENT,
   shortenLinkChars = 0,
   noteId,
+  onTabOut,
   ref,
 }: Props) {
   const t = useT();
@@ -747,6 +752,14 @@ export function MarkdownEditor({
       e.preventDefault();
       selectAllLines();
     }
+    // Tab hands focus on rather than indenting — the host places the editor in
+    // the page's tab order (the surface itself is skipped by the browser). Only
+    // when the caret is in the surface: an attachment thumbnail inside the note
+    // is its own tab stop, and its Tab bubbles through here.
+    if (e.key === "Tab" && e.target === e.currentTarget) {
+      e.preventDefault();
+      onTabOut(e.shiftKey);
+    }
   }
 
   // Ctrl/Cmd+A pressed while the surface doesn't hold focus — the opening
@@ -831,7 +844,12 @@ export function MarkdownEditor({
           role="textbox"
           aria-multiline="true"
           aria-label={t("app.startWriting")}
-          tabIndex={0}
+          // Out of the browser's sequential tab order: the note body sits after
+          // the header in the DOM, but belongs right after the title in the tab
+          // order, which document order alone can't express. The host tabs into
+          // it from the title and out of it via `onTabOut`, so the surface is
+          // never reached twice (and never traps focus in the header).
+          tabIndex={-1}
           contentEditable={editableMode}
           suppressContentEditableWarning
           spellCheck={!disableSpellcheck}
