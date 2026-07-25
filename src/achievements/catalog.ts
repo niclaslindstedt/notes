@@ -19,6 +19,7 @@ import {
   CodeGlyph,
   CopyGlyph,
   EyeOffGlyph,
+  FileQuestionGlyph,
   FlaskGlyph,
   FolderGlyph,
   FolderTreeGlyph,
@@ -437,6 +438,15 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     tier: "pro",
     glyph: MergeGlyph,
     learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "straggler",
+    tier: "pro",
+    glyph: FileQuestionGlyph,
+    learnMore: true,
+    // Fired by `useOrphans` for any of the three decisions — adopt, delete,
+    // ignore — since the trophy is for dealing with the file at all.
     trigger: { kind: "manual" },
   },
   {

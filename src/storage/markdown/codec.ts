@@ -58,6 +58,43 @@ function slugify(name: string): string {
     .slice(0, 48);
 }
 
+// -- The archive directory --------------------------------------------
+//
+// An archived note's file is filed under a real `archived/` subdirectory of the
+// namespace's notes root, so the synced folder mirrors what the app shows: the
+// notes root holds exactly the notes the overview lists, and everything the
+// user swiped away sits in one obvious place. The `archived: true` frontmatter
+// (and, on the encrypted representation, the sealed note JSON) remains the
+// authoritative flag the load reads back — the directory is a write-side
+// projection, so a file that ends up in the "wrong" place still loads with the
+// archived state its own contents declare, and the next save relocates it.
+//
+// An archived note that also belongs to a folder nests inside it:
+// `archived/<folder-dir>/<stem>.md`. Keeping `archived/` outermost means the
+// whole archive can be moved, shared, or deleted as one directory.
+
+/** Directory segment archived notes are filed under, at the notes root. */
+export const ARCHIVED_DIR = "archived";
+
+/**
+ * The `archived/`-prefixed counterpart of `path`, or the path unchanged when it
+ * already carries the prefix. Together with `unarchivedPath` this is what lets
+ * the save relocate a file whose bytes it can't re-derive (a deferred note)
+ * instead of rewriting it.
+ */
+export function archivedPath(path: string): string {
+  return isArchivedPath(path) ? path : `${ARCHIVED_DIR}/${path}`;
+}
+
+/** `path` with any leading `archived/` segment stripped. */
+export function unarchivedPath(path: string): string {
+  return isArchivedPath(path) ? path.slice(ARCHIVED_DIR.length + 1) : path;
+}
+
+export function isArchivedPath(path: string): boolean {
+  return path.startsWith(`${ARCHIVED_DIR}/`);
+}
+
 // -- Physical folder directories --------------------------------------
 //
 // A note's folder is a **real subdirectory** on the file/cloud backends: a
@@ -93,12 +130,32 @@ export function folderDirName(
 }
 
 /**
+ * The directory a note's file lives in, relative to the notes root: the
+ * `archived/` prefix when the note is archived, the folder's directory when it
+ * is grouped, both (`archived/<folder-dir>`) when it is each, and the empty
+ * string for an active, ungrouped note at the root.
+ */
+export function noteDirName(note: Note, folders?: readonly Folder[]): string {
+  const segments: string[] = [];
+  if (note.archived) segments.push(ARCHIVED_DIR);
+  const folderDir = folderDirName(note.folderId, folders);
+  if (folderDir) segments.push(folderDir);
+  return segments.join("/");
+}
+
+/** How many directories deep below the notes root `dir` sits (0 for the root). */
+export function dirDepth(dir: string): number {
+  return dir ? dir.split("/").length : 0;
+}
+
+/**
  * The path a note's `.md` file lives at, relative to the notes root, resolving
- * its folder against the registry: `<folder-dir>/<stem>.md` when grouped,
- * `<stem>.md` when ungrouped.
+ * its archived state and folder against the registry: `<stem>.md` at the root
+ * for an active ungrouped note, and one directory level per `archived/` /
+ * folder segment otherwise (see `noteDirName`).
  */
 export function noteFilePath(note: Note, folders?: readonly Folder[]): string {
-  const dir = folderDirName(note.folderId, folders);
+  const dir = noteDirName(note, folders);
   const stem = noteFileStem(note);
   return dir ? `${dir}/${stem}.md` : `${stem}.md`;
 }
@@ -106,30 +163,32 @@ export function noteFilePath(note: Note, folders?: readonly Folder[]): string {
 // -- Serialize --------------------------------------------------------
 
 /**
- * Every note in a snapshot, as an individual markdown file. A grouped note is
- * filed into its folder's real subdirectory (`<folder-dir>/<stem>.md`); an
- * ungrouped one sits at the notes root. The on-disk attachment references are
- * pointed up the extra directory level a folder adds so they still resolve in
- * an external markdown viewer.
+ * Every note in a snapshot, as an individual markdown file. An archived note is
+ * filed under `archived/`, a grouped one into its folder's real subdirectory,
+ * and one that is both nests as `archived/<folder-dir>/<stem>.md`; an active,
+ * ungrouped note sits at the notes root. The on-disk attachment references are
+ * pointed up one level per directory so they still resolve in an external
+ * markdown viewer.
  */
 export function snapshotToFiles(snapshot: Snapshot): MarkdownFile[] {
   return snapshot.notes.map((note) => {
-    const dir = folderDirName(note.folderId, snapshot.folders);
+    const dir = noteDirName(note, snapshot.folders);
     const stem = noteFileStem(note);
     return {
       path: dir ? `${dir}/${stem}.md` : `${stem}.md`,
-      text: noteToMarkdown(note, dir ? 1 : 0),
+      text: noteToMarkdown(note, dirDepth(dir)),
     };
   });
 }
 
 /**
- * Serialize one note to its `.md` file contents. `folderDepth` is how many
- * folder directories the note is nested under the notes root (0 ungrouped, 1
- * inside a folder), so the attachment references point up the right number of
- * levels to reach the sibling `attachments/` tree.
+ * Serialize one note to its `.md` file contents. `depth` is how many
+ * directories the note's file is nested under the notes root (0 at the root, 1
+ * inside a folder or under `archived/`, 2 for an archived note in a folder), so
+ * the attachment references point up the right number of levels to reach the
+ * sibling `attachments/` tree.
  */
-export function noteToMarkdown(note: Note, folderDepth = 0): string {
+export function noteToMarkdown(note: Note, depth = 0): string {
   const front = renderFrontmatter({
     id: note.id,
     // Only written when set, so a title-less note's frontmatter stays minimal.
@@ -156,7 +215,7 @@ export function noteToMarkdown(note: Note, folderDepth = 0): string {
   const body = refsToDisk(
     (note.body ?? "").replace(/\n+$/, ""),
     noteFileStem(note),
-    folderDepth,
+    depth,
   );
   // One blank line between the frontmatter and the body, and exactly one
   // trailing newline so the file ends cleanly. Trailing blank lines in the
@@ -178,11 +237,11 @@ export function noteToMarkdown(note: Note, folderDepth = 0): string {
 
 const ATTACHMENT_REF_RE = /(!?\[[^\]]*\]\()([^)]+)(\))/g;
 
-function refsToDisk(body: string, stem: string, folderDepth = 0): string {
+function refsToDisk(body: string, stem: string, depth = 0): string {
   // One `../` climbs out of the notes root to the namespace root (where the
-  // `attachments/` tree sits beside `notes/`); each folder directory the note
-  // is filed under adds one more.
-  const up = "../".repeat(1 + folderDepth);
+  // `attachments/` tree sits beside `notes/`); each directory the note is filed
+  // under — `archived/`, its folder, or both — adds one more.
+  const up = "../".repeat(1 + depth);
   return body.replace(
     ATTACHMENT_REF_RE,
     (whole, open: string, href: string, close: string) => {
@@ -214,18 +273,31 @@ function renderFrontmatter(fields: Record<string, string>): string {
 // -- Parse ------------------------------------------------------------
 
 /**
- * Reconstruct a `Snapshot` from a set of markdown files. Files that fail to
- * parse (missing frontmatter or id) are skipped rather than failing the whole
- * load — a single bad file shouldn't hide every other note. Order follows the
- * input file order.
+ * Reconstruct a `Snapshot` from a set of markdown files, **reporting** the ones
+ * that failed. A file with no frontmatter or no `id:` is not a note this app
+ * wrote — typically hand-authored in the synced folder, or left by another tool
+ * — so it is skipped rather than failing the whole load (one bad file must
+ * never hide every other note), and its path is returned in `unreadable` so the
+ * caller can surface it as an orphan instead of quietly discarding it. Order
+ * follows the input file order.
  */
-export function filesToSnapshot(files: readonly MarkdownFile[]): Snapshot {
+export function parseFiles(files: readonly MarkdownFile[]): {
+  snapshot: Snapshot;
+  unreadable: string[];
+} {
   const notes: Note[] = [];
+  const unreadable: string[] = [];
   for (const file of files) {
     const note = parseNote(file.text);
     if (note) notes.push(note);
+    else unreadable.push(file.path);
   }
-  return { notes };
+  return { snapshot: { notes }, unreadable };
+}
+
+/** `parseFiles` when only the notes are wanted and failures can be ignored. */
+export function filesToSnapshot(files: readonly MarkdownFile[]): Snapshot {
+  return parseFiles(files).snapshot;
 }
 
 export function parseNote(text: string): Note | null {

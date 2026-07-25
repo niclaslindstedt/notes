@@ -16,6 +16,7 @@ import {
 } from "../storage/active-note-preference.ts";
 import { unlockAchievements, useApplyAppearance } from "../theme/useTheme.ts";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
+import { OrphanFilesModal } from "../ui/OrphanFilesModal.tsx";
 import { DropOverlay } from "../ui/DropOverlay.tsx";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
 import { useFileDrop } from "../ui/hooks/useFileDrop.ts";
@@ -57,6 +58,7 @@ import { SettingsModalHost } from "./modals/SettingsModalHost.tsx";
 import { useEncryptionMigration } from "./use-encryption-migration.ts";
 import { useNavState } from "./use-nav.ts";
 import { useNotes } from "./use-notes.ts";
+import { useOrphans } from "./use-orphans.ts";
 import { useSettingsSync } from "./use-settings-sync.ts";
 import { useUploadStatus } from "./use-upload-status.ts";
 
@@ -181,6 +183,18 @@ export function App() {
       refreshIndex: storage.refreshIndex,
       onDisableComplete: storage.finishDisableEncryption,
     });
+
+  // Files the last load found in the notes folder but couldn't match to a note
+  // — a hand-authored markdown file, or something another tool left behind. The
+  // storage layer refuses to delete them on its own, so this is what asks the
+  // user to decide. Inert on the browser backend, which owns its whole key.
+  const orphans = useOrphans({
+    adapter: storage.adapter,
+    backendId: storage.backend,
+    namespace: storage.activeNamespace,
+    loaded: sync.loaded,
+    importFiles,
+  });
 
   // Per-note upload progress for the sync spinner: the ids of notes whose file
   // is being pushed to the backend right now. Empty on the local backend, which
@@ -636,6 +650,7 @@ export function App() {
             <AchievementsModalHost />
             <AchievementsUnlockModalHost />
             <ConflictModal sync={sync} />
+            <OrphanFilesModal orphans={orphans} />
             <PullToRefreshIndicator
               state={ptr.state}
               pullDistance={ptr.pullDistance}

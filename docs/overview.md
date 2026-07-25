@@ -1613,11 +1613,80 @@ backends share. `snapshotToFiles` / `filesToSnapshot` convert in both
 directions; `noteToMarkdown` writes YAML frontmatter (id, title, created,
 updated, archived, and the `folder:` id) plus the body; `parseNote` reads it
 back defensively (skipping malformed files); `noteFileStem` builds the
-`<slug>-<id-suffix>.md` filename. `noteFilePath` / `folderDirName` /
-`folderDirSegment` add the **physical folder directory** a grouped note is filed
-into — `<folder-dir>/<stem>.md`, the folder-name slug — and `noteToMarkdown`
-takes a `folderDepth` so a note nested in a folder points its on-disk attachment
-references up the extra `../` level to reach the sibling `attachments/` tree.
+`<slug>-<id-suffix>.md` filename. `noteFilePath` / `noteDirName` /
+`folderDirName` / `folderDirSegment` resolve the directory a note is filed into
+— the **physical folder directory** of a grouped note (`<folder-dir>/<stem>.md`,
+the folder-name slug) and the [archive directory](#archive-directory) of an
+archived one — and `noteToMarkdown` takes a `depth` so a nested note points its
+on-disk attachment references up one extra `../` per level to reach the sibling
+`attachments/` tree. `parseFiles` is the reporting form of `filesToSnapshot`:
+same result, plus the paths that failed to parse, which the directory adapter
+surfaces as [orphan files](#orphan-files) instead of discarding.
+
+### Archive directory
+
+Archiving is a soft delete in the document (see [archive /
+restore](#archive--restore)); on the file/cloud backends it is also a **move on
+disk**. An archived note's file lives under `archived/` at the namespace's notes
+root, so the synced folder mirrors what the app shows — the root holds exactly
+the notes the overview lists, and everything swiped away sits in one directory
+that can be browsed, shared, or deleted wholesale. A note that is both archived
+and grouped nests as `archived/<folder-dir>/<stem>.md`.
+
+Both representations move: the plaintext `.md` and the encrypted `.enc` alike
+(`ARCHIVED_DIR`, `noteDirName` in the codec; `encNotePath` in the directory
+adapter). The encrypted filename is a keyed HMAC of the note id *alone*, so
+archiving changes only the directory, never the name — which means the bytes can
+be transferred verbatim. Note that with the ciphertext filed this way, an
+observer of the raw folder can see how many notes are archived, though not which
+ones or what they say; that is the deliberate trade for a layout that reads the
+same whether or not encryption is on.
+
+The `archived: true` frontmatter (and, encrypted, the sealed note JSON) stays
+the **authoritative** flag the load reads back, so the directory is a write-side
+projection only: a file in the "wrong" place still loads with the state its own
+contents declare, and the next save relocates it. That is what makes the upgrade
+free — notes archived by an older build sit at the notes root, load correctly,
+and move the first time anything is saved.
+
+`relocateDeferred` (`src/storage/directory-adapter.ts`) covers the one case the
+ordinary write path can't. Archiving a note whose body was never loaded (a
+**deferred** note on an encrypted backend) leaves nothing to write — the save
+skips it — while its old path is tracked and unwanted, so the planner would
+delete the only copy. The relocation pass moves the bytes first, turning it into
+an ordinary rename; it runs after the conflict check and before the removals, so
+an interruption leaves both copies rather than none.
+
+### Orphan files
+
+A file/cloud backend keeps your notes in a folder **you** can also open and
+write to, so a load turns up files that aren't notes. Two kinds
+(`OrphanReason`): `unreadable` — a `.md` with no frontmatter or no `id:`,
+typically hand-authored in the synced folder — and `foreign`, a file whose
+extension the app doesn't own at all. Sidecars (`folders.json`, the key params,
+the encrypted index, the legacy blob) and dotfiles (`.DS_Store` and friends) are
+never flagged.
+
+The important half is what *stopped* happening. An unreadable `.md` used to be
+skipped by the codec, yet it was still tracked from the directory listing and
+absent from the desired set — the exact signature of a deleted note — so the
+next unrelated save deleted it. The directory adapter now subtracts the orphan
+set from both `plan`'s removals and the representation supersede, so an
+unrecognised file is never removed as a side effect. `removeOrphan` is the only
+path that deletes one, and it takes an explicit decision.
+
+`getOrphans` reports what the last load found; `readOrphan` / `removeOrphan` act
+on it, both scoped to the reported set so neither becomes a general read or
+delete of anything under the notes root. `useOrphans`
+(`src/app/use-orphans.ts`) reads the set once each load settles and drives
+`OrphanFilesModal`, which offers the three answers that exist per file: **import
+as note** (its contents become the body, its filename the title, via
+`importFiles`; the original is deleted afterwards, since the adopted note is
+rewritten at the app's own canonical path), **delete file**, or leave it alone —
+either for now, or for good via `orphan-ignore.ts`. That ignore list is
+deliberately device-local `localStorage`, keyed per backend + namespace:
+"don't bother *me* about this" is a per-device preference, and syncing it would
+let one device silence a file the others have never shown their user.
 
 ### Save retry
 

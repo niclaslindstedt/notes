@@ -72,6 +72,19 @@ export function withEncryption(
       return { ...written, text };
     },
 
+    // Orphan files are unencrypted metadata about the *folder*, not the
+    // document, so they pass through untouched — and forwarding them keeps the
+    // `"orphans"` capability this wrapper copies from `inner` honest.
+    getOrphans: inner.getOrphans ? () => inner.getOrphans!() : undefined,
+
+    readOrphan: inner.readOrphan
+      ? (path) => inner.readOrphan!(path)
+      : undefined,
+
+    removeOrphan: inner.removeOrphan
+      ? (path) => inner.removeOrphan!(path)
+      : undefined,
+
     watch: inner.watch
       ? (onRemoteChange) =>
           inner.watch!((snap) => {
