@@ -1142,7 +1142,13 @@ It lays out, top to bottom:
   [logger](#logger)), filtered to a `SYNC_LOG_SCOPES` allowlist. It shows even
   when the developer-mode capture toggle is off (capture only governs
   persistence across reloads, not the live buffer), with a Copy button — so a
-  non-developer can read what sync is doing without entering dev mode.
+  non-developer can read what sync is doing without entering dev mode. The list
+  is ordered **newest first**, so the line that explains what just happened sits
+  at the top of the scroll box rather than below the whole session's history;
+  the Copy button still writes the entries oldest-first, the order a log is read
+  in when it is pasted into a bug report. (The [Logs](#logs) settings tab keeps
+  its chronological order — it is a full transcript, not a "what just happened"
+  view.)
 
 The status copy names the bare service ("Synced to Dropbox"), since the
 Encryption column now carries the at-rest state. Its content is short and opens

@@ -653,15 +653,20 @@ function SyncLogPanel({ t }: { t: TFunction }) {
   // ring buffer; the filter narrows it to the cloud-sync scopes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const all = useMemo(() => getLogs(), [version]);
+  // Newest first: the ring buffer is chronological, but the reason the modal is
+  // open is almost always "what just happened", so the latest line sits at the
+  // top of the scroll box instead of below a wall of history.
   const entries = useMemo(
-    () => all.filter((e) => SYNC_LOG_SCOPES.has(e.scope)),
+    () => all.filter((e) => SYNC_LOG_SCOPES.has(e.scope)).reverse(),
     [all],
   );
 
   async function handleCopy() {
     try {
+      // The copied text stays chronological — it is pasted into bug reports,
+      // where a log reads oldest-first.
       await navigator.clipboard.writeText(
-        entries.map(formatLogLine).join("\n"),
+        entries.slice().reverse().map(formatLogLine).join("\n"),
       );
       setCopyStatus("copied");
     } catch {
