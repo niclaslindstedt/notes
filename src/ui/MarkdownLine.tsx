@@ -274,10 +274,17 @@ function RenderedLineImpl({
         </div>
       );
 
+    // A code line renders verbatim — no inline parsing, no markers. The block's
+    // background comes from `sizeClass`; only the ink differs, so a fence that
+    // is still visible (the caret is inside the block) reads as the markup it
+    // is, while the code it wraps reads as content.
     case "fence":
     case "code":
       return (
-        <div className={`${sizeClass} text-muted`} data-src={0}>
+        <div
+          className={`${sizeClass} ${block.kind === "fence" ? "text-muted" : "text-fg-bright"}`}
+          data-src={0}
+        >
           {block.raw.length === 0 ? " " : block.raw}
         </div>
       );

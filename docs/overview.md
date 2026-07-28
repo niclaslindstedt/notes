@@ -343,6 +343,11 @@ carries a `bare: true` flag so the renderer knows it may [shorten it for
 display](#shorten-links) — an explicit link's label is never touched. The `image` node (`![alt](href)`) is what
 the [attachment renderer](#attachments) turns into an inline thumbnail.
 
+A ` ``` ` line toggles the fenced state, so the lines between a pair of them
+classify as `code` and are never reparsed as Markdown; `fencedRanges` /
+`hiddenFenceLines` / `hasClosedFence` are the helpers built on top of that
+state — see [Code block](#code-block).
+
 After the per-line pass, `numberLists` walks the blocks once more to fill in the
 two list fields the classifier can't decide line-by-line: a `depth` from each
 `ul`/`ol` item's indentation (a stack of `{ indent, count }` frames opens a
@@ -434,6 +439,45 @@ short URL (where head + marker + tail would meet or overlap) is shown in full.
 `LinkNode` (`src/ui/MarkdownLine.tsx`) applies it; the
 [Short and sweet](#unlock-triggers) achievement fires the first time it's
 switched on.
+
+### Code block
+
+Lines wrapped in a pair of ` ``` ` (or `~~~`) fences are a **fenced code
+block**: `classifyLines` (see [Markdown parser](#markdown-parser)) tracks the
+fence state and gives every line inside the block the `code` kind, so its
+contents render verbatim — a `#` inside a block stays a hash, not a heading.
+The delimiter lines themselves are the `fence` kind.
+
+In the [live-preview editor](#markdown-editor) the fences are hidden the same
+way a heading's `#` is: `hiddenFenceLines(blocks, activeLine)`
+(`src/domain/markdown.ts`) returns both delimiter lines of every **closed**
+block the caret is *outside* of, and `MarkdownEditor` skips rendering those
+lines. Move the caret anywhere inside a block — onto its code, or onto a fence
+itself — and both delimiters reappear, so they can be edited or deleted; move
+it out and they fold away again. `fencedRanges` is the underlying pairing pass
+(each opening fence matched to the next closing one). Two rules keep this from
+hiding something the user needs:
+
+- An **unterminated** fence is never hidden. Until a closing ` ``` ` exists the
+  block has no end, and hiding the opener would swallow the only marker saying
+  the rest of the note is code — so a half-typed block keeps its fence on
+  screen.
+- A block stays **visible as a block** without its delimiters: `lineTextClass`
+  (`src/ui/markdown-line-class.ts`) gives every `code` and `fence` line a
+  `bg-surface-2` slab and horizontal padding. The editor renders one element
+  per source line, so there is no container to paint — the adjacent lines'
+  boxes meet and read as one block. The **active raw line** gets the same
+  classes, so putting the caret inside a block doesn't punch a hole in it.
+  `RenderedLine` (`src/ui/MarkdownLine.tsx`) then only varies the ink: a
+  visible fence is muted (it is markup), the code it wraps is bright (it is
+  content).
+
+The lines stay in the source throughout — hiding is purely a render-time skip,
+so line indices, structural edits, and [selection
+mapping](#selection-mapping) are unaffected. `hasClosedFence(body)` is the
+cheap line-level scan (no blocks built) behind the
+[Fenced in](#unlock-triggers) achievement, which fires the first time a note
+holds a closed block.
 
 ### Bullet characters
 

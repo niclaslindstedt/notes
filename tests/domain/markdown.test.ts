@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyLines,
+  fencedRanges,
+  hasClosedFence,
+  hiddenFenceLines,
   parseInline,
   shortenUrl,
   type InlineNode,
@@ -73,6 +76,71 @@ describe("classifyLines", () => {
     const [block] = classifyLines("just words");
     expect(block?.kind).toBe("paragraph");
     expect(block?.contentStart).toBe(0);
+  });
+});
+
+describe("fencedRanges", () => {
+  it("pairs each opening fence with its closing one", () => {
+    const blocks = classifyLines("a\n```\ncode\n```\nb\n~~~\nmore\n~~~");
+    expect(fencedRanges(blocks)).toEqual([
+      { open: 1, close: 3 },
+      { open: 5, close: 7 },
+    ]);
+  });
+
+  it("ignores an unterminated fence", () => {
+    expect(fencedRanges(classifyLines("a\n```\ncode"))).toEqual([]);
+    // The closed block before it is still reported.
+    expect(fencedRanges(classifyLines("```\na\n```\n```\nb"))).toEqual([
+      { open: 0, close: 2 },
+    ]);
+  });
+
+  it("reports an empty block whose fences are adjacent", () => {
+    expect(fencedRanges(classifyLines("```\n```"))).toEqual([
+      { open: 0, close: 1 },
+    ]);
+  });
+});
+
+describe("hiddenFenceLines", () => {
+  const blocks = classifyLines("a\n```\ncode\n```\nb");
+
+  it("hides both fences of a block the caret is outside of", () => {
+    expect([...hiddenFenceLines(blocks, 0)]).toEqual([1, 3]);
+    expect([...hiddenFenceLines(blocks, 4)]).toEqual([1, 3]);
+  });
+
+  it("hides every block's fences when no line is active", () => {
+    expect([...hiddenFenceLines(blocks, null)]).toEqual([1, 3]);
+  });
+
+  it("reveals both fences while the caret is inside the block", () => {
+    // On the block's body…
+    expect(hiddenFenceLines(blocks, 2).size).toBe(0);
+    // …and on either delimiter itself.
+    expect(hiddenFenceLines(blocks, 1).size).toBe(0);
+    expect(hiddenFenceLines(blocks, 3).size).toBe(0);
+  });
+
+  it("reveals only the block the caret is in, leaving other blocks hidden", () => {
+    const two = classifyLines("```\na\n```\nb\n```\nc\n```");
+    expect([...hiddenFenceLines(two, 5)]).toEqual([0, 2]);
+  });
+
+  it("never hides an unterminated fence", () => {
+    const open = classifyLines("a\n```\ncode");
+    expect(hiddenFenceLines(open, 0).size).toBe(0);
+  });
+});
+
+describe("hasClosedFence", () => {
+  it("is true only once a fence has been closed", () => {
+    expect(hasClosedFence("")).toBe(false);
+    expect(hasClosedFence("just words")).toBe(false);
+    expect(hasClosedFence("```\ncode")).toBe(false);
+    expect(hasClosedFence("```\ncode\n```")).toBe(true);
+    expect(hasClosedFence("~~~js\ncode\n~~~")).toBe(true);
   });
 });
 

@@ -118,6 +118,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Inställningar → Redigerare smalnar av skrivkolumnen för en mer fokuserad, sidlik känsla — eller låter den löpa över skärmens fulla bredd.",
     },
+    fencedIn: {
+      name: "Inom staketet",
+      condition: "Skriv ett kodblock med ``` i en anteckning.",
+      learnMore:
+        "Omslut rader med ``` så visar redigeraren dem som ett kodblock — ordagrant, utan någon Markdown-formatering inuti. Själva staketraderna döljs när blocket är stängt och kommer tillbaka så fort du placerar markören inuti det.",
+    },
     plainText: {
       name: "Enkelt och rent",
       condition: "Stäng av direkt Markdown-visning.",

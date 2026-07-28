@@ -283,6 +283,46 @@ describe("MarkdownEditor", () => {
     });
   });
 
+  describe("fenced code blocks", () => {
+    // The source lines actually rendered, in order — a hidden line is absent
+    // from the DOM entirely (it stays in the source).
+    function renderedIndices(): string[] {
+      return [...surface().querySelectorAll("[data-line-index]")].map(
+        (el) => el.getAttribute("data-line-index") ?? "",
+      );
+    }
+
+    it("hides both fences of a closed block the caret is outside of", () => {
+      // Caret opens on the trailing line 4, outside the block on lines 1–3.
+      renderEditor("before\n```\ncode\n```\n");
+      expect(renderedIndices()).toEqual(["0", "2", "4"]);
+      expect(surface().textContent).not.toContain("```");
+      // The code inside is still rendered, verbatim.
+      expect(screen.getByText("code")).not.toBeNull();
+    });
+
+    it("reveals the fences once the caret steps inside the block", () => {
+      renderEditor("before\n```\ncode\n```\n", { focusOnMount: false });
+      caretIn(screen.getByText("code"), 0);
+      act(() => document.dispatchEvent(new Event("selectionchange")));
+      expect(renderedIndices()).toEqual(["0", "1", "2", "3", "4"]);
+      expect(rawLine()?.getAttribute("data-line-index")).toBe("2");
+      expect(surface().textContent).toContain("```");
+    });
+
+    it("keeps an unterminated fence on screen", () => {
+      // No closing fence yet, so nothing is hidden even with the caret away.
+      renderEditor("```\ncode", { focusOnMount: false });
+      expect(renderedIndices()).toEqual(["0", "1"]);
+      expect(surface().textContent).toContain("```");
+    });
+
+    it("hides every block's fences when no line is active", () => {
+      renderEditor("```\na\n```\ntext\n```\nb\n```", { focusOnMount: false });
+      expect(renderedIndices()).toEqual(["1", "3", "5"]);
+    });
+  });
+
   describe("blur reformats the note", () => {
     it("renders a trailing lone hyphen as a rule once the body loses focus", async () => {
       const { container } = renderEditor("text\n-");
