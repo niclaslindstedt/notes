@@ -26,7 +26,7 @@ import {
   replaceRange,
   type SourcePoint,
 } from "../domain/line-edit.ts";
-import { classifyLines } from "../domain/markdown.ts";
+import { classifyLines, hiddenFenceLines } from "../domain/markdown.ts";
 import type { Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { getEditorPosition, setEditorPosition } from "./editor-position.ts";
@@ -241,6 +241,16 @@ export function MarkdownEditor({
 
   const clampedIndex =
     active.index === null ? null : Math.min(active.index, lines.length - 1);
+
+  // The ``` delimiters of every closed code block the caret is outside of. They
+  // are dropped from the preview the same way a heading's `#` is — the block
+  // renders as code, and the fences reappear the moment the caret steps inside
+  // it (see `hiddenFenceLines`). They stay in the source, so line indices and
+  // structural edits are untouched.
+  const hiddenFences = useMemo(
+    () => hiddenFenceLines(blocks, clampedIndex),
+    [blocks, clampedIndex],
+  );
 
   // Mutate the source and move the caret. Re-derives the string and queues the
   // caret column for the effect below to install. The active node is remounted
@@ -939,7 +949,7 @@ export function MarkdownEditor({
             // in place; skip its line here. It stays in the source (so indices
             // and structural edits are unaffected) and reveals its raw markdown
             // when the caret lands on it (making it the active line).
-            if (hidden.has(index)) return null;
+            if (hidden.has(index) || hiddenFences.has(index)) return null;
             return (
               <div
                 key={index}

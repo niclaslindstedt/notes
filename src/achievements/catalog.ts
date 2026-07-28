@@ -6,6 +6,7 @@
 // `learnMore: true` flags entries that carry an expanded body.
 
 import { isImageAttachment } from "../domain/attachment.ts";
+import { hasClosedFence } from "../domain/markdown.ts";
 import type { Snapshot } from "../domain/note.ts";
 import {
   AccessibilityGlyph,
@@ -70,6 +71,11 @@ const hasMultiLineNote = (snap: Snapshot) =>
 // uses the dedicated title row rather than letting a note stay untitled.
 const hasTitledNote = (snap: Snapshot) =>
   snap.notes.some((n) => n.title.trim() !== "");
+
+// A note holding a closed ``` fenced code block — the point where someone is
+// keeping snippets in the app, not just prose.
+const hasCodeBlock = (snap: Snapshot) =>
+  snap.notes.some((n) => hasClosedFence(n.body ?? ""));
 
 // A note that has been swiped into the archive — the first time someone tidies
 // a note away without deleting it.
@@ -236,6 +242,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       slices: (s) => [s.appearance.editor.margin],
       predicate: (prev, next) =>
         prev.appearance.editor.margin !== next.appearance.editor.margin,
+    },
+  },
+  {
+    id: "fencedIn",
+    tier: "intermediate",
+    glyph: CodeGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasCodeBlock(prev.snapshot) && hasCodeBlock(next.snapshot),
     },
   },
   {

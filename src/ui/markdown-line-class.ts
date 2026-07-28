@@ -19,8 +19,14 @@ export function lineTextClass(block: LineBlock): string {
         return "text-base font-semibold text-fg-bright";
     }
   }
+  // A code line carries the block's slab of background itself: the lines of a
+  // fenced block are separate stacked elements (the editor renders one per
+  // source line), so there is no container to paint. Adjacent lines' boxes
+  // meet, reading as one block — which is what keeps a block recognisable once
+  // its ``` fences are hidden. The active raw line gets it too, so putting the
+  // caret inside a block doesn't punch a hole in it.
   if (block.kind === "code" || block.kind === "fence") {
-    return "text-sm";
+    return "bg-surface-2 px-2 text-sm";
   }
   return "";
 }

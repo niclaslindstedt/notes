@@ -123,6 +123,12 @@ const achievements = {
       learnMore:
         "Settings → Editor narrows the writing column for a more focused, page-like feel — or lets it run the full width of the screen.",
     },
+    fencedIn: {
+      name: "Fenced in",
+      condition: "Write a fenced code block in a note.",
+      learnMore:
+        "Wrap lines in ``` and the editor renders them as a block of code — verbatim, with no Markdown formatting applied inside. The fences themselves disappear once the block is closed, and come back the moment you put the caret inside it.",
+    },
     plainText: {
       name: "Plain and simple",
       condition: "Turn live Markdown rendering off.",

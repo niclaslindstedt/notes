@@ -86,6 +86,70 @@ export function classifyLines(body: string): LineBlock[] {
   return blocks;
 }
 
+/** A fenced code block's source-line span, both delimiter lines inclusive. */
+export type FencedRange = { open: number; close: number };
+
+/**
+ * Every **closed** fenced code block in `blocks`, as inclusive line ranges. A
+ * trailing unterminated fence yields nothing: its block has no end yet (the
+ * user is still typing it), so there is no delimiter pair to reason about.
+ */
+export function fencedRanges(blocks: readonly LineBlock[]): FencedRange[] {
+  const ranges: FencedRange[] = [];
+  let open: number | null = null;
+  for (let i = 0; i < blocks.length; i += 1) {
+    if (blocks[i]!.kind !== "fence") continue;
+    if (open === null) {
+      open = i;
+    } else {
+      ranges.push({ open, close: i });
+      open = null;
+    }
+  }
+  return ranges;
+}
+
+/**
+ * The fence delimiter lines the live preview hides: both ``` lines of every
+ * closed code block the caret is *outside* of. A finished block then reads as
+ * a block of code rather than as its own markup, and stepping the caret
+ * anywhere inside it — including onto a fence itself — brings the delimiters
+ * back so they can be edited or removed. An unterminated fence is never
+ * hidden: with no closing line, hiding the opener would silently swallow the
+ * only marker saying the rest of the note is code.
+ *
+ * `activeLine` is the source line the caret sits on, or null when the note has
+ * no active line (nothing focused) — then every closed block hides its fences.
+ */
+export function hiddenFenceLines(
+  blocks: readonly LineBlock[],
+  activeLine: number | null,
+): Set<number> {
+  const hidden = new Set<number>();
+  for (const { open, close } of fencedRanges(blocks)) {
+    if (activeLine !== null && activeLine >= open && activeLine <= close)
+      continue;
+    hidden.add(open);
+    hidden.add(close);
+  }
+  return hidden;
+}
+
+/**
+ * Whether `body` holds at least one closed fenced code block. A line-level
+ * scan rather than a full `classifyLines` pass, so the achievement watcher can
+ * run it over every note on each edit without building blocks it throws away.
+ */
+export function hasClosedFence(body: string): boolean {
+  let open = false;
+  for (const raw of body.split("\n")) {
+    if (!FENCE_RE.test(raw)) continue;
+    if (open) return true;
+    open = true;
+  }
+  return false;
+}
+
 // Second pass over the classified blocks: assign every `ul`/`ol` item a nesting
 // `depth` from its indentation, and every `ol` item a sequential `marker`. The
 // per-line classifier can't do this — the displayed number of `1.`/`1.` (→ `1.`
