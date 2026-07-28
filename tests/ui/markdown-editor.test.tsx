@@ -309,6 +309,63 @@ describe("MarkdownEditor", () => {
     });
   });
 
+  // A composition is the one edit the browser applies to the line itself, so
+  // React's record of that line's children goes stale the moment it starts.
+  // This is not only the IME case it sounds like: on the Nordic layouts `` ` ``
+  // and `´` are dead keys, so typing a plain backtick composes — and used to
+  // take the whole app down with a `removeChild` NotFoundError, because React
+  // reconciled the line in place and tried to tear down the `<br>` the browser
+  // had already swapped out. `composeInto` stands in for that native rewrite.
+  describe("IME / dead-key composition", () => {
+    function composeInto(line: HTMLElement, text: string) {
+      act(() => {
+        fireEvent.compositionStart(surface());
+      });
+      // The browser rewrites the line's children itself — on an empty line that
+      // means dropping the lone <br> React rendered there.
+      line.textContent = text;
+      act(() => {
+        fireEvent.compositionEnd(surface(), { data: text });
+      });
+    }
+
+    it("takes a dead-key backtick on an empty line without crashing", () => {
+      const { onChange, container } = renderEditor("");
+      const raw = rawLine()!;
+      expect(raw.querySelector("br")).not.toBeNull();
+
+      composeInto(raw, "`");
+
+      expect(onChange).toHaveBeenLastCalledWith("`");
+      expect(rawLine()?.textContent).toBe("`");
+      expect(container.querySelector("[data-raw] br")).toBeNull();
+    });
+
+    it("takes a composed character mid-note without crashing", () => {
+      const { onChange } = renderEditor("alpha\n");
+      // The caret opens on the trailing (empty) last line.
+      composeInto(rawLine()!, "à");
+      expect(onChange).toHaveBeenLastCalledWith("alpha\nà");
+
+      // And again on the now non-empty line, so the second composition
+      // reconciles against a line React last rendered as text.
+      composeInto(rawLine()!, "àb");
+      expect(onChange).toHaveBeenLastCalledWith("alpha\nàb");
+    });
+
+    it("rebuilds the line but reports no edit when composition changes nothing", () => {
+      const { onChange } = renderEditor("alpha");
+      // A composition the user cancelled: the browser touched the line, but it
+      // resolved back to the text already in the source.
+      composeInto(rawLine()!, "alpha");
+      // The unchanged document is never pushed through onChange (it would bump
+      // the note's updatedAt for a keystroke that changed nothing)…
+      expect(onChange).not.toHaveBeenCalled();
+      // …but the line is still on screen and editable.
+      expect(rawLine()?.textContent).toBe("alpha");
+    });
+  });
+
   describe("tab order", () => {
     it("reports Tab up instead of indenting, and stays out of the tab order", () => {
       // The host places the editor between the title and the header actions —

@@ -190,6 +190,19 @@ text at the root), which is exactly why every edit is intercepted. **IME
 composition is the one exception** — it can't be `preventDefault`ed, so it runs
 natively on the active line and is reconciled on `compositionend`.
 
+**A composition always remounts the line it touched.** Because the browser wrote
+into the line itself, React's record of that line's children is stale by the time
+`readBackComposition` runs, so it bumps the active-line key rather than letting
+React reconcile in place — even when the composed text turns out to match what
+was already in the source (a cancelled composition still moved DOM around, and it
+reports no edit through `onChange`, so a keystroke that changed nothing never
+bumps the note's `updatedAt`). Reconciling in place instead would try to tear down
+nodes the browser had already replaced — on an empty line, the lone `<br>` — and
+the resulting `removeChild` `NotFoundError` unmounts the whole app. This is far
+less niche than "IME" suggests: **a dead key composes too**, so on the Nordic
+layouts, where `` ` `` and `´` are dead keys, typing a plain backtick went through
+this path and blanked the screen.
+
 **Opening a note shows it fully formatted.** The active line is nullable
 (`active: { index: number | null; key }`), and an existing note opens with *no*
 line active (the app passes `focusOnMount={false}`), so every line — last one
