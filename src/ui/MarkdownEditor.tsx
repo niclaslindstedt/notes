@@ -246,7 +246,9 @@ export function MarkdownEditor({
   // caret column for the effect below to install. The active node is remounted
   // (bumped key) only when the caret crosses onto a *different* line — a
   // same-line edit keeps the node, letting React update its text in place.
-  function commit(nextLines: string[], caret: SourcePoint) {
+  // `remount` forces that fresh node even within one line, for the one caller
+  // whose line the browser has mutated behind React's back (see `activate`).
+  function commit(nextLines: string[], caret: SourcePoint, remount = false) {
     const next = nextLines.join("\n");
     setValue(next);
     onChange(next);
@@ -254,16 +256,23 @@ export function MarkdownEditor({
     lastCaret.current = caret;
     setActive((a) => ({
       index: caret.line,
-      key: a.index === caret.line ? a.key : a.key + 1,
+      key: a.index === caret.line && !remount ? a.key : a.key + 1,
     }));
   }
 
   // Move the active line without editing the source (a caret move that reveals a
   // new raw line). Remounts the active node so it renders that line's raw text.
-  function activate(index: number, col: number) {
+  // `remount` forces the remount when the line is already active: after an IME
+  // composition the browser has rewritten that line's children itself, so
+  // React's record of them is stale and reconciling in place tears down nodes
+  // that are no longer there. A fresh key throws the whole subtree away instead.
+  function activate(index: number, col: number, remount = false) {
     pendingCaret.current = col;
     lastCaret.current = { line: index, col };
-    setActive((a) => ({ index, key: a.index === index ? a.key : a.key + 1 }));
+    setActive((a) => ({
+      index,
+      key: a.index === index && !remount ? a.key : a.key + 1,
+    }));
   }
 
   // Adopt an out-of-band change to this note's body — a live cloud pull while
@@ -549,6 +558,15 @@ export function MarkdownEditor({
   // Reconcile the active line after an IME composition (the one edit the browser
   // applies itself): read the raw line's text back into the source and restore
   // the caret to where composition left it.
+  //
+  // The line is *always* remounted, whether or not the text ended up different.
+  // Composition is the one path where the browser writes into the line itself,
+  // so React's picture of that line's children is stale the moment it starts —
+  // on an empty line it swaps out the `<br>` React put there, and reconciling in
+  // place then tries to remove a node that is no longer a child, which throws
+  // and takes the whole app down. This is not the niche IME case it reads like:
+  // a **dead key** composes too, so on the Nordic layouts (where `` ` `` and `´`
+  // are dead keys) typing a plain backtick crashed the editor.
   function readBackComposition() {
     const el = activeElRef.current;
     const root = rootRef.current;
@@ -566,10 +584,15 @@ export function MarkdownEditor({
           )?.col ?? raw.length)
         : raw.length;
     const next = [...linesRef.current];
-    if (next[i] !== raw) {
-      next[i] = raw;
-      commit(next, { line: i, col });
+    if (next[i] === raw) {
+      // Nothing to write back (a composition that resolved to what was already
+      // there, or one the user cancelled) — but the browser still touched the
+      // line, so it must be rebuilt rather than left for React to reconcile.
+      activate(i, col, true);
+      return;
     }
+    next[i] = raw;
+    commit(next, { line: i, col }, true);
   }
 
   // --- Selection-driven active line ----------------------------------------
