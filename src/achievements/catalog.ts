@@ -24,6 +24,7 @@ import {
   FlaskGlyph,
   FolderGlyph,
   FolderTreeGlyph,
+  FormatGlyph,
   GlobeGlyph,
   ImageGlyph,
   ImportGlyph,
@@ -417,6 +418,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     learnMore: true,
     // Fired when reopening a note restores the caret / scroll position it was
     // left at earlier this session (see `src/ui/editor-position.ts`).
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "stylist",
+    tier: "beginner",
+    glyph: FormatGlyph,
+    learnMore: true,
+    // Fired by the first press of any styling-toolbar button (`runFormat` in
+    // `src/ui/NoteEditor.tsx`) — the markup it writes is indistinguishable
+    // from typing it by hand, so there is nothing in the document to derive.
     trigger: { kind: "manual" },
   },
 

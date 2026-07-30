@@ -87,6 +87,12 @@ const achievements = {
       learnMore:
         "notes is a Progressive Web App: add it to your home screen or launcher and it opens full-screen and works offline, just like a native app.",
     },
+    stylist: {
+      name: "Stylist",
+      condition: "Format something with the styling toolbar.",
+      learnMore:
+        "The formatting button at the top right of a note opens a toolbar above the text — headings, bold, italic, strikethrough, inline code, bullet and numbered lists, quotes, code blocks, indent and outdent, links, images and dividers, one button each. It writes ordinary Markdown, so anything you reach for there you can also just type; every button is a toggle, so pressing a lit one takes the formatting back off.",
+    },
 
     // ── Intermediate ──────────────────────────────────────────────────
     collector: {

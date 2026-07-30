@@ -81,6 +81,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "notes är en Progressive Web App: lägg till den på hemskärmen eller i appstartaren så öppnas den i helskärm och fungerar offline, precis som en inbyggd app.",
     },
+    stylist: {
+      name: "Stilisten",
+      condition: "Formatera något med formateringsraden.",
+      learnMore:
+        "Formateringsknappen uppe till höger i en anteckning fäller ut en rad ovanför texten — rubriker, fet, kursiv, genomstruken, kod i text, punktlistor och numrerade listor, citat, kodblock, indrag, länkar, bilder och avdelare, en knapp var. Den skriver vanlig Markdown, så allt du når där kan du lika gärna skriva för hand; varje knapp är en växel, så ett tryck på en tänd knapp tar bort formateringen igen.",
+    },
 
     // ── Van ───────────────────────────────────────────────────────────
     collector: {

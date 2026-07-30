@@ -52,35 +52,62 @@ export function collapsedCaret(): { node: Node; offset: number } | null {
   return { node: range.startContainer, offset: range.startOffset };
 }
 
-// Place a collapsed caret `col` characters into `lineEl`'s text. Walks the
-// line's text nodes to find the one that contains the column; falls back to the
-// element itself (an empty line rendered as a lone <br>) so the caret still
-// lands somewhere focusable.
-export function placeCaret(lineEl: HTMLElement, col: number): void {
-  const doc = lineEl.ownerDocument;
-  const walker = doc.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT);
+// Resolve column `col` of `lineEl`'s text to the (node, offset) the DOM speaks.
+// Walks the line's text nodes to find the one that contains the column; falls
+// back to the element itself (an empty line rendered as a lone <br>) so a caret
+// still lands somewhere focusable.
+function domPointAt(
+  lineEl: HTMLElement,
+  col: number,
+): {
+  node: Node;
+  offset: number;
+} {
+  const walker = lineEl.ownerDocument.createTreeWalker(
+    lineEl,
+    NodeFilter.SHOW_TEXT,
+  );
   let remaining = col;
   let node = walker.nextNode() as Text | null;
-  let target: { node: Node; offset: number } | null = null;
   while (node) {
     const len = node.data.length;
-    if (remaining <= len) {
-      target = { node, offset: remaining };
-      break;
-    }
+    if (remaining <= len) return { node, offset: remaining };
     remaining -= len;
     node = walker.nextNode() as Text | null;
   }
   // Past the end of all text (or no text at all): land at the line's end.
-  if (!target) {
-    const last = lastTextNode(lineEl);
-    target = last
-      ? { node: last, offset: last.data.length }
-      : { node: lineEl, offset: 0 };
-  }
+  const last = lastTextNode(lineEl);
+  return last
+    ? { node: last, offset: last.data.length }
+    : { node: lineEl, offset: 0 };
+}
+
+/** Place a collapsed caret `col` characters into `lineEl`'s text. */
+export function placeCaret(lineEl: HTMLElement, col: number): void {
+  placeRange(lineEl, col, col);
+}
+
+/**
+ * Select `[from, to)` of `lineEl`'s text — the ranged sibling of
+ * {@link placeCaret}, used when an edit wants to hand a span back selected
+ * (the toolbar wrapping a word in `**`, or landing on a link's `url`
+ * placeholder ready to be typed over) rather than just a caret.
+ */
+export function placeRange(
+  lineEl: HTMLElement,
+  from: number,
+  to: number,
+): void {
+  const doc = lineEl.ownerDocument;
+  const a = domPointAt(lineEl, from);
+  const b = to === from ? a : domPointAt(lineEl, to);
   const range = doc.createRange();
-  range.setStart(target.node, target.offset);
-  range.collapse(true);
+  range.setStart(a.node, a.offset);
+  try {
+    range.setEnd(b.node, b.offset);
+  } catch {
+    range.collapse(true);
+  }
   const sel = doc.defaultView?.getSelection();
   if (!sel) return;
   sel.removeAllRanges();

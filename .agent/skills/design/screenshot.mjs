@@ -53,6 +53,15 @@ const VIEWPORTS = {
     hasTouch: true,
     isMobile: true,
   },
+  // The narrow end of the phone band (iPhone SE / 13 mini / older Androids).
+  // Worth checking whenever a row of controls has to fit one line — the 30px
+  // it loses against `mobile` is often exactly what tips a toolbar into
+  // wrapping.
+  "mobile-small": {
+    viewport: { width: 360, height: 740 },
+    hasTouch: true,
+    isMobile: true,
+  },
   "mobile-landscape": {
     viewport: { width: 844, height: 390 },
     hasTouch: true,
@@ -149,12 +158,25 @@ function parseArgs(argv) {
 // just `await openApp(page);`.
 
 async function recipe(page, _viewport) {
+  if (process.env.DESIGN_THEME) {
+    // The theme engine reads its preference before first paint, so seed the
+    // appearance store on the origin before the app is ever navigated to.
+    await page.goto("/");
+    await page.evaluate((theme) => {
+      localStorage.setItem("notes/appearance", JSON.stringify({ theme }));
+    }, process.env.DESIGN_THEME);
+  }
   await openApp(page);
 
   // Start a fresh note (the "New note" FAB / drawer action) and type a
   // little Markdown so the live-preview editor renders formatted lines.
   await page.getByRole("button", { name: /^new note$/i }).first().click();
   await page.waitForTimeout(150);
+
+  // Click into the body: a fresh note opens with the caret in the *title*, and
+  // the live-preview surface has no active line until something lands in it.
+  await page.getByRole("textbox", { name: /start writing/i }).click();
+  await page.waitForTimeout(100);
 
   // The editor's active line is a textarea; the rest are rendered proxies.
   // Type a heading and a list so the preview shows real formatting.
@@ -163,6 +185,17 @@ async function recipe(page, _viewport) {
   await page.keyboard.type("- **Eggs**\n");
   await page.keyboard.type("- Bread");
   await page.waitForTimeout(200);
+
+  // Open the styling toolbar so it sits above the text.
+  await page.getByRole("button", { name: /^formatting$/i }).click();
+  await page.waitForTimeout(300);
+
+  // Land the caret back on a bullet so the block menu's trigger shows it.
+  await page.getByText("Milk", { exact: true }).click();
+  await page.waitForTimeout(150);
+  // Open the block-style menu so the glyph+text rows are on screen.
+  await page.getByRole("button", { name: "Bullet list", exact: true }).click();
+  await page.waitForTimeout(300);
 }
 
 // === RUN (don't edit) ===
@@ -172,7 +205,15 @@ async function main() {
   const baseURL = await resolveBaseUrl(args.baseUrl);
   if (!existsSync(args.out)) await mkdir(args.out, { recursive: true });
   const viewports = args.viewports.split(",").map((s) => s.trim());
-  const browser = await chromium.launch();
+  // A sandbox may ship a pre-installed Chromium whose build number doesn't
+  // match the `@playwright/test` the skill just installed; `PW_CHROMIUM_PATH`
+  // points straight at that binary so the loop runs without re-downloading a
+  // browser (which the network policy may not allow anyway).
+  const browser = await chromium.launch(
+    process.env.PW_CHROMIUM_PATH
+      ? { executablePath: process.env.PW_CHROMIUM_PATH }
+      : {},
+  );
   try {
     for (const viewport of viewports) {
       const spec = VIEWPORTS[viewport];

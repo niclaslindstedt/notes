@@ -611,6 +611,80 @@ case reuses the [markdown codec](#markdown-codec)'s `noteToMarkdown` so a copied
 note is byte-identical to its on-disk file. Copying is the **Copycat**
 achievement (fired via `unlock("copycat")`).
 
+### Styling toolbar
+
+`FormatToolbar` + `FormatToolbarButton` (`src/ui/FormatToolbar.tsx`) — a row of
+one button per Markdown construct the app renders, brought up by the
+`FormatToolbarButton` sitting top-right in the editor header (leftmost of the
+header's action cluster, before the [copy button](#copy-button) and the
+[sync glyph](#sync-status)). Pressing that button opens the toolbar; pressing it
+again takes it away, and the choice is remembered across notes and reloads under
+the `notes/format-toolbar` localStorage key.
+
+The toolbar renders **inside the note's content column**, as a sibling ahead of
+the editing surface — so opening it pushes the note's text down rather than
+floating over it, and the line you were about to format is never the line it
+covers. It aligns with the writing column ([editor margin](#editor-settings)) and
+unfolds with the `format-toolbar-in` animation in `src/styles/theme.css` (a grid
+`0fr → 1fr` track, so the text below slides rather than jumps).
+
+Nineteen constructs would be nineteen buttons, which wraps to three rows on a
+phone — so the families collapse into **menus** and the row carries nine
+controls, which fits one line down to a 360px viewport:
+
+| Cluster       | Controls                                                        |
+| ------------- | ---------------------------------------------------------------- |
+| Heading ▾     | menu — the six heading levels                                     |
+| inline        | buttons — **bold**, *italic*, ~~strikethrough~~, `inline code`     |
+| Block style ▾ | menu — bullet list, numbered list, quote, fenced code block        |
+| nesting       | buttons — outdent, indent (how a bullet becomes a **child**)       |
+| Insert ▾      | menu — link, image, divider                                       |
+
+The two most-reached-for families stay one tap: inline emphasis, and the
+indent pair the nesting of list children depends on. A menu's trigger wears the
+glyph of whichever member is currently applied — a caret on an H2 line shows
+`H2`, lit, and names itself "Heading 2" — and its rows carry both the glyph
+**and** the construct's name, which the bare icon buttons never could. The row
+still wraps if it must (a very narrow viewport, a large font scale). The whole
+toolbar is one stop in the keyboard order — `role="toolbar"` with a roving
+tabindex, arrow keys walking the controls; a menu opened *from the keyboard*
+(a click with `detail === 0`) moves focus onto its first row, since the panel is
+portalled out of the row and Tab would otherwise sail past it.
+
+Two behaviours make it usable rather than merely present:
+
+- **It never takes focus.** Every button — and every menu row, and the header
+  toggle — cancels its own `mousedown`, so the caret and any selection stay
+  exactly where they were in the editing surface. Without that, pressing Bold
+  would blur the editor and there would be nothing left to embolden.
+- **It shows what is already applied.** The caret's line is classified by the same
+  [parser](#markdown-parser) the preview renders from and reported up as a
+  `LineFormat` (`onLineFormat`), so the heading / block trigger lights up (and
+  adopts the applied member's glyph and name) when the caret sits on such a
+  line — and every action toggles, so pressing a lit control takes the marker
+  back off. Outdent is disabled at the left margin.
+
+The edits themselves are pure: `applyFormat` (`src/domain/markdown-format.ts`)
+takes the line array plus a `{ start, end }` pair of `SourcePoint`s and returns the
+new lines and the selection to restore, so both editing surfaces share one
+implementation and agree on what a press does. A block press (heading, list, quote,
+indent) re-marks every line the selection touches, deciding once from whether *all*
+of them already carry the marker — so a mixed selection moves as one block — and
+replaces any existing marker rather than stacking on it (a bullet asked to become a
+heading is `# item`, never `# - item`). An inline press wraps the selection, or the
+word under a bare caret, and unwraps when it is already wrapped. A link press makes
+the selection the label and hands back the `url` placeholder *selected*, ready to
+type over — unless the selection is itself a URL, in which case it becomes the href.
+
+`MarkdownEditor` applies the result through its own commit path and then installs
+the selection: a same-line result comes back ranged (`placeRange` in
+`contenteditable-caret.ts`), so bolding a word leaves it highlighted; a result
+spanning lines drops the raw active line and draws a whole-line selection across
+the line elements instead, which is what lets presses **chain** — bullet three
+lines, then indent the same three into children. `PlainEditor` (Markdown rendering
+off) runs the same formatter, converting between the textarea's flat offsets and
+source points. The first press of any button unlocks the **Stylist** achievement.
+
 ### Editor position memory
 
 `src/ui/editor-position.ts` — a **session-scoped** memory of where the caret sat
