@@ -138,8 +138,10 @@ describe("Editor", () => {
     body.focus();
 
     fireEvent.keyDown(body, { key: "Tab" });
+    // The leftmost action in the header cluster — the styling toolbar's toggle,
+    // with no folders to put a folder picker before it.
     expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "Copy note" }),
+      screen.getByRole("button", { name: "Formatting" }),
     );
 
     fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
@@ -166,5 +168,94 @@ describe("Editor", () => {
   it("offers the folder picker when folders exist", () => {
     renderEditor({ folders: [{ id: "f1", name: "Work", createdAt: 0 }] });
     expect(screen.getByLabelText("Move to folder")).toBeTruthy();
+  });
+});
+
+describe("the styling toolbar", () => {
+  afterEach(() => localStorage.clear());
+
+  function openToolbar() {
+    fireEvent.click(screen.getByRole("button", { name: "Formatting" }));
+  }
+
+  it("stays closed until the header button asks for it", () => {
+    renderEditor();
+    expect(screen.queryByRole("toolbar")).toBeNull();
+    openToolbar();
+    expect(screen.getByRole("toolbar")).toBeTruthy();
+  });
+
+  it("puts itself above the note body rather than over it", () => {
+    renderEditor();
+    openToolbar();
+    const toolbar = screen.getByRole("toolbar");
+    const body = screen.getByDisplayValue("the body");
+    // Document order is what pushes the text down — the toolbar is a sibling
+    // ahead of the editing surface, not an overlay on top of it.
+    expect(
+      toolbar.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("closes again on a second press, and remembers the choice", () => {
+    renderEditor();
+    openToolbar();
+    fireEvent.click(screen.getByRole("button", { name: "Hide formatting" }));
+    expect(screen.queryByRole("toolbar")).toBeNull();
+    expect(localStorage.getItem("notes/format-toolbar")).toBe("false");
+
+    cleanup();
+    localStorage.setItem("notes/format-toolbar", "true");
+    renderEditor();
+    expect(screen.getByRole("toolbar")).toBeTruthy();
+  });
+
+  it("applies a heading to the caret's line", () => {
+    const { onChange } = renderEditor({ note: note({ body: "hello" }) });
+    openToolbar();
+    const body = screen.getByDisplayValue("hello") as HTMLTextAreaElement;
+    body.focus();
+    body.setSelectionRange(2, 2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Heading 2" }));
+    expect(onChange).toHaveBeenCalledWith("## hello");
+  });
+
+  it("wraps the selected text in bold and leaves it selected", () => {
+    const { onChange } = renderEditor({ note: note({ body: "say hello" }) });
+    openToolbar();
+    const body = screen.getByDisplayValue("say hello") as HTMLTextAreaElement;
+    body.focus();
+    body.setSelectionRange(4, 9);
+
+    fireEvent.click(screen.getByRole("button", { name: "Bold" }));
+    expect(onChange).toHaveBeenCalledWith("say **hello**");
+    expect(body.value.slice(body.selectionStart, body.selectionEnd)).toBe(
+      "**hello**",
+    );
+  });
+
+  it("lights the button matching the line the caret is on", () => {
+    renderEditor({ note: note({ body: "- milk" }) });
+    openToolbar();
+    const body = screen.getByDisplayValue("- milk") as HTMLTextAreaElement;
+    body.focus();
+    fireEvent.select(body, { target: { selectionStart: 3, selectionEnd: 3 } });
+
+    expect(
+      screen.getByRole("button", { name: "Bullet list" }).ariaPressed,
+    ).toBe("true");
+    expect(
+      screen.getByRole("button", { name: "Numbered list" }).ariaPressed,
+    ).toBe("false");
+  });
+
+  it("disables outdent when the line is already at the left margin", () => {
+    renderEditor({ note: note({ body: "- milk" }) });
+    openToolbar();
+    expect(
+      (screen.getByRole("button", { name: "Outdent" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
   });
 });

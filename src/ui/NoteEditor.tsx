@@ -1,17 +1,25 @@
 import {
   useCallback,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  type Ref,
   type RefObject,
 } from "react";
 
 import { unlock } from "../achievements/index.ts";
 import { type Attachment } from "../domain/attachment.ts";
 import { firstChangedLine } from "../domain/line-edit.ts";
+import {
+  applyFormat,
+  lineFormatAt,
+  type FormatAction,
+  type LineFormat,
+} from "../domain/markdown-format.ts";
 import { isBlank, type Folder, type Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
@@ -23,6 +31,7 @@ import {
   pointToOffset,
   setEditorPosition,
 } from "./editor-position.ts";
+import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
 import { SelectPicker } from "./form/SelectPicker.tsx";
 import { useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
@@ -84,6 +93,22 @@ function FolderPicker({
 const FOCUSABLE =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
+// Whether the styling toolbar is up survives switching notes and reloading,
+// under this key: someone who writes in Markdown wants it every time, and
+// someone who doesn't should never have to dismiss it twice. Mirrored as a
+// plain string, the same way the side menu remembers its collapsed footer.
+const TOOLBAR_OPEN_KEY = "notes/format-toolbar";
+
+function readToolbarOpen(): boolean {
+  if (typeof localStorage === "undefined") return false;
+  return localStorage.getItem(TOOLBAR_OPEN_KEY) === "true";
+}
+
+/** What the plain-textarea fallback exposes, mirroring the live-preview one. */
+type PlainEditorHandle = {
+  format: (action: FormatAction) => void;
+};
+
 export function Editor({
   note,
   editor,
@@ -138,10 +163,41 @@ export function Editor({
   // Handle on the live-preview editor so the title can hand focus down into the
   // body even when no line is active yet (the body has no textarea until then).
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null);
+  const plainEditorRef = useRef<PlainEditorHandle>(null);
   // The header centres a single-line title against the glyph and the copy/sync
   // buttons, and top-aligns once the title wraps so those stay pinned to the
   // first line (the title field reports the transition as it grows).
   const [titleMultiline, setTitleMultiline] = useState(false);
+
+  // The styling toolbar: whether it is up (remembered across notes and
+  // reloads), and the block state of the line the caret sits on, which the
+  // open toolbar reads to light the buttons already in effect. The editing
+  // surface only reports that state while the toolbar is open, so a closed
+  // toolbar costs nothing.
+  const [toolbarOpen, setToolbarOpen] = useState(readToolbarOpen);
+  const [lineFormat, setLineFormat] = useState<LineFormat | null>(null);
+
+  function toggleToolbar() {
+    setToolbarOpen((open) => {
+      const next = !open;
+      try {
+        localStorage.setItem(TOOLBAR_OPEN_KEY, String(next));
+      } catch {
+        // Storage denied (private mode); the toolbar simply won't be
+        // remembered past this session.
+      }
+      return next;
+    });
+  }
+
+  // Route a toolbar press to whichever surface is mounted — the live-preview
+  // editor, or the plain textarea when Markdown rendering is switched off.
+  // Both apply the same pure formatter, so the two agree on what a press does.
+  function runFormat(action: FormatAction) {
+    unlock("stylist");
+    if (editor.renderMarkdown) markdownEditorRef.current?.format(action);
+    else plainEditorRef.current?.format(action);
+  }
 
   // Move focus from the title field into the body's editing surface, used when
   // the user presses Enter or Arrow-Down in the title. The live-preview editor
@@ -237,12 +293,23 @@ export function Editor({
               onChange={(id) => onMoveFolder(id || null)}
             />
           )}
+          <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
           <CopyNoteButton note={note} copyScope={editor.copyScope} />
           {syncSlot}
         </div>
       </header>
 
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">
+        {/* The toolbar sits *in* the content column rather than floating over
+            it: opening it pushes the note's text down, so the line you are
+            about to format is never the line it covers. */}
+        {toolbarOpen && !loading && (
+          <FormatToolbar
+            line={lineFormat}
+            onAction={runFormat}
+            maxWidth={maxWidth}
+          />
+        )}
         {loading ? (
           <div className="flex flex-1 items-center justify-center gap-2 p-8 text-sm text-muted">
             <CipherGlyph className="shrink-0 text-accent" />
@@ -270,12 +337,15 @@ export function Editor({
             }}
             shortenLinkChars={editor.shortenLinkChars}
             onTabOut={onBodyTab}
+            onLineFormat={toolbarOpen ? setLineFormat : undefined}
           />
         ) : (
           <PlainEditor
+            ref={plainEditorRef}
             body={note.body ?? ""}
             onChange={onChange}
             onTabOut={onBodyTab}
+            onLineFormat={toolbarOpen ? setLineFormat : undefined}
             undoScrollSeq={undoScrollSeq}
             wordWrap={editor.wordWrap}
             disableSpellcheck={editor.disableSpellcheck}
@@ -465,6 +535,8 @@ function PlainEditor({
   focusOnMount = true,
   noteId,
   onTabOut,
+  onLineFormat,
+  ref,
 }: {
   body: string;
   onChange: (body: string) => void;
@@ -479,6 +551,11 @@ function PlainEditor({
   noteId?: string;
   /** Tab / Shift+Tab in the body — see the tab-order note in `Editor`. */
   onTabOut: (backwards: boolean) => void;
+  /** Report the caret's line to the styling toolbar; only passed while it's
+   *  open, so a closed toolbar never pays for the classification. */
+  onLineFormat?: (line: LineFormat | null) => void;
+  /** Imperative handle so the toolbar can apply an action here. */
+  ref?: Ref<PlainEditorHandle>;
 }) {
   const t = useT();
   const [value, setValue] = useState(body);
@@ -575,6 +652,62 @@ function PlainEditor({
     el.select();
   });
 
+  // --- The styling toolbar -------------------------------------------------
+  //
+  // Markdown-off is still Markdown *source*, so the toolbar applies here too —
+  // through the same pure formatter the live-preview editor uses, with the
+  // caret and selection converted between the textarea's flat offsets and the
+  // `(line, column)` points the formatter speaks. The selection it hands back
+  // is installed once the new value has rendered, so wrapping a word leaves it
+  // highlighted rather than dropping the caret at the end of the note.
+  const pendingSelection = useRef<{ from: number; to: number } | null>(null);
+  useLayoutEffect(() => {
+    const sel = pendingSelection.current;
+    const el = textareaRef.current;
+    if (!sel || !el) return;
+    pendingSelection.current = null;
+    el.focus();
+    el.setSelectionRange(sel.from, sel.to);
+  }, [value]);
+
+  useImperativeHandle(ref, () => ({
+    format: (action: FormatAction) => {
+      const el = textareaRef.current;
+      if (!el) return;
+      const source = el.value;
+      const result = applyFormat(
+        source.split("\n"),
+        {
+          start: offsetToPoint(source, el.selectionStart),
+          end: offsetToPoint(source, el.selectionEnd),
+        },
+        action,
+      );
+      const next = result.lines.join("\n");
+      setValue(next);
+      onChange(next);
+      pendingSelection.current = {
+        from: pointToOffset(next, result.start),
+        to: pointToOffset(next, result.end),
+      };
+      lastOffset.current = pointToOffset(next, result.end);
+    },
+  }));
+
+  // Keep the toolbar's lit buttons in step with the caret's line. Only runs
+  // while the toolbar is open (`onLineFormat` is undefined otherwise), so the
+  // Markdown-off editor doesn't parse Markdown for nothing.
+  const [caretLine, setCaretLine] = useState(0);
+  useEffect(() => {
+    onLineFormat?.(lineFormatAt(value.split("\n"), caretLine));
+  }, [onLineFormat, value, caretLine]);
+
+  function trackCaret(el: HTMLTextAreaElement) {
+    lastOffset.current = el.selectionStart;
+    if (onLineFormat)
+      setCaretLine(offsetToPoint(el.value, el.selectionStart).line);
+  }
+
   return (
     <textarea
       ref={textareaRef}
@@ -586,11 +719,12 @@ function PlainEditor({
       onChange={(e) => {
         setValue(e.target.value);
         onChange(e.target.value);
-        lastOffset.current = e.target.selectionStart;
+        trackCaret(e.target);
       }}
       onSelect={(e) => {
-        // Track the caret so switching away and back restores it.
-        lastOffset.current = e.currentTarget.selectionStart;
+        // Track the caret so switching away and back restores it (and so the
+        // styling toolbar knows which line's buttons to light).
+        trackCaret(e.currentTarget);
       }}
       onKeyDown={(e) => {
         // Tab moves on rather than indenting; the editor owns where to (see the

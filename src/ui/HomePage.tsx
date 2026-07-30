@@ -87,6 +87,16 @@ export function HomePage() {
               spot and cursor position you left each one at.
             </li>
             <li>
+              Reach for the formatting button at the top right of a note to open
+              a styling toolbar above the text — headings, bold, italic,
+              strikethrough, inline code, bullet and numbered lists (with indent
+              and outdent for sub-points), quotes, code blocks, links, images,
+              and dividers, one button each. It writes ordinary Markdown, so
+              anything you reach for there you can just as well type by hand,
+              and every button is a toggle — press a lit one to take the
+              formatting back off.
+            </li>
+            <li>
               Swipe a note right — in the overview or the side menu — to{" "}
               <em>archive</em> it: it leaves the list without being deleted, and
               you can restore it from the Archive view. Swipe left to uncover a

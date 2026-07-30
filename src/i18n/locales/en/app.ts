@@ -36,6 +36,28 @@ const app = {
     label: "Copy note",
     copied: "Copied",
   },
+  // The styling toolbar: its header toggle, its accessible name, and one
+  // label per button — each names the Markdown construct it applies, since
+  // the buttons are glyph-only and the label is both tooltip and a11y name.
+  format: {
+    show: "Formatting",
+    hide: "Hide formatting",
+    toolbar: "Formatting",
+    heading: "Heading {level}",
+    bold: "Bold",
+    italic: "Italic",
+    strikethrough: "Strikethrough",
+    code: "Inline code",
+    bulletList: "Bullet list",
+    numberedList: "Numbered list",
+    quote: "Quote",
+    codeBlock: "Code block",
+    indent: "Indent",
+    outdent: "Outdent",
+    link: "Link",
+    image: "Image",
+    rule: "Divider",
+  },
   // Screen-reader label for the gray lock shown on a note that is encrypted at
   // rest but whose body hasn't been decrypted/loaded yet this session.
   encryptedNote: "Encrypted at rest",

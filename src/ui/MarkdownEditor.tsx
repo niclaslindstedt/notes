@@ -27,6 +27,12 @@ import {
   type SourcePoint,
 } from "../domain/line-edit.ts";
 import { classifyLines, hiddenFenceLines } from "../domain/markdown.ts";
+import {
+  applyFormat,
+  lineFormatOf,
+  type FormatAction,
+  type LineFormat,
+} from "../domain/markdown-format.ts";
 import type { Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { getEditorPosition, setEditorPosition } from "./editor-position.ts";
@@ -40,6 +46,7 @@ import {
   lineElementOf,
   lineIndexOf,
   placeCaret,
+  placeRange,
 } from "./contenteditable-caret.ts";
 import {
   bufferedScrollTop,
@@ -124,6 +131,13 @@ type Props = {
    *  of the browser's own tab order (see the `tabIndex` on the surface), so its
    *  host decides where focus goes next — `backwards` is Shift+Tab. */
   onTabOut: (backwards: boolean) => void;
+  /**
+   * Called with the block state of the line the caret sits on (null when no
+   * line is active), so the styling toolbar can light up the buttons that are
+   * already applied. Only passed while the toolbar is open — the classification
+   * is otherwise work nobody reads.
+   */
+  onLineFormat?: (line: LineFormat | null) => void;
   /** Imperative handle so the title field can hand focus down into the body. */
   ref?: Ref<MarkdownEditorHandle>;
 };
@@ -132,6 +146,8 @@ type Props = {
 export type MarkdownEditorHandle = {
   /** Place the caret at the end of the note and start editing there. */
   focus: () => void;
+  /** Apply a styling-toolbar action to the selection (or the caret's line). */
+  format: (action: FormatAction) => void;
 };
 
 // The active line's identity: which source line is being edited as raw text, and
@@ -157,6 +173,7 @@ export function MarkdownEditor({
   shortenLinkChars = 0,
   noteId,
   onTabOut,
+  onLineFormat,
   ref,
 }: Props) {
   const t = useT();
@@ -179,6 +196,9 @@ export function MarkdownEditor({
   // fall back to the mount behaviour — the last line when `focusOnMount`, no
   // active line (fully formatted, keyboard down) for an existing note.
   const savedCaret = saved?.caret ?? null;
+  // The first line of a whole-line selection a block press just drew, so the
+  // toolbar still knows what it applied while no single line is active.
+  const [spanLine, setSpanLine] = useState<number | null>(null);
   const [active, setActive] = useState<Active>(() => ({
     index: savedCaret
       ? Math.min(savedCaret.line, body.split("\n").length - 1)
@@ -210,6 +230,17 @@ export function MarkdownEditor({
         ? Math.max(0, (lines[lines.length - 1] ?? "").length)
         : null,
   );
+  // The ranged sibling of `pendingCaret`, for an edit that hands a span back
+  // *selected* rather than collapsed — the styling toolbar wrapping a word in
+  // `**`, or dropping the caret onto a fresh link's `url` placeholder so the
+  // address can be typed straight over it. Takes precedence when set.
+  const pendingRange = useRef<{ from: number; to: number } | null>(null);
+  // A whole-line span to re-select after the value changes, by source line
+  // index. Block formatting (heading, list, quote, indent) is a whole-line
+  // affair, so when it spans several lines the selection is restored at line
+  // granularity — which is what lets a press chain onto the last one: bullet
+  // three lines, then indent the same three into children.
+  const pendingLineSpan = useRef<{ from: number; to: number } | null>(null);
 
   // The latest known caret (as a source point) and scroll offset, kept current
   // as the user types / moves / scrolls so the unmount handler can stash them in
@@ -326,11 +357,15 @@ export function MarkdownEditor({
   // caret (plain caret move the browser already handled) is a no-op.
   useLayoutEffect(() => {
     const el = activeElRef.current;
-    if (active.index === null || !el || pendingCaret.current === null) return;
+    const range = pendingRange.current;
+    if (active.index === null || !el) return;
+    if (pendingCaret.current === null && range === null) return;
     settingSel.current = true;
     const root = rootRef.current;
     if (root && document.activeElement !== root) root.focus();
-    placeCaret(el, pendingCaret.current);
+    if (range) placeRange(el, range.from, range.to);
+    else placeCaret(el, pendingCaret.current!);
+    pendingRange.current = null;
     pendingCaret.current = null;
     // A touch tap that just landed the caret on a new line: scroll that line
     // clear of the soft keyboard. The keyboard shrinks the visual viewport
@@ -819,11 +854,101 @@ export function MarkdownEditor({
     }
     activate(last, 0);
   }
+  // --- The styling toolbar -------------------------------------------------
+  //
+  // A toolbar press arrives here with the caret and any selection untouched
+  // (the buttons cancel their own mousedown, so focus never left the surface).
+  // The span is resolved to source points, handed to the pure formatter, and
+  // the result committed like any other edit — then the selection it asks for
+  // is installed: a same-line result comes back *selected*, so bolding a word
+  // leaves it highlighted and a second press unbolds it, while a result
+  // spanning lines settles for a caret at its end.
+  function format(action: FormatAction) {
+    const pts = selectionPoints();
+    const at = lastCaret.current ?? { line: 0, col: 0 };
+    const sel = pts
+      ? { start: pts.start, end: pts.end }
+      : { start: at, end: at };
+    const r = applyFormat(linesRef.current, sel, action);
+    const next = r.lines.join("\n");
+    setValue(next);
+    onChange(next);
+    lastCaret.current = r.end;
+    if (r.start.line === r.end.line) {
+      pendingRange.current = { from: r.start.col, to: r.end.col };
+      pendingCaret.current = null;
+      pendingLineSpan.current = null;
+      setActive((a) => ({ index: r.end.line, key: a.key + 1 }));
+      return;
+    }
+    // A result spanning lines drops the raw active line — every line renders
+    // formatted, and the selection is drawn across whole line elements, which
+    // both maps back to source cleanly and shows the result of the press.
+    pendingRange.current = null;
+    pendingCaret.current = null;
+    pendingLineSpan.current = { from: r.start.line, to: r.end.line };
+    setSpanLine(r.start.line);
+    setActive((a) => (a.index === null ? a : { index: null, key: a.key + 1 }));
+  }
+
+  // Draw a selection over whole source lines `[from, to]`. The endpoints are
+  // anchored *inside* the line elements (not at the contenteditable root) so
+  // both map back to source — the same shape `selectAllLines` relies on.
+  function selectLineSpan(from: number, to: number) {
+    const root = rootRef.current;
+    const sel = window.getSelection();
+    if (!root || !sel) return;
+    const first = root.querySelector(`[data-line-index="${from}"]`);
+    const last = root.querySelector(`[data-line-index="${to}"]`);
+    if (!first || !last) return;
+    settingSel.current = true;
+    if (document.activeElement !== root) root.focus();
+    const range = document.createRange();
+    range.setStart(first, 0);
+    range.setEnd(last, last.childNodes.length);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    queueMicrotask(() => {
+      settingSel.current = false;
+    });
+  }
+
+  useLayoutEffect(() => {
+    const span = pendingLineSpan.current;
+    if (!span) return;
+    pendingLineSpan.current = null;
+    selectLineSpan(span.from, span.to);
+  });
+
+  // Tell the toolbar what the caret's line already is, so the H2 / bullet /
+  // quote button can light up. Skipped entirely when nobody is listening (the
+  // toolbar is closed), which is the common case. With a whole-line selection
+  // drawn by a block press there is no active line, so the *first* selected
+  // line stands in — otherwise bulleting three lines would leave the bullet
+  // button dark and its own undo press unfindable.
+  const reportIndex = clampedIndex ?? spanLine;
+  const lineFormat =
+    reportIndex === null ? null : (blocks[reportIndex] ?? null);
+  useEffect(() => {
+    onLineFormat?.(lineFormat ? lineFormatOf(lineFormat) : null);
+  }, [onLineFormat, lineFormat]);
+
+  // The stand-in above only holds while nothing is being edited; the moment
+  // the caret lands on a line again, that line is the truth.
+  useEffect(() => {
+    if (active.index !== null) setSpanLine(null);
+  }, [active.index]);
+
   const placeCaretAtEndRef = useRef(placeCaretAtEnd);
   placeCaretAtEndRef.current = placeCaretAtEnd;
+  const formatRef = useRef(format);
+  formatRef.current = format;
   useImperativeHandle(
     ref,
-    () => ({ focus: () => placeCaretAtEndRef.current() }),
+    () => ({
+      focus: () => placeCaretAtEndRef.current(),
+      format: (action: FormatAction) => formatRef.current(action),
+    }),
     [],
   );
 

@@ -211,3 +211,39 @@ body {
   -webkit-text-fill-color: transparent;
   transition: background-position 250ms linear;
 }
+
+/* Styling-toolbar entrance. The toolbar mounts only while open and pushes the
+   note's text down, so its height can't be transitioned from a resting state —
+   a CSS `animation` plays straight off the mount instead (the same reason the
+   drawer uses one). It unfolds from zero height while its buttons fade up, so
+   the text below slides down rather than jumping. The reduce-motion guard
+   above zeroes the duration. */
+@keyframes format-toolbar-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+
+.format-toolbar-in {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: format-toolbar-in 180ms ease-out;
+}
+
+/* The row has to clip itself while the track collapses, or it simply overflows
+   the zero-height parent and no unfold is visible. */
+.format-toolbar-in > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .format-toolbar-in {
+    animation-duration: 0ms;
+  }
+}

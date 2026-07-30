@@ -40,6 +40,20 @@ is fast — you can see every iteration without leaving the session.
 > Nothing else in notes depends on Playwright, so it is left out of
 > `package.json` by default. If you'd rather not add it, this skill's
 > screenshot loop can't run.
+>
+> **If a Chromium is already on the box** (some sandboxes pre-install one
+> under `/opt/pw-browsers`, and `npx playwright install` may be blocked by
+> the network policy), point the harness straight at that binary instead
+> of downloading a matching build:
+>
+> ```sh
+> PW_CHROMIUM_PATH=/opt/pw-browsers/chromium-<rev>/chrome-linux/chrome \
+>   node .agent/skills/design/screenshot.mjs
+> ```
+>
+> A build-number mismatch between the pre-installed browser and the
+> `@playwright/test` you just installed is fine for screenshots; the
+> "Executable doesn't exist at …" error is the tell that you need this.
 
 ## When to invoke
 
@@ -152,6 +166,13 @@ All flags are optional.
 | `--name <prefix>`    | `design`         | Filename prefix. Useful when iterating on two screens in parallel (`--name dialog-foo` vs `--name list-bar`).                                                                                                                                                 |
 | `--viewports <list>` | `desktop,mobile` | Comma-separated subset of `desktop`, `mobile`, `mobile-landscape`, `tablet`. Skip the ones you don't need so the loop stays under a couple of seconds. Mobile viewports always write `fullPage: false` (one-screen capture); desktop writes the full content. |
 
+Two environment variables the harness also reads:
+
+| Variable            | What it does                                                                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PW_CHROMIUM_PATH`  | Launch this Chromium binary instead of the one Playwright manages — see the prerequisite note above.                                                                |
+| `DESIGN_THEME`      | Seed `notes/appearance` with this [theme preset](../../../docs/dictionary.md) (e.g. `quietLight`) before the first navigation, so a run renders in that theme. Pair it with `--name design-light` / `--name design-dark` to keep the two runs' PNGs apart. |
+
 ## Available helpers
 
 All exported from `screenshot.mjs`. Import them at the top of a
@@ -185,7 +206,28 @@ async function recipe(page) {
 async function recipe(page) {
   await openApp(page);
   await page.getByRole("button", { name: /^new note$/i }).first().click();
+  await page.waitForTimeout(150);
+  // A fresh note opens with the caret in the *title*, and the live-preview
+  // surface has no active line until something lands in it — click the body
+  // first or the keystrokes go nowhere.
+  await page.getByRole("textbox", { name: /start writing/i }).click();
   await page.keyboard.type("# Heading\n\nSome **bold** body text.");
+}
+```
+
+### "I'm tuning the styling toolbar"
+
+```js
+async function recipe(page) {
+  await openApp(page);
+  await page.getByRole("button", { name: /^new note$/i }).first().click();
+  await page.getByRole("textbox", { name: /start writing/i }).click();
+  await page.keyboard.type("# Shopping list\n- Milk");
+  // The header toggle; it reads "Hide formatting" once open.
+  await page.getByRole("button", { name: /^formatting$/i }).click();
+  // Buttons are glyph-only — address them by their accessible name
+  // ("Heading 2", "Bold", "Bullet list", "Indent", "Link", …).
+  await page.getByRole("button", { name: "Bold", exact: true }).click();
 }
 ```
 
