@@ -210,15 +210,28 @@ describe("the styling toolbar", () => {
     expect(screen.getByRole("toolbar")).toBeTruthy();
   });
 
-  it("applies a heading to the caret's line", () => {
+  it("applies a heading from the heading menu", () => {
     const { onChange } = renderEditor({ note: note({ body: "hello" }) });
     openToolbar();
     const body = screen.getByDisplayValue("hello") as HTMLTextAreaElement;
     body.focus();
     body.setSelectionRange(2, 2);
 
-    fireEvent.click(screen.getByRole("button", { name: "Heading 2" }));
+    // The six levels live behind one trigger so the row fits a phone in a
+    // single line; the menu rows name the level as well as drawing it.
+    fireEvent.click(screen.getByRole("button", { name: "Heading" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Heading 2" }));
     expect(onChange).toHaveBeenCalledWith("## hello");
+  });
+
+  it("closes the menu once a row is picked", () => {
+    renderEditor({ note: note({ body: "hello" }) });
+    openToolbar();
+    fireEvent.click(screen.getByRole("button", { name: "Heading" }));
+    expect(screen.getByRole("menu", { name: "Heading" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Heading 2" }));
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 
   it("wraps the selected text in bold and leaves it selected", () => {
@@ -235,19 +248,42 @@ describe("the styling toolbar", () => {
     );
   });
 
-  it("lights the button matching the line the caret is on", () => {
+  it("wears the applied construct on the menu's trigger", () => {
     renderEditor({ note: note({ body: "- milk" }) });
     openToolbar();
     const body = screen.getByDisplayValue("- milk") as HTMLTextAreaElement;
     body.focus();
     fireEvent.select(body, { target: { selectionStart: 3, selectionEnd: 3 } });
 
-    expect(
-      screen.getByRole("button", { name: "Bullet list" }).ariaPressed,
-    ).toBe("true");
-    expect(
-      screen.getByRole("button", { name: "Numbered list" }).ariaPressed,
-    ).toBe("false");
+    // With a bullet under the caret the collapsed group names it rather than
+    // the group — so the row still says what is applied.
+    expect(screen.queryByRole("button", { name: "Block style" })).toBeNull();
+    const trigger = screen.getByRole("button", { name: "Bullet list" });
+    expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
+  });
+
+  it("marks the applied row inside the menu", () => {
+    renderEditor({ note: note({ body: "- milk" }) });
+    openToolbar();
+    const body = screen.getByDisplayValue("- milk") as HTMLTextAreaElement;
+    body.focus();
+    fireEvent.select(body, { target: { selectionStart: 3, selectionEnd: 3 } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Bullet list" }));
+    const rows = screen.getAllByRole("menuitem");
+    expect(rows.map((r) => r.textContent)).toEqual([
+      "Bullet list",
+      "Numbered list",
+      "Quote",
+      "Code block",
+    ]);
+  });
+
+  it("lights an inline button by its own state, not the line's", () => {
+    renderEditor({ note: note({ body: "- milk" }) });
+    openToolbar();
+    // Bold has no line-level state to read, so it never claims to be pressed.
+    expect(screen.getByRole("button", { name: "Bold" }).ariaPressed).toBeNull();
   });
 
   it("disables outdent when the line is already at the left margin", () => {

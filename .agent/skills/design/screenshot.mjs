@@ -53,6 +53,15 @@ const VIEWPORTS = {
     hasTouch: true,
     isMobile: true,
   },
+  // The narrow end of the phone band (iPhone SE / 13 mini / older Androids).
+  // Worth checking whenever a row of controls has to fit one line — the 30px
+  // it loses against `mobile` is often exactly what tips a toolbar into
+  // wrapping.
+  "mobile-small": {
+    viewport: { width: 360, height: 740 },
+    hasTouch: true,
+    isMobile: true,
+  },
   "mobile-landscape": {
     viewport: { width: 844, height: 390 },
     hasTouch: true,
@@ -181,8 +190,11 @@ async function recipe(page, _viewport) {
   await page.getByRole("button", { name: /^formatting$/i }).click();
   await page.waitForTimeout(300);
 
-  // Land the caret back on a bullet so its list button lights up.
+  // Land the caret back on a bullet so the block menu's trigger shows it.
   await page.getByText("Milk", { exact: true }).click();
+  await page.waitForTimeout(150);
+  // Open the block-style menu so the glyph+text rows are on screen.
+  await page.getByRole("button", { name: "Bullet list", exact: true }).click();
   await page.waitForTimeout(300);
 }
 

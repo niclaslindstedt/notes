@@ -628,25 +628,41 @@ covers. It aligns with the writing column ([editor margin](#editor-settings)) an
 unfolds with the `format-toolbar-in` animation in `src/styles/theme.css` (a grid
 `0fr → 1fr` track, so the text below slides rather than jumps).
 
-Nineteen buttons in five pills: the six heading levels; **bold** / *italic* /
-~~strikethrough~~ / `inline code`; bullet list, numbered list, quote, fenced code
-block; outdent and indent (how a bullet becomes a **child** bullet); and link,
-image, and divider. The row wraps rather than scrolling, so every button is
-reachable at a phone width. It is one stop in the keyboard order — `role="toolbar"`
-with a roving tabindex, arrow keys walking the buttons.
+Nineteen constructs would be nineteen buttons, which wraps to three rows on a
+phone — so the families collapse into **menus** and the row carries nine
+controls, which fits one line down to a 360px viewport:
+
+| Cluster       | Controls                                                        |
+| ------------- | ---------------------------------------------------------------- |
+| Heading ▾     | menu — the six heading levels                                     |
+| inline        | buttons — **bold**, *italic*, ~~strikethrough~~, `inline code`     |
+| Block style ▾ | menu — bullet list, numbered list, quote, fenced code block        |
+| nesting       | buttons — outdent, indent (how a bullet becomes a **child**)       |
+| Insert ▾      | menu — link, image, divider                                       |
+
+The two most-reached-for families stay one tap: inline emphasis, and the
+indent pair the nesting of list children depends on. A menu's trigger wears the
+glyph of whichever member is currently applied — a caret on an H2 line shows
+`H2`, lit, and names itself "Heading 2" — and its rows carry both the glyph
+**and** the construct's name, which the bare icon buttons never could. The row
+still wraps if it must (a very narrow viewport, a large font scale). The whole
+toolbar is one stop in the keyboard order — `role="toolbar"` with a roving
+tabindex, arrow keys walking the controls; a menu opened *from the keyboard*
+(a click with `detail === 0`) moves focus onto its first row, since the panel is
+portalled out of the row and Tab would otherwise sail past it.
 
 Two behaviours make it usable rather than merely present:
 
-- **It never takes focus.** Every button (and the header toggle) cancels its own
-  `mousedown`, so the caret and any selection stay exactly where they were in the
-  editing surface. Without that, pressing Bold would blur the editor and there
-  would be nothing left to embolden.
+- **It never takes focus.** Every button — and every menu row, and the header
+  toggle — cancels its own `mousedown`, so the caret and any selection stay
+  exactly where they were in the editing surface. Without that, pressing Bold
+  would blur the editor and there would be nothing left to embolden.
 - **It shows what is already applied.** The caret's line is classified by the same
   [parser](#markdown-parser) the preview renders from and reported up as a
-  `LineFormat` (`onLineFormat`), so the H2 / bullet / quote / code-block button
-  lights up when the caret sits on such a line — and every action toggles, so
-  pressing a lit button takes the marker back off. Outdent is disabled at the left
-  margin.
+  `LineFormat` (`onLineFormat`), so the heading / block trigger lights up (and
+  adopts the applied member's glyph and name) when the caret sits on such a
+  line — and every action toggles, so pressing a lit control takes the marker
+  back off. Outdent is disabled at the left margin.
 
 The edits themselves are pure: `applyFormat` (`src/domain/markdown-format.ts`)
 takes the line array plus a `{ start, end }` pair of `SourcePoint`s and returns the
