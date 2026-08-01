@@ -535,6 +535,46 @@ describe("MarkdownEditor", () => {
     });
   });
 
+  describe("deleting a line", () => {
+    // Ctrl/Cmd+K on the surface; the header button reaches the same code
+    // through the editor's imperative handle.
+    function ctrlK() {
+      act(() => {
+        fireEvent.keyDown(surface(), { key: "k", ctrlKey: true });
+      });
+    }
+
+    it("removes the caret's line whole from its start", () => {
+      // The caret opens on the last line, so that is the one that goes.
+      const { onChange } = renderEditor("one\ntwo\nthree");
+      caretIn(rawLine()!, 0);
+      ctrlK();
+      expect(onChange).toHaveBeenLastCalledWith("one\ntwo");
+    });
+
+    it("clears only the text after a mid-line caret", () => {
+      const { onChange } = renderEditor("keep this. drop this.");
+      caretIn(rawLine()!, 11);
+      ctrlK();
+      expect(onChange).toHaveBeenLastCalledWith("keep this. ");
+    });
+
+    it("leaves the note alone when there is nothing to remove", () => {
+      const { onChange } = renderEditor("");
+      caretIn(rawLine()!, 0);
+      ctrlK();
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("keeps the cut line's replacement active for editing", () => {
+      renderEditor("one\ntwo");
+      caretIn(rawLine()!, 0);
+      ctrlK();
+      // "one" moved up into the gap and is the line now being edited.
+      expect(rawLine()?.textContent).toBe("one");
+    });
+  });
+
   describe("clicking the empty space below", () => {
     it("lands the caret at the end without reporting an edit", () => {
       const { onChange, container } = renderEditor(

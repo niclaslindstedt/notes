@@ -36,6 +36,9 @@ const app = {
     label: "Copy note",
     copied: "Copied",
   },
+  // The editor's delete-line button (left of the copy button) and its
+  // Ctrl/Cmd+K shortcut. Mid-line it clears only what follows the caret.
+  deleteLine: "Delete line",
   // The styling toolbar: its header toggle, its accessible name, and one
   // label per button — each names the Markdown construct it applies, since
   // the buttons are glyph-only and the label is both tooltip and a11y name.

@@ -87,6 +87,60 @@ function clamp(n: number, min: number, max: number): number {
 }
 
 /**
+ * Remove the line the caret sits on — the editor's delete-line button and its
+ * Ctrl/Cmd+K shortcut. Returns `null` when there is nothing to remove (an
+ * already-empty one-line note), so the caller can leave the source untouched.
+ *
+ * Three shapes, in the order a writer expects them:
+ *
+ *   * **Caret in the middle of a line** — only the text *after* it goes; the
+ *     line (and the caret's column) stays. This is the kill-to-end-of-line
+ *     every terminal binds to Ctrl+K, and it's what makes the button useful
+ *     for trimming a sentence rather than only for dropping whole lines.
+ *   * **Caret at either end of a line** — the whole line goes, newline and
+ *     all, so the ones below move up. At the start there is nothing to trim
+ *     but the line itself; at the end trimming would delete nothing, and a
+ *     button that sometimes does nothing reads as broken.
+ *   * **A ranged selection** — every line it touches goes. An endpoint resting
+ *     at column 0 hasn't visually taken that line, so it is left alone.
+ *
+ * The caret lands at the start of whichever line moved up into the gap, or at
+ * the end of the new last line when the note's tail was what went.
+ */
+export function deleteLine(
+  lines: readonly string[],
+  a: SourcePoint,
+  b: SourcePoint = a,
+): EditResult | null {
+  const [start, end] = orderPoints(a, b);
+  const from = clamp(start.line, 0, lines.length - 1);
+  const text = lines[from] ?? "";
+  const col = clamp(start.col, 0, text.length);
+
+  if (pointsEqual(start, end) && col > 0 && col < text.length) {
+    const next = [...lines];
+    next[from] = text.slice(0, col);
+    return { lines: next, caret: { line: from, col } };
+  }
+
+  // A selection ending at the very start of a line stops short of it.
+  const last = clamp(end.line, from, lines.length - 1);
+  const to = last > from && end.col === 0 ? last - 1 : last;
+
+  if (from === 0 && to === lines.length - 1)
+    return lines.length === 1 && text === ""
+      ? null
+      : { lines: [""], caret: { line: 0, col: 0 } };
+
+  const next = [...lines.slice(0, from), ...lines.slice(to + 1)];
+  const line = Math.min(from, next.length - 1);
+  return {
+    lines: next,
+    caret: { line, col: line === from ? 0 : (next[line] ?? "").length },
+  };
+}
+
+/**
  * The index of the first line that differs between two versions of a note's
  * source, or `null` when they are identical. Used to anchor the scroll when
  * undo / redo swaps the body out from under the editor: the view jumps to the

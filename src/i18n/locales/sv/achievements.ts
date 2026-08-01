@@ -81,6 +81,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "notes är en Progressive Web App: lägg till den på hemskärmen eller i appstartaren så öppnas den i helskärm och fungerar offline, precis som en inbyggd app.",
     },
+    guillotine: {
+      name: "Giljotinen",
+      condition: "Kapa en rad med raderingsknappen (eller Ctrl/Cmd+K).",
+      learnMore:
+        "X—-knappen uppe till höger i en anteckning tar bort raden som markören står på, så att städa en anteckning blir ett tryck i stället för att markera och sudda eller hålla in Backsteg. Står markören mitt i en mening rensas bara det som kommer efter den på raden, så det du ville behålla står kvar. Ctrl/Cmd+K gör samma sak från tangentbordet, och Ångra lägger tillbaka raden.",
+    },
     stylist: {
       name: "Stilisten",
       condition: "Formatera något med formateringsraden.",
