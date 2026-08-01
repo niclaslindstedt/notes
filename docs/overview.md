@@ -1017,8 +1017,13 @@ fields (the note title, settings, modal inputs) so their native character-level
 undo wins, but it **does** answer the shortcut inside the live-preview editor's
 `contenteditable` — that surface deliberately swallows the browser's native
 contenteditable undo (React owns its DOM), so without this the shortcut would be
-dead while the caret sits in a note. There it reverts one sentence of the open
-note's editing burst, exactly as the side menu's Undo button does.
+dead while the caret sits in a note — answering only once the Undo button had
+moved focus out of the editor. There it reverts one sentence of the open note's
+editing burst, exactly as the side menu's Undo button does. That carve-out is
+why the hook stays app-owned rather than re-exporting the
+[framework's](#the-shared-framework), which stands down on every
+`isContentEditable` target. It does adopt the framework's two gates: `enabled`,
+and standing down while a modal (`[aria-modal="true"]`) is open.
 
 **Undo / redo scrolls the changed region back into view.** When a step lands off
 screen — you undo a paragraph you scrolled past, or redo an edit near the note's
@@ -2641,9 +2646,9 @@ emitted, and `src/styles/theme.css` aliases the framework's seven extra
 colour slots (meta/path/flag/pipe/success/positive/negative) onto notes'
 11-slot palette. What deliberately stays app-side — the theme system,
 the encryption core, the i18n runtime, the Markdown parser/editor, the
-sync UI, search, the side-menu shell, and everything the React Native
-app imports — is listed with reasons in AGENTS.md's "The shared
-framework" section.
+[undo/redo shortcuts](#undo--redo), the sync UI, search, the side-menu
+shell, and everything the React Native app imports — is listed with
+reasons in AGENTS.md's "The shared framework" section.
 
 ## The public pages
 
