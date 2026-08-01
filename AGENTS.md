@@ -344,6 +344,13 @@ product decision):
   live-preview editor — notes' parser has evolved past the framework's
   (depth-based list-marker rotation) and the editor is coupled to
   attachments and the undo timeline.
+- **The undo/redo shortcuts** (`src/ui/hooks/useUndoRedoShortcuts.ts`) —
+  the framework's hook stands down on every `isContentEditable` target so
+  the browser's native undo wins. notes' live-preview editor deliberately
+  swallows native contenteditable undo (React owns its DOM), so that guard
+  leaves ⌘/Ctrl+Z dead while the caret sits in a note. The app-owned hook
+  keeps the `<input>` / `<textarea>` / `<select>` carve-out and answers the
+  shortcut inside the editor.
 - **The sync UI** (`SyncStatus`, `SyncDetailsModal`), **the search
   feature** (`domain/search.ts`, `SearchModal`), **the side-menu shell**
   (`SideMenu*`), and the storage plumbing (`oauth-pkce`, `http-utils`,
