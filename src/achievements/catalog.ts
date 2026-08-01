@@ -19,6 +19,7 @@ import {
   CloudGlyph,
   CodeGlyph,
   CopyGlyph,
+  DeleteLineGlyph,
   EyeOffGlyph,
   FileQuestionGlyph,
   FlaskGlyph,
@@ -418,6 +419,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     learnMore: true,
     // Fired when reopening a note restores the caret / scroll position it was
     // left at earlier this session (see `src/ui/editor-position.ts`).
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "guillotine",
+    tier: "beginner",
+    glyph: DeleteLineGlyph,
+    learnMore: true,
+    // Fired by the delete-line button (or Ctrl/Cmd+K) actually removing
+    // something — the cut leaves ordinary text behind, so there is nothing in
+    // the document to derive it from.
     trigger: { kind: "manual" },
   },
   {

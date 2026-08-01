@@ -87,6 +87,12 @@ const achievements = {
       learnMore:
         "notes is a Progressive Web App: add it to your home screen or launcher and it opens full-screen and works offline, just like a native app.",
     },
+    guillotine: {
+      name: "Guillotine",
+      condition: "Cut a line with the delete-line button (or Ctrl/Cmd+K).",
+      learnMore:
+        "The X— button at the top right of a note removes the line the cursor is on, so tidying a note is one tap instead of a select-and-erase or a held Backspace. Park the cursor mid-sentence and it clears only what comes after it on that line, leaving what you wanted to keep. Ctrl/Cmd+K does the same from the keyboard, and Undo puts the line back.",
+    },
     stylist: {
       name: "Stylist",
       condition: "Format something with the styling toolbar.",

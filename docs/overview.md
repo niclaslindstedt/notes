@@ -611,6 +611,45 @@ case reuses the [markdown codec](#markdown-codec)'s `noteToMarkdown` so a copied
 note is byte-identical to its on-disk file. Copying is the **Copycat**
 achievement (fired via `unlock("copycat")`).
 
+### Delete-line button
+
+`DeleteLineButton` (`src/ui/DeleteLineButton.tsx`) — the "X—" glyph immediately
+left of the [copy button](#copy-button) in the editor header. It removes the
+line the caret sits on, because clearing a line by hand is otherwise a
+select-and-erase or a held Backspace. `Ctrl/Cmd+K` is the same edit from the
+keyboard, bound by each editing surface itself (so the browser only loses the
+shortcut while the note body has focus). Neither is offered in the read-only
+archived-note view (see [Archive view](#archive-view)), and the button is
+withheld while a note is still [decrypting](#encryption) — there is no surface
+to cut in.
+
+What exactly goes is decided by the pure `deleteLine`
+(`src/domain/line-edit.ts`), so both surfaces agree:
+
+- **Caret in the middle of a line** — only the text *after* it goes, and the
+  caret stays at its column. This is the kill-to-end-of-line every terminal
+  binds to Ctrl+K, and it's what makes the button useful for dropping the rest
+  of a sentence rather than only whole lines.
+- **Caret at either end of a line** — the whole line goes, newline and all, so
+  the lines below move up. At the end of a line trimming the tail would delete
+  nothing, and a button that sometimes does nothing reads as broken.
+- **A ranged selection** — every line it touches goes; an endpoint resting at
+  column 0 hasn't visually taken that line, so it survives.
+
+The caret lands at the start of whichever line moved up into the gap (or at the
+end of the new last line when the note's tail was what went), which is what lets
+presses repeat: hold the button (or Ctrl+K) and lines peel off one after
+another. A one-line note empties to a single blank line rather than to no lines
+at all, and the edit runs through the same commit path as typing — so it is one
+step on the [undo timeline](#undo--redo) and syncs like any other edit.
+
+Like the [styling toolbar](#styling-toolbar)'s buttons, the header button cancels
+its own `mousedown`: the press must not blur the editing surface, or there would
+be no caret left to cut at. In the [live-preview editor](#markdown-editor) a
+press with no caret ever placed (an existing note opened but not yet tapped)
+does nothing rather than guess at a line. Cutting something unlocks the
+**Guillotine** achievement.
+
 ### Styling toolbar
 
 `FormatToolbar` + `FormatToolbarButton` (`src/ui/FormatToolbar.tsx`) — a row of

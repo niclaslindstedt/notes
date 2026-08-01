@@ -92,6 +92,30 @@ export function ImportIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * A cross followed by a stroke — "X—", the editor's delete-line button. Reads
+ * as taking a line of text away rather than the note itself, which is what the
+ * trash can already means everywhere else in the app.
+ */
+export function DeleteLineIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="m3 8 8 8M11 8l-8 8" />
+      <path d="M14.5 12H21" />
+    </svg>
+  );
+}
+
 /** The app's wordmark glyph — a dog-eared note sheet. App-specific. */
 export function NotesMarkIcon({ className }: IconProps) {
   return (

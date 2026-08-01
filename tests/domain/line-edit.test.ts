@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  deleteLine,
   firstChangedLine,
   orderPoints,
   pointsEqual,
@@ -133,5 +134,69 @@ describe("firstChangedLine", () => {
     const before = Array.from({ length: 40 }, (_, i) => `line ${i}`).join("\n");
     const after = before.replace("line 30", "line 30 edited");
     expect(firstChangedLine(before, after)).toBe(30);
+  });
+});
+
+describe("deleteLine", () => {
+  it("clears only the text after a mid-line caret", () => {
+    const r = deleteLine(["one two three"], P(0, 4))!;
+    expect(r.lines).toEqual(["one "]);
+    // The caret stays where it was, ready to type the rest again.
+    expect(r.caret).toEqual(P(0, 4));
+  });
+
+  it("removes the whole line from its start", () => {
+    const r = deleteLine(["one", "two", "three"], P(1, 0))!;
+    expect(r.lines).toEqual(["one", "three"]);
+    // The line that moved up into the gap takes the caret.
+    expect(r.caret).toEqual(P(1, 0));
+  });
+
+  it("removes the whole line from its end, where trimming would be a no-op", () => {
+    const r = deleteLine(["one", "two", "three"], P(1, 3))!;
+    expect(r.lines).toEqual(["one", "three"]);
+    expect(r.caret).toEqual(P(1, 0));
+  });
+
+  it("removes an empty line", () => {
+    const r = deleteLine(["one", "", "three"], P(1, 0))!;
+    expect(r.lines).toEqual(["one", "three"]);
+  });
+
+  it("lands the caret at the end of the new last line when the tail goes", () => {
+    const r = deleteLine(["one", "two"], P(1, 0))!;
+    expect(r.lines).toEqual(["one"]);
+    expect(r.caret).toEqual(P(0, 3));
+  });
+
+  it("empties a one-line note rather than leaving no lines at all", () => {
+    const r = deleteLine(["only"], P(0, 0))!;
+    expect(r.lines).toEqual([""]);
+    expect(r.caret).toEqual(P(0, 0));
+  });
+
+  it("returns null when there is nothing left to remove", () => {
+    expect(deleteLine([""], P(0, 0))).toBeNull();
+  });
+
+  it("removes every line a selection touches", () => {
+    const r = deleteLine(["one", "two", "three", "four"], P(1, 2), P(2, 1))!;
+    expect(r.lines).toEqual(["one", "four"]);
+    expect(r.caret).toEqual(P(1, 0));
+  });
+
+  it("leaves a line a selection only reaches the start of", () => {
+    const r = deleteLine(["one", "two", "three"], P(0, 1), P(1, 0))!;
+    expect(r.lines).toEqual(["two", "three"]);
+  });
+
+  it("takes a backwards selection the same way", () => {
+    const r = deleteLine(["one", "two", "three"], P(2, 1), P(1, 1))!;
+    expect(r.lines).toEqual(["one"]);
+  });
+
+  it("clamps a caret past the end of the line", () => {
+    const r = deleteLine(["one", "two"], P(0, 99))!;
+    expect(r.lines).toEqual(["two"]);
   });
 });

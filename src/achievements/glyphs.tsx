@@ -21,6 +21,7 @@ import {
   CloudIcon,
   CodeIcon,
   CopyIcon,
+  DeleteLineIcon,
   ImportIcon,
   PaletteIcon,
   PlusIcon,
@@ -361,3 +362,4 @@ export const PaletteGlyph: Glyph = PaletteIcon;
 export const CopyGlyph: Glyph = CopyIcon;
 export const SearchGlyph: Glyph = SearchIcon;
 export const FormatGlyph: Glyph = FormatIcon;
+export const DeleteLineGlyph: Glyph = DeleteLineIcon;

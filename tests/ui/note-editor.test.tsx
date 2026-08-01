@@ -171,6 +171,67 @@ describe("Editor", () => {
   });
 });
 
+describe("the delete-line button", () => {
+  // The note body, which a multi-line value can't be found by: the display-value
+  // query collapses whitespace, so "one\ntwo" never matches.
+  const bodyField = () =>
+    screen.getByPlaceholderText("Start writing…") as HTMLTextAreaElement;
+
+  it("removes the line the caret sits on", () => {
+    const { onChange } = renderEditor({
+      note: note({ body: "one\ntwo\nthree" }),
+    });
+    const body = bodyField();
+    body.focus();
+    body.setSelectionRange(4, 4); // start of "two"
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete line" }));
+    expect(onChange).toHaveBeenCalledWith("one\nthree");
+  });
+
+  it("clears only what follows a mid-line caret", () => {
+    const { onChange } = renderEditor({
+      note: note({ body: "keep this. drop this." }),
+    });
+    const body = screen.getByDisplayValue(
+      "keep this. drop this.",
+    ) as HTMLTextAreaElement;
+    body.focus();
+    body.setSelectionRange(11, 11);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete line" }));
+    expect(onChange).toHaveBeenCalledWith("keep this. ");
+    // The caret stays put so typing carries straight on.
+    expect(body.selectionStart).toBe(11);
+  });
+
+  it("answers Ctrl+K in the body the same way", () => {
+    const { onChange } = renderEditor({ note: note({ body: "one\ntwo" }) });
+    const body = bodyField();
+    body.focus();
+    body.setSelectionRange(0, 0);
+
+    fireEvent.keyDown(body, { key: "k", ctrlKey: true });
+    expect(onChange).toHaveBeenCalledWith("two");
+  });
+
+  it("keeps the caret in the body — the press must not blur the editor", () => {
+    renderEditor({ note: note({ body: "one\ntwo" }) });
+    const body = bodyField();
+    body.focus();
+
+    const button = screen.getByRole("button", { name: "Delete line" });
+    const down = fireEvent.mouseDown(button);
+    // A cancelled mousedown is what leaves focus (and the caret) where it is.
+    expect(down).toBe(false);
+  });
+
+  it("is withheld while the note is still decrypting", () => {
+    renderEditor({ loading: true });
+    expect(screen.queryByRole("button", { name: "Delete line" })).toBeNull();
+  });
+});
+
 describe("the styling toolbar", () => {
   afterEach(() => localStorage.clear());
 

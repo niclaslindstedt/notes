@@ -21,6 +21,7 @@ const app: AppCatalog = {
     label: "Kopiera anteckning",
     copied: "Kopierat",
   },
+  deleteLine: "Ta bort rad",
   format: {
     show: "Formatering",
     hide: "Dölj formatering",

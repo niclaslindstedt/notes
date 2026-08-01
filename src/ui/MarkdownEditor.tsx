@@ -20,6 +20,7 @@ import {
 } from "../domain/attachment.ts";
 import { unlock } from "../achievements/index.ts";
 import {
+  deleteLine,
   firstChangedLine,
   orderPoints,
   pointsEqual,
@@ -148,6 +149,8 @@ export type MarkdownEditorHandle = {
   focus: () => void;
   /** Apply a styling-toolbar action to the selection (or the caret's line). */
   format: (action: FormatAction) => void;
+  /** Remove the caret's line (or, mid-line, the text after the caret). */
+  deleteLine: () => void;
 };
 
 // The active line's identity: which source line is being edited as raw text, and
@@ -820,6 +823,18 @@ export function MarkdownEditor({
       e.preventDefault();
       selectAllLines();
     }
+    // Ctrl/Cmd+K deletes the caret's line — the keyboard twin of the header's
+    // delete-line button. Taken from the browser (Chrome and Firefox aim it at
+    // the address bar) only while the editing surface holds focus.
+    if (
+      (e.metaKey || e.ctrlKey) &&
+      !e.altKey &&
+      !e.shiftKey &&
+      e.key.toLowerCase() === "k"
+    ) {
+      e.preventDefault();
+      removeLine();
+    }
     // Tab hands focus on rather than indenting — the host places the editor in
     // the page's tab order (the surface itself is skipped by the browser). Only
     // when the caret is in the surface: an attachment thumbnail inside the note
@@ -891,6 +906,28 @@ export function MarkdownEditor({
     setActive((a) => (a.index === null ? a : { index: null, key: a.key + 1 }));
   }
 
+  // --- Deleting a line -----------------------------------------------------
+  //
+  // The header's delete-line button and its Ctrl/Cmd+K shortcut, applied
+  // through the same pure engine and `commit` as every other structural edit —
+  // so the note re-renders, the caret is re-placed where the cut left it, and
+  // the app's own undo can put it back. What exactly goes is `deleteLine`'s
+  // call (the whole line, or only the text after a mid-line caret).
+  //
+  // Until the caret has been placed at all — an existing note opened and not
+  // yet tapped — there is no line to point at, so the press does nothing
+  // rather than guess at one.
+  function removeLine() {
+    const pts = selectionPoints();
+    const at = lastCaret.current;
+    const span = pts ?? (at ? { start: at, end: at } : null);
+    if (!span) return;
+    const r = deleteLine(linesRef.current, span.start, span.end);
+    if (!r) return;
+    unlock("guillotine");
+    commit(r.lines, r.caret);
+  }
+
   // Draw a selection over whole source lines `[from, to]`. The endpoints are
   // anchored *inside* the line elements (not at the contenteditable root) so
   // both map back to source — the same shape `selectAllLines` relies on.
@@ -943,11 +980,14 @@ export function MarkdownEditor({
   placeCaretAtEndRef.current = placeCaretAtEnd;
   const formatRef = useRef(format);
   formatRef.current = format;
+  const removeLineRef = useRef(removeLine);
+  removeLineRef.current = removeLine;
   useImperativeHandle(
     ref,
     () => ({
       focus: () => placeCaretAtEndRef.current(),
       format: (action: FormatAction) => formatRef.current(action),
+      deleteLine: () => removeLineRef.current(),
     }),
     [],
   );

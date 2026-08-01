@@ -97,6 +97,13 @@ export function HomePage() {
               formatting back off.
             </li>
             <li>
+              Clear a line you no longer want with the <em>X—</em> button beside
+              the copy button: it removes whichever line the cursor is on, or —
+              with the cursor parked mid-sentence — just the text after it on
+              that line. <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>K</kbd> does the
+              same from the keyboard, and Undo puts the line back.
+            </li>
+            <li>
               Swipe a note right — in the overview or the side menu — to{" "}
               <em>archive</em> it: it leaves the list without being deleted, and
               you can restore it from the Archive view. Swipe left to uncover a
