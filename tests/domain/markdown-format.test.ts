@@ -184,6 +184,84 @@ describe("inline emphasis", () => {
   it("skips blank lines inside a multi-line selection", () => {
     expect(run("[one\n\ntwo]", BOLD)).toBe("[**one**\n\n**two**]");
   });
+
+  it("takes the whole run off from a caret anywhere inside it", () => {
+    expect(run("say **hel|lo there** now", BOLD)).toBe("say [hello there] now");
+  });
+
+  it("takes the whole run off from a partial selection of it", () => {
+    expect(run("say **[hello] there** now", BOLD)).toBe(
+      "say [hello there] now",
+    );
+  });
+
+  it("takes only one mark off a run wearing two", () => {
+    expect(run("***x|***", BOLD)).toBe("[*x*]");
+    expect(run("***x|***", ITALIC)).toBe("[**x**]");
+  });
+
+  it("unwraps the innermost run of the delimiter pressed", () => {
+    expect(run("**a *b|* c**", ITALIC)).toBe("**a [b] c**");
+  });
+
+  it("unwraps a run written with underscores", () => {
+    expect(run("say _hel|lo_ now", ITALIC)).toBe("say [hello] now");
+  });
+
+  it("falls back to the characters either side inside a fenced block", () => {
+    // A fenced line renders verbatim, so the parser reports no run there for
+    // the toolbar to light — a press still toggles the delimiters it finds.
+    expect(run("```\n**a|**\n```", BOLD)).toBe("```\n[a]\n```");
+  });
+});
+
+describe("the caret's inline marks", () => {
+  // The toolbar's lit buttons, as reported for a caret written in the source.
+  function marksAt(marked: string): string[] {
+    const { text, start, end } = unmark(marked);
+    return (
+      lineFormatAt(text.split("\n"), start.line, {
+        from: start.col,
+        to: end.col,
+      })?.inline ?? []
+    );
+  }
+
+  it("reports the run a bare caret sits in", () => {
+    expect(marksAt("say **hel|lo** now")).toEqual(["**"]);
+    expect(marksAt("say ~~hel|lo~~ now")).toEqual(["~~"]);
+    expect(marksAt("say `hel|lo` now")).toEqual(["`"]);
+  });
+
+  it("reports nothing outside a run", () => {
+    expect(marksAt("say **hello** n|ow")).toEqual([]);
+  });
+
+  it("reports every mark the caret is inside, outermost first", () => {
+    expect(marksAt("**a *b|c* d**")).toEqual(["**", "*"]);
+  });
+
+  it("reads a run wearing both marks as both", () => {
+    expect(marksAt("***x|***")).toEqual(["**", "*"]);
+  });
+
+  it("does not mistake bold for italic", () => {
+    expect(marksAt("**b|old**")).toEqual(["**"]);
+  });
+
+  it("reports the run a selection sits within", () => {
+    expect(marksAt("say **[hello]** now")).toEqual(["**"]);
+  });
+
+  it("reports nothing for a line inside a fence", () => {
+    expect(marksAt("```\n**a|**\n```")).toEqual([]);
+  });
+
+  it("reads past a block marker, not through it", () => {
+    expect(marksAt("- **mi|lk**")).toEqual(["**"]);
+    // The `-` bullet marker is not an emphasis delimiter.
+    expect(marksAt("- mi|lk")).toEqual([]);
+  });
 });
 
 describe("code fences", () => {
@@ -234,6 +312,7 @@ describe("lineFormatAt", () => {
       kind: "heading",
       level: 2,
       indent: 0,
+      inline: [],
     });
   });
 
@@ -242,6 +321,7 @@ describe("lineFormatAt", () => {
       kind: "ul",
       level: undefined,
       indent: 2,
+      inline: [],
     });
   });
 

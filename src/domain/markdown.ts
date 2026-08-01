@@ -329,14 +329,23 @@ function classifyLine(raw: string): LineBlock {
 // Inline level
 // ---------------------------------------------------------------------------
 
+/**
+ * The source columns a construct occupies, **delimiters included** — absolute
+ * within the original line. Carried by the marked-up constructs (code, bold,
+ * italic, strikethrough) so a caret column can be asked which marks it sits
+ * inside, which is what lights the styling toolbar and what tells a press
+ * exactly how much to unwrap.
+ */
+export type InlineSpan = { from: number; to: number };
+
 export type InlineNode =
   | { type: "text"; text: string; offset: number }
-  | { type: "code"; text: string; offset: number }
+  | { type: "code"; text: string; offset: number; span: InlineSpan }
   | { type: "link"; text: string; href: string; offset: number; bare?: true }
   | { type: "image"; alt: string; href: string; offset: number }
-  | { type: "strong"; children: InlineNode[] }
-  | { type: "em"; children: InlineNode[] }
-  | { type: "strikethrough"; children: InlineNode[] };
+  | { type: "strong"; children: InlineNode[]; span: InlineSpan }
+  | { type: "em"; children: InlineNode[]; span: InlineSpan }
+  | { type: "strikethrough"; children: InlineNode[]; span: InlineSpan };
 
 /**
  * Tokenise `text` into inline nodes. `base` is the source column of `text[0]`
@@ -369,6 +378,7 @@ export function parseInline(text: string, base = 0): InlineNode[] {
           type: "code",
           text: text.slice(i + 1, close),
           offset: base + i + 1,
+          span: { from: base + i, to: base + close + 1 },
         });
         i = close + 1;
         textStart = i;
@@ -552,6 +562,7 @@ function matchEmphasis(
       node: {
         type: "strikethrough",
         children: parseInline(text.slice(open, close), base + open),
+        span: { from: base + start, to: base + close + 2 },
       },
       end: close + 2,
     };
@@ -576,10 +587,16 @@ function matchEmphasis(
   if (inner.length === 0) return null;
 
   const children = parseInline(inner, base + open);
+  // The whole run, delimiters included. A `***x***` is one run wearing both
+  // marks, so its `strong` and its `em` share the same span — each still knows
+  // its own delimiter width, which is what lets one of the two be taken off
+  // (`***x***` unbolds to `*x*`, unitalicises to `**x**`).
+  const span = { from: base + start, to: base + close + len };
   let node: InlineNode;
-  if (len === 1) node = { type: "em", children };
-  else if (len === 2) node = { type: "strong", children };
-  else node = { type: "strong", children: [{ type: "em", children }] };
+  if (len === 1) node = { type: "em", children, span };
+  else if (len === 2) node = { type: "strong", children, span };
+  else
+    node = { type: "strong", children: [{ type: "em", children, span }], span };
   return { node, end: close + len };
 }
 

@@ -93,7 +93,9 @@ export function HomePage() {
               and outdent for sub-points), quotes, code blocks, links, images,
               and dividers, one button each. It writes ordinary Markdown, so
               anything you reach for there you can just as well type by hand,
-              and every button is a toggle — press a lit one to take the
+              and every button is a toggle — the toolbar lights up whatever the
+              cursor is already sitting in, from the heading it's on to the bold
+              or italic phrase around it, so pressing a lit button takes that
               formatting back off.
             </li>
             <li>
