@@ -340,11 +340,50 @@ describe("the styling toolbar", () => {
     ]);
   });
 
-  it("lights an inline button by its own state, not the line's", () => {
-    renderEditor({ note: note({ body: "- milk" }) });
+  it("lights an inline button when the caret sits inside its run", () => {
+    renderEditor({ note: note({ body: "say **hello** now" }) });
     openToolbar();
-    // Bold has no line-level state to read, so it never claims to be pressed.
-    expect(screen.getByRole("button", { name: "Bold" }).ariaPressed).toBeNull();
+    const body = screen.getByDisplayValue(
+      "say **hello** now",
+    ) as HTMLTextAreaElement;
+    body.focus();
+
+    // Inside `**hello**` — Bold is on, and a press would take it back off.
+    body.setSelectionRange(7, 7);
+    fireEvent.mouseUp(body);
+    expect(screen.getByRole("button", { name: "Bold" }).ariaPressed).toBe(
+      "true",
+    );
+    // Italic is not: a `**` run wears one mark, not two.
+    expect(screen.getByRole("button", { name: "Italic" }).ariaPressed).toBe(
+      "false",
+    );
+
+    // Stepping out of the run puts it out again.
+    body.setSelectionRange(15, 15);
+    fireEvent.mouseUp(body);
+    expect(screen.getByRole("button", { name: "Bold" }).ariaPressed).toBe(
+      "false",
+    );
+  });
+
+  it("takes the whole run off when a lit inline button is pressed", () => {
+    const onChange = vi.fn();
+    renderEditor({ note: note({ body: "say **hello** now" }), onChange });
+    openToolbar();
+    const body = screen.getByDisplayValue(
+      "say **hello** now",
+    ) as HTMLTextAreaElement;
+    body.focus();
+    // A bare caret mid-word: the lit button unbolds the phrase it lit for.
+    body.setSelectionRange(7, 7);
+    fireEvent.mouseUp(body);
+
+    fireEvent.click(screen.getByRole("button", { name: "Bold" }));
+    expect(onChange).toHaveBeenCalledWith("say hello now");
+    expect(screen.getByRole("button", { name: "Bold" }).ariaPressed).toBe(
+      "false",
+    );
   });
 
   it("disables outdent when the line is already at the left margin", () => {

@@ -343,6 +343,13 @@ carries a `bare: true` flag so the renderer knows it may [shorten it for
 display](#shorten-links) — an explicit link's label is never touched. The `image` node (`![alt](href)`) is what
 the [attachment renderer](#attachments) turns into an inline thumbnail.
 
+The four marked-up constructs — `strong`, `em`, `strikethrough`, `code` — also
+carry an `InlineSpan`: the source columns of the *whole* run, delimiters
+included. That is what lets a caret column be asked which runs it sits inside,
+which the [styling toolbar](#styling-toolbar) lights its buttons from and its
+presses unwrap by. A `***x***` is one run wearing two marks, so its `strong` and
+its `em` share one span and each is taken off by its own delimiter's width.
+
 A ` ``` ` line toggles the fenced state, so the lines between a pair of them
 classify as `code` and are never reparsed as Markdown; `fencedRanges` /
 `hiddenFenceLines` / `hasClosedFence` are the helpers built on top of that
@@ -696,12 +703,25 @@ Two behaviours make it usable rather than merely present:
   toggle — cancels its own `mousedown`, so the caret and any selection stay
   exactly where they were in the editing surface. Without that, pressing Bold
   would blur the editor and there would be nothing left to embolden.
-- **It shows what is already applied.** The caret's line is classified by the same
-  [parser](#markdown-parser) the preview renders from and reported up as a
+- **It shows what is already applied.** The caret's position is classified by the
+  same [parser](#markdown-parser) the preview renders from and reported up as a
   `LineFormat` (`onLineFormat`), so the heading / block trigger lights up (and
   adopts the applied member's glyph and name) when the caret sits on such a
   line — and every action toggles, so pressing a lit control takes the marker
   back off. Outdent is disabled at the left margin.
+
+  That reaches **inside the line** as well as across it. The editing surface
+  reports the caret's *columns*, not just its line, and `inlineMarksAt` walks the
+  line's inline nodes for every run enclosing them — so Bold lights anywhere
+  within `**…**`, Italic within `*…*` or `_…_`, Strikethrough within `~~…~~`,
+  Inline code within `` `…` ``, with no selection needed. A caret in
+  `**a *b* c**` lights Bold *and* Italic; a `***x***` wears both at once. The
+  lit-means-removable promise holds because `applyInline` unwraps the very run
+  the toolbar lit: a caret anywhere in `**hello there**` unbolds the whole
+  phrase, and `***x***` gives up one mark per press (`*x*`, then `x`). A caret
+  inside a fenced block lights nothing — that text renders verbatim, so there is
+  no emphasis there to be inside of. A selection spanning lines lights nothing
+  either, since inline emphasis can't cross a line boundary.
 
 The edits themselves are pure: `applyFormat` (`src/domain/markdown-format.ts`)
 takes the line array plus a `{ start, end }` pair of `SourcePoint`s and returns the

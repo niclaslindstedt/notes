@@ -17,6 +17,7 @@ import { deleteLine, firstChangedLine } from "../domain/line-edit.ts";
 import {
   applyFormat,
   lineFormatAt,
+  type ColumnSpan,
   type FormatAction,
   type LineFormat,
 } from "../domain/markdown-format.ts";
@@ -719,27 +720,52 @@ function PlainEditor({
       const next = result.lines.join("\n");
       setValue(next);
       onChange(next);
-      pendingSelection.current = {
-        from: pointToOffset(next, result.start),
-        to: pointToOffset(next, result.end),
-      };
-      lastOffset.current = pointToOffset(next, result.end);
+      const from = pointToOffset(next, result.start);
+      const to = pointToOffset(next, result.end);
+      pendingSelection.current = { from, to };
+      lastOffset.current = to;
+      // Report the selection the press left behind rather than waiting for it
+      // to be installed, so the button it lit (or put out) is right at once.
+      if (onLineFormat) markCaret(next, from, to);
     },
     deleteLine: removeLine,
   }));
 
-  // Keep the toolbar's lit buttons in step with the caret's line. Only runs
-  // while the toolbar is open (`onLineFormat` is undefined otherwise), so the
-  // Markdown-off editor doesn't parse Markdown for nothing.
-  const [caretLine, setCaretLine] = useState(0);
+  // Keep the toolbar's lit buttons in step with the caret. The line decides the
+  // block buttons; the columns decide the inline ones (Bold lights up inside a
+  // `**…**` run), so a move *within* a line has to report too — hence the whole
+  // selection rather than just its line. Only runs while the toolbar is open
+  // (`onLineFormat` is undefined otherwise), so the Markdown-off editor doesn't
+  // parse Markdown for nothing.
+  const [caret, setCaret] = useState<{
+    line: number;
+    span: ColumnSpan | null;
+  }>({ line: 0, span: { from: 0, to: 0 } });
   useEffect(() => {
-    onLineFormat?.(lineFormatAt(value.split("\n"), caretLine));
-  }, [onLineFormat, value, caretLine]);
+    onLineFormat?.(lineFormatAt(value.split("\n"), caret.line, caret.span));
+  }, [onLineFormat, value, caret]);
+
+  // A selection across lines covers no single line's columns, so it reports the
+  // line it starts on and no span — nothing inline can enclose it.
+  function markCaret(source: string, from: number, to: number) {
+    const start = offsetToPoint(source, from);
+    const end = offsetToPoint(source, to);
+    const next =
+      start.line === end.line
+        ? { line: start.line, span: { from: start.col, to: end.col } }
+        : { line: start.line, span: null };
+    setCaret((cur) =>
+      cur.line === next.line &&
+      cur.span?.from === next.span?.from &&
+      cur.span?.to === next.span?.to
+        ? cur
+        : next,
+    );
+  }
 
   function trackCaret(el: HTMLTextAreaElement) {
     lastOffset.current = el.selectionStart;
-    if (onLineFormat)
-      setCaretLine(offsetToPoint(el.value, el.selectionStart).line);
+    if (onLineFormat) markCaret(el.value, el.selectionStart, el.selectionEnd);
   }
 
   return (

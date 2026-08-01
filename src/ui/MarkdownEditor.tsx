@@ -202,6 +202,16 @@ export function MarkdownEditor({
   // The first line of a whole-line selection a block press just drew, so the
   // toolbar still knows what it applied while no single line is active.
   const [spanLine, setSpanLine] = useState<number | null>(null);
+  // Where the caret (or a single-line selection) sits, in source coordinates —
+  // what tells the toolbar which *inline* runs it is inside. The caret's line
+  // alone can't: bold is a span within a line, not a property of it. Null while
+  // the position isn't known, and only tracked while the toolbar is listening
+  // (a closed toolbar shouldn't re-render the editor on every caret move).
+  const [caretSpan, setCaretSpan] = useState<{
+    line: number;
+    from: number;
+    to: number;
+  } | null>(null);
   const [active, setActive] = useState<Active>(() => ({
     index: savedCaret
       ? Math.min(savedCaret.line, body.split("\n").length - 1)
@@ -298,11 +308,41 @@ export function MarkdownEditor({
     onChange(next);
     pendingCaret.current = caret.col;
     lastCaret.current = caret;
+    markCaret(caret.line, caret.col, caret.col);
     setActive((a) => ({
       index: caret.line,
       key: a.index === caret.line && !remount ? a.key : a.key + 1,
     }));
   }
+
+  // Remember where the caret is, for the toolbar's inline lights. Every caret
+  // we place ourselves reports here rather than waiting for the
+  // `selectionchange` it fires — that one is swallowed by `settingSel`. A no-op
+  // while the toolbar is closed, and while the position hasn't actually moved,
+  // so neither costs a render.
+  function markCaret(line: number, from: number, to: number) {
+    if (!onLineFormat) return;
+    setCaretSpan((cur) =>
+      cur && cur.line === line && cur.from === from && cur.to === to
+        ? cur
+        : { line, from, to },
+    );
+  }
+
+  // A selection spanning lines has no single line's columns to report.
+  function clearCaretSpan() {
+    if (!onLineFormat) return;
+    setCaretSpan((cur) => (cur === null ? cur : null));
+  }
+
+  // Seed the caret's position the moment the toolbar starts listening, so
+  // opening it over a word already in `**` lights Bold without having to move
+  // the caret first.
+  useEffect(() => {
+    if (!onLineFormat) return;
+    const at = lastCaret.current;
+    setCaretSpan(at ? { line: at.line, from: at.col, to: at.col } : null);
+  }, [onLineFormat]);
 
   // Move the active line without editing the source (a caret move that reveals a
   // new raw line). Remounts the active node so it renders that line's raw text.
@@ -313,6 +353,7 @@ export function MarkdownEditor({
   function activate(index: number, col: number, remount = false) {
     pendingCaret.current = col;
     lastCaret.current = { line: index, col };
+    markCaret(index, col, col);
     setActive((a) => ({
       index,
       key: a.index === index && !remount ? a.key : a.key + 1,
@@ -659,7 +700,17 @@ export function MarkdownEditor({
     if (!sel.anchorNode || !root.contains(sel.anchorNode)) return;
     const cur = activeRef.current.index;
 
-    if (!sel.isCollapsed) return;
+    if (!sel.isCollapsed) {
+      // A drag is left exactly as the browser is drawing it — but the toolbar
+      // still wants to know what it covers, so selecting a bolded word lights
+      // Bold. Reading the endpoints doesn't disturb the selection.
+      const pts = selectionPoints();
+      if (!pts) return;
+      if (pts.start.line === pts.end.line)
+        markCaret(pts.start.line, pts.start.col, pts.end.col);
+      else clearCaretSpan();
+      return;
+    }
 
     const lineEl = lineElementOf(root, sel.anchorNode);
     const L = lineIndexOf(lineEl);
@@ -674,7 +725,12 @@ export function MarkdownEditor({
       sel.anchorNode,
       sel.anchorOffset,
     );
-    if (pt) lastCaret.current = pt;
+    if (pt) {
+      lastCaret.current = pt;
+      // Within-line moves matter too: stepping the caret out of a `**` run
+      // must put Bold out, and that never re-enters `activate` below.
+      markCaret(pt.line, pt.col, pt.col);
+    }
     if (L === cur) return;
     // The caret entered a different line: make that line active (raw) at the col.
     activate(L, pt?.col ?? 0);
@@ -893,12 +949,14 @@ export function MarkdownEditor({
       pendingRange.current = { from: r.start.col, to: r.end.col };
       pendingCaret.current = null;
       pendingLineSpan.current = null;
+      markCaret(r.end.line, r.start.col, r.end.col);
       setActive((a) => ({ index: r.end.line, key: a.key + 1 }));
       return;
     }
     // A result spanning lines drops the raw active line — every line renders
     // formatted, and the selection is drawn across whole line elements, which
     // both maps back to source cleanly and shows the result of the press.
+    clearCaretSpan();
     pendingRange.current = null;
     pendingCaret.current = null;
     pendingLineSpan.current = { from: r.start.line, to: r.end.line };
@@ -957,18 +1015,28 @@ export function MarkdownEditor({
     selectLineSpan(span.from, span.to);
   });
 
-  // Tell the toolbar what the caret's line already is, so the H2 / bullet /
-  // quote button can light up. Skipped entirely when nobody is listening (the
-  // toolbar is closed), which is the common case. With a whole-line selection
-  // drawn by a block press there is no active line, so the *first* selected
-  // line stands in — otherwise bulleting three lines would leave the bullet
-  // button dark and its own undo press unfindable.
+  // Tell the toolbar what is already in effect at the caret, so the H2 /
+  // bullet / quote button can light up — and, from `caretSpan`, so can Bold
+  // when the caret sits inside a `**…**` run. Skipped entirely when nobody is
+  // listening (the toolbar is closed), which is the common case. With a
+  // whole-line selection drawn by a block press there is no active line, so the
+  // *first* selected line stands in — otherwise bulleting three lines would
+  // leave the bullet button dark and its own undo press unfindable.
   const reportIndex = clampedIndex ?? spanLine;
   const lineFormat =
     reportIndex === null ? null : (blocks[reportIndex] ?? null);
+  // Only columns *on the reported line* say anything about the inline marks
+  // there; a caret elsewhere (or a selection across lines) reports none.
+  const inlineFrom = caretSpan?.line === reportIndex ? caretSpan.from : null;
+  const inlineTo = caretSpan?.line === reportIndex ? caretSpan.to : null;
   useEffect(() => {
-    onLineFormat?.(lineFormat ? lineFormatOf(lineFormat) : null);
-  }, [onLineFormat, lineFormat]);
+    if (!onLineFormat) return;
+    const span =
+      inlineFrom === null || inlineTo === null
+        ? null
+        : { from: inlineFrom, to: inlineTo };
+    onLineFormat(lineFormat ? lineFormatOf(lineFormat, span) : null);
+  }, [onLineFormat, lineFormat, inlineFrom, inlineTo]);
 
   // The stand-in above only holds while nothing is being edited; the moment
   // the caret lands on a line again, that line is the truth.

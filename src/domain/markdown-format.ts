@@ -16,7 +16,13 @@
 // **Bullet list** on a list un-lists it — so one button covers both
 // directions and the toolbar can light up to show what's already applied.
 
-import { classifyLines, type BlockKind, type LineBlock } from "./markdown.ts";
+import {
+  classifyLines,
+  parseInline,
+  type BlockKind,
+  type InlineNode,
+  type LineBlock,
+} from "./markdown.ts";
 import { orderPoints, type SourcePoint } from "./line-edit.ts";
 
 /** A selection (or, when the two points are equal, a bare caret). */
@@ -59,9 +65,16 @@ const URL_PLACEHOLDER = "url";
 const URL_RE = /^(?:https?:\/\/|www\.)\S+$/i;
 
 /**
- * The block state of a single source line, as the toolbar reads it to decide
- * which buttons are lit. Derived from the same parser the preview renders
- * from, so "the button is on" and "the line looks like that" can't disagree.
+ * Where the caret (or a selection) sits within one line, as source columns.
+ * Null when the selection spans several lines — inline emphasis can't cross a
+ * line boundary, so there is no single run to be inside of.
+ */
+export type ColumnSpan = { from: number; to: number };
+
+/**
+ * The formatting state at the caret, as the toolbar reads it to decide which
+ * buttons are lit. Derived from the same parser the preview renders from, so
+ * "the button is on" and "the line looks like that" can't disagree.
  */
 export type LineFormat = {
   kind: BlockKind;
@@ -69,19 +82,84 @@ export type LineFormat = {
   level?: number;
   /** Leading-indent width in characters — non-zero means a nested item. */
   indent: number;
+  /**
+   * The inline emphasis the caret sits *inside* — bold, italic, strikethrough,
+   * inline code — so those buttons light up too and a press takes the mark back
+   * off. Empty when the caret's position isn't known (nothing focused) or the
+   * selection spans lines.
+   */
+  inline: InlineDelimiter[];
 };
 
-/** The toolbar's view of an already-classified line. */
-export function lineFormatOf(block: LineBlock): LineFormat {
+/**
+ * An inline construct enclosing a span of one line: which toolbar button owns
+ * it, and the columns of the whole run in the source, delimiters included.
+ */
+export type InlineMark = ColumnSpan & { delimiter: InlineDelimiter };
+
+/** Which toolbar button each marked-up inline node belongs to. */
+const NODE_DELIMITER = {
+  strong: "**",
+  em: "*",
+  strikethrough: "~~",
+  code: "`",
+} as const satisfies Partial<Record<InlineNode["type"], InlineDelimiter>>;
+
+/**
+ * Every inline construct enclosing `span` on `block`'s line, outermost first.
+ * The line is tokenised by the same parser the preview renders from, so a run
+ * the toolbar calls "bold" is exactly the run that renders bold — a caret in
+ * `a **b *c* d** e` reports both the bold and the italic it sits in.
+ *
+ * A line inside a fenced code block reports nothing: it renders verbatim, so
+ * there is no emphasis there to be inside of.
+ */
+export function inlineMarksAt(
+  block: LineBlock,
+  span: ColumnSpan,
+): InlineMark[] {
+  if (block.kind === "code" || block.kind === "fence") return [];
+  const marks: InlineMark[] = [];
+  const walk = (nodes: readonly InlineNode[]) => {
+    for (const node of nodes) {
+      if (
+        node.type === "strong" ||
+        node.type === "em" ||
+        node.type === "strikethrough" ||
+        node.type === "code"
+      ) {
+        if (node.span.from <= span.from && span.to <= node.span.to) {
+          marks.push({ delimiter: NODE_DELIMITER[node.type], ...node.span });
+        }
+      }
+      if ("children" in node) walk(node.children);
+    }
+  };
+  walk(parseInline(block.content, block.contentStart));
+  return marks;
+}
+
+/**
+ * The toolbar's view of an already-classified line. `span` is where the caret
+ * (or the selection) sits on it, which decides the inline marks; omit it when
+ * that isn't known and only the block state is reported.
+ */
+export function lineFormatOf(
+  block: LineBlock,
+  span: ColumnSpan | null = null,
+): LineFormat {
   return {
     kind: block.kind,
     level: block.level,
     indent: leadingWhitespace(block.raw).length,
+    inline: span
+      ? inlineMarksAt(block, span).map((mark) => mark.delimiter)
+      : [],
   };
 }
 
 /**
- * Read the block state of `lines[index]`, classifying the document first. The
+ * Read the format state of `lines[index]`, classifying the document first. The
  * live-preview editor already holds a classification and calls
  * {@link lineFormatOf} directly; this is for callers (the plain-textarea
  * fallback) that don't.
@@ -89,9 +167,10 @@ export function lineFormatOf(block: LineBlock): LineFormat {
 export function lineFormatAt(
   lines: readonly string[],
   index: number,
+  span: ColumnSpan | null = null,
 ): LineFormat | null {
   const block = classifyLines(lines.join("\n"))[index];
-  return block ? lineFormatOf(block) : null;
+  return block ? lineFormatOf(block, span) : null;
 }
 
 /**
@@ -267,6 +346,12 @@ function outdentLine(line: string): string {
  * it — an empty line, a run of spaces — an empty pair is opened and the caret
  * lands between the delimiters, ready to type into.
  *
+ * Unwrapping comes first, and asks the parser rather than the characters
+ * either side of the selection: whatever run the toolbar lit for this position
+ * is exactly the run a press takes off, however much of it was selected. So a
+ * caret anywhere inside `**bold text**` unbolds the whole phrase, and a
+ * `***x***` gives up one mark at a time.
+ *
  * A selection spanning several lines wraps each line's share separately, since
  * Markdown emphasis doesn't cross a line boundary.
  */
@@ -278,6 +363,22 @@ function applyInline(
 ): FormatResult {
   const span = rangeOf(start, end);
   const collapsed = start.line === end.line && start.col === end.col;
+
+  if (start.line === end.line) {
+    const line = lines[start.line] ?? "";
+    const sel = collapsed
+      ? { from: start.col, to: end.col }
+      : trimSpan(line, start.col, end.col);
+    const block = classifyLines(lines.join("\n"))[start.line];
+    // The innermost run of this delimiter the selection sits in, so a nested
+    // one comes off before the run around it. `inlineMarksAt` reports
+    // outermost first, so the innermost is the last match.
+    const enclosing = block
+      ? inlineMarksAt(block, sel).filter((m) => m.delimiter === delim)
+      : [];
+    const mark = enclosing[enclosing.length - 1];
+    if (mark) return stripMark(lines, start.line, mark, delim);
+  }
 
   if (collapsed) {
     const line = lines[start.line] ?? "";
@@ -337,6 +438,30 @@ function applyInline(
     last = { line: t.i, col: edit.to + delta };
   }
   return { lines: next, start: first!, end: last! };
+}
+
+/**
+ * Take one mark off the run at `mark`, leaving its text selected so a second
+ * press puts it straight back. Only this delimiter's own width goes from each
+ * end, so the other marks on a run survive: `***x***` unbolds to `*x*` (and,
+ * pressed with `*`, unitalicises to `**x**`).
+ */
+function stripMark(
+  lines: readonly string[],
+  index: number,
+  mark: InlineMark,
+  delim: InlineDelimiter,
+): FormatResult {
+  const line = lines[index] ?? "";
+  const width = delim.length;
+  const body = line.slice(mark.from + width, mark.to - width);
+  const next = [...lines];
+  next[index] = line.slice(0, mark.from) + body + line.slice(mark.to);
+  return {
+    lines: next,
+    start: { line: index, col: mark.from },
+    end: { line: index, col: mark.from + body.length },
+  };
 }
 
 /** Whether a press decides for itself, or was told which way the block goes. */

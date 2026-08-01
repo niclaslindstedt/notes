@@ -6,7 +6,11 @@ import {
   type ReactNode,
 } from "react";
 
-import type { FormatAction, LineFormat } from "../domain/markdown-format.ts";
+import type {
+  FormatAction,
+  InlineDelimiter,
+  LineFormat,
+} from "../domain/markdown-format.ts";
 import { useT, type TFunction } from "../i18n/index.ts";
 import { haptics } from "../platform/native-bridge.ts";
 import { FloatingPanel } from "./FloatingPanel.tsx";
@@ -52,10 +56,11 @@ import { ChevronDownIcon } from "./icons.tsx";
 //     selection) stays exactly where it was in the editing surface. Without
 //     that, pressing "Bold" would blur the editor and there would be nothing
 //     left to embolden.
-//   * **It shows what is already applied.** The caret's line is classified by
-//     the same parser the preview renders from, so the heading / block button
-//     lights up when the caret is on such a line, and pressing a lit control
-//     takes the marker off again.
+//   * **It shows what is already applied.** The caret's position is classified
+//     by the same parser the preview renders from — the line's block kind *and*
+//     the inline runs the caret sits inside — so the heading / block button
+//     lights up on such a line and Bold lights up anywhere within `**…**`.
+//     Pressing a lit control takes that marker off again.
 //
 // `role="toolbar"` with a roving tabindex keeps the row one stop in the keyboard
 // order rather than nine.
@@ -66,7 +71,7 @@ type ToolbarItem = {
   action: FormatAction;
   label: string;
   glyph: ReactNode;
-  /** Whether the caret's line already carries this construct. */
+  /** Whether the caret already sits in (or on) this construct. */
   active?: (line: LineFormat | null) => boolean;
   /** Whether the press would do nothing (an outdent at the left margin). */
   disabled?: (line: LineFormat | null) => boolean;
@@ -91,6 +96,11 @@ type ToolbarGroup = {
 );
 
 const HEADING_LEVELS = [1, 2, 3, 4, 5, 6];
+
+/** Whether the caret sits inside a run of `delim` — see `inlineMarksAt`. */
+function wearing(line: LineFormat | null, delim: InlineDelimiter): boolean {
+  return line?.inline.includes(delim) === true;
+}
 
 const ICON = "h-[18px] w-[18px]";
 
@@ -125,24 +135,28 @@ function buildGroups(t: TFunction): ToolbarGroup[] {
           action: { kind: "inline", delimiter: "**" },
           label: t("app.format.bold"),
           glyph: <BoldGlyph className={ICON} />,
+          active: (line) => wearing(line, "**"),
         },
         {
           id: "italic",
           action: { kind: "inline", delimiter: "*" },
           label: t("app.format.italic"),
           glyph: <ItalicGlyph className={ICON} />,
+          active: (line) => wearing(line, "*"),
         },
         {
           id: "strikethrough",
           action: { kind: "inline", delimiter: "~~" },
           label: t("app.format.strikethrough"),
           glyph: <StrikethroughGlyph className={ICON} />,
+          active: (line) => wearing(line, "~~"),
         },
         {
           id: "code",
           action: { kind: "inline", delimiter: "`" },
           label: t("app.format.code"),
           glyph: <InlineCodeGlyph className={ICON} />,
+          active: (line) => wearing(line, "`"),
         },
       ],
     },
