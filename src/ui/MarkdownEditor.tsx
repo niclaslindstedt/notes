@@ -667,9 +667,15 @@ export function MarkdownEditor({
       e.preventDefault();
       return;
     }
+    // Refused *before* the mapping is consulted, and whether or not it
+    // succeeds: React owns every node in this surface, so an edit we can't
+    // express as a source splice must still not reach the browser. Letting one
+    // through has it rewrite the surface behind React's back, and the next
+    // render — reconciling against nodes that are no longer there — throws and
+    // takes the whole app down.
+    e.preventDefault();
     const pts = editPoints(e);
     if (!pts) return;
-    e.preventDefault();
     if (it === "insertParagraph" || it === "insertLineBreak") {
       // A quote carries its marker onto the row the split opens, so pressing
       // Enter keeps writing the same quote (see `newlineFor`).
@@ -920,10 +926,13 @@ export function MarkdownEditor({
     }
     // Route all text paste through the engine so a multi-line paste never edits
     // formatted DOM and the exact source is preserved.
+    // Taken from the browser unconditionally, for the reason the `beforeinput`
+    // interception above is: a paste it applies itself corrupts the DOM React
+    // owns. An unmappable selection drops the paste rather than risking that.
+    e.preventDefault();
     const text = e.clipboardData.getData("text/plain");
     const pts = selectionPoints();
     if (!pts) return;
-    e.preventDefault();
     replaceSelection(pts.start, pts.end, text);
   }
 

@@ -53,7 +53,30 @@ the bundled webfont for offline first paint, then does a trivial
 `window.location.pathname` switch: a path ending in `/privacy` renders
 `PrivacyPage`, `/home` renders `HomePage`, anything else renders the main
 `App`. Only the app shell is wrapped in `LanguageRoot` (`src/i18n/`); the two
-public pages are English-only and bypass i18n.
+public pages are English-only and bypass i18n. The shell is additionally wrapped
+in `ErrorBoundary` (inside `LanguageRoot`, so the fallback is translated) — see
+[crash screen](#crash-screen).
+
+### Crash screen
+
+`ErrorBoundary` (`src/ui/ErrorBoundary.tsx`) — the app's last line of defence,
+wrapped around the shell in `main.tsx`. React unmounts the entire root when a
+render throws and nothing catches it, which on a PWA leaves a blank page whose
+only cure is force-quitting the app and launching it cold. The boundary turns
+that into a titled message and a **Reload the app** button. Nothing is lost by
+reloading: notes are persisted on every edit, so the reload re-reads them from
+the active backend.
+
+The caught error goes to the [in-app logger](#logger) under the `crash` scope
+rather than the console — on the phone where a blank screen hurts most,
+devtools aren't reachable, and the entry survives the reload so it can be read
+back from Settings → Logs and reported. The stack is also shown inline behind a
+collapsed "Error details" disclosure.
+
+This is a safety net, not a licence: a caught error is still a defect. The
+crash it was built for was the [live-preview editor](#markdown-editor) letting
+the browser mutate the DOM React owns (see [selection
+mapping](#selection-mapping)), which is fixed at the source too.
 
 ### Note list / overview
 
@@ -193,6 +216,17 @@ browser mutate a contenteditable itself corrupts its structure (it inserts bare
 text at the root), which is exactly why every edit is intercepted. **IME
 composition is the one exception** — it can't be `preventDefault`ed, so it runs
 natively on the active line and is reconciled on `compositionend`.
+
+**An edit that can't be mapped is refused, not passed on.** The
+`preventDefault` fires *before* the source points are resolved and regardless of
+whether they resolve, in the `beforeinput` handler and in `onPaste` alike. An
+unmappable edit that reaches the browser has it rewrite the surface behind
+React's back, and the next render — reconciling against nodes that are no longer
+there — throws and takes the whole app down (the same `removeChild`
+`NotFoundError` the composition remount avoids). Dropping such an edit is the
+strictly safer failure: the mapping itself is what should cover the case, and
+[selection mapping](#selection-mapping) resolves the endpoints the browser
+anchors above the lines.
 
 **A composition always remounts the line it touched.** Because the browser wrote
 into the line itself, React's record of that line's children is stale by the time
@@ -361,7 +395,24 @@ inline leaf carries. A leaf whose rendered text is shorter than its source (a
 [shortened bare URL](#shorten-links)) also carries `data-len` so the *end* of the
 leaf maps to the end of the full source token, and an endpoint anchored at the
 line container itself (Ctrl/Cmd+A's range boundaries) maps to the true line edge,
-markers included. `extractSourceRange` then returns the **verbatim** source the
+markers included.
+
+An endpoint anchored *above* the lines — on the editing surface itself, or on a
+wrapper between it and them — is resolved by `containerPoint` to the nearest
+line edge rather than given up on: the DOM boundary `(el, offset)` sits before
+`el.childNodes[offset]`, so it maps to the start of the first line at or after
+that child, and to the end of the last line when the offset runs past the
+children. The editor's own Ctrl/Cmd+A anchors *inside* the first and last lines
+precisely so this isn't needed, but a selection the **browser** draws has no
+such manners: iOS Safari's native "Select All" (the text-selection callout —
+how a note gets erased on a phone) runs its range from `(surface, 0)` to
+`(surface, childCount)`. While those endpoints resolved to `null` the editor
+couldn't express the delete as a source splice, so it declined to intercept it,
+and WebKit applied the delete itself — tearing out the line elements React
+believes it owns and blanking the app on the next render (see [crash
+screen](#crash-screen)).
+
+`extractSourceRange` then returns the **verbatim** source the
 selection covers — raw Markdown, list/heading/quote markers and all, so a copy
 round-trips as the source it was typed as; only the columns at the very start and
 end of the selection are trimmed, interior lines are taken in full. Both are
