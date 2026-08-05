@@ -69,8 +69,9 @@ Honour these when naming a new file, key, or string.
 | **Editor** / **live-preview editor** / **note body editor** | `MarkdownEditor` (`src/ui/MarkdownEditor.tsx`). [→](overview.md#markdown-editor)                            |
 | **Active line** / **raw line** / **the line I'm editing**  | `ActiveLine` + `active` state (`data-raw`) in `MarkdownEditor` (`src/ui/MarkdownEditor.tsx`). [→](overview.md#markdown-editor) |
 | **Edit engine** / **replaceRange** / **splice the source** / **line editing** | `replaceRange`, `orderPoints`, `SourcePoint` (`src/domain/line-edit.ts`). [→](overview.md#markdown-editor) |
-| **Contenteditable caret helpers** / **place the caret** / **caret column** | `placeCaret`, `offsetWithin`, `lineElementOf`, `lineIndexOf` (`src/ui/contenteditable-caret.ts`). [→](overview.md#selection-mapping) |
-| **Follow the cursor** / **keep the caret visible** / **cursor scrolls off screen** / **caret buffer while typing** | `scrollCaretLineIntoView` (`src/ui/MarkdownEditor.tsx`); `bufferedScrollTop` (`src/ui/hooks/scrollFocusedIntoView.ts`). [→](overview.md#markdown-editor) |
+| **Contenteditable caret helpers** / **place the caret** / **caret column** / **where the caret is on screen** | `placeCaret`, `offsetWithin`, `lineElementOf`, `lineIndexOf`, `caretRectWithin` (`src/ui/contenteditable-caret.ts`). [→](overview.md#selection-mapping) |
+| **Follow the cursor** / **keep the caret visible** / **cursor scrolls off screen** / **caret buffer while typing** | `scrollCaretLineIntoView` (`src/ui/MarkdownEditor.tsx`); `bufferedScrollTop`, `revealRect` (`src/ui/hooks/scrollFocusedIntoView.ts`). [→](overview.md#markdown-editor) |
+| **Long / wrapped line** / **a sentence spanning several screens** / **tapping into a long row scrolls somewhere else** | `revealRect` (`src/ui/hooks/scrollFocusedIntoView.ts`) — the reveal measures the caret's rect, not the wrapped line's box; `caretRectWithin` (`src/ui/contenteditable-caret.ts`). [→](overview.md#markdown-editor) |
 | **Rendered line** / **formatted line** / **live preview**  | `RenderedLine` (`src/ui/MarkdownLine.tsx`); `markdownLineClass` (`src/ui/markdown-line-class.ts`). [→](overview.md#rendered-line) |
 | **Markdown parser** / **classify lines** / **inline formatting** | `classifyLines`, `parseInline`, `LineBlock`, `InlineNode`, `InlineSpan` (the source columns of a marked-up run, delimiters included) (`src/domain/markdown.ts`). [→](overview.md#markdown-parser) |
 | **Clickable link** / **open a link** / **link in the editor** | the `link` case in `renderInline` (`src/ui/MarkdownLine.tsx`); opens on click instead of placing the caret. [→](overview.md#rendered-line) |
@@ -136,7 +137,7 @@ Honour these when naming a new file, key, or string.
 | **Right-click menu** / **context menu** / **row actions** (desktop) | `RowActionMenu` (`src/ui/RowActionMenu.tsx`); built on `FloatingPanel`; its **Copy link** entry is `onCopyLink` on `SwipeableNoteCard` / `SwipeToRemove`, fed by `copyNoteLink` in `src/app/App.tsx`. [→](overview.md#right-click-menu) |
 | **Pull to refresh** / **pull down to sync**                | `usePullToRefresh` (`src/ui/hooks/usePullToRefresh.ts`); `PullToRefreshIndicator` (`src/ui/PullToRefreshIndicator.tsx`). [→](overview.md#pull-to-refresh) |
 | **Pinned sidebar** / **docked on tablet** / **media query** | `pinned` in `nav-context.ts`; `useMediaQuery` (`src/ui/hooks/useMediaQuery.ts`). [→](overview.md#pinned-sidebar) |
-| **Viewport height** / **soft-keyboard height** / **scroll a tapped line / field clear of the keyboard** | `useViewportHeight` (`src/ui/hooks/useViewportHeight.ts`); `appViewportRect` (`src/ui/appViewportRect.ts`); `scrollFocusedIntoView` (`src/ui/hooks/scrollFocusedIntoView.ts`). [→](overview.md#viewport-height) |
+| **Viewport height** / **soft-keyboard height** / **scroll a tapped line / field clear of the keyboard** | `useViewportHeight` (`src/ui/hooks/useViewportHeight.ts`); `appViewportRect` (`src/ui/appViewportRect.ts`); `scrollFocusedIntoView`, `revealRect` (`src/ui/hooks/scrollFocusedIntoView.ts`). [→](overview.md#viewport-height) |
 
 ## Modals and dialogs
 

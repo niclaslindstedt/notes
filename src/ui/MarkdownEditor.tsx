@@ -53,6 +53,7 @@ import {
 } from "./contenteditable-caret.ts";
 import {
   bufferedScrollTop,
+  revealRect,
   scrollFocusedIntoView,
 } from "./hooks/scrollFocusedIntoView.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
@@ -1331,13 +1332,16 @@ function carriesFiles(e: ReactDragEvent): boolean {
   return types ? Array.from(types).includes("Files") : false;
 }
 
-// Keep the caret's line clear of the editor's top and bottom edges by a
-// one-line buffer, so an edit that lands the caret at the foot of the viewport
-// — pressing Enter on the bottom line — scrolls it back with a blank line of
-// breathing room instead of tucking it against (or past) the edge, where the
-// browser leaves it because we intercept the edit and re-place the caret
-// ourselves (no native reveal). A line already inside the buffered band leaves
-// the view untouched, so ordinary mid-note typing never jumps. `root` is the
+// Keep the caret clear of the editor's top and bottom edges by a one-line
+// buffer, so an edit that lands it at the foot of the viewport — pressing Enter
+// on the bottom line — scrolls it back with a blank line of breathing room
+// instead of tucking it against (or past) the edge, where the browser leaves it
+// because we intercept the edit and re-place the caret ourselves (no native
+// reveal). A caret already inside the buffered band leaves the view untouched,
+// so ordinary mid-note typing never jumps. The geometry comes from the caret's
+// own rect rather than the line's box (`revealRect`): a line that soft-wraps
+// past the viewport is never "inside the band", so measuring the box would
+// scroll on every keystroke and aim at the paragraph's middle. `root` is the
 // contenteditable; its parent is the `overflow-y-auto` scroller and the only
 // scrollable ancestor, so scrolling its `scrollTop` stays contained to the note.
 function scrollCaretLineIntoView(
@@ -1347,16 +1351,16 @@ function scrollCaretLineIntoView(
   if (!root || !line) return;
   const scroller = root.parentElement;
   if (!scroller) return;
-  const lineRect = line.getBoundingClientRect();
+  const caretRect = revealRect(line);
   const viewRect = scroller.getBoundingClientRect();
   const top = bufferedScrollTop(
-    lineRect.top,
-    lineRect.height,
+    caretRect.top,
+    caretRect.height,
     viewRect.top,
     scroller.scrollTop,
     scroller.clientHeight,
     scroller.scrollHeight,
-    lineRect.height,
+    caretRect.height,
   );
   // Absolute target (not a relative nudge) so a call issued mid-animation
   // retargets the in-flight scroll instead of compounding onto it.

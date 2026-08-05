@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   bufferedScrollTop,
   centeredScrollTop,
+  revealRect,
   scrollFocusedIntoView,
 } from "../../src/ui/hooks/scrollFocusedIntoView.ts";
 
@@ -72,6 +73,39 @@ function scrollableLine() {
   return { scroller, line, scrollTo };
 }
 
+// A single editable line that soft-wraps across several screens (1200 tall in a
+// 400 band) — the long-sentence case. jsdom does no layout and reports no range
+// geometry, so the caret's rect is stubbed: `putCaretAt` parks a fake collapsed
+// selection inside the line at a given viewport offset.
+function tallEditableLine() {
+  const { scroller, line, scrollTo } = scrollableLine();
+  const text = line.ownerDocument.createTextNode("a very long sentence");
+  line.append(text);
+  Object.defineProperty(line, "isContentEditable", {
+    value: true,
+    configurable: true,
+  });
+  // Content offset 300, 1200 tall: three times the visible band.
+  line.getBoundingClientRect = () =>
+    ({ top: 300 - scroller.scrollTop, height: 1200 }) as DOMRect;
+
+  const putCaretAt = (offsetInLine: number) => {
+    const caret = {
+      top: 300 - scroller.scrollTop + offsetInLine,
+      height: 20,
+    } as DOMRect;
+    const range = {
+      startContainer: text,
+      getClientRects: () => [caret] as unknown as DOMRectList,
+    };
+    vi.spyOn(window, "getSelection").mockReturnValue({
+      rangeCount: 1,
+      getRangeAt: () => range,
+    } as unknown as Selection);
+  };
+  return { scroller, line, scrollTo, putCaretAt };
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   stubReducedMotion(false);
@@ -84,7 +118,40 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   document.body.innerHTML = "";
+});
+
+describe("revealRect", () => {
+  it("measures the caret, not the box, on a line that wraps past the viewport", () => {
+    const { line, putCaretAt } = tallEditableLine();
+
+    putCaretAt(1100); // near the end of the long sentence
+    expect(revealRect(line)).toEqual({ top: 1400, bottom: 1420, height: 20 });
+  });
+
+  it("falls back to the element when the caret is elsewhere", () => {
+    const { line } = tallEditableLine();
+    const other = document.createElement("div");
+    document.body.append(other);
+    vi.spyOn(window, "getSelection").mockReturnValue({
+      rangeCount: 1,
+      getRangeAt: () => ({ startContainer: other, getClientRects: () => [] }),
+    } as unknown as Selection);
+
+    expect(revealRect(line)).toEqual({ top: 300, bottom: 1500, height: 1200 });
+  });
+
+  it("falls back to the element for a non-editable field", () => {
+    const { line, putCaretAt } = tallEditableLine();
+    putCaretAt(1100);
+    Object.defineProperty(line, "isContentEditable", {
+      value: false,
+      configurable: true,
+    });
+
+    expect(revealRect(line)).toEqual({ top: 300, bottom: 1500, height: 1200 });
+  });
 });
 
 describe("centeredScrollTop", () => {
@@ -230,6 +297,40 @@ describe("scrollFocusedIntoView", () => {
     scrollFocusedIntoView(line);
     expect(scrollTo).toHaveBeenCalledTimes(1);
     expect(scrollTo).toHaveBeenCalledWith({ top: 110, behavior: "smooth" });
+  });
+
+  it("reveals where the caret is on a line that wraps past the viewport", () => {
+    const { line, scrollTo, putCaretAt } = tallEditableLine();
+
+    // Caret near the sentence's end: centring its own row puts it mid-band —
+    // content offset 300 + 1100, minus half the band, minus half a caret.
+    putCaretAt(1100);
+    scrollFocusedIntoView(line);
+    vv.emit("resize");
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      top: 1210,
+      behavior: "smooth",
+    });
+  });
+
+  it("reveals a different place for each end of the same long line", () => {
+    const near = tallEditableLine();
+    near.putCaretAt(0); // the sentence's first row
+    scrollFocusedIntoView(near.line);
+    vv.emit("resize");
+    const atStart = near.scroller.scrollTop;
+
+    document.body.innerHTML = "";
+    const far = tallEditableLine();
+    far.putCaretAt(1180); // its last row
+    scrollFocusedIntoView(far.line);
+    vv.emit("resize");
+    const atEnd = far.scroller.scrollTop;
+
+    // The bug: both ends (and the middle) centred the line's *box*, so every
+    // tap landed on the same offset regardless of where the caret went.
+    expect(atStart).toBe(110);
+    expect(atEnd).toBe(1290);
   });
 
   it("snaps instantly when the user prefers reduced motion", () => {

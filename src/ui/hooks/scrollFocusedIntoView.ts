@@ -42,6 +42,32 @@
 // rather than a jump. Users who ask for reduced motion get the instant jump
 // instead.
 
+import { caretRectWithin } from "../contenteditable-caret.ts";
+
+// What to actually bring into view for `el`: the caret's own rect when `el` is
+// an editable line the caret sits in, otherwise the element's box.
+//
+// The distinction only matters for a line that soft-wraps across several
+// screens — a long sentence in the live-preview editor. Its element rect is
+// taller than the visible band, so centring *it* lands on the middle of the
+// paragraph no matter where inside it the caret is: tapping the start, the
+// middle, or the end of the sentence all scrolled to the same place, never to
+// the caret. Measuring the caret reveals where the user actually pointed. A
+// short line's caret rect is its text row, so the reveal is unchanged there.
+//
+// Non-editable targets (the Storage settings passphrase `<input>`) keep no
+// document selection to read, so they fall back to the element — which is
+// exactly right, since they can't outgrow the band.
+export function revealRect(el: HTMLElement): {
+  top: number;
+  bottom: number;
+  height: number;
+} {
+  const caret = el.isContentEditable ? caretRectWithin(el) : null;
+  const rect = caret ?? el.getBoundingClientRect();
+  return { top: rect.top, bottom: rect.top + rect.height, height: rect.height };
+}
+
 // The `scrollTop` that centres an element within its scroll container, clamped
 // to the container's scroll range so an element near an edge rests at the band's
 // top / bottom rather than being pushed past it. Pure so the geometry is unit-
@@ -132,7 +158,7 @@ export function scrollFocusedIntoView(
       el.scrollIntoView({ block: "center", behavior });
       return;
     }
-    const elRect = el.getBoundingClientRect();
+    const elRect = revealRect(el);
     const viewRect = scroller.getBoundingClientRect();
     // Already fully within the visible band: preserve the current scroll.
     if (

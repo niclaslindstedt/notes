@@ -244,18 +244,31 @@ sticky header (a first line vanishing off screen, caret and all). It is scoped
 to touch (a mouse never loses the caret to a keyboard) and gated on the
 active-line key so typing within a line never re-scrolls.
 
+What it centres is the **caret**, not the line's box (`revealRect`,
+`src/ui/hooks/scrollFocusedIntoView.ts`, reading the caret's own client rect via
+`caretRectWithin` in `src/ui/contenteditable-caret.ts`). One source line
+soft-wraps into as many rows as it needs, so a long sentence can be several
+screens tall; centring that element lands on the middle of the sentence wherever
+the caret actually is — tapping its start, its middle, or its end all scrolled to
+the same place, with the caret often off screen. A short line's caret rect is its
+text row, so the reveal is unchanged there. Targets with no document selection to
+read (the Storage settings passphrase `<input>`) fall back to the element box.
+
 **Typing keeps the caret on screen with a one-line buffer.** Because every edit
 is intercepted and the caret re-placed programmatically, the browser runs no
 native "keep the caret visible" pass — so on desktop, pressing Enter on the
 bottom line would push the new line off the foot of the viewport. The same
 caret-placement effect that handles the touch reveal falls through, on any
 non-touch edit, to `scrollCaretLineIntoView` (`src/ui/MarkdownEditor.tsx`), which
-keeps the caret's line clear of the container's top and bottom edges by a
+keeps the caret clear of the container's top and bottom edges by a
 one-line-height buffer via the pure `bufferedScrollTop`
 (`src/ui/hooks/scrollFocusedIntoView.ts`). It scrolls the editor's own container
 to an **absolute** target (so a call issued mid-animation retargets rather than
-compounds) and is a no-op whenever the line already sits inside the buffered
-band, so ordinary mid-note typing never jumps the view.
+compounds) and is a no-op whenever the caret already sits inside the buffered
+band, so ordinary mid-note typing never jumps the view. Its geometry comes from
+the same caret rect (`revealRect`) for the same reason: a line that wraps past
+the viewport is never "inside the band", so measuring its box would scroll on
+every keystroke, and towards the paragraph's middle rather than the caret.
 
 Clicking the empty space below the note lands the caret on a blank line at the
 very bottom, **appending one when the document doesn't already end in a newline**
@@ -1375,7 +1388,11 @@ side: it scrolls a freshly-focused field or tapped line clear of the soft
 keyboard by re-centring it on every visual-viewport change until the
 keyboard-settling burst goes quiet — the keyboard animates in as a series of
 intermediate heights, so centring only on the first would leave the last line
-(which can't scroll any further up) behind the keyboard. It centres by setting
+(which can't scroll any further up) behind the keyboard. What it centres is the
+target's *reveal rect* (`revealRect`): the caret's own client rect when the
+target is an editable line holding the caret, so a sentence that soft-wraps
+across several screens reveals where the caret is rather than the middle of its
+box; the element's rect otherwise. It centres by setting
 the **nearest scrollable ancestor's `scrollTop`** (the pure `centeredScrollTop`
 clamps to the container's scroll range), *not* `Element.scrollIntoView`: the
 latter walks up every scroll container and, on iOS, nudges the visual viewport
