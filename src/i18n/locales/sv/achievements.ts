@@ -201,7 +201,7 @@ const achievements: AchievementsCatalog = {
       name: "Arkiveringssystem",
       condition: "Skapa en mapp för att gruppera anteckningar.",
       learnMore:
-        "Mappar grupperar anteckningar inuti en namnrymd — en ”Inloggningsfunktion”, en ”Semester 2025”. Tryck på mappknappen vid Anteckningar-rubriken i sidomenyn för att skapa en, och dra sedan anteckningar till den (eller använd en antecknings ”Flytta till mapp”) för att lägga undan dem. En mapp kan fällas ut för att skapa en ny anteckning direkt i den.",
+        "Mappar grupperar anteckningar inuti en namnrymd — en ”Inloggningsfunktion”, en ”Semester 2025”. Tryck på mappknappen vid Anteckningar-rubriken i sidomenyn för att skapa en, och dra sedan anteckningar till den för att lägga undan dem. En mapp kan fällas ut för att skapa en ny anteckning direkt i den.",
     },
     polyglot: {
       name: "Polyglott",

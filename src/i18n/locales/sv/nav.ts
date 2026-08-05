@@ -16,7 +16,6 @@ const nav: NavCatalog = {
   renameFolder: "Byt namn på mapp",
   deleteFolder: "Ta bort mapp",
   folderActions: "Mappåtgärder",
-  moveToFolder: "Flytta till mapp",
   noFolder: "Ingen mapp",
   showAll: "Visa alla",
   notesEmpty: "Inga anteckningar än.",

@@ -36,9 +36,7 @@ function renderEditor() {
     <Editor
       note={note()}
       editor={PLAIN}
-      folders={[]}
       onBack={vi.fn()}
-      onMoveFolder={vi.fn()}
       onChange={vi.fn()}
       onTitleChange={vi.fn()}
       onTitleSettle={vi.fn()}

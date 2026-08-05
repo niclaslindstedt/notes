@@ -33,7 +33,6 @@ const PLAIN = { ...DEFAULT_EDITOR_SETTINGS, renderMarkdown: false };
 
 function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
   const onBack = vi.fn();
-  const onMoveFolder = vi.fn();
   const onChange = vi.fn();
   const onTitleChange = vi.fn();
   const onTitleSettle = vi.fn();
@@ -42,9 +41,7 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
     <Editor
       note={note()}
       editor={PLAIN}
-      folders={[]}
       onBack={onBack}
-      onMoveFolder={onMoveFolder}
       onChange={onChange}
       onTitleChange={onTitleChange}
       onTitleSettle={onTitleSettle}
@@ -53,7 +50,7 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
       {...props}
     />,
   );
-  return { onBack, onMoveFolder, onChange, onTitleChange, onTitleSettle };
+  return { onBack, onChange, onTitleChange, onTitleSettle };
 }
 
 describe("Editor", () => {
@@ -137,8 +134,7 @@ describe("Editor", () => {
     body.focus();
 
     fireEvent.keyDown(body, { key: "Tab" });
-    // The leftmost action in the header cluster — the find bar's toggle, with
-    // no folders to put a folder picker before it.
+    // The leftmost action in the header cluster — the find bar's toggle.
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: "Find in note" }),
     );
@@ -159,14 +155,9 @@ describe("Editor", () => {
     expect(body.tabIndex).toBe(-1);
   });
 
-  it("hides the folder picker when there are no folders", () => {
-    renderEditor({ folders: [] });
+  it("keeps the header free of a folder control — filing is a side-menu drag", () => {
+    renderEditor();
     expect(screen.queryByLabelText("Move to folder")).toBeNull();
-  });
-
-  it("offers the folder picker when folders exist", () => {
-    renderEditor({ folders: [{ id: "f1", name: "Work", createdAt: 0 }] });
-    expect(screen.getByLabelText("Move to folder")).toBeTruthy();
   });
 });
 
