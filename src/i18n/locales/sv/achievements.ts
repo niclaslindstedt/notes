@@ -149,6 +149,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Tryck Enter inuti ett citat så öppnas ytterligare en citatrad, så att ett långt stycke kan skrivas i ett svep i stället för att varje rad märks upp för hand. Citatet fortsätter tills du lämnar det: tryck Citat igen för att ta bort märkningen från raden, eller placera markören på en rad som inte är ett citat.",
     },
+    subPoint: {
+      name: "Underpunkt",
+      condition: "Lägg en listpunkt under en annan.",
+      learnMore:
+        "Tryck Enter på en punkt- eller nummerrad så öppnas nästa, så att en lista kan skrivas i ett svep — och Tab på en rad lägger den under raden ovanför (Skift+Tab drar ut den igen). En tom punkt avslutar listan: ett Enter drar ut en indragen punkt en nivå, nästa tömmer raden. Skift+Enter öppnar i stället ytterligare en rad inuti punkten du står på i stället för att börja en ny.",
+    },
     plainText: {
       name: "Enkelt och rent",
       condition: "Stäng av direkt Markdown-visning.",

@@ -118,6 +118,40 @@ describe("MarkdownEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith("> one\n> \n> ");
   });
 
+  it("opens another bullet on Enter inside a list", () => {
+    const { onChange } = renderEditor("- one");
+    caretIn(rawLine()!, 5);
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("- one\n- ");
+  });
+
+  it("bumps the number on Enter inside an ordered list", () => {
+    const { onChange } = renderEditor("1. one");
+    caretIn(rawLine()!, 6);
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("1. one\n2. ");
+  });
+
+  it("leaves the list on Enter from an empty item", () => {
+    const { onChange } = renderEditor("- one\n  - ");
+    caretIn(rawLine()!, 4);
+    // The first press pulls the nested item back out a level…
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("- one\n- ");
+    caretIn(rawLine()!, 2);
+    // …the next clears the row entirely.
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("- one\n");
+  });
+
+  it("opens a row inside the item on Shift+Enter", () => {
+    const { onChange } = renderEditor("- one");
+    caretIn(rawLine()!, 5);
+    fireEvent.keyDown(surface(), { key: "Enter", shiftKey: true });
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("- one\n  ");
+  });
+
   it("does not quote the next row from an unquoted one", () => {
     const { onChange } = renderEditor("> quoted\nplain");
     caretIn(rawLine()!, 5);
@@ -603,6 +637,31 @@ describe("MarkdownEditor", () => {
 
       fireEvent.keyDown(surface(), { key: "Tab" });
       expect(onTabOut).toHaveBeenLastCalledWith(false);
+
+      fireEvent.keyDown(surface(), { key: "Tab", shiftKey: true });
+      expect(onTabOut).toHaveBeenLastCalledWith(true);
+    });
+
+    it("indents a list row instead of tabbing out", () => {
+      const onTabOut = vi.fn();
+      const { onChange } = renderEditor("- one", { onTabOut });
+      caretIn(rawLine()!, 4);
+
+      fireEvent.keyDown(surface(), { key: "Tab" });
+      expect(onChange).toHaveBeenLastCalledWith("  - one");
+      expect(onTabOut).not.toHaveBeenCalled();
+
+      caretIn(rawLine()!, 6);
+      fireEvent.keyDown(surface(), { key: "Tab", shiftKey: true });
+      expect(onChange).toHaveBeenLastCalledWith("- one");
+      expect(onTabOut).not.toHaveBeenCalled();
+    });
+
+    it("tabs out of a list row that has nothing left to unindent", () => {
+      // Otherwise the outer level of a list would trap the keyboard.
+      const onTabOut = vi.fn();
+      renderEditor("- one", { onTabOut });
+      caretIn(rawLine()!, 4);
 
       fireEvent.keyDown(surface(), { key: "Tab", shiftKey: true });
       expect(onTabOut).toHaveBeenLastCalledWith(true);

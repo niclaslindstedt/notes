@@ -275,6 +275,35 @@ export function hasMultiLineQuote(body: string): boolean {
   return false;
 }
 
+/**
+ * Whether `body` holds a list item nested under another one — an indented
+ * bullet or numbered row with a shallower list row above it, which is what Tab
+ * in the editor (and the toolbar's indent button) writes. A line-level scan for
+ * the same reason as {@link hasClosedFence}, and fence-aware so an indented `-`
+ * inside a code block isn't counted.
+ */
+export function hasNestedListItem(body: string): boolean {
+  let inFence = false;
+  let open: number | null = null;
+  for (const raw of body.split("\n")) {
+    if (FENCE_RE.test(raw)) {
+      inFence = !inFence;
+      open = null;
+      continue;
+    }
+    if (inFence) continue;
+    if (raw.trim() === "") continue;
+    if (!UL_RE.test(raw) && !OL_RE.test(raw)) {
+      open = null;
+      continue;
+    }
+    const indent = leadingIndent(raw);
+    if (open !== null && indent > open) return true;
+    if (open === null || indent < open) open = indent;
+  }
+  return false;
+}
+
 // Second pass over the classified blocks: assign every `ul`/`ol` item a nesting
 // `depth` from its indentation, and every `ol` item a sequential `marker`. The
 // per-line classifier can't do this — the displayed number of `1.`/`1.` (→ `1.`
@@ -282,12 +311,20 @@ export function hasMultiLineQuote(body: string): boolean {
 // of `{ indent, count }` frames tracks the open lists: a deeper indent opens a
 // child list, a shallower one closes back to the matching level, and an equal
 // indent is the next sibling (its counter ticks up). Blank lines are ignored so
-// a gap between items keeps the list going; any other non-list line ends it.
+// a gap between items keeps the list going, as is a paragraph indented past the
+// open item's own indent — a continuation row *inside* that item, which is what
+// Shift+Enter in the editor writes. Any other non-list line ends the list.
 function numberLists(blocks: LineBlock[]): void {
   const stack: { indent: number; count: number }[] = [];
   for (const block of blocks) {
     if (block.kind !== "ul" && block.kind !== "ol") {
-      if (block.kind !== "blank") stack.length = 0;
+      if (block.kind === "blank") continue;
+      const open = stack[stack.length - 1];
+      const continuation =
+        block.kind === "paragraph" &&
+        open !== undefined &&
+        leadingIndent(block.raw) > open.indent;
+      if (!continuation) stack.length = 0;
       continue;
     }
     const indent = leadingIndent(block.raw);

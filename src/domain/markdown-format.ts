@@ -174,21 +174,118 @@ export function lineFormatAt(
 }
 
 /**
- * The text an Enter at column `col` of `block` should insert. A bare newline
- * everywhere but inside a quote, where it carries the line's own `> ` marker
- * (indent included) across, so the row the split opens is a quote row too and
- * a quote can be written as a paragraph rather than re-marked line by line.
- *
- * Quote mode is deliberately **sticky**: an empty quote row continues into
- * another one rather than dropping out, so leaving a quote is an explicit act —
- * press Quote to unmark the row, or put the caret on a row that isn't quoted.
- *
- * A caret still inside the marker isn't *in* the quote — Enter there pushes the
- * whole row down, exactly as on any other line.
+ * What an Enter (or Shift+Enter) does to the source. Nearly every press splices
+ * text in at the caret; the one that doesn't is Enter on an *empty* list item,
+ * which rewrites that row instead — which is how a list is left.
  */
-export function newlineFor(block: LineBlock | undefined, col: number): string {
-  if (!block || block.kind !== "quote" || col < block.contentStart) return "\n";
-  return `\n${block.raw.slice(0, block.contentStart)}`;
+export type NewlineEdit =
+  /** Splice `text` in over the selection — the ordinary split. */
+  | { kind: "insert"; text: string }
+  /** Replace the caret's whole line with `line`, caret at its end. */
+  | { kind: "replaceLine"; line: string };
+
+/** A list row as Enter reads it: its marker (indent included) and its text. */
+type ListItem = { prefix: string; content: string; ordered: boolean };
+
+// A row that is nothing but a single bullet character — what Enter on a bullet
+// writes, before anything is typed into it.
+const LONE_BULLET_RE = /^[ \t]*[-*+][ \t]*$/;
+
+/**
+ * The list item `blocks[index]` is, or null when that line isn't one. Almost
+ * always just the classified block — the exception is a row emptied down to a
+ * lone `-`, which classifies as a **divider** (`hr`, the shorthand a
+ * note-taker reaches for without counting out three dashes) and only really is
+ * one when no list is open above it. Directly under a list row it is instead
+ * the empty bullet the previous Enter opened, so Enter there ends the list
+ * rather than leaving a stray rule behind. A divider under a list is still
+ * reachable by typing `---` or pressing the toolbar's rule button.
+ */
+function listItemAt(
+  blocks: readonly LineBlock[],
+  index: number,
+): ListItem | null {
+  const block = blocks[index];
+  if (!block) return null;
+  if (block.kind === "ul" || block.kind === "ol") {
+    return {
+      prefix: block.raw.slice(0, block.contentStart),
+      content: block.content,
+      ordered: block.kind === "ol",
+    };
+  }
+  if (block.kind !== "hr" || !LONE_BULLET_RE.test(block.raw)) return null;
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const kind = blocks[i]?.kind;
+    if (kind === "blank") continue;
+    if (kind !== "ul" && kind !== "ol") return null;
+    return { prefix: block.raw, content: "", ordered: false };
+  }
+  return null;
+}
+
+/**
+ * What an Enter at column `col` of `blocks[index]` should do — `soft` for
+ * Shift+Enter. A bare newline on an ordinary line; on the block kinds that
+ * carry a leading marker, the marker travels so the construct can be written
+ * straight through rather than re-marked row by row:
+ *
+ * - **A quote** carries its own `> ` (indent and exact spelling included).
+ *   Quote mode is deliberately **sticky**: an empty quote row continues into
+ *   another one rather than dropping out, so leaving a quote is an explicit
+ *   act — press Quote to unmark the row, or put the caret on a row that isn't
+ *   quoted.
+ * - **A bullet** carries its own `- ` / `* ` / `+ `, at its own indent.
+ * - **A numbered item** carries its number bumped by one (`2. ` → `3. `), so
+ *   the source reads the way it renders; the preview renumbers regardless.
+ *
+ * Lists, unlike quotes, are **not** sticky — an endless column of empty bullets
+ * is nobody's intent. Enter on an empty item pulls a nested one back out a
+ * level, and clears a top-level one to a blank line, so repeated Enter walks
+ * out of the list the same way it walked in.
+ *
+ * **Shift+Enter** opens another row *inside* the item rather than a new item:
+ * a plain line padded out to the item's text column, so it hangs under the
+ * words above it (and `classifyLines` reads it as a continuation, keeping the
+ * list's numbering and nesting going). In a quote it still carries the `> ` —
+ * a quote row without the marker isn't in the quote at all.
+ *
+ * A caret still inside the marker isn't *in* the construct — Enter there pushes
+ * the whole row down, exactly as on any other line.
+ */
+export function newlineFor(
+  blocks: readonly LineBlock[],
+  index: number,
+  col: number,
+  soft = false,
+): NewlineEdit {
+  const plain = { kind: "insert", text: "\n" } as const;
+  const block = blocks[index];
+  if (!block || col < block.contentStart) return plain;
+  if (block.kind === "quote") {
+    return {
+      kind: "insert",
+      text: `\n${block.raw.slice(0, block.contentStart)}`,
+    };
+  }
+  const item = listItemAt(blocks, index);
+  if (!item) return plain;
+  // The marker blanked out to spaces, leaving the line's own indent verbatim —
+  // so a tab-indented item's continuation row is tab-indented too.
+  if (soft) {
+    return { kind: "insert", text: `\n${item.prefix.replace(/\S/g, " ")}` };
+  }
+  if (item.content !== "") {
+    const marker = item.ordered
+      ? item.prefix.replace(/\d+/, (n) => String(Number.parseInt(n, 10) + 1))
+      : item.prefix;
+    return { kind: "insert", text: `\n${marker}` };
+  }
+  const outdented = outdentLine(item.prefix);
+  return {
+    kind: "replaceLine",
+    line: outdented === item.prefix ? "" : outdented,
+  };
 }
 
 /**

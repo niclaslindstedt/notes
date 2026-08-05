@@ -104,6 +104,15 @@ export function HomePage() {
               formatting back off.
             </li>
             <li>
+              Lists write themselves. <kbd>Enter</kbd> on a bullet or numbered
+              row opens the next one — numbers count up as you go — and{" "}
+              <kbd>Tab</kbd> tucks a row in under the one above it, with{" "}
+              <kbd>Shift</kbd>+<kbd>Tab</kbd> to pull it back out. Press{" "}
+              <kbd>Enter</kbd> on an empty row to step back out of the list, or{" "}
+              <kbd>Shift</kbd>+<kbd>Enter</kbd> to add another line to the point
+              you are already on. Quotes carry on the same way.
+            </li>
+            <li>
               Cut text out with the <em>scissors</em> button beside the copy
               button: it takes whatever you have selected, or — with nothing
               selected — the whole line the cursor is on, or just the text after

@@ -762,17 +762,17 @@ button, all of them in `CodeCopyButton`:
 
 Pressing **Enter** inside a quote opens another quote row, so a passage can be
 typed straight through instead of re-marking every row from the
-[styling toolbar](#styling-toolbar). `newlineFor(block, col)`
-(`src/domain/markdown-format.ts`) is the pure decision — the text the split
-inserts: a bare `"\n"` everywhere else, and `"\n"` plus the line's **own**
-marker inside a quote, so the indent and the exact spelling (`> ` or a bare
-`>`) carry across rather than being normalised. The
-[live-preview editor](#markdown-editor) calls it from the
-`insertParagraph` / `insertLineBreak` branch of its `beforeinput` handler and
-feeds the result to the same `replaceRange` engine every other structural edit
-goes through, so splitting mid-row quotes the tail too (`> one|two` →
-`> one` / `> two`). It reads the caret's line from the classification the
-editor already holds, so a `>` inside a
+[styling toolbar](#styling-toolbar). `newlineFor(blocks, index, col, soft)`
+(`src/domain/markdown-format.ts`) is the pure decision — what the press does to
+the source (see [list continuation](#list-continuation), which shares it): a
+bare `"\n"` everywhere else, and `"\n"` plus the line's **own** marker inside a
+quote, so the indent and the exact spelling (`> ` or a bare `>`) carry across
+rather than being normalised. The [live-preview editor](#markdown-editor) calls
+it from the `insertParagraph` / `insertLineBreak` branch of its `beforeinput`
+handler and feeds the result to the same `replaceRange` engine every other
+structural edit goes through, so splitting mid-row quotes the tail too
+(`> one|two` → `> one` / `> two`). It reads the caret's line from the
+classification the editor already holds, so a `>` inside a
 [fenced code block](#code-block) is code, not a quote.
 
 Quote mode is deliberately **sticky**: an empty quote row opens another one
@@ -793,6 +793,84 @@ than the inconsistency.
 line-level scan (no blocks built) behind the [Quote, unquote](#unlock-triggers)
 achievement, which fires the first time a note holds a quote running over two
 or more consecutive rows.
+
+### List continuation
+
+A list is written the way it reads. Pressing **Enter** on a bullet or numbered
+row opens the next one, **Tab** nests a row under the one above it, and
+**Shift+Enter** opens another row *inside* the item you're on — so a whole
+outline is typed without reaching for the [styling toolbar](#styling-toolbar)
+or the mouse.
+
+**Enter** shares its decision with [quote continuation](#quote-continuation):
+`newlineFor(blocks, index, col, soft)` (`src/domain/markdown-format.ts`) answers
+what the press does to the source, and the
+[live-preview editor](#markdown-editor) applies it through the same
+`replaceRange` engine every other structural edit uses. On a list row the
+answer carries the marker across, exactly as written:
+
+- **A bullet** repeats its own character and indent — `- `, `* `, `+ `,
+  `  - ` — so the new row lands as a sibling of the one it came from.
+- **A numbered item** bumps its number by one (`2. ` → `3. `, `9) ` → `10) `),
+  so the source reads the way it renders. The preview renumbers regardless
+  (`numberLists`), so a hand-edited file is never a column of `1.`.
+- **Splitting mid-row** carries the tail into the new item, the same as a
+  quote: `- one|two` → `- one` / `- two`.
+- **A caret still inside the marker** isn't in the item at all — Enter there
+  pushes the whole row down, as on any other line.
+
+Lists, unlike quotes, are **not sticky** — an endless column of empty bullets
+is nobody's intent. Enter on an **empty item** ends the list instead of opening
+another: one press pulls a nested item back out a level (`  - ` → `- `), the
+next clears the row to a blank line, so repeated Enter walks out of the list
+the same way Tab walked into it. That is the one case `newlineFor` answers with
+a `replaceLine` rather than an `insert` — it rewrites the caret's row instead of
+splicing at the caret — and it is a bare-caret answer only; with a range to
+delete, Enter splits like any other press.
+
+Spotting that empty row takes a second look, because a row emptied down to a
+lone `-` classifies as a **divider** (`hr` — the shorthand a note-taker reaches
+for without counting out three dashes). `listItemAt(blocks, index)` resolves the
+ambiguity from the line above: directly under a list row, a lone bullet
+character is the empty item the last Enter opened; anywhere else it stays the
+divider it looks like. (A divider *inside* a list is still reachable by typing
+`---` or pressing the toolbar's rule button.)
+
+**Shift+Enter** opens a continuation row instead of a new item: a plain line
+padded out to the item's text column, keeping the row's own leading whitespace
+verbatim (so a tab-indented item's continuation is tab-indented too). `numberLists`
+(`src/domain/markdown.ts`) reads a paragraph indented past the open item's
+indent as part of that item rather than as the end of the list, so a
+continuation row doesn't restart the numbering or flatten the nesting under it.
+In a **quote** Shift+Enter still carries the `> ` — a quote row without the
+marker isn't in the quote at all.
+
+Which of the two a press was is read from the `keydown` that precedes the
+`beforeinput` (the `softBreak` ref in `MarkdownEditor`), not from its
+`inputType`. `insertLineBreak` vs `insertParagraph` is meant to say exactly
+this, but the two aren't reliably split that way across browsers in a
+`plaintext-only` host, and getting it wrong would stop plain Enter continuing a
+list. A soft keyboard, which sends no such keydown, has no Shift+Enter to
+report anyway.
+
+**Tab** on a list row indents it; **Shift+Tab** pulls it back out. `indentList`
+(`src/ui/MarkdownEditor.tsx`) routes straight to the toolbar's own
+`{ kind: "indent" }` action, so the keyboard and the indent / outdent buttons
+are the same edit, and a multi-line selection moves every row it covers.
+Otherwise Tab keeps its existing job of handing focus on (see
+[Editor tab order](#editor-tab-order)) — and so it does in two cases that
+matter: when the selection holds no list row at all, and when a **Shift+Tab has
+nothing left to unindent**. That second carve-out is what keeps the outer level
+of a list from being a place the keyboard can't tab out of.
+
+Only the live-preview editor does any of this, for the reason
+[quote continuation](#quote-continuation) gives: the Markdown-off
+[plain fallback](#editor-settings) is a real `<textarea>`, and intercepting its
+Enter and Tab would cost the browser's own undo history.
+
+`hasNestedListItem(body)` (`src/domain/markdown.ts`) is the cheap, fence-aware
+line-level scan behind the [Sub-point](#unlock-triggers) achievement, which
+fires the first time a note holds a list row indented under a shallower one.
 
 ### Bullet characters
 

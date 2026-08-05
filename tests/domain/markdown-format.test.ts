@@ -341,34 +341,102 @@ describe("lineFormatAt", () => {
 describe("newlineFor", () => {
   // What Enter inserts with the caret at `col` of the line at `line`.
   const enterAt = (source: string, line: number, col: number) =>
-    newlineFor(classifyLines(source)[line], col);
+    newlineFor(classifyLines(source), line, col);
+  // The same, with Shift held.
+  const softAt = (source: string, line: number, col: number) =>
+    newlineFor(classifyLines(source), line, col, true);
+  const inserts = (text: string) => ({ kind: "insert", text });
 
-  it("inserts a bare newline outside a quote", () => {
-    expect(enterAt("plain text", 0, 5)).toBe("\n");
-    expect(enterAt("- item", 0, 6)).toBe("\n");
-    expect(newlineFor(undefined, 0)).toBe("\n");
+  it("inserts a bare newline on an unmarked line", () => {
+    expect(enterAt("plain text", 0, 5)).toEqual(inserts("\n"));
+    expect(enterAt("# heading", 0, 9)).toEqual(inserts("\n"));
+    expect(newlineFor([], 0, 0)).toEqual(inserts("\n"));
   });
 
   it("carries the quote marker onto the next row", () => {
-    expect(enterAt("> quoted", 0, 8)).toBe("\n> ");
-    expect(enterAt("> quoted", 0, 4)).toBe("\n> ");
+    expect(enterAt("> quoted", 0, 8)).toEqual(inserts("\n> "));
+    expect(enterAt("> quoted", 0, 4)).toEqual(inserts("\n> "));
   });
 
   it("reproduces the marker as it was written, indent included", () => {
-    expect(enterAt("  > quoted", 0, 10)).toBe("\n  > ");
-    expect(enterAt(">tight", 0, 6)).toBe("\n>");
+    expect(enterAt("  > quoted", 0, 10)).toEqual(inserts("\n  > "));
+    expect(enterAt(">tight", 0, 6)).toEqual(inserts("\n>"));
   });
 
   it("keeps quoting from an empty quote row (leaving one is explicit)", () => {
-    expect(enterAt("> a\n> ", 1, 2)).toBe("\n> ");
+    expect(enterAt("> a\n> ", 1, 2)).toEqual(inserts("\n> "));
   });
 
   it("leaves a caret inside the marker alone, so the row is pushed down", () => {
-    expect(enterAt("> quoted", 0, 0)).toBe("\n");
-    expect(enterAt("> quoted", 0, 1)).toBe("\n");
+    expect(enterAt("> quoted", 0, 0)).toEqual(inserts("\n"));
+    expect(enterAt("> quoted", 0, 1)).toEqual(inserts("\n"));
+    expect(enterAt("- item", 0, 1)).toEqual(inserts("\n"));
+    expect(enterAt("1. item", 0, 2)).toEqual(inserts("\n"));
   });
 
   it("does not quote a `>` line inside a fenced code block", () => {
-    expect(enterAt("```\n> not a quote\n```", 1, 14)).toBe("\n");
+    expect(enterAt("```\n> not a quote\n```", 1, 14)).toEqual(inserts("\n"));
+  });
+
+  it("opens another bullet, keeping the bullet character and indent", () => {
+    expect(enterAt("- item", 0, 6)).toEqual(inserts("\n- "));
+    expect(enterAt("* item", 0, 6)).toEqual(inserts("\n* "));
+    expect(enterAt("    + item", 0, 10)).toEqual(inserts("\n    + "));
+  });
+
+  it("splits a bullet mid-row, so the tail becomes the next item", () => {
+    expect(enterAt("- onetwo", 0, 5)).toEqual(inserts("\n- "));
+  });
+
+  it("bumps the number on an ordered item", () => {
+    expect(enterAt("1. item", 0, 7)).toEqual(inserts("\n2. "));
+    expect(enterAt("9. item", 0, 7)).toEqual(inserts("\n10. "));
+    expect(enterAt("  3) item", 0, 9)).toEqual(inserts("\n  4) "));
+  });
+
+  it("clears a top-level empty item, so Enter twice leaves the list", () => {
+    expect(enterAt("- a\n- ", 1, 2)).toEqual({ kind: "replaceLine", line: "" });
+    expect(enterAt("1. a\n2. ", 1, 3)).toEqual({
+      kind: "replaceLine",
+      line: "",
+    });
+  });
+
+  it("pulls a nested empty item back out one level", () => {
+    expect(enterAt("- a\n  - ", 1, 4)).toEqual({
+      kind: "replaceLine",
+      line: "- ",
+    });
+    expect(enterAt("- a\n\t- ", 1, 3)).toEqual({
+      kind: "replaceLine",
+      line: "- ",
+    });
+  });
+
+  it("reads an emptied `- ` row under a list as a bullet, not a divider", () => {
+    expect(enterAt("- a\n- ", 1, 2)).toEqual({ kind: "replaceLine", line: "" });
+    expect(enterAt("- a\n\n- ", 2, 2)).toEqual({
+      kind: "replaceLine",
+      line: "",
+    });
+  });
+
+  it("leaves a lone `-` divider alone when no list is open above it", () => {
+    expect(enterAt("prose\n- ", 1, 2)).toEqual(inserts("\n"));
+    expect(enterAt("- ", 0, 2)).toEqual(inserts("\n"));
+  });
+
+  it("opens a continuation row inside the item on Shift+Enter", () => {
+    expect(softAt("- item", 0, 6)).toEqual(inserts("\n  "));
+    expect(softAt("  10. item", 0, 10)).toEqual(inserts("\n      "));
+    expect(softAt("\t- item", 0, 7)).toEqual(inserts("\n\t  "));
+  });
+
+  it("keeps the marker on Shift+Enter in a quote — a bare row is not quoted", () => {
+    expect(softAt("> quoted", 0, 8)).toEqual(inserts("\n> "));
+  });
+
+  it("leaves Shift+Enter bare on an unmarked line", () => {
+    expect(softAt("plain text", 0, 5)).toEqual(inserts("\n"));
   });
 });
