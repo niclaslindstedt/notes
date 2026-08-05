@@ -892,6 +892,59 @@ describe("MarkdownEditor", () => {
     });
   });
 
+  // Every edit is refused at `beforeinput` whether or not it can be mapped —
+  // letting one through has the browser rewrite the DOM React owns. Refusing
+  // *and* silently dropping it, though, is a dead keyboard: the user types and
+  // nothing happens at all, with no crash to explain it.
+  describe("an edit whose position can't be resolved", () => {
+    it("lands an insertion at the last known caret instead of dropping it", () => {
+      const { onChange } = renderEditor("hello");
+      caretIn(rawLine()!, 5);
+      beforeInput("insertText", "!");
+      expect(onChange).toHaveBeenLastCalledWith("hello!");
+      // The browser proposes another keystroke, but nothing anchors it: no
+      // target range and no selection to fall back on.
+      window.getSelection()?.removeAllRanges();
+      beforeInput("insertText", "?");
+      expect(onChange).toHaveBeenLastCalledWith("hello!?");
+    });
+
+    it("still refuses a deletion rather than guessing at a span", () => {
+      const { onChange } = renderEditor("hello");
+      caretIn(rawLine()!, 5);
+      beforeInput("insertText", "!");
+      onChange.mockClear();
+      window.getSelection()?.removeAllRanges();
+      beforeInput("deleteContentBackward");
+      // Guessing here would remove text the browser never pointed at.
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("drops an insertion when the caret has never been placed", () => {
+      const { onChange } = renderEditor("hello", { focusOnMount: false });
+      window.getSelection()?.removeAllRanges();
+      beforeInput("insertText", "?");
+      expect(onChange).not.toHaveBeenCalled();
+    });
+  });
+
+  // The editing host holds nothing but lines. A `contenteditable={false}`
+  // island inside it is a node the browser normalises around and React later
+  // removes, which surfaces as a `removeChild` NotFoundError that unmounts the
+  // app — the crash the empty-note prompt was moved out for.
+  it("draws the collected attachments block outside the editing host", () => {
+    const { container } = renderEditor("![img](attachments/a.png)", {
+      canAttach: true,
+      placement: { imagesAtEnd: true, filesAtEnd: true },
+      attachments: [{ filename: "a.png", mime: "image/png" }],
+    });
+    const block = screen.getByText("Attachments").closest("div")!;
+    expect(surface().contains(block)).toBe(false);
+    expect(container.contains(block)).toBe(true);
+    // Nothing non-editable is left parked at the end of the document.
+    expect(surface().querySelector("[contenteditable=false]")).toBeNull();
+  });
+
   describe("clicking the empty space below", () => {
     it("lands the caret at the end without reporting an edit", () => {
       const { onChange, container } = renderEditor(

@@ -70,8 +70,21 @@ the active backend.
 The caught error goes to the [in-app logger](#logger) under the `crash` scope
 rather than the console — on the phone where a blank screen hurts most,
 devtools aren't reachable, and the entry survives the reload so it can be read
-back from Settings → Logs and reported. The stack is also shown inline behind a
-collapsed "Error details" disclosure.
+back from Settings → Logs and reported. The stack and the React **component
+stack** (which names the surface that threw) are also shown inline behind a
+collapsed "Error details" disclosure, and a **Copy report** button puts both,
+plus the tail of the in-app log, on the clipboard. Settings → Logs lives inside
+the app this screen has replaced, so without that button the only way to report
+a phone-only crash was to transcribe the stack off the screen by hand.
+
+The screen is a **fixed, self-scrolling sheet**, not a block in document flow.
+It renders outside the app shell (which pins itself to the visual viewport),
+and `html, body` are locked to `overflow: hidden` so the document itself never
+scrolls — anything past the fold was simply clipped away, taking the error
+details with it. Pinning to the viewport and scrolling inside keeps the whole
+report reachable, and safe-area padding on **all four** edges keeps it clear of
+the notch, the home indicator, and the landscape rounded corners the way every
+modal is.
 
 This is a safety net, not a licence: a caught error is still a defect. The
 crash it was built for was the [live-preview editor](#markdown-editor) letting
@@ -223,10 +236,20 @@ whether they resolve, in the `beforeinput` handler and in `onPaste` alike. An
 unmappable edit that reaches the browser has it rewrite the surface behind
 React's back, and the next render — reconciling against nodes that are no longer
 there — throws and takes the whole app down (the same `removeChild`
-`NotFoundError` the composition remount avoids). Dropping such an edit is the
+`NotFoundError` the composition remount avoids). Refusing such an edit is the
 strictly safer failure: the mapping itself is what should cover the case, and
 [selection mapping](#selection-mapping) resolves the endpoints the browser
 anchors above the lines.
+
+**Refused is not the same as dropped, though.** Refusing *and* silently
+discarding an edit reads as a dead keyboard — the user types and nothing at all
+happens, with no crash to explain it and no way back. So an unmappable
+**insertion** falls back to the last caret the editor tracked (clamped to the
+current source), and the character lands there. A **deletion** gets no such
+fallback: guessing a span would remove text the browser never pointed at, so it
+is refused outright. Either way the drop is reported to the
+[in-app logger](#logger) under the `editor` scope, since on a phone this is
+otherwise completely silent.
 
 **A composition always remounts the line it touched.** Because the browser wrote
 into the line itself, React's record of that line's children is stale by the time
@@ -265,6 +288,15 @@ remove that node again on the first keystroke. Either way round, a browser that
 had moved or eaten it in the meantime turned the next render into a
 `removeChild` `NotFoundError` and unmounted the app. Out of the host, the
 editing surface holds nothing but its lines.
+
+The [collected attachments block](#attachments) is out of the host for the same
+reason. It was the last child of the editing surface — a second
+`contentEditable={false}` island, this one sitting exactly where a caret on the
+final line forward-deletes into, and one React rebuilds whenever the placement
+setting or the note's attachments change. It now renders as a sibling after the
+host, mirroring its horizontal padding and width and carrying the bottom
+safe-area inset; it hides itself entirely (`empty:hidden`) under the default
+inline placement, so the tap-below-to-place-the-caret band is unchanged.
 
 **Leaving the body clears the active line.** When focus moves out of the editor
 — to the title field, a header button, the side menu — the `onBlur` handler nulls
