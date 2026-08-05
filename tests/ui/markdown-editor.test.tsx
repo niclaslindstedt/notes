@@ -535,7 +535,7 @@ describe("MarkdownEditor", () => {
     });
   });
 
-  describe("deleting a line", () => {
+  describe("cutting", () => {
     // Ctrl/Cmd+K on the surface; the header button reaches the same code
     // through the editor's imperative handle.
     function ctrlK() {
@@ -544,7 +544,7 @@ describe("MarkdownEditor", () => {
       });
     }
 
-    it("removes the caret's line whole from its start", () => {
+    it("cuts the caret's line whole from its start", () => {
       // The caret opens on the last line, so that is the one that goes.
       const { onChange } = renderEditor("one\ntwo\nthree");
       caretIn(rawLine()!, 0);
@@ -552,14 +552,29 @@ describe("MarkdownEditor", () => {
       expect(onChange).toHaveBeenLastCalledWith("one\ntwo");
     });
 
-    it("clears only the text after a mid-line caret", () => {
+    it("cuts only the text after a mid-line caret", () => {
       const { onChange } = renderEditor("keep this. drop this.");
       caretIn(rawLine()!, 11);
       ctrlK();
       expect(onChange).toHaveBeenLastCalledWith("keep this. ");
     });
 
-    it("leaves the note alone when there is nothing to remove", () => {
+    it("puts what it took on the clipboard", () => {
+      const writeText = vi.fn(() => Promise.resolve());
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText },
+        configurable: true,
+      });
+      renderEditor("one\ntwo\nthree");
+      caretIn(rawLine()!, 0);
+      ctrlK();
+      // The caret opens on the last line, and a whole line is cut with its
+      // newline so pasting it back makes a line again.
+      expect(writeText).toHaveBeenCalledWith("three\n");
+      Reflect.deleteProperty(navigator, "clipboard");
+    });
+
+    it("leaves the note alone when there is nothing to cut", () => {
       const { onChange } = renderEditor("");
       caretIn(rawLine()!, 0);
       ctrlK();

@@ -510,7 +510,7 @@ function clamp(n: number, max: number): number {
 
 /**
  * The toolbar's toggle, sitting top-right in the editor header beside the find,
- * delete-line and copy glyphs. Pressing it opens the toolbar; pressing it again takes it
+ * cut and copy glyphs. Pressing it opens the toolbar; pressing it again takes it
  * away. It reads as "on" while the toolbar is up (filled with the accent
  * rather than merely outlined) so the header says which state you're in.
  */

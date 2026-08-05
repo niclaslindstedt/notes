@@ -19,7 +19,7 @@ import {
   CloudGlyph,
   CodeGlyph,
   CopyGlyph,
-  DeleteLineGlyph,
+  CutGlyph,
   EyeOffGlyph,
   FileQuestionGlyph,
   FlaskGlyph,
@@ -447,11 +447,11 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   {
     id: "guillotine",
     tier: "beginner",
-    glyph: DeleteLineGlyph,
+    glyph: CutGlyph,
     learnMore: true,
-    // Fired by the delete-line button (or Ctrl/Cmd+K) actually removing
-    // something — the cut leaves ordinary text behind, so there is nothing in
-    // the document to derive it from.
+    // Fired by the cut button (or Ctrl/Cmd+K) actually removing something —
+    // the cut leaves ordinary text behind, so there is nothing in the document
+    // to derive it from.
     trigger: { kind: "manual" },
   },
   {
