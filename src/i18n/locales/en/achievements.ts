@@ -232,6 +232,12 @@ const achievements = {
       learnMore:
         "While the app is open it remembers where the caret sat and how far you'd scrolled in each note, so hopping between notes drops you back exactly where you were — same line, same place on screen — instead of at the top. On a phone the keyboard comes back up with the caret already in place. It's per-session: a fresh reload starts each note clean.",
     },
+    retrace: {
+      name: "Retrace",
+      condition: "Use your browser's Back button to return to a note.",
+      learnMore:
+        "Every move you make — opening a note, hopping to another, stepping into the archive — leaves a step in your browser's history, so Back walks you through the notes you visited (and Forward walks you out again). It works with the back button, the keyboard shortcut, and Android's back gesture. The address bar never changes: notes stay private to this device, so there is no link to a note to hand out.",
+    },
 
     // ── Pro ───────────────────────────────────────────────────────────
     localVault: {

@@ -33,14 +33,17 @@ whenever you add a dictionary row.
 
 `src/app/App.tsx` — the single-shell SPA. A flex-row layout holding the
 `SideMenu` (a drawer on phones, a docked sidebar on tablets and up) beside a
-main area that switches between four surfaces by plain state (no router, so the
-tree stays mounted): the notes overview (`NoteList`), the archive
-(`ArchiveList`), an editable note (`Editor`), and a read-only archived note
-(`ReadOnlyNote`). It owns the small top-level state — `editingId`, `readingId`,
-`view` — and wires the cross-cutting hooks (`useNotes`, `useNotesSync` via the
-store, `useNavState`, `useTheme`/appearance, `usePullToRefresh`, `useFileDrop`,
-`useEdgeSwipeOpen`, `useUndoRedoShortcuts`) plus the five modal hosts and the
-header (app title, the sync glyph `SyncStatus`, and the `TrophyButton`).
+main area that switches between four surfaces on a plain `Route` value (no
+routing library, so the tree stays mounted): the notes overview (`NoteList`),
+the archive (`ArchiveList`), an editable note (`Editor`), and a read-only
+archived note (`ReadOnlyNote`). The small top-level state — `editingId`,
+`readingId`, `view` — is projected off that route, which `useRoute` mirrors
+into the browser's session history so Back / Forward walk the notes you
+visited (see [route](#route--browser-back--forward)). It wires the
+cross-cutting hooks (`useNotes`, `useNotesSync` via the store, `useNavState`,
+`useTheme`/appearance, `usePullToRefresh`, `useFileDrop`, `useEdgeSwipeOpen`,
+`useUndoRedoShortcuts`) plus the five modal hosts and the header (app title,
+the sync glyph `SyncStatus`, and the `TrophyButton`).
 
 ### Entry point / path switch
 
@@ -1057,6 +1060,52 @@ persisted `position`, and `showButton`. It is published through `NavContext`
 (`src/ui/nav-context.ts`) so components read it via `useNav()` rather than
 threaded props.
 
+### Route / browser back & forward
+
+`useRoute` (`src/app/use-route.ts`) is the shell's route model and its bridge
+to the browser's session history. The main area still switches surfaces on a
+plain value — `Route` is `{ kind: "list" }`, `{ kind: "note", id }`,
+`{ kind: "archive" }`, or `{ kind: "archived", id }`, and `App` projects
+`editingId` / `readingId` / `view` off it — but every move leaves a history
+entry, so **Back and Forward walk the notes you visited** (open note A, then
+note B, and Back returns to A). Android's back button and the desktop
+keyboard shortcut ride the same history. There is no routing library and the
+tree stays a single mounted shell.
+
+The **URL is deliberately untouched**: the app is served as static files from
+GitHub Pages under three [deploy slots](../AGENTS.md), so a `/note/<id>` path
+would 404 on a cold load, and a note id only names a note inside its own
+namespace's document — it isn't a shareable link. Everything rides in the
+entry's `history.state` (merged, not overwritten, so `useCloudBackend`'s OAuth
+URL cleanup keeps its own state), which the browser restores on a step *and*
+across a reload — so a refresh resumes on the surface the tab was showing,
+ahead of the per-namespace [active note cursor](#active-note-cursor).
+
+Three verbs, so each caller says what kind of move it is:
+
+- `go(route)` — navigate, leaving a back step. A no-op if it's the route
+  already showing (tapping the open note doesn't stack an entry).
+- `replace(route)` — navigate with no back step, for moves the user can't
+  sensibly return to: the open note was deleted, archived, or moved to another
+  namespace, or the namespace itself was switched.
+- `backTo(target)` — an in-app back control (the editor's back button, the
+  archive's, "Show all"): steps the browser back when the entry behind is
+  exactly `target`, otherwise navigates. Keeps list → note → back → note from
+  growing the stack each round.
+
+Each entry also carries the namespace its ids belong to. The active namespace
+is a per-device cursor rather than part of the route, so a step onto an entry
+from another namespace resolves to the overview instead of applying an id this
+document has never heard of (which would also poison the remembered-note
+cursor). A `popstate` the hook didn't stamp is left alone.
+
+`App` passes an `onPop` that runs the same side effects an in-app tap does: a
+never-typed-into new note is discarded on the way out (see
+[blank note](#blank-note)), the note being landed on is refreshed from the
+backend, and the `retrace` achievement fires. The
+[swipe-back suppression](#suppress-swipe-navigation) is unchanged — the iOS
+edge-swipe still belongs to the side menu's gestures, not to history.
+
 ## Navigation, drawer, and gestures
 
 ### Side menu
@@ -1616,10 +1665,12 @@ backend resolves.
 `src/storage/active-note-preference.ts` — a per-device, per-namespace
 localStorage cursor (`getActiveNote` / `setActiveNote`, keyed
 `notes:active-note:<slug>`) remembering which note was open in the editor.
-`App` seeds `editingId` from it on mount and writes it back whenever the open
-note changes, so a reload or PWA upgrade lands back on the same note instead of
-the overview; switching namespaces restores that namespace's own remembered
-note. Like the [backend preference](#backend-preference) and the active-namespace
+`App` seeds the initial [route](#route--browser-back--forward) from it on mount
+and writes it back whenever the open note changes, so a reload or PWA upgrade
+lands back on the same note instead of the overview; switching namespaces
+restores that namespace's own remembered note. A reload where the history entry
+still carries a route resumes on *that* surface instead — it's the more precise
+record of where this tab was. Like the [backend preference](#backend-preference) and the active-namespace
 pointer, it's a device-local cursor (where you were looking, not shared document
 state), so it lives outside the synced snapshot. A stale id (the note was
 deleted elsewhere) resolves to nothing and falls back to the overview.

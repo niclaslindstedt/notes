@@ -59,16 +59,25 @@ import { useEncryptionMigration } from "./use-encryption-migration.ts";
 import { useNavState } from "./use-nav.ts";
 import { useNotes } from "./use-notes.ts";
 import { useOrphans } from "./use-orphans.ts";
+import {
+  ARCHIVE_ROUTE,
+  LIST_ROUTE,
+  noteRoute,
+  useRoute,
+  type Route,
+} from "./use-route.ts";
 import { useSettingsSync } from "./use-settings-sync.ts";
 import { useUploadStatus } from "./use-upload-status.ts";
 
 // Root component. The shell is a flex row — the side menu (a docked sidebar
 // on wide viewports, a drag-out drawer on phones) beside a main area that
-// shows one of four surfaces, switched on plain state rather than a router so
-// the tree stays a single mounted shell: the notes overview, the archive page
-// (the same overview filtered to archived notes — a real page, not a modal, so
-// the side menu's edge-swipe still works over it), a full-screen editor
-// (`editingId`), or a read-only view of an archived note (`readingId`).
+// shows one of four surfaces, switched on a plain `Route` value rather than a
+// routing library so the tree stays a single mounted shell: the notes
+// overview, the archive page (the same overview filtered to archived notes — a
+// real page, not a modal, so the side menu's edge-swipe still works over it),
+// a full-screen editor (`editingId`), or a read-only view of an archived note
+// (`readingId`). `useRoute` mirrors that value into the browser's session
+// history, so Back / Forward walk the notes you visited (see `use-route.ts`).
 // `NavContext` carries the drawer state down to `SideMenu`; `ModalBusProvider`
 // lets any button open the settings dialog without threading openers through
 // the tree.
@@ -105,16 +114,37 @@ export function App() {
     }),
     [editor.trimTrailingSpaces, editor.trailingNewline],
   );
-  // Restore the note that was open in the active namespace before the last
-  // reload / PWA upgrade, so a refresh lands back where you left off instead of
-  // dropping to the overview. Once the (possibly async-loading) document
-  // arrives, `editing` below resolves the id to the note; a stale id (the note
-  // was deleted elsewhere) simply resolves to nothing and falls back to the
-  // overview. Declared before `useNotes` so the open note scopes its undo
-  // timeline (undo/redo act on the note you're looking at).
-  const [editingId, setEditingId] = useState<string | null>(() =>
-    getActiveNote(storage.activeNamespace),
-  );
+  // Which surface the main area shows, as a browser history entry: every move
+  // between the overview, a note, the archive, and an archived note leaves a
+  // back step, so Back / Forward (and Android's back button) walk the notes
+  // you visited. The initial route restores the note that was open in the
+  // active namespace before the last reload / PWA upgrade, so a refresh lands
+  // back where you left off instead of dropping to the overview. Once the
+  // (possibly async-loading) document arrives, `editing` below resolves the id
+  // to the note; a stale id (the note was deleted elsewhere) simply resolves to
+  // nothing and falls back to the overview. Declared before `useNotes` so the
+  // open note scopes its undo timeline (undo/redo act on the note you're
+  // looking at). A Back / Forward step is applied through `popHandlerRef`,
+  // which runs the same leave-the-editor side effects an in-app tap does.
+  const popHandlerRef = useRef<(next: Route) => void>(() => {});
+  const handlePop = useCallback((next: Route) => {
+    popHandlerRef.current(next);
+  }, []);
+  const { route, go, replace, backTo } = useRoute({
+    initial: () => noteRoute(getActiveNote(storage.activeNamespace)),
+    namespace: storage.activeNamespace,
+    onPop: handlePop,
+  });
+  // The three pieces of view state the shell renders from, projected off the
+  // route so there is one source of truth for "where am I".
+  const editingId = route.kind === "note" ? route.id : null;
+  // An archived note opened read-only (tapped from the archive page). Distinct
+  // from `editingId` so the editor stays the editable surface and the reader
+  // the read-only one.
+  const readingId = route.kind === "archived" ? route.id : null;
+  // Which list the main area shows when nothing is open in the editor / reader.
+  const view: "notes" | "archive" =
+    route.kind === "archive" || route.kind === "archived" ? "archive" : "notes";
   const {
     notes,
     allNotes,
@@ -151,12 +181,6 @@ export function App() {
   useEffect(() => {
     setActiveNote(storage.activeNamespace, editingId);
   }, [storage.activeNamespace, editingId]);
-  // Which list the main area shows when nothing is open in the editor / reader.
-  const [view, setView] = useState<"notes" | "archive">("notes");
-  // An archived note opened read-only (tapped from the archive page). Distinct
-  // from `editingId` so the editor stays the editable surface and the reader
-  // the read-only one.
-  const [readingId, setReadingId] = useState<string | null>(null);
   const nav = useNavState();
   // True while a note is being picked up and dragged (the touch/pointer path),
   // reported up from `NoteDragProvider` so pull-to-refresh stands down for its
@@ -267,12 +291,12 @@ export function App() {
   // Switch namespace and reopen wherever you last were in the target — the note
   // that was open belongs to the namespace we're leaving, so we restore the new
   // namespace's own remembered note (or its overview if none), the same place a
-  // reload would land.
+  // reload would land. It replaces rather than pushes: the namespace is a
+  // per-device cursor the route doesn't carry, so a back step onto the note
+  // we're leaving would resolve against the wrong document.
   function switchNamespace(slug: string) {
     storage.switchNamespace(slug);
-    setEditingId(getActiveNote(slug));
-    setReadingId(null);
-    setView("notes");
+    replace(noteRoute(getActiveNote(slug)));
   }
 
   const editing = editingId
@@ -315,6 +339,20 @@ export function App() {
     );
   }
 
+  // A Back / Forward step lands here once the route has been applied. It does
+  // what `switchTo` does around the state change: drop the note we're leaving
+  // if it was never typed into, and pull the latest for the note we're landing
+  // on so it reads current.
+  popHandlerRef.current = (next: Route) => {
+    const staying = next.kind === "note" && next.id === editing?.id;
+    if (editing && !staying && discardable(editing)) remove(editing.id);
+    if (next.kind === "note") {
+      // Landing back on a note through the browser is the "Retrace" trophy.
+      unlock("retrace");
+      void sync.refresh();
+    }
+  };
+
   // Pull-to-refresh: a downward drag from the top of the note list pulls the
   // latest from the backend. Only on a list (not in the editor or the
   // read-only archived-note view), only on a remote backend (the local store
@@ -356,9 +394,7 @@ export function App() {
   function switchTo(id: string | null) {
     if (editing && discardable(editing) && editing.id !== id)
       remove(editing.id);
-    setReadingId(null);
-    if (id) setView("notes");
-    setEditingId(id);
+    go(noteRoute(id));
     if (id !== null) void sync.refresh();
   }
 
@@ -367,8 +403,6 @@ export function App() {
   // it lands ungrouped.
   function openNew(folderId?: string) {
     if (editing && discardable(editing)) remove(editing.id);
-    setReadingId(null);
-    setView("notes");
     const title = defaultNoteTitle(editor.defaultTitle, allNotes);
     // On a file/cloud backend, hold the save until the title is committed so
     // the note's file is created already bearing the user's title (the
@@ -379,7 +413,7 @@ export function App() {
     if (storage.backend !== "browser") sync.holdSaves();
     const id = create(title, folderId);
     pristineNew.current = { id, title };
-    setEditingId(id);
+    go({ kind: "note", id });
   }
 
   // Land a batch of dropped markdown files in the library, then surface them:
@@ -390,39 +424,38 @@ export function App() {
     const added = importFiles(files);
     if (added === 0) return;
     if (editing && discardable(editing)) remove(editing.id);
-    setEditingId(null);
-    setReadingId(null);
-    setView("notes");
+    go(LIST_ROUTE);
     unlock("importer");
   }
 
   // Leave the editor / reader and show the full overview of active notes —
-  // wired to the side menu's "Show all".
+  // wired to the side menu's "Show all" and the editor's back button. Steps
+  // the browser back when the overview is where we came from, so bouncing in
+  // and out of a note doesn't pile up history entries.
   function showAll() {
     if (editing && discardable(editing)) remove(editing.id);
-    setEditingId(null);
-    setReadingId(null);
-    setView("notes");
+    backTo(LIST_ROUTE);
   }
 
   // Open the archive page — the same overview filtered to archived notes.
   // Leaves the editor / reader so the list is what shows.
   function openArchive() {
     if (editing && discardable(editing)) remove(editing.id);
-    setEditingId(null);
-    setReadingId(null);
-    setView("archive");
+    go(ARCHIVE_ROUTE);
   }
 
   // Open an archived note read-only (tapped from the archive page).
   function openRead(id: string) {
-    setReadingId(id);
+    go({ kind: "archived", id });
   }
 
+  // Deleting the note that's open leaves its surface without a back step —
+  // stepping back onto a note that no longer exists would only bounce off the
+  // overview anyway.
   function removeNote(id: string) {
     remove(id);
-    if (id === editingId) setEditingId(null);
-    if (id === readingId) setReadingId(null);
+    if (id === editingId) replace(LIST_ROUTE);
+    else if (id === readingId) replace(ARCHIVE_ROUTE);
   }
 
   // Archiving a note from the overview leaves the editor too if that note
@@ -430,7 +463,7 @@ export function App() {
   // that's no longer in the list.
   function archiveNote(id: string) {
     archive(id);
-    if (id === editingId) setEditingId(null);
+    if (id === editingId) replace(LIST_ROUTE);
   }
 
   // Move a note into another namespace (sidebar drag): write it into the
@@ -442,8 +475,8 @@ export function App() {
     if (!note) return;
     if (await storage.moveNoteToNamespace(note, slug)) {
       remove(id);
-      if (id === editingId) setEditingId(null);
-      if (id === readingId) setReadingId(null);
+      if (id === editingId) replace(LIST_ROUTE);
+      else if (id === readingId) replace(ARCHIVE_ROUTE);
     }
   }
 
@@ -458,8 +491,9 @@ export function App() {
     const folderNotes = allNotes.filter((n) => n.folderId === folderId);
     if (await storage.moveFolderToNamespace(folder, folderNotes, slug)) {
       removeFolderWithNotes(folderId);
-      if (folderNotes.some((n) => n.id === editingId)) setEditingId(null);
-      if (folderNotes.some((n) => n.id === readingId)) setReadingId(null);
+      if (folderNotes.some((n) => n.id === editingId)) replace(LIST_ROUTE);
+      else if (folderNotes.some((n) => n.id === readingId))
+        replace(ARCHIVE_ROUTE);
     }
   }
 
@@ -497,7 +531,7 @@ export function App() {
   // list and reappears in the overview, but we stay on the archive page.
   function restoreNote(id: string) {
     restore(id);
-    if (id === readingId) setReadingId(null);
+    if (id === readingId) replace(ARCHIVE_ROUTE);
   }
 
   // Restore from the read-only view's Restore button: the note is unarchived
@@ -505,9 +539,7 @@ export function App() {
   // editable editor, so the user can keep writing without another tap.
   function restoreAndEdit(id: string) {
     restore(id);
-    setReadingId(null);
-    setView("notes");
-    setEditingId(id);
+    go({ kind: "note", id });
   }
 
   // Encryption on, no passphrase held this session — block the app behind the
@@ -608,7 +640,7 @@ export function App() {
                       key={reading.id}
                       note={reading}
                       editor={editor}
-                      onBack={() => setReadingId(null)}
+                      onBack={() => backTo(ARCHIVE_ROUTE)}
                       onRestore={() => restoreAndEdit(reading.id)}
                       onDelete={() => removeNote(reading.id)}
                       syncSlot={syncSlot}
@@ -619,7 +651,7 @@ export function App() {
                       onOpen={openRead}
                       onRestore={restoreNote}
                       onDelete={removeNote}
-                      onBack={() => setView("notes")}
+                      onBack={() => backTo(LIST_ROUTE)}
                       syncSlot={syncSlot}
                     />
                   ) : (

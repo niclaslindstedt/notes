@@ -27,6 +27,7 @@ import {
   FolderTreeGlyph,
   FormatGlyph,
   GlobeGlyph,
+  HistoryGlyph,
   ImageGlyph,
   ImportGlyph,
   KeyGlyph,
@@ -419,6 +420,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     learnMore: true,
     // Fired when reopening a note restores the caret / scroll position it was
     // left at earlier this session (see `src/ui/editor-position.ts`).
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "retrace",
+    tier: "intermediate",
+    glyph: HistoryGlyph,
+    learnMore: true,
+    // Fired when a browser Back / Forward step lands back on a note (the pop
+    // handler in `App`) — session history lives outside the document, so
+    // there is nothing to derive it from.
     trigger: { kind: "manual" },
   },
   {

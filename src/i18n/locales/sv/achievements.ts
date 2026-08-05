@@ -227,6 +227,13 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Så länge appen är öppen kommer den ihåg var markören satt och hur långt du rullat i varje anteckning, så att hoppa mellan anteckningar tar dig tillbaka precis dit du var — samma rad, samma plats på skärmen — i stället för till toppen. På en telefon kommer tangentbordet upp igen med markören redan på plats. Det gäller per session: en ny omladdning börjar varje anteckning på nytt.",
     },
+    retrace: {
+      name: "Tillbakaspårning",
+      condition:
+        "Använd webbläsarens bakåtknapp för att gå till en anteckning.",
+      learnMore:
+        "Varje förflyttning du gör — att öppna en anteckning, hoppa till en annan, kliva in i arkivet — lämnar ett steg i webbläsarens historik, så bakåtknappen tar dig genom anteckningarna du besökt (och framåtknappen tillbaka ut igen). Det fungerar med bakåtknappen, tangentbordsgenvägen och Androids bakåtgest. Adressfältet ändras aldrig: anteckningar stannar på den här enheten, så det finns ingen länk till en anteckning att dela ut.",
+    },
 
     // ── Proffs ────────────────────────────────────────────────────────
     localVault: {
