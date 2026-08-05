@@ -4,6 +4,7 @@ import {
   classifyLines,
   fencedRanges,
   hasClosedFence,
+  hasMultiLineQuote,
   hiddenFenceLines,
   parseInline,
   shortenUrl,
@@ -141,6 +142,20 @@ describe("hasClosedFence", () => {
     expect(hasClosedFence("```\ncode")).toBe(false);
     expect(hasClosedFence("```\ncode\n```")).toBe(true);
     expect(hasClosedFence("~~~js\ncode\n~~~")).toBe(true);
+  });
+});
+
+describe("hasMultiLineQuote", () => {
+  it("needs two consecutive quote rows", () => {
+    expect(hasMultiLineQuote("")).toBe(false);
+    expect(hasMultiLineQuote("> alone")).toBe(false);
+    expect(hasMultiLineQuote("> one\nplain\n> two")).toBe(false);
+    expect(hasMultiLineQuote("> one\n> two")).toBe(true);
+    expect(hasMultiLineQuote("intro\n  > one\n  > two\nafter")).toBe(true);
+  });
+
+  it("ignores a `>` inside a fenced code block", () => {
+    expect(hasMultiLineQuote("```\n> one\n> two\n```")).toBe(false);
   });
 });
 

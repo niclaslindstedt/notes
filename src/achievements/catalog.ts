@@ -6,7 +6,7 @@
 // `learnMore: true` flags entries that carry an expanded body.
 
 import { isImageAttachment } from "../domain/attachment.ts";
-import { hasClosedFence } from "../domain/markdown.ts";
+import { hasClosedFence, hasMultiLineQuote } from "../domain/markdown.ts";
 import type { Snapshot } from "../domain/note.ts";
 import {
   AccessibilityGlyph,
@@ -42,6 +42,7 @@ import {
   PanelBottomGlyph,
   PaperclipGlyph,
   PlusGlyph,
+  QuoteGlyph,
   RefreshGlyph,
   ScaleTextGlyph,
   SearchGlyph,
@@ -81,6 +82,11 @@ const hasTitledNote = (snap: Snapshot) =>
 // keeping snippets in the app, not just prose.
 const hasCodeBlock = (snap: Snapshot) =>
   snap.notes.some((n) => hasClosedFence(n.body ?? ""));
+
+// A quote running over two or more rows — what pressing Enter inside a quote
+// writes, so this is the trophy for discovering that a quote keeps going.
+const hasLongQuote = (snap: Snapshot) =>
+  snap.notes.some((n) => hasMultiLineQuote(n.body ?? ""));
 
 // A note that has been swiped into the archive — the first time someone tidies
 // a note away without deleting it.
@@ -259,6 +265,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       slices: (s) => [s.snapshot.notes],
       predicate: (prev, next) =>
         !hasCodeBlock(prev.snapshot) && hasCodeBlock(next.snapshot),
+    },
+  },
+  {
+    id: "quoteUnquote",
+    tier: "intermediate",
+    glyph: QuoteGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasLongQuote(prev.snapshot) && hasLongQuote(next.snapshot),
     },
   },
   {

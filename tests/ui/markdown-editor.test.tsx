@@ -96,6 +96,35 @@ describe("MarkdownEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith("he\nllo");
   });
 
+  it("opens another quote row on Enter inside a quote", () => {
+    const { onChange } = renderEditor("> quoted");
+    caretIn(rawLine()!, 8);
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("> quoted\n> ");
+  });
+
+  it("quotes the tail when Enter splits a quote mid-row", () => {
+    const { onChange } = renderEditor("> abcd");
+    caretIn(rawLine()!, 4);
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("> ab\n> cd");
+  });
+
+  it("keeps quoting from an empty quote row", () => {
+    // Leaving a quote is explicit — unmark the row, or move to another one.
+    const { onChange } = renderEditor("> one\n> ");
+    caretIn(rawLine()!, 2);
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("> one\n> \n> ");
+  });
+
+  it("does not quote the next row from an unquoted one", () => {
+    const { onChange } = renderEditor("> quoted\nplain");
+    caretIn(rawLine()!, 5);
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("> quoted\nplain\n");
+  });
+
   it("merges into the previous line on Backspace at column 0", () => {
     const { onChange } = renderEditor("a\nb");
     const raw = rawLine()!;

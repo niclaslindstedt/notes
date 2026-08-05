@@ -143,6 +143,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Omslut rader med ``` så visar redigeraren dem som ett kodblock — ordagrant, utan någon Markdown-formatering inuti. Själva staketraderna döljs när blocket är stängt och kommer tillbaka så fort du placerar markören inuti det.",
     },
+    quoteUnquote: {
+      name: "Citat, slut citat",
+      condition: "Skriv ett citat som löper över mer än en rad.",
+      learnMore:
+        "Tryck Enter inuti ett citat så öppnas ytterligare en citatrad, så att ett långt stycke kan skrivas i ett svep i stället för att varje rad märks upp för hand. Citatet fortsätter tills du lämnar det: tryck Citat igen för att ta bort märkningen från raden, eller placera markören på en rad som inte är ett citat.",
+    },
     plainText: {
       name: "Enkelt och rent",
       condition: "Stäng av direkt Markdown-visning.",
