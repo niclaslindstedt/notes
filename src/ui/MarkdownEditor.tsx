@@ -20,7 +20,7 @@ import {
 } from "../domain/attachment.ts";
 import { unlock } from "../achievements/index.ts";
 import {
-  deleteLine,
+  cutLine,
   firstChangedLine,
   orderPoints,
   pointsEqual,
@@ -38,6 +38,7 @@ import {
 import type { NoteMatch } from "../domain/note-find.ts";
 import type { Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
+import { writeClipboard } from "./clipboard.ts";
 import { getEditorPosition, setEditorPosition } from "./editor-position.ts";
 import { AttachmentsEndBlock } from "./attachments/AttachmentsEndBlock.tsx";
 import { AttachmentsProvider } from "./attachments/AttachmentsProvider.tsx";
@@ -163,8 +164,9 @@ export type MarkdownEditorHandle = {
   focus: () => void;
   /** Apply a styling-toolbar action to the selection (or the caret's line). */
   format: (action: FormatAction) => void;
-  /** Remove the caret's line (or, mid-line, the text after the caret). */
-  deleteLine: () => void;
+  /** Cut to the clipboard: the selection, the text after a mid-line caret, or
+   *  the whole line. */
+  cut: () => void;
 };
 
 // The active line's identity: which source line is being edited as raw text, and
@@ -931,9 +933,9 @@ export function MarkdownEditor({
       e.preventDefault();
       selectAllLines();
     }
-    // Ctrl/Cmd+K deletes the caret's line — the keyboard twin of the header's
-    // delete-line button. Taken from the browser (Chrome and Firefox aim it at
-    // the address bar) only while the editing surface holds focus.
+    // Ctrl/Cmd+K cuts at the caret — the keyboard twin of the header's cut
+    // button. Taken from the browser (Chrome and Firefox aim it at the address
+    // bar) only while the editing surface holds focus.
     if (
       (e.metaKey || e.ctrlKey) &&
       !e.altKey &&
@@ -941,7 +943,7 @@ export function MarkdownEditor({
       e.key.toLowerCase() === "k"
     ) {
       e.preventDefault();
-      removeLine();
+      cut();
     }
     // Tab hands focus on rather than indenting — the host places the editor in
     // the page's tab order (the surface itself is skipped by the browser). Only
@@ -1016,24 +1018,31 @@ export function MarkdownEditor({
     setActive((a) => (a.index === null ? a : { index: null, key: a.key + 1 }));
   }
 
-  // --- Deleting a line -----------------------------------------------------
+  // --- Cutting -------------------------------------------------------------
   //
-  // The header's delete-line button and its Ctrl/Cmd+K shortcut, applied
-  // through the same pure engine and `commit` as every other structural edit —
-  // so the note re-renders, the caret is re-placed where the cut left it, and
-  // the app's own undo can put it back. What exactly goes is `deleteLine`'s
-  // call (the whole line, or only the text after a mid-line caret).
+  // The header's cut button and its Ctrl/Cmd+K shortcut, applied through the
+  // same pure engine and `commit` as every other structural edit — so the note
+  // re-renders, the caret is re-placed where the cut left it, and the app's own
+  // undo can put it back. What exactly goes is `cutLine`'s call (the selection,
+  // the text after a mid-line caret, or the whole line); the text it took goes
+  // on the clipboard, so this really is a cut and not just a delete.
+  //
+  // The clipboard write is fire-and-forget: it can fail (a denied permission,
+  // an insecure origin the fallback can't rescue) and the edit still stands —
+  // undo is right there, and holding the edit hostage to the clipboard would
+  // make the button feel broken in the case that matters least.
   //
   // Until the caret has been placed at all — an existing note opened and not
   // yet tapped — there is no line to point at, so the press does nothing
   // rather than guess at one.
-  function removeLine() {
+  function cut() {
     const pts = selectionPoints();
     const at = lastCaret.current;
     const span = pts ?? (at ? { start: at, end: at } : null);
     if (!span) return;
-    const r = deleteLine(linesRef.current, span.start, span.end);
+    const r = cutLine(linesRef.current, span.start, span.end);
     if (!r) return;
+    void writeClipboard(r.text);
     unlock("guillotine");
     commit(r.lines, r.caret);
   }
@@ -1100,14 +1109,14 @@ export function MarkdownEditor({
   placeCaretAtEndRef.current = placeCaretAtEnd;
   const formatRef = useRef(format);
   formatRef.current = format;
-  const removeLineRef = useRef(removeLine);
-  removeLineRef.current = removeLine;
+  const cutRef = useRef(cut);
+  cutRef.current = cut;
   useImperativeHandle(
     ref,
     () => ({
       focus: () => placeCaretAtEndRef.current(),
       format: (action: FormatAction) => formatRef.current(action),
-      deleteLine: () => removeLineRef.current(),
+      cut: () => cutRef.current(),
     }),
     [],
   );

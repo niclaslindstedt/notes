@@ -86,57 +86,95 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
+/** A cut: what the edit left behind, plus the source text it took away. */
+export type CutResult = EditResult & {
+  /** Exactly the source that was removed — what the caller puts on the
+   *  clipboard, so the cut can be pasted back somewhere else. */
+  text: string;
+};
+
+/** The source spanning `[a, b]`, with `\n` between the lines it crosses. */
+export function sliceRange(
+  lines: readonly string[],
+  a: SourcePoint,
+  b: SourcePoint,
+): string {
+  const [start, end] = orderPoints(a, b);
+  const from = clamp(start.line, 0, lines.length - 1);
+  const to = clamp(end.line, from, lines.length - 1);
+  const startLine = lines[from] ?? "";
+  const endLine = lines[to] ?? "";
+  const startCol = clamp(start.col, 0, startLine.length);
+  const endCol = clamp(end.col, 0, endLine.length);
+  if (from === to) return startLine.slice(startCol, endCol);
+  return [
+    startLine.slice(startCol),
+    ...lines.slice(from + 1, to),
+    endLine.slice(0, endCol),
+  ].join("\n");
+}
+
 /**
- * Remove the line the caret sits on — the editor's delete-line button and its
- * Ctrl/Cmd+K shortcut. Returns `null` when there is nothing to remove (an
- * already-empty one-line note), so the caller can leave the source untouched.
+ * Cut at the caret — the editor's cut button and its Ctrl/Cmd+K shortcut.
+ * Returns the new lines, where the caret should land, and the source that was
+ * taken (for the clipboard), or `null` when there is nothing to cut (an
+ * already-empty one-line note, or an empty selection), so the caller can leave
+ * the source untouched.
  *
  * Three shapes, in the order a writer expects them:
  *
+ *   * **A ranged selection** — exactly what is highlighted goes, to the
+ *     column, and the caret lands where it started. What you can see is
+ *     selected is what ends up on the clipboard.
  *   * **Caret in the middle of a line** — only the text *after* it goes; the
  *     line (and the caret's column) stays. This is the kill-to-end-of-line
  *     every terminal binds to Ctrl+K, and it's what makes the button useful
- *     for trimming a sentence rather than only for dropping whole lines.
+ *     for lifting the rest of a sentence rather than only whole lines.
  *   * **Caret at either end of a line** — the whole line goes, newline and
  *     all, so the ones below move up. At the start there is nothing to trim
- *     but the line itself; at the end trimming would delete nothing, and a
- *     button that sometimes does nothing reads as broken.
- *   * **A ranged selection** — every line it touches goes. An endpoint resting
- *     at column 0 hasn't visually taken that line, so it is left alone.
+ *     but the line itself; at the end trimming would cut nothing, and a button
+ *     that sometimes does nothing reads as broken.
  *
- * The caret lands at the start of whichever line moved up into the gap, or at
- * the end of the new last line when the note's tail was what went.
+ * A whole line is cut *with* its newline, so pasting it back re-creates a line
+ * rather than splicing it into the one the caret is on.
+ *
+ * After a whole-line cut the caret lands at the start of whichever line moved
+ * up into the gap, or at the end of the new last line when the note's tail was
+ * what went.
  */
-export function deleteLine(
+export function cutLine(
   lines: readonly string[],
   a: SourcePoint,
   b: SourcePoint = a,
-): EditResult | null {
+): CutResult | null {
   const [start, end] = orderPoints(a, b);
   const from = clamp(start.line, 0, lines.length - 1);
   const text = lines[from] ?? "";
   const col = clamp(start.col, 0, text.length);
 
-  if (pointsEqual(start, end) && col > 0 && col < text.length) {
-    const next = [...lines];
-    next[from] = text.slice(0, col);
-    return { lines: next, caret: { line: from, col } };
+  if (!pointsEqual(start, end)) {
+    const cut = sliceRange(lines, start, end);
+    if (cut === "") return null;
+    return { ...replaceRange([...lines], start, end, ""), text: cut };
   }
 
-  // A selection ending at the very start of a line stops short of it.
-  const last = clamp(end.line, from, lines.length - 1);
-  const to = last > from && end.col === 0 ? last - 1 : last;
+  if (col > 0 && col < text.length) {
+    const next = [...lines];
+    next[from] = text.slice(0, col);
+    return { lines: next, caret: { line: from, col }, text: text.slice(col) };
+  }
 
-  if (from === 0 && to === lines.length - 1)
-    return lines.length === 1 && text === ""
+  if (lines.length === 1)
+    return text === ""
       ? null
-      : { lines: [""], caret: { line: 0, col: 0 } };
+      : { lines: [""], caret: { line: 0, col: 0 }, text: `${text}\n` };
 
-  const next = [...lines.slice(0, from), ...lines.slice(to + 1)];
+  const next = [...lines.slice(0, from), ...lines.slice(from + 1)];
   const line = Math.min(from, next.length - 1);
   return {
     lines: next,
     caret: { line, col: line === from ? 0 : (next[line] ?? "").length },
+    text: `${text}\n`,
   };
 }
 

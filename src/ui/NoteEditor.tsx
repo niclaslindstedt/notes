@@ -14,7 +14,7 @@ import { flushSync } from "react-dom";
 
 import { unlock } from "../achievements/index.ts";
 import { type Attachment } from "../domain/attachment.ts";
-import { deleteLine, firstChangedLine } from "../domain/line-edit.ts";
+import { cutLine, firstChangedLine } from "../domain/line-edit.ts";
 import {
   applyFormat,
   lineFormatAt,
@@ -27,8 +27,9 @@ import { isBlank, type Folder, type Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { CipherGlyph } from "./CipherGlyph.tsx";
+import { writeClipboard } from "./clipboard.ts";
 import { CopyNoteButton } from "./CopyNoteButton.tsx";
-import { DeleteLineButton } from "./DeleteLineButton.tsx";
+import { CutButton } from "./CutButton.tsx";
 import {
   getEditorPosition,
   offsetToPoint,
@@ -116,7 +117,7 @@ const NO_MATCHES: readonly NoteMatch[] = [];
 /** What the plain-textarea fallback exposes, mirroring the live-preview one. */
 type PlainEditorHandle = {
   format: (action: FormatAction) => void;
-  deleteLine: () => void;
+  cut: () => void;
 };
 
 export function Editor({
@@ -246,12 +247,13 @@ export function Editor({
     else plainEditorRef.current?.format(action);
   }
 
-  // The delete-line button, routed to whichever surface is mounted the same way
-  // a toolbar press is. Both apply the same pure `deleteLine`, so the button and
-  // the Ctrl/Cmd+K the surfaces bind themselves cut identically.
-  function runDeleteLine() {
-    if (editor.renderMarkdown) markdownEditorRef.current?.deleteLine();
-    else plainEditorRef.current?.deleteLine();
+  // The cut button, routed to whichever surface is mounted the same way a
+  // toolbar press is. Both apply the same pure `cutLine` and put what it took
+  // on the clipboard, so the button and the Ctrl/Cmd+K the surfaces bind
+  // themselves cut identically.
+  function runCut() {
+    if (editor.renderMarkdown) markdownEditorRef.current?.cut();
+    else plainEditorRef.current?.cut();
   }
 
   // Move focus from the title field into the body's editing surface, used when
@@ -350,7 +352,7 @@ export function Editor({
           )}
           <NoteFindButton open={findOpen} onToggle={toggleFind} />
           <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
-          {!loading && <DeleteLineButton onDelete={runDeleteLine} />}
+          {!loading && <CutButton onCut={runCut} />}
           <CopyNoteButton note={note} copyScope={editor.copyScope} />
         </div>
       </header>
@@ -785,19 +787,21 @@ function PlainEditor({
     el.setSelectionRange(sel.from, sel.to);
   }, [value]);
 
-  // The delete-line button and its Ctrl/Cmd+K shortcut, through the same pure
-  // engine the live-preview editor uses — the textarea always has a real caret,
-  // so there is always a line to point at.
-  function removeLine() {
+  // The cut button and its Ctrl/Cmd+K shortcut, through the same pure engine
+  // the live-preview editor uses — the textarea always has a real caret, so
+  // there is always a line to point at. As there, the clipboard write is
+  // fire-and-forget: a refused clipboard must not hold up the edit.
+  function cut() {
     const el = textareaRef.current;
     if (!el) return;
     const source = el.value;
-    const result = deleteLine(
+    const result = cutLine(
       source.split("\n"),
       offsetToPoint(source, el.selectionStart),
       offsetToPoint(source, el.selectionEnd),
     );
     if (!result) return;
+    void writeClipboard(result.text);
     unlock("guillotine");
     const next = result.lines.join("\n");
     setValue(next);
@@ -831,7 +835,7 @@ function PlainEditor({
       // to be installed, so the button it lit (or put out) is right at once.
       if (onLineFormat) markCaret(next, from, to);
     },
-    deleteLine: removeLine,
+    cut,
   }));
 
   // Keep the toolbar's lit buttons in step with the caret. The line decides the
@@ -890,9 +894,9 @@ function PlainEditor({
         trackCaret(e.currentTarget);
       }}
       onKeyDown={(e) => {
-        // Ctrl/Cmd+K deletes the caret's line — the keyboard twin of the
-        // header's delete-line button, taken from the browser (which aims it
-        // at the address bar) only while the note body holds focus.
+        // Ctrl/Cmd+K cuts at the caret — the keyboard twin of the header's
+        // cut button, taken from the browser (which aims it at the address
+        // bar) only while the note body holds focus.
         if (
           (e.metaKey || e.ctrlKey) &&
           !e.altKey &&
@@ -900,7 +904,7 @@ function PlainEditor({
           e.key.toLowerCase() === "k"
         ) {
           e.preventDefault();
-          removeLine();
+          cut();
           return;
         }
         // Tab moves on rather than indenting; the editor owns where to (see the
