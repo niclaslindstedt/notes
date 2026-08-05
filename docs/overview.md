@@ -624,8 +624,8 @@ achievement (fired via `unlock("copycat")`).
 
 ### Cut button
 
-`CutButton` (`src/ui/CutButton.tsx`) — the "X—" glyph immediately left of the
-[copy button](#copy-button) in the editor header. It cuts at the caret: what it
+`CutButton` (`src/ui/CutButton.tsx`) — the scissors glyph immediately left of
+the [copy button](#copy-button) in the editor header. It cuts at the caret: what it
 takes leaves the note *and* lands on the clipboard, because clearing a line by
 hand is otherwise a select-and-erase or a held Backspace, and text you pulled
 out is text you often want to put somewhere else. `Ctrl/Cmd+K` is the same edit
