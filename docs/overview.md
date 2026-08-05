@@ -3077,6 +3077,95 @@ diagnostics through it.
 `define` at build time (`__APP_VERSION__` / `__BUILD_LABEL__`) and re-exported
 typed.
 
+### Embedded (wrapper) builds
+
+`isEmbedded` / `__EMBEDDED__` (`vite.config.ts`, `src/vite-env.d.ts`) — true
+when the bundle is being built for one of the two wrappers that ship the app as
+a downloadable binary: `VITE_TARGET=native` (the React Native WebView shell in
+`native/`) or `VITE_TARGET=electron` (the desktop shell in `electron/`). It
+flips three things at once: the asset base becomes relative (`./`) so
+`/assets/...` URLs resolve under a `file://` or private-scheme origin; VitePWA
+is disabled, because offline is already guaranteed by the on-device bundle and
+a service worker has no HTTP origin to attach to; and the sidecar emitters
+(`version.json`, `precache-manifest.json`, the `/privacy` and `/home` aliases)
+are skipped, since nothing in a wrapper reads them. `usePwaUpdate`
+(`src/pwa/usePwaUpdate.ts`) reads `__EMBEDDED__` to know there is no service
+worker to register.
+
+### Capabilities
+
+`platform()` / `capabilities()` (`src/platform/capabilities.ts`) — the single
+answer to *which surface is this, and what can it do*. `platform()` returns
+`"native"` (the `native/` WebView wrapper, detected by
+`window.ReactNativeWebView`), `"desktop"` (the `electron/` shell, detected by
+its private `notes:` scheme), or `"web"`. `capabilities()` turns that into the
+three things that actually differ:
+
+- **`folderPicker`** — the File System Access API behind the
+  [folder backend](#folder-backend). A browser-engine question (Chromium yes,
+  Firefox/Safari no), so it is true in both wrappers.
+- **`redirectOauth`** — whether a redirect-based OAuth flow can complete on
+  this origin, gating both cloud backends. False on the desktop: `redirectUri()`
+  (`src/storage/oauth-pkce.ts`) is built from `window.location`, so it is
+  `notes://app` there, and no provider will register a custom scheme (Google
+  rejects non-`https` outright).
+- **`pinnedFetch`** — SPKI-pinned HTTPS behind the
+  [notesd backend](#notesd-backend). Native code only.
+
+`useStorageBackend` reads all four of its availability flags from here
+(`dropboxAvailable`, `gdriveAvailable`, `folderAvailable`, `notesdAvailable`)
+rather than re-deriving each at its own call site. That centralisation is the
+point: before it, the desktop build offered no cloud sync only because the
+packaging job happened not to pass `VITE_DROPBOX_APP_KEY` /
+`VITE_GOOGLE_CLIENT_ID` — adding those secrets would have lit both options up
+and then failed at the redirect, because the reason they cannot work there was
+written down nowhere. The module lives in `src/`, not in a wrapper: the page
+works its surface out from what it can observe, and no shell tells it anything.
+
+### Desktop app (Electron)
+
+`electron/` — a **thin** Electron window around the same compiled web app. The
+entire main process is `electron/main.js`: it registers a private `notes://app`
+scheme, serves `electron/webroot/` (the embedded build, written by
+`electron/scripts/bundle-web.mjs`) from it, opens one sandboxed
+context-isolated window, and sends off-origin links to the system browser.
+There is no preload, no IPC, and no storage the renderer can see — the embedded
+app runs its own `localStorage`, exactly as it does in a browser tab.
+
+The one thing the shell owns is the window's **remembered size and position**
+(`window-state.json` in the app's user-data directory, written on `close`),
+because a web page cannot size or place its own OS window. It reads that file
+defensively: bounds are saved from `getNormalBounds` so a maximized window does
+not restore at screen size forever, a rectangle that no longer overlaps any
+connected display keeps its size but drops its position (an unplugged monitor
+would otherwise strand the window off-screen), and an unreadable or malformed
+file falls through to the 1100×800 default.
+
+The private scheme rather than `loadFile` is the one load-bearing decision:
+`localStorage` is keyed by origin and a `file://` page is an *opaque* origin, so
+notes would depend on where the app happened to be installed. `notes://app` is
+a constant, so notes survive updates and moves. It must be registered before
+Electron's `ready` event — a scheme registered late loads the page as an opaque
+origin anyway, with no `localStorage` at all.
+
+`electron-builder.config.cjs` packages an **archive** per platform (Windows
+zip, macOS zip for x64 and arm64 separately, Linux tar.gz) rather than an
+installer, because an unsigned installer trips SmartScreen / Gatekeeper; it
+reads the app's real version from the root `package.json`, and always signs the
+macOS build — ad hoc when no Apple credentials are present, since Apple Silicon
+refuses to execute unsigned arm64 code at all. The `desktop` job in
+`.github/workflows/release.yml` builds all four on one runner per platform and
+attaches them to the draft release, which the `publish` job then makes public.
+
+The cloud backends (Dropbox, Google Drive) are **not offered** in the desktop
+app — `capabilities().redirectOauth` is false there, so the storage picker
+shows both rows disabled the way it already does for the folder backend on
+Safari. Their OAuth flows redirect to a registered `https://` URL, which
+`notes://app` is not. Local storage and the picked-folder backend work as they
+do on the web. See [Capabilities](#capabilities), `electron/README.md`, and
+AGENTS.md's "The wrappers are thin" for the rule about what may live in that
+directory (in short: nothing that could live in `src/`).
+
 ### The shared framework
 
 `@niclaslindstedt/oss-framework` — the npm package (GitHub Packages

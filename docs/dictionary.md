@@ -300,6 +300,9 @@ Honour these when naming a new file, key, or string.
 | **Logger** / **log buffer**                                | `createLogger`, `getLogs`, `setCaptureEnabled` (`src/dev/logger.ts`). [→](overview.md#logger)                |
 | **App version** / **build label**                          | `APP_VERSION`, `BUILD_LABEL` (`src/build-env.ts`). [→](overview.md#build-env)                                 |
 | **The framework** / **oss-framework** / **shared package** | `@niclaslindstedt/oss-framework` (npm dep; `.npmrc` + `GITHUB_PAT`). Shims/wrappers keep historical paths — see AGENTS.md "The shared framework". [→](overview.md#the-shared-framework) |
+| **Desktop app** / **the Electron wrapper** / **the downloadable app** / **the window** / **window size** / **remember the window** | `electron/main.js` (the whole main process — `webrootFile`, `loadWindowState` / `saveWindowState`), `electron/electron-builder.config.cjs`, `electron/scripts/bundle-web.mjs`; built by `make build-electron` (`VITE_TARGET=electron` in `vite.config.ts`), packaged by the `desktop` job in `.github/workflows/release.yml`. [→](overview.md#desktop-app-electron) |
+| **Embedded build** / **wrapper build** / **`VITE_TARGET`** | `isEmbedded`, `__EMBEDDED__` (`vite.config.ts`); consumed by `usePwaUpdate` (`src/pwa/usePwaUpdate.ts`). [→](overview.md#embedded-wrapper-builds) |
+| **Capabilities** / **what this surface can do** / **web vs native vs desktop** / **why is Dropbox greyed out** | `platform`, `capabilities`, `Platform` (`src/platform/capabilities.ts`); consumed by `useStorageBackend` (`dropboxAvailable` / `gdriveAvailable` / `folderAvailable` / `notesdAvailable`). [→](overview.md#capabilities) |
 
 ## The public pages
 

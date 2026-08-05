@@ -229,7 +229,16 @@ export function HomePage() {
             </li>
             <li>
               Install it as an app and keep using it offline — no connection
-              required once it has loaded.
+              required once it has loaded. There are also downloadable{" "}
+              <a
+                href="https://github.com/niclaslindstedt/notes/releases/latest"
+                className="text-link hover:underline"
+              >
+                desktop builds
+              </a>{" "}
+              for Windows, macOS, and Linux: the same app in its own window,
+              sending nothing anywhere. Cloud sync is available in the browser
+              and mobile app only.
             </li>
             <li>
               Optionally sync your notes to a location you control: a local

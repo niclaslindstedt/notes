@@ -1,4 +1,4 @@
-.PHONY: build build-native test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump
+.PHONY: build build-native build-electron test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump
 
 install:
 	npm ci
@@ -20,6 +20,13 @@ build:
 # prebuild). See native/README.md.
 build-native:
 	npm run build:native
+
+# Build the app for embedding in the Electron desktop wrapper: relative asset
+# base, no service worker, output to electron/webroot/ (packaged into the
+# binary by electron-builder). Package it with `npm --prefix electron run
+# dist[:win|:mac]`. See electron/README.md.
+build-electron:
+	npm run build:electron
 
 preview:
 	npm run preview

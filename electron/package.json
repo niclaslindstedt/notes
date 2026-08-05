@@ -1,0 +1,22 @@
+{
+  "name": "notes",
+  "productName": "Notes",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Desktop (Electron) wrapper around the notes PWA — a window showing the bundled app.",
+  "author": "Niclas Lindstedt <niclas@agilator.se>",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "repository": "https://github.com/niclaslindstedt/notes",
+  "main": "main.js",
+  "scripts": {
+    "bundle": "node scripts/bundle-web.mjs",
+    "start": "npm run bundle && electron .",
+    "dist": "npm run bundle && electron-builder --config electron-builder.config.cjs --linux --publish never",
+    "dist:win": "npm run bundle && electron-builder --config electron-builder.config.cjs --win --publish never",
+    "dist:mac": "npm run bundle && electron-builder --config electron-builder.config.cjs --mac --publish never"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
+  }
+}
