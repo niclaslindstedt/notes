@@ -155,6 +155,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Föredrar du ren text? Inställningar → Redigerare stänger av direktförhandsvisningen så att anteckningar förblir vanlig, oformaterad källtext.",
     },
+    countTheLines: {
+      name: "Räkna raderna",
+      condition: "Slå på radnummer i redigeraren.",
+      learnMore:
+        "Inställningar → Redigerare numrerar varje rad längs vänsterkanten, som i en kodredigerare. Tryck på ett nummer för att markera hela raden — redo att klippa ut, ersätta eller formatera om.",
+    },
     freehand: {
       name: "Frihand",
       condition: "Inaktivera stavningskontroll eller autokorrigering.",
@@ -232,6 +238,12 @@ const achievements: AchievementsCatalog = {
       condition: "Kopiera en anteckning till urklipp.",
       learnMore:
         "Kopieringsknappen i en antecknings sidhuvud lägger den öppna anteckningen på urklipp. Inställningar → Redigerare väljer hur mycket som tas med — bara brödtexten, titel och brödtext, eller hela .md-filen med dess YAML-frontmatter.",
+    },
+    snippetSnatcher: {
+      name: "Kodsnattare",
+      condition: "Kopiera ett kodblock med dess kopieringsknapp.",
+      learnMore:
+        "Varje stängt kodblock har en liten kopieringsknapp uppe till höger. Ett tryck lägger koden — allt mellan ```-staketen, och inget annat — på urklipp, utan att du behöver placera markören i anteckningen eller markera en enda rad för hand.",
     },
     seeker: {
       name: "Sökare",

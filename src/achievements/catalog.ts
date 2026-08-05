@@ -34,6 +34,7 @@ import {
   KeyGlyph,
   LayersGlyph,
   LinkGlyph,
+  ListOrderedGlyph,
   LockGlyph,
   MedalGlyph,
   MergeGlyph,
@@ -300,6 +301,19 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     },
   },
   {
+    id: "countTheLines",
+    tier: "intermediate",
+    glyph: ListOrderedGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.appearance.editor.lineNumbers],
+      predicate: (prev, next) =>
+        !prev.appearance.editor.lineNumbers &&
+        next.appearance.editor.lineNumbers,
+    },
+  },
+  {
     id: "freehand",
     tier: "intermediate",
     glyph: TypeGlyph,
@@ -442,6 +456,13 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     id: "copycat",
     tier: "intermediate",
     glyph: CopyGlyph,
+    learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "snippetSnatcher",
+    tier: "intermediate",
+    glyph: CodeGlyph,
     learnMore: true,
     trigger: { kind: "manual" },
   },

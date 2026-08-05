@@ -160,6 +160,12 @@ const achievements = {
       learnMore:
         "Prefer raw text? Settings → Editor switches the live preview off so notes stay plain, unformatted source.",
     },
+    countTheLines: {
+      name: "Count the lines",
+      condition: "Turn the editor's line numbers on.",
+      learnMore:
+        "Settings → Editor numbers every line down the left edge, the way a code editor does. Press a number to select that whole line — ready to cut, replace, or restyle.",
+    },
     freehand: {
       name: "Freehand",
       condition: "Disable spell check or autocorrect.",
@@ -237,6 +243,12 @@ const achievements = {
       condition: "Copy a note to the clipboard.",
       learnMore:
         "The copy button in a note's header puts the open note on your clipboard. Settings → Editor chooses how much it takes — just the body, the title and body, or the whole .md file with its YAML frontmatter.",
+    },
+    snippetSnatcher: {
+      name: "Snippet snatcher",
+      condition: "Copy a code block with its copy button.",
+      learnMore:
+        "Every closed code block wears a small copy button in its top-right corner. One press puts the code — everything between the ``` fences, and nothing else — on your clipboard, without placing the caret in the note or selecting a single line by hand.",
     },
     seeker: {
       name: "Seeker",

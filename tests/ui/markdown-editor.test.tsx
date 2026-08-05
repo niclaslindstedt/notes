@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MarkdownEditor } from "../../src/ui/MarkdownEditor.tsx";
 import {
@@ -350,6 +350,45 @@ describe("MarkdownEditor", () => {
       renderEditor("```\na\n```\ntext\n```\nb\n```", { focusOnMount: false });
       expect(renderedIndices()).toEqual(["1", "3", "5"]);
     });
+
+    // The button that copies a block. It hangs inside the block's first drawn
+    // line, so its wrapper says which source line it is anchored to.
+    function copyButtons(): HTMLElement[] {
+      return [
+        ...surface().querySelectorAll<HTMLElement>("button[aria-label]"),
+      ].filter((el) => /copy code/i.test(el.getAttribute("aria-label") ?? ""));
+    }
+
+    function anchorOf(button: HTMLElement): string | null {
+      return (
+        button.closest("[data-line-index]")?.getAttribute("data-line-index") ??
+        null
+      );
+    }
+
+    it("hangs a copy button on the first drawn line of every closed block", () => {
+      renderEditor("```\na\n```\ntext\n```\nb\n```", { focusOnMount: false });
+      // The fences are folded away, so each button rides the block's code.
+      expect(copyButtons().map(anchorOf)).toEqual(["1", "5"]);
+    });
+
+    it("gives an empty block and an unterminated fence no button", () => {
+      renderEditor("```\n```\n```\ndangling", { focusOnMount: false });
+      expect(copyButtons()).toHaveLength(0);
+    });
+
+    it("copies the block's code without its fences", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+      renderEditor("```sh\nnpm run build\nnpm test\n```", {
+        focusOnMount: false,
+      });
+      await act(async () => {
+        fireEvent.click(copyButtons()[0]!);
+      });
+      expect(writeText).toHaveBeenCalledWith("npm run build\nnpm test");
+      vi.unstubAllGlobals();
+    });
   });
 
   describe("blur reformats the note", () => {
@@ -532,6 +571,121 @@ describe("MarkdownEditor", () => {
     });
   });
 
+  describe("where a press lands the caret", () => {
+    // A touch press also arms the soft-keyboard reveal, which scrolls the line
+    // it lands on; jsdom has no `scrollIntoView`.
+    const originalScroll = HTMLElement.prototype.scrollIntoView;
+    beforeEach(() => {
+      HTMLElement.prototype.scrollIntoView = vi.fn();
+    });
+    afterEach(() => {
+      HTMLElement.prototype.scrollIntoView = originalScroll;
+    });
+
+    // A press arrives as a pointerdown (which says what pressed) followed by a
+    // click (by which time the browser has placed its own caret — stood in for
+    // here by `caretIn` / `caretAt`, since jsdom does no hit-testing).
+    function press(target: Element, pointerType: "touch" | "mouse") {
+      fireEvent.pointerDown(surface(), { pointerType });
+      fireEvent.click(target, { detail: 1 });
+    }
+
+    // Point the collapsed caret at `offset` inside an arbitrary text node.
+    function caretAt(node: Node, offset: number) {
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(node, offset);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    /** The caret's offset within the raw active line. */
+    function caretOffset(): number {
+      return window.getSelection()!.anchorOffset;
+    }
+
+    it("snaps a touch tap to the end of the word it hit", () => {
+      renderEditor("hello world");
+      caretIn(rawLine()!, 2);
+      press(rawLine()!, "touch");
+      expect(caretOffset()).toBe(5);
+    });
+
+    it("keeps the exact column a mouse click landed on", () => {
+      renderEditor("hello world");
+      caretIn(rawLine()!, 2);
+      press(rawLine()!, "mouse");
+      expect(caretOffset()).toBe(2);
+    });
+
+    it("leaves a touch tap that landed on whitespace where it is", () => {
+      renderEditor("hello world");
+      caretIn(rawLine()!, 5);
+      press(rawLine()!, "touch");
+      expect(caretOffset()).toBe(5);
+    });
+
+    it("snaps a tap on a formatted line, opening it raw at the word end", () => {
+      renderEditor("hello world\nsecond");
+      const word = screen.getByText("hello world");
+      caretAt(word.firstChild!, 2);
+      press(word, "touch");
+      // The tapped line is now the raw active line, caret past "hello".
+      expect(rawLine()?.getAttribute("data-line-index")).toBe("0");
+      expect(caretOffset()).toBe(5);
+    });
+
+    it("lands at the end of a horizontal rule so it can be erased", () => {
+      // A rule renders as a lone <hr> with no text to anchor a caret in, so the
+      // browser leaves the caret elsewhere and a phone (no forward-delete key)
+      // could never remove the line. The press takes the end of it instead.
+      const { container } = renderEditor("---\nsecond");
+      const rule = container.querySelector("hr")!;
+      press(rule, "touch");
+      expect(rawLine()?.getAttribute("data-line-index")).toBe("0");
+      expect(rawLine()?.textContent).toBe("---");
+      expect(caretOffset()).toBe(3);
+    });
+
+    it("lands at the end of a horizontal rule for a mouse too", () => {
+      const { container } = renderEditor("---\nsecond");
+      press(container.querySelector("hr")!, "mouse");
+      expect(rawLine()?.getAttribute("data-line-index")).toBe("0");
+      expect(caretOffset()).toBe(3);
+    });
+
+    it("leaves a ranged selection the press ended on alone", () => {
+      // A drag-select (or a double-click's word) must keep exactly what the
+      // browser drew rather than collapsing to a word end.
+      renderEditor("hello world");
+      const line = rawLine()!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(line.firstChild!, 0);
+      range.setEnd(line.firstChild!, 5);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      press(line, "touch");
+      expect(sel.isCollapsed).toBe(false);
+      expect(sel.toString()).toBe("hello");
+    });
+
+    it("leaves the caret alone when the press opened a link", () => {
+      // The link handler answers the press (`preventDefault`) and opens the
+      // URL; the caret must not be dragged onto the link's line behind it.
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      try {
+        renderEditor("[google](https://example.com)\nplain");
+        press(screen.getByText("google"), "touch");
+        expect(open).toHaveBeenCalled();
+        expect(rawLine()?.getAttribute("data-line-index")).toBe("1");
+      } finally {
+        open.mockRestore();
+      }
+    });
+  });
+
   describe("session position restore", () => {
     it("reopens a note at the remembered caret line", () => {
       // A position left earlier this session for this note id.
@@ -669,6 +823,80 @@ describe("MarkdownEditor", () => {
     it("renders no extra nodes when nothing matches", () => {
       renderEditor("alpha beta", { focusOnMount: false });
       expect(surface().querySelectorAll("mark").length).toBe(0);
+    });
+  });
+
+  describe("line numbers", () => {
+    // The gutter's press targets, in document order.
+    function gutter(): HTMLElement[] {
+      return [
+        ...surface().querySelectorAll<HTMLElement>(
+          "button[aria-label^='Select line']",
+        ),
+      ];
+    }
+
+    it("renders nothing extra while the setting is off", () => {
+      renderEditor("one\ntwo", { focusOnMount: false });
+      expect(gutter().length).toBe(0);
+      // Every line element is still a direct child of the surface — the DOM the
+      // editor has always rendered.
+      for (const el of surface().querySelectorAll("[data-line-index]"))
+        expect(el.parentElement).toBe(surface());
+    });
+
+    it("numbers every rendered line from one", () => {
+      renderEditor("one\ntwo\nthree", {
+        focusOnMount: false,
+        lineNumbers: true,
+      });
+      expect(gutter().map((b) => b.textContent)).toEqual(["1", "2", "3"]);
+    });
+
+    it("keeps the number out of the line's own text", () => {
+      // A digit inside the line element would shift every source column by its
+      // width, so the button must be a sibling of `[data-line-index]`.
+      renderEditor("hello", { lineNumbers: true });
+      expect(rawLine()?.textContent).toBe("hello");
+      expect(surface().querySelector("[data-line-index]")).not.toBe(
+        gutter()[0]!.parentElement,
+      );
+    });
+
+    it("selects the whole line when its number is pressed", () => {
+      renderEditor("alpha\nbeta", { focusOnMount: false, lineNumbers: true });
+      act(() => {
+        fireEvent.mouseDown(gutter()[0]!);
+      });
+      const sel = window.getSelection()!;
+      expect(sel.isCollapsed).toBe(false);
+      expect(sel.toString()).toBe("alpha");
+    });
+
+    it("drops the active raw line so the selection covers the formatted one", () => {
+      // The caret opens on the last line (raw); pressing another line's number
+      // takes the whole note back to formatted and selects that line.
+      renderEditor("**bold**\nplain", { lineNumbers: true });
+      expect(rawLine()).not.toBeNull();
+      act(() => {
+        fireEvent.mouseDown(gutter()[0]!);
+      });
+      expect(rawLine()).toBeNull();
+      expect(window.getSelection()!.toString()).toBe("bold");
+    });
+
+    it("cuts the pressed line through the editor's own cut", () => {
+      // The selection a press draws is an ordinary ranged one, so everything
+      // that reads the selection — cut, copy, typing over it — sees it.
+      const { onChange } = renderEditor("alpha\nbeta", {
+        focusOnMount: false,
+        lineNumbers: true,
+      });
+      act(() => {
+        fireEvent.mouseDown(gutter()[0]!);
+      });
+      beforeInput("insertText", "X");
+      expect(onChange).toHaveBeenLastCalledWith("X\nbeta");
     });
   });
 });

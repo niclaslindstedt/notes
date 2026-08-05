@@ -8,6 +8,8 @@ import {
   type ClipboardEvent as ReactClipboardEvent,
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
   type Ref,
 } from "react";
 
@@ -25,9 +27,15 @@ import {
   orderPoints,
   pointsEqual,
   replaceRange,
+  wordEndAt,
   type SourcePoint,
 } from "../domain/line-edit.ts";
-import { classifyLines, hiddenFenceLines } from "../domain/markdown.ts";
+import {
+  classifyLines,
+  codeBlockCopyAnchors,
+  codeBlockEdges,
+  hiddenFenceLines,
+} from "../domain/markdown.ts";
 import {
   applyFormat,
   lineFormatOf,
@@ -58,7 +66,8 @@ import {
   scrollFocusedIntoView,
 } from "./hooks/scrollFocusedIntoView.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
-import { lineTextClass } from "./markdown-line-class.ts";
+import { codeBlockEdgeClass, lineTextClass } from "./markdown-line-class.ts";
+import { CodeCopyButton } from "./CodeCopyButton.tsx";
 import { RenderedLine, type LineHighlight } from "./MarkdownLine.tsx";
 import {
   extractSourceRange,
@@ -129,6 +138,9 @@ type Props = {
   placement?: AttachmentPlacement;
   /** Trim bare URLs in the preview to this many characters either side (0 = off). */
   shortenLinkChars?: number;
+  /** Number every line in a gutter down the left edge, code-editor style, each
+   *  number a press target that selects its whole line. */
+  lineNumbers?: boolean;
   /** The open note's id, keying its session-remembered caret / scroll position
    *  so switching away and back reopens where you left off. */
   noteId?: string;
@@ -191,6 +203,7 @@ export function MarkdownEditor({
   onAttach,
   placement = INLINE_PLACEMENT,
   shortenLinkChars = 0,
+  lineNumbers = false,
   noteId,
   onTabOut,
   onLineFormat,
@@ -293,6 +306,11 @@ export function MarkdownEditor({
   // The last active-line key we revealed for, so typing within a line (which
   // re-runs the effect without changing the key) never re-triggers a scroll.
   const lastRevealKey = useRef<number | null>(null);
+  // Whether the press being handled came from a finger / pen rather than a
+  // mouse, which decides how precisely its caret is taken (see `onSurfaceClick`).
+  // Only an explicit touch/pen counts: an engine that reports no `pointerType`
+  // is treated as a mouse, so a desktop click is never snapped.
+  const touchPress = useRef(false);
 
   // Undo/redo scroll bookkeeping. `lastUndoSeq` remembers the tick we last acted
   // on (seeded to the current one so a fresh mount never scrolls); when it
@@ -312,6 +330,22 @@ export function MarkdownEditor({
   // structural edits are untouched.
   const hiddenFences = useMemo(
     () => hiddenFenceLines(blocks, clampedIndex),
+    [blocks, clampedIndex],
+  );
+
+  // Which drawn lines carry a code block's copy button, and the code each one
+  // copies. Keyed by the block's first *visible* line so the button rides the
+  // top-right corner of the block as drawn (see `codeBlockCopyAnchors`).
+  const copyAnchors = useMemo(
+    () => codeBlockCopyAnchors(blocks, clampedIndex),
+    [blocks, clampedIndex],
+  );
+
+  // The drawn lines that are a code block's top / bottom edge, which is where
+  // the block's rounded corners and its vertical padding go — there is no
+  // per-block container to put them on (see `codeBlockEdges`).
+  const codeEdges = useMemo(
+    () => codeBlockEdges(blocks, clampedIndex),
     [blocks, clampedIndex],
   );
 
@@ -980,6 +1014,61 @@ export function MarkdownEditor({
     }
     activate(last, 0);
   }
+
+  // --- Where a press lands the caret ---------------------------------------
+  //
+  // The browser's own placement is exact to the pixel, which is what a mouse
+  // wants and what a fingertip cannot use: a tap covers about a word, so which
+  // of the characters under it the browser picks is a coin toss. A touch press
+  // therefore snaps forward to the end of the word it hit (`wordEndAt`) — an
+  // aimable position, and the one Backspace works back from. A mouse press is
+  // left exactly where it landed.
+  //
+  // Either way, a press on a line the browser can't anchor a caret in at all —
+  // a horizontal rule is a lone `<hr>` with no text, so the caret falls to the
+  // line's start or onto a neighbour — lands at the *end* of that line instead.
+  // Without this a rule can't be removed on a phone at all: the caret sits
+  // before it with nothing to Backspace, and there is no forward-delete key.
+  //
+  // Runs on `click` rather than `pointerup`: by then the browser has placed its
+  // caret (so there is something to read and adjust), and the presses that must
+  // not move the caret — dragging a selection handle, a long-press selection —
+  // never produce one.
+  function onSurfaceClick(e: ReactMouseEvent<HTMLElement>) {
+    // A press the content already answered (a link opened, an attachment
+    // opened) or one no pointer made (a keyboard-synthesised click).
+    if (e.defaultPrevented || e.detail === 0) return;
+    const root = rootRef.current;
+    const lineEl = (e.target as Element | null)?.closest?.("[data-line-index]");
+    if (!root || !(lineEl instanceof HTMLElement) || !root.contains(lineEl))
+      return;
+    const line = lineIndexOf(lineEl);
+    if (line === null) return;
+    // A drag-select (or a double-click's word) that happens to end here keeps
+    // exactly the range the browser drew.
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) return;
+    const raw = linesRef.current[line] ?? "";
+    const pt =
+      sel && sel.anchorNode
+        ? sourcePointFromDom(
+            root,
+            blocksRef.current,
+            sel.anchorNode,
+            sel.anchorOffset,
+          )
+        : null;
+    // Nothing to anchor in (the rule), or the browser anchored somewhere other
+    // than the line that was pressed: take the end of the pressed line.
+    if (!pt || pt.line !== line || (lineEl.textContent ?? "") === "") {
+      activate(line, raw.length);
+      return;
+    }
+    if (!touchPress.current) return;
+    const col = wordEndAt(raw, pt.col);
+    if (col !== pt.col) activate(line, col);
+  }
+
   // --- The styling toolbar -------------------------------------------------
   //
   // A toolbar press arrives here with the caret and any selection untouched
@@ -1077,6 +1166,30 @@ export function MarkdownEditor({
     selectLineSpan(span.from, span.to);
   });
 
+  // A press on the line-number gutter: take the whole line. The line stops
+  // being the active raw one first — a whole-line selection reads as the
+  // formatted line the rest of the note shows, and both endpoints then map back
+  // to source the same way a block format's multi-line result does. Clearing
+  // the active line is what re-renders it, so the selection is queued for the
+  // effect above to draw afterwards; with no active line to clear there is no
+  // re-render to wait for and it is drawn straight away.
+  function selectLine(index: number) {
+    const len = (linesRef.current[index] ?? "").length;
+    lastCaret.current = { line: index, col: len };
+    // No single line is active, so the toolbar reads the pressed one instead
+    // (see `reportIndex`) — bulleting a gutter-selected line lights the button.
+    setSpanLine(index);
+    markCaret(index, 0, len);
+    if (activeRef.current.index === null) {
+      selectLineSpan(index, index);
+      return;
+    }
+    pendingCaret.current = null;
+    pendingRange.current = null;
+    pendingLineSpan.current = { from: index, to: index };
+    setActive((a) => ({ index: null, key: a.key + 1 }));
+  }
+
   // Tell the toolbar what is already in effect at the caret, so the H2 /
   // bullet / quote button can light up — and, from `caretSpan`, so can Bold
   // when the caret sits inside a `**…**` run. Skipped entirely when nobody is
@@ -1153,6 +1266,9 @@ export function MarkdownEditor({
           // line the caret lands on is scrolled clear of the soft keyboard; a
           // mouse never needs it (no keyboard steals the caret's space).
           if (e.pointerType !== "mouse") revealPending.current = true;
+          // Remember what pressed, for the caret placement the click brings.
+          touchPress.current =
+            e.pointerType === "touch" || e.pointerType === "pen";
         }}
         onMouseDown={(e) => {
           // A click in the empty space below the text lands the caret at the end
@@ -1184,6 +1300,7 @@ export function MarkdownEditor({
           autoCorrect={disableAutocorrect ? "off" : "on"}
           autoCapitalize={disableAutocorrect ? "off" : "sentences"}
           onKeyDown={onKeyDown}
+          onClick={onSurfaceClick}
           onPaste={onPaste}
           onBlur={() => {
             // Focus left the editing surface (the title field, a header button,
@@ -1215,7 +1332,7 @@ export function MarkdownEditor({
             composing.current = false;
             readBackComposition();
           }}
-          className={`relative px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
+          className={`relative ${lineNumbers ? "pr-4 pl-14" : "px-4"} pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
           style={widthStyle}
         >
           {value === "" && (
@@ -1227,36 +1344,63 @@ export function MarkdownEditor({
             </span>
           )}
           {lines.map((line, index) => {
+            const edgeClass = codeBlockEdgeClass(codeEdges, index);
             if (index === clampedIndex) {
               return (
-                <ActiveLine
-                  key={`active-${active.key}`}
+                <LineRow
+                  key={index}
                   index={index}
-                  text={line}
-                  setRef={(el) => {
-                    activeElRef.current = el;
-                  }}
-                  className={`cursor-text ${wrapClass} ${lineTextClass(blocks[index]!)}`}
-                />
+                  numbered={lineNumbers}
+                  current
+                  onSelect={selectLine}
+                  label={t("app.selectLine", { n: index + 1 })}
+                >
+                  <ActiveLine
+                    key={`active-${active.key}`}
+                    index={index}
+                    text={line}
+                    setRef={(el) => {
+                      activeElRef.current = el;
+                    }}
+                    className={`cursor-text ${wrapClass} ${lineTextClass(blocks[index]!)} ${edgeClass}`}
+                  />
+                </LineRow>
               );
             }
             // An at-end attachment reference is drawn in the collected block, not
             // in place; skip its line here. It stays in the source (so indices
             // and structural edits are unaffected) and reveals its raw markdown
-            // when the caret lands on it (making it the active line).
+            // when the caret lands on it (making it the active line). A hidden
+            // line takes its number with it, the way a folded region does.
             if (hidden.has(index) || hiddenFences.has(index)) return null;
+            const code = copyAnchors.get(index);
             return (
-              <div
+              <LineRow
                 key={index}
-                data-line-index={index}
-                className={`cursor-text ${wrapClass}`}
+                index={index}
+                numbered={lineNumbers}
+                current={false}
+                onSelect={selectLine}
+                label={t("app.selectLine", { n: index + 1 })}
               >
-                <RenderedLine
-                  block={blocks[index]!}
-                  shortenLinkChars={shortenLinkChars}
-                  highlights={highlightsByLine.get(index)}
-                />
-              </div>
+                <div
+                  data-line-index={index}
+                  className={`cursor-text ${wrapClass} ${code === undefined ? "" : "relative"}`}
+                >
+                  <RenderedLine
+                    block={blocks[index]!}
+                    shortenLinkChars={shortenLinkChars}
+                    highlights={highlightsByLine.get(index)}
+                    edgeClass={edgeClass}
+                  />
+                  {code !== undefined && (
+                    <CodeCopyButton
+                      code={code}
+                      padded={codeEdges.top.has(index)}
+                    />
+                  )}
+                </div>
+              </LineRow>
             );
           })}
           <div contentEditable={false}>
@@ -1265,6 +1409,61 @@ export function MarkdownEditor({
         </div>
       </div>
     </AttachmentsProvider>
+  );
+}
+
+// One line of the note, optionally carrying its number in the gutter.
+//
+// With numbering off this is the line element itself, so the default editor
+// renders exactly the DOM it always has. With it on, the line is wrapped in a
+// positioning context and the number hangs in the surface's left padding —
+// deliberately a *sibling* of the `[data-line-index]` element rather than a
+// child of it. Everything that reads the editor's text (`offsetWithin` on the
+// active raw line, the caret walker in `placeCaret`, the composition read-back)
+// measures that element's own text, so a digit inside it would shift every
+// column by its width and corrupt each edit.
+function LineRow({
+  index,
+  numbered,
+  current,
+  label,
+  onSelect,
+  children,
+}: {
+  index: number;
+  numbered: boolean;
+  /** This is the line the caret sits on — lit the way a code editor lights it. */
+  current: boolean;
+  label: string;
+  onSelect: (index: number) => void;
+  children: ReactNode;
+}) {
+  if (!numbered) return children;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        // Out of the tab order for the same reason the surface itself is: the
+        // editor hands focus on via `onTabOut`, and one tab stop per line would
+        // make tabbing out of a long note impossible.
+        tabIndex={-1}
+        contentEditable={false}
+        aria-label={label}
+        onMouseDown={(e) => {
+          // Take the press before the browser moves the caret / focus with it,
+          // so the selection we draw is the only one. A tap on a touch screen
+          // arrives here as a synthesized mousedown, so this covers both.
+          e.preventDefault();
+          onSelect(index);
+        }}
+        className={`absolute top-0 -left-12 w-9 cursor-pointer text-right text-xs tabular-nums select-none ${
+          current ? "text-fg-bright" : "text-muted/50 hover:text-muted"
+        }`}
+      >
+        {index + 1}
+      </button>
+      {children}
+    </div>
   );
 }
 

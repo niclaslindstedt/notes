@@ -247,6 +247,7 @@ function coerce(raw: unknown): Appearance {
         typeof editor.renderMarkdown === "boolean"
           ? editor.renderMarkdown
           : DEFAULT_EDITOR_SETTINGS.renderMarkdown,
+      lineNumbers: editor.lineNumbers === true,
       disableSpellcheck: editor.disableSpellcheck === true,
       disableAutocorrect: editor.disableAutocorrect === true,
       trimTrailingSpaces:

@@ -82,9 +82,14 @@ export function HomePage() {
               note is tidied as it's saved — trailing spaces trimmed and a
               closing newline added, both optional in Settings. Long pasted
               links can be shortened in the preview so they don't sprawl across
-              the note — the full link is still saved and still opens. While the
-              app is open, hopping between notes drops you back at the exact
-              spot and cursor position you left each one at.
+              the note — the full link is still saved and still opens. Tapping
+              the text puts the cursor at the end of the word under your finger,
+              which is something a fingertip can actually aim at, while a mouse
+              click lands exactly where you point. Line numbers can be switched
+              on down the editor's left edge, code-editor style, where pressing
+              a number selects that whole line. While the app is open, hopping
+              between notes drops you back at the exact spot and cursor position
+              you left each one at.
             </li>
             <li>
               Reach for the formatting button at the top right of a note to open
@@ -177,6 +182,14 @@ export function HomePage() {
               Settings, the title and body or the whole Markdown file with its
               frontmatter. It stays on your device; the clipboard is written
               locally.
+            </li>
+            <li>
+              Lift a <em>code block</em> out of a note in one tap — every block
+              fenced in <code>```</code> carries a small copy button in its
+              top-right corner that puts the code (and only the code) on your
+              clipboard, without placing the cursor in the note or selecting a
+              line by hand. As with the note copy above, the clipboard is
+              written locally and nothing is sent anywhere.
             </li>
             <li>
               Group notes into separate <em>namespaces</em> — independent

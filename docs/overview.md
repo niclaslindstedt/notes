@@ -305,6 +305,50 @@ verbatim **source** is placed on the clipboard — Markdown syntax and full,
 un-shortened URLs survive the copy rather than the rendered text. See
 [Selection mapping](#selection-mapping).
 
+Where a press *lands* the caret within the line it hit is its own rule — see
+[Caret placement on press](#caret-placement-on-press).
+
+### Caret placement on press
+
+`onSurfaceClick` (`src/ui/MarkdownEditor.tsx`) + `wordEndAt`
+(`src/domain/line-edit.ts`) — how precisely a press is taken, which differs by
+what pressed.
+
+**A mouse keeps the browser's exact column.** Clicking rendered text maps
+through the leaf's `data-src` offset ([selection mapping](#selection-mapping))
+to the character under the pointer, and the press is left there.
+
+**A touch snaps forward to the end of the word it hit.** A fingertip covers
+roughly a word, so which of the characters under it the browser picks out is a
+coin toss — and on a phone there is no way to nudge the caret one character over
+afterwards. `wordEndAt` runs the mapped column out to the end of the run of
+non-whitespace it sits in, giving a position a tap can actually aim at and the
+one **Backspace** works back from. A press that landed *on* whitespace is left
+where it is: that already is the end of the word before it. A "word" is any run
+of non-whitespace, punctuation and Markdown markers included, so tapping inside
+`**bold**` lands past the closing `**` — the end of the word as it is drawn. The
+pointer type comes from the `pointerdown` that opened the press, and only an
+explicit `touch` / `pen` snaps: an engine reporting no `pointerType` is treated
+as a mouse, so a desktop click is never snapped.
+
+**A press on a line the browser can't put a caret in lands at the end of that
+line.** A [horizontal rule](#markdown-parser) renders as a lone `<hr>` with no
+text to anchor in, so the browser drops the caret at the line's start or onto a
+neighbour — leaving nothing to Backspace, and a phone has no forward-delete key,
+so the rule could not be removed at all. Pressing one now takes the end of its
+source line (`---`, caret at column 3), and three Backspaces erase it. This one
+applies to **every** pointer type, mouse included, since the caret the browser
+offers is unusable either way. The same fallback covers any press whose caret
+the browser resolved onto a different line than the one under the pointer.
+
+It runs on `click` rather than `pointerup`: by then the browser has placed its
+own caret (so there is something to read and adjust), and the presses that must
+*not* move the caret never produce one — dragging a selection handle, a
+long-press selection. A press the content already answered (`preventDefault` —
+a [link](#rendered-line) opening, an [attachment](#attachments) opening), a
+ranged selection the press ended on (a drag-select, a double-click's word), and
+a keyboard-synthesised click (`detail === 0`) are all left alone.
+
 ### Selection mapping
 
 `src/ui/markdown-selection.ts` — translates a live-preview DOM selection back
@@ -435,7 +479,8 @@ header.
 ### Editor settings
 
 `EditorSettings` (`src/theme/themes.ts`) — margin (writing-column max width via
-`editorMarginMaxWidth`), `wordWrap`, `renderMarkdown`, `disableSpellcheck`,
+`editorMarginMaxWidth`), `wordWrap`, `renderMarkdown`, `lineNumbers` (see
+[Line numbers](#line-numbers)), `disableSpellcheck`,
 `disableAutocorrect`, `shortenLinkChars` (see [Shorten links](#shorten-links)),
 the `defaultTitle` scheme, and the `copyScope` (see
 [Copy button](#copy-button)). They live in the
@@ -443,10 +488,49 @@ the `defaultTitle` scheme, and the `copyScope` (see
 are edited in the Editor tab of the settings modal, `EditorSection`
 (`src/ui/settings/EditorSection.tsx`), which groups them into focused bordered
 sections (mirroring the General tab) — **New notes** (the default-title scheme),
-**Writing column** (margins, word wrap), **Markdown** (live render + link
-shortening), **Typing aids** (spell-check / auto-correct), **Formatting on
-save** (see [Format on save](#format-on-save)), and **Copying** (the copy scope)
-— see [Storage settings](#storage-settings) and its sibling sections.
+**Writing column** (margins, word wrap), **Markdown** (live render, line
+numbers, link shortening), **Typing aids** (spell-check / auto-correct),
+**Formatting on save** (see [Format on save](#format-on-save)), and **Copying**
+(the copy scope) — see [Storage settings](#storage-settings) and its sibling
+sections.
+
+### Line numbers
+
+Off by default. With the `lineNumbers` editor setting on, the
+[live-preview editor](#markdown-editor) numbers every line in a gutter hanging
+in its left padding, the way a code editor does — the line the caret sits on lit
+brighter than the rest — and each number is a press target that **selects that
+whole line**.
+
+`LineRow` (`src/ui/MarkdownEditor.tsx`) is the whole feature. With the setting
+off it renders its child — the line element — verbatim, so the default editor
+produces exactly the DOM it always has; with it on it wraps the line in a
+positioning context and hangs a `<button>` beside it. That button is
+deliberately a **sibling** of the `[data-line-index]` element rather than a
+child: everything that measures the editor's text works within that element
+(`offsetWithin` on the active raw line, `domPointAt`'s tree walk in
+`placeCaret`, the composition read-back's `textContent` — see
+[Markdown editor](#markdown-editor)), so a digit inside it would shift every
+source column by its width and corrupt each edit. It is `contentEditable={false}`
+and `tabIndex={-1}`, keeping it out of both the editable text and the tab order
+(the editor hands focus on via `onTabOut`, and one tab stop per line would trap
+a long note).
+
+A press runs `selectLine`, which reuses the same machinery a multi-line block
+format does: the line stops being the active raw one, and the whole-line
+selection is queued in `pendingLineSpan` for the layout effect to draw with
+`selectLineSpan` once the re-render lands (with no active line to clear there is
+no re-render to wait for, so it is drawn straight away). The result is an
+ordinary ranged selection over the formatted line, so cut / copy / type-over and
+the styling toolbar all treat it exactly as a hand-drawn one — `spanLine` keeps
+the toolbar reporting the pressed line while no single line is active.
+
+Numbers are the *source* line numbers, so a line hidden from the preview — an
+[at-end attachment](#attachments-at-the-end) reference, or a
+[fence](#code-block) the caret is outside of — takes its number with it, leaving
+a gap the way a folded region does. The Markdown-off
+[plain textarea](#markdown-editor) has no per-line elements to hang a gutter on
+and ignores the setting, which the toggle's hint says outright.
 
 ### Shorten links
 
@@ -543,6 +627,21 @@ hiding something the user needs:
   `RenderedLine` (`src/ui/MarkdownLine.tsx`) then only varies the ink: a
   visible fence is muted (it is markup), the code it wraps is bright (it is
   content).
+- The block's **box is closed at its outermost drawn lines**:
+  `codeBlockEdges(blocks, activeLine)` (`src/domain/markdown.ts`) names the
+  block's first and last drawn line, and `codeBlockEdgeClass`
+  (`src/ui/markdown-line-class.ts`) gives them the rounded corners
+  (`var(--radius)`, so the block follows the user's radius preference) and the
+  vertical padding — top on the first, bottom on the last, so a one-line block
+  closes the box on its own and a tall one keeps its interior lines tight
+  rather than turning airy. The padding is also what gives the block's first
+  row room to hold the [copy button](#code-block-copy-button). Which lines are
+  the edges shifts as the fences fold: with the caret outside they are the
+  first and last *code* lines, with it inside they are the delimiters. An
+  unterminated fence counts from its opener to the end of the note, so a
+  half-typed block reads as a block too. Like `lineTextClass`, the classes go
+  on the active raw line as well, so the caret landing on an edge doesn't
+  change the block's height.
 
 The lines stay in the source throughout — hiding is purely a render-time skip,
 so line indices, structural edits, and [selection
@@ -551,6 +650,51 @@ cheap line-level scan (no blocks built) behind the
 [Fenced in](#unlock-triggers) achievement, which fires the first time a note
 holds a closed block.
 
+### Code block copy button
+
+Every **closed** code block wears a small copy button in its top-right corner,
+so the code can be lifted out with one tap — without placing the caret in the
+note, dragging a selection over the block, or opening the raw source.
+`CodeCopyButton` (`src/ui/CodeCopyButton.tsx`) draws it, and one press puts the
+block's lines on the clipboard through the shared `writeClipboard`
+(`src/ui/clipboard.ts`) — the code **only**, with the ` ``` ` fences and any
+info string (` ```sh `) left off — then flips its glyph to a check for a moment
+to confirm the write. It fires the [Snippet snatcher](#unlock-triggers)
+achievement.
+
+`codeBlockCopyAnchors(blocks, activeLine)` (`src/domain/markdown.ts`) decides
+where each button hangs: it returns a map from a source line index to the code
+that line's button copies, and `MarkdownEditor` renders the button into that
+line's wrapper. Because the editor draws one element per source line (there is
+no per-block container to hang anything off — see [Code block](#code-block)),
+the anchor is the block's first line that *actually renders*: the opening fence
+while it is visible (the caret is inside the block), otherwise the first code
+line under it. The active line is skipped as well — it renders as raw source —
+so the button steps to the line below instead of being planted in the line
+being typed on. A block with nothing between its fences gets no button: there
+is no code to copy.
+
+Living inside the `contenteditable` surface puts three constraints on the
+button, all of them in `CodeCopyButton`:
+
+- It is `contentEditable={false}` and unselectable, so the browser treats it as
+  an atom — it never lands in the note's source, and dragging a selection
+  across the note doesn't sweep it up with the code.
+- Its `mousedown` is cancelled (the same trick [a link in the
+  preview](#rendered-line) uses), so pressing it doesn't roll the caret into
+  the block — which would unfold the block's fences and shuffle it down a line
+  under the user's finger mid-press.
+- It is a `sticky` float on a zero-height rail across the anchor line, centred
+  on that line's first *row* (a code line is a fixed 20px tall) and following
+  the block's own top padding down when the anchor is the block's top edge.
+  Centring on the row rather than on the line's box keeps the button in the
+  corner on a tall or wrapped block and inside the slab on a one-line one —
+  which is why a block pads its [top and bottom edges](#code-block): a bare
+  20px row has no room to hold a 28px button. The stickiness
+  matters when word wrap ([Editor settings](#editor-settings)) is off and the note scrolls sideways —
+  every line is then as wide as the widest line in the note, and without it the
+  button would park a screen or two off to the right where nobody would find
+  it.
 ### Quote continuation
 
 Pressing **Enter** inside a quote opens another quote row, so a passage can be
