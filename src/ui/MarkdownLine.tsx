@@ -311,12 +311,19 @@ function RenderedLineImpl({
   block,
   shortenLinkChars = 0,
   highlights = NO_HIGHLIGHTS,
+  edgeClass = "",
 }: {
   block: LineBlock;
   /** Trim bare URLs to this many characters either side (0 = show in full). */
   shortenLinkChars?: number;
   /** Find-bar hits on this line, in its own source columns (see `markSource`). */
   highlights?: readonly LineHighlight[];
+  /**
+   * The rounded corners / padding this line carries as a code block's top or
+   * bottom edge (`codeBlockEdgeClass`), or "" for every other line. The block's
+   * slab is its lines' stacked backgrounds, so its box is closed here.
+   */
+  edgeClass?: string;
 }) {
   const sizeClass = lineTextClass(block);
 
@@ -390,7 +397,7 @@ function RenderedLineImpl({
     case "code":
       return (
         <div
-          className={`${sizeClass} ${block.kind === "fence" ? "text-muted" : "text-fg-bright"}`}
+          className={`${sizeClass} ${edgeClass} ${block.kind === "fence" ? "text-muted" : "text-fg-bright"}`}
           data-src={0}
         >
           {block.raw.length === 0 ? " " : block.raw}
@@ -429,6 +436,7 @@ export const RenderedLine = memo(
   RenderedLineImpl,
   (a, b) =>
     a.shortenLinkChars === b.shortenLinkChars &&
+    a.edgeClass === b.edgeClass &&
     sameHighlights(a.highlights, b.highlights) &&
     a.block.kind === b.block.kind &&
     a.block.raw === b.block.raw &&

@@ -207,7 +207,7 @@ const achievements: AchievementsCatalog = {
       name: "Arkiveringssystem",
       condition: "Skapa en mapp för att gruppera anteckningar.",
       learnMore:
-        "Mappar grupperar anteckningar inuti en namnrymd — en ”Inloggningsfunktion”, en ”Semester 2025”. Tryck på mappknappen vid Anteckningar-rubriken i sidomenyn för att skapa en, och dra sedan anteckningar till den (eller använd en antecknings ”Flytta till mapp”) för att lägga undan dem. En mapp kan fällas ut för att skapa en ny anteckning direkt i den.",
+        "Mappar grupperar anteckningar inuti en namnrymd — en ”Inloggningsfunktion”, en ”Semester 2025”. Tryck på mappknappen vid Anteckningar-rubriken i sidomenyn för att skapa en, och dra sedan anteckningar till den för att lägga undan dem. En mapp kan fällas ut för att skapa en ny anteckning direkt i den.",
     },
     polyglot: {
       name: "Polyglott",
@@ -232,6 +232,12 @@ const achievements: AchievementsCatalog = {
       condition: "Kopiera en anteckning till urklipp.",
       learnMore:
         "Kopieringsknappen i en antecknings sidhuvud lägger den öppna anteckningen på urklipp. Inställningar → Redigerare väljer hur mycket som tas med — bara brödtexten, titel och brödtext, eller hela .md-filen med dess YAML-frontmatter.",
+    },
+    snippetSnatcher: {
+      name: "Kodsnattare",
+      condition: "Kopiera ett kodblock med dess kopieringsknapp.",
+      learnMore:
+        "Varje stängt kodblock har en liten kopieringsknapp uppe till höger. Ett tryck lägger koden — allt mellan ```-staketen, och inget annat — på urklipp, utan att du behöver placera markören i anteckningen eller markera en enda rad för hand.",
     },
     seeker: {
       name: "Sökare",

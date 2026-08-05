@@ -39,6 +39,9 @@ const app = {
     label: "Copy note",
     copied: "Copied",
   },
+  // The copy button in a fenced code block's top-right corner. It confirms
+  // with the same "Copied" as the header's copy button above.
+  copyCode: "Copy code",
   // Right-click menu entry on a note row: puts the note's own link on the
   // clipboard, so it can be bookmarked or sent to yourself.
   copyLink: "Copy link",

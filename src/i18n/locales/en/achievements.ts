@@ -212,7 +212,7 @@ const achievements = {
       name: "Filing system",
       condition: "Create a folder to group notes.",
       learnMore:
-        "Folders group notes inside a namespace — a “Login feature”, a “Vacation 2025”. Tap the folder button on the Notes heading in the side menu to make one, then drag notes onto it (or use a note's “Move to folder”) to file them away. A folder can expand to make a new note straight inside it.",
+        "Folders group notes inside a namespace — a “Login feature”, a “Vacation 2025”. Tap the folder button on the Notes heading in the side menu to make one, then drag notes onto it to file them away. A folder can expand to make a new note straight inside it.",
     },
     polyglot: {
       name: "Polyglot",
@@ -237,6 +237,12 @@ const achievements = {
       condition: "Copy a note to the clipboard.",
       learnMore:
         "The copy button in a note's header puts the open note on your clipboard. Settings → Editor chooses how much it takes — just the body, the title and body, or the whole .md file with its YAML frontmatter.",
+    },
+    snippetSnatcher: {
+      name: "Snippet snatcher",
+      condition: "Copy a code block with its copy button.",
+      learnMore:
+        "Every closed code block wears a small copy button in its top-right corner. One press puts the code — everything between the ``` fences, and nothing else — on your clipboard, without placing the caret in the note or selecting a single line by hand.",
     },
     seeker: {
       name: "Seeker",

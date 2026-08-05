@@ -6,6 +6,7 @@ import {
   orderPoints,
   pointsEqual,
   replaceRange,
+  wordEndAt,
   type SourcePoint,
 } from "../../src/domain/line-edit.ts";
 
@@ -102,6 +103,43 @@ describe("replaceRange", () => {
     const r = replaceRange(["one", "two"], P(0, 3), P(0, 3), "\n");
     expect(r.lines).toEqual(["one", "", "two"]);
     expect(r.caret).toEqual(P(1, 0));
+  });
+});
+
+describe("wordEndAt", () => {
+  it("runs a column inside a word out to its end", () => {
+    expect(wordEndAt("hello world", 2)).toBe(5);
+  });
+
+  it("leaves a column already at a word end alone", () => {
+    expect(wordEndAt("hello world", 5)).toBe(5);
+  });
+
+  it("leaves a column on whitespace alone (it ends the word before it)", () => {
+    expect(wordEndAt("hello  world", 6)).toBe(6);
+  });
+
+  it("takes the last word out to the end of the line", () => {
+    expect(wordEndAt("hello world", 8)).toBe(11);
+  });
+
+  it("counts Markdown markers as part of the word they wrap", () => {
+    // Tapping inside the drawn word lands past the closing `**`, so the caret
+    // sits where the word visibly ends rather than inside its markup.
+    expect(wordEndAt("a **bold** one", 5)).toBe(10);
+  });
+
+  it("takes a whole horizontal rule as one word", () => {
+    expect(wordEndAt("---", 0)).toBe(3);
+  });
+
+  it("clamps a column outside the line", () => {
+    expect(wordEndAt("one", 99)).toBe(3);
+    expect(wordEndAt("one", -1)).toBe(3);
+  });
+
+  it("stays put on an empty line", () => {
+    expect(wordEndAt("", 0)).toBe(0);
   });
 });
 

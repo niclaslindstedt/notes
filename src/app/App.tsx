@@ -675,11 +675,7 @@ export function App() {
                       key={editing.id}
                       note={editing}
                       editor={editor}
-                      folders={folders}
                       onBack={showAll}
-                      onMoveFolder={(folderId) =>
-                        moveNote(editing.id, folderId)
-                      }
                       onChange={(body) => update(editing.id, body)}
                       onTitleChange={(title) => retitle(editing.id, title)}
                       onTitleSettle={sync.releaseSaves}
