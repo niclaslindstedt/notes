@@ -37,6 +37,32 @@ jobs:
       - run: make test
       - run: make build
 
+  electron:
+    # `electron/` is not an npm workspace member and is in the root eslint
+    # ignores, so `make lint` / `make test` stop at its edge — without this
+    # job, nothing in CI would notice the desktop shell breaking until a
+    # release tried to package it.
+    #
+    # It is plain JavaScript checked with `// @ts-check` against Electron's
+    # own type definitions (see electron/jsconfig.json), so this needs no
+    # build and no browser: the ~100 MB Electron binary download is skipped
+    # because the types ship inside the npm package itself.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: electron
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+
   changeset:
     # Enforces that every PR touching user-visible code drops a
     # changelog fragment under .changes/unreleased/, or opts out via

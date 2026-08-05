@@ -25,10 +25,26 @@ change would add logic to this directory, that is the signal it should be
 solved in the PWA instead — see AGENTS.md, "The wrappers are thin — put the
 logic in the PWA".
 
+## Why it isn't TypeScript
+
+Compiling one file would mean a `dist/`, a build to run before both `electron
+.` and packaging, and a `main` field pointing at generated output — so the
+file that runs would stop being the file you read. Instead `main.js` carries
+`// @ts-check` and [`jsconfig.json`](jsconfig.json) type-checks it against
+Electron's own `electron.d.ts` (which ships in the npm package) with **no
+emit and no build step**. `npm run typecheck` covers `main.js`, the packaging
+config, and the bundle script; the `electron` job in `.github/workflows/ci.yml`
+runs it on every push, since the root `make lint` / `make test` stop at this
+directory's edge.
+
+That check is types only. There are no tests here — the shell is verified by
+running and packaging it.
+
 ## Build and run
 
 ```sh
 npm ci                # from this directory — electron/ has its own dep tree
+npm run typecheck     # type-check main.js and the build scripts (no build step)
 npm run bundle        # build the web app into electron/webroot/
 npm start             # bundle, then launch the shell
 npm run dist          # bundle + package (Linux tar.gz)

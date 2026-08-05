@@ -3,9 +3,13 @@
 // own. Anything that looks like a feature belongs in `../src/`, not here (see
 // AGENTS.md, "The wrappers are thin — put the logic in the PWA").
 //
-// Plain CommonJS rather than TypeScript on purpose: a compile step would mean
-// a tsconfig, a `dist/`, and a build to keep in sync, for one file that only
-// ever calls Electron's own API.
+// Plain CommonJS rather than TypeScript on purpose: compiling one file would
+// mean a `dist/`, a build to run before both `electron .` and packaging, and a
+// `main` field pointing at generated output — so the file that runs would stop
+// being the file you read. `// @ts-check` below buys the type safety without
+// any of that: `npm run typecheck` checks this against Electron's own
+// `electron.d.ts`, with no emit and nothing to keep in sync (see
+// `jsconfig.json`).
 //
 // The one non-obvious choice is the private `notes://app` scheme instead of
 // `loadFile`. Every note lives in `localStorage`, which is keyed by origin,
@@ -14,6 +18,8 @@
 // constant, so an update (or a move to another folder) keeps the same notes.
 // It has to be registered before `ready`; a scheme registered late loads the
 // page as an opaque origin anyway, with no `localStorage` at all.
+
+// @ts-check
 
 const {
   app,
@@ -53,6 +59,9 @@ protocol.registerSchemesAsPrivileged([
  *
  * The containment check is done on the resolved path rather than the raw
  * string, and the decode happens first so a `%2e%2e` cannot slip past it.
+ *
+ * @param {string} pathname The request URL's path, still percent-encoded.
+ * @returns {string | null} An absolute path inside the webroot, or null.
  */
 function webrootFile(pathname) {
   let decoded;
@@ -129,6 +138,7 @@ function loadWindowState() {
   };
 }
 
+/** @param {import("electron").BrowserWindow} win */
 function saveWindowState(win) {
   if (win.isDestroyed()) return;
   // `getNormalBounds`, not `getBounds`: a maximized or full-screen window
@@ -194,7 +204,8 @@ function createWindow() {
 }
 
 /** Hand a URL to the desktop, but only the schemes a link can legitimately
- * use — `shell.openExternal` will launch anything the OS has registered. */
+ * use — `shell.openExternal` will launch anything the OS has registered.
+ * @param {string} url */
 function openExternally(url) {
   const scheme = url.slice(0, url.indexOf(":") + 1);
   if (["http:", "https:", "mailto:"].includes(scheme))

@@ -477,9 +477,10 @@ the renderer can see. Keep it that way.
 So when a feature request arrives while you are working in a wrapper:
 
 - **Build it in `src/`** and let both wrappers pick it up for free. A feature
-  written in the shell exists on one platform, is untested (the wrappers are
-  outside `make lint` / `make test`), and has to be written again for the
-  other shell and for the web.
+  written in the shell exists on one platform, is barely verified (both
+  wrappers are outside `make lint` / `make test`; `electron/` gets a
+  types-only check from the `electron` CI job and neither has any tests), and
+  has to be written again for the other shell and for the web.
 - **If it genuinely cannot be done in a web page**, add the *smallest possible*
   capability to the wrapper, expose it through the platform seam, and put the
   decision of when to use it in `src/` — the wrapper answers a question, it
