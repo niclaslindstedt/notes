@@ -93,11 +93,11 @@ export function ImportIcon({ className }: IconProps) {
 }
 
 /**
- * A cross followed by a stroke — "X—", the editor's delete-line button. Reads
- * as taking a line of text away rather than the note itself, which is what the
- * trash can already means everywhere else in the app.
+ * A cross followed by a stroke — "X—", the editor's cut button. Reads as taking
+ * a run of text away rather than the note itself, which is what the trash can
+ * already means everywhere else in the app.
  */
-export function DeleteLineIcon({ className }: IconProps) {
+export function CutIcon({ className }: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"

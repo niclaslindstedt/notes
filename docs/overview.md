@@ -622,37 +622,50 @@ case reuses the [markdown codec](#markdown-codec)'s `noteToMarkdown` so a copied
 note is byte-identical to its on-disk file. Copying is the **Copycat**
 achievement (fired via `unlock("copycat")`).
 
-### Delete-line button
+### Cut button
 
-`DeleteLineButton` (`src/ui/DeleteLineButton.tsx`) — the "X—" glyph immediately
-left of the [copy button](#copy-button) in the editor header. It removes the
-line the caret sits on, because clearing a line by hand is otherwise a
-select-and-erase or a held Backspace. `Ctrl/Cmd+K` is the same edit from the
-keyboard, bound by each editing surface itself (so the browser only loses the
-shortcut while the note body has focus). Neither is offered in the read-only
-archived-note view (see [Archive view](#archive-view)), and the button is
-withheld while a note is still [decrypting](#encryption) — there is no surface
-to cut in.
+`CutButton` (`src/ui/CutButton.tsx`) — the "X—" glyph immediately left of the
+[copy button](#copy-button) in the editor header. It cuts at the caret: what it
+takes leaves the note *and* lands on the clipboard, because clearing a line by
+hand is otherwise a select-and-erase or a held Backspace, and text you pulled
+out is text you often want to put somewhere else. `Ctrl/Cmd+K` is the same edit
+from the keyboard, bound by each editing surface itself (so the browser only
+loses the shortcut while the note body has focus). Neither is offered in the
+read-only archived-note view (see [Archive view](#archive-view)), and the button
+is withheld while a note is still [decrypting](#encryption) — there is no
+surface to cut in.
 
-What exactly goes is decided by the pure `deleteLine`
-(`src/domain/line-edit.ts`), so both surfaces agree:
+What exactly goes is decided by the pure `cutLine` (`src/domain/line-edit.ts`),
+so both surfaces agree:
 
+- **A ranged selection** — exactly what is highlighted goes, to the column, and
+  the caret lands where the selection started. What you can see is selected is
+  what ends up on the clipboard. In the [live-preview
+  editor](#markdown-editor) a selection reaching a line's content start is first
+  snapped over that line's block marker (`snapStartToLineEdge`), so cutting a
+  bulleted line takes its `- ` too.
 - **Caret in the middle of a line** — only the text *after* it goes, and the
   caret stays at its column. This is the kill-to-end-of-line every terminal
-  binds to Ctrl+K, and it's what makes the button useful for dropping the rest
+  binds to Ctrl+K, and it's what makes the button useful for lifting the rest
   of a sentence rather than only whole lines.
 - **Caret at either end of a line** — the whole line goes, newline and all, so
-  the lines below move up. At the end of a line trimming the tail would delete
+  the lines below move up. At the end of a line trimming the tail would cut
   nothing, and a button that sometimes does nothing reads as broken.
-- **A ranged selection** — every line it touches goes; an endpoint resting at
-  column 0 hasn't visually taken that line, so it survives.
 
-The caret lands at the start of whichever line moved up into the gap (or at the
-end of the new last line when the note's tail was what went), which is what lets
-presses repeat: hold the button (or Ctrl+K) and lines peel off one after
-another. A one-line note empties to a single blank line rather than to no lines
-at all, and the edit runs through the same commit path as typing — so it is one
-step on the [undo timeline](#undo--redo) and syncs like any other edit.
+A whole line is cut *with* its trailing newline, so pasting it back re-creates a
+line rather than splicing it into the one the caret is on; a selection is cut
+verbatim. The text goes out through `writeClipboard` (`src/ui/clipboard.ts`,
+shared with the [copy button](#copy-button)) and the write is deliberately
+fire-and-forget — a refused or unavailable clipboard must not hold up the edit,
+and [undo](#undo--redo) is right there.
+
+After a whole-line cut the caret lands at the start of whichever line moved up
+into the gap (or at the end of the new last line when the note's tail was what
+went), which is what lets presses repeat: hold the button (or Ctrl+K) and lines
+peel off one after another. A one-line note empties to a single blank line
+rather than to no lines at all, and the edit runs through the same commit path
+as typing — so it is one step on the [undo timeline](#undo--redo) and syncs like
+any other edit.
 
 Like the [styling toolbar](#styling-toolbar)'s buttons, the header button cancels
 its own `mousedown`: the press must not blur the editing surface, or there would
@@ -667,7 +680,7 @@ does nothing rather than guess at a line. Cutting something unlocks the
 one button per Markdown construct the app renders, brought up by the
 `FormatToolbarButton` sitting top-right in the editor header (after the
 [find bar](#find-in-note)'s magnifier, before the
-[delete-line](#delete-line-button) and [copy](#copy-button) buttons). Pressing that button opens the toolbar; pressing it
+[cut](#cut-button) and [copy](#copy-button) buttons). Pressing that button opens the toolbar; pressing it
 again takes it away, and the choice is remembered across notes and reloads under
 the `notes/format-toolbar` localStorage key.
 

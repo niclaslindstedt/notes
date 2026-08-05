@@ -21,7 +21,7 @@ import {
   CloudIcon,
   CodeIcon,
   CopyIcon,
-  DeleteLineIcon,
+  CutIcon,
   ImportIcon,
   PaletteIcon,
   PlusIcon,
@@ -392,4 +392,4 @@ export const CopyGlyph: Glyph = CopyIcon;
 export const SearchGlyph: Glyph = SearchIcon;
 export const FormatGlyph: Glyph = FormatIcon;
 export const LinkGlyph: Glyph = LinkFormatIcon;
-export const DeleteLineGlyph: Glyph = DeleteLineIcon;
+export const CutGlyph: Glyph = CutIcon;

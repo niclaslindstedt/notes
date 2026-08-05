@@ -176,7 +176,7 @@ function FindBarButton({
 
 /**
  * The bar's toggle, sitting in the editor header beside the formatting, copy
- * and delete-line glyphs. Pressing it opens the bar (which takes focus and
+ * and cut glyphs. Pressing it opens the bar (which takes focus and
  * raises the keyboard); pressing it again puts it away. It reads as "on" while
  * the bar is up, so the header says which state you're in.
  *
