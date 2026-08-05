@@ -9,6 +9,7 @@ import {
 import { useT } from "../i18n/index.ts";
 import { useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSwipeReveal } from "./hooks/useSwipeReveal.ts";
+import { LinkGlyph } from "./format-glyphs.tsx";
 import { RowActionMenu } from "./RowActionMenu.tsx";
 import {
   ArchiveIcon,
@@ -450,6 +451,7 @@ export function SwipeToRemove({
   archiveLabel,
   onRemove,
   onArchive,
+  onCopyLink,
   children,
 }: {
   /** Accessible label for the trash button. */
@@ -458,6 +460,9 @@ export function SwipeToRemove({
   archiveLabel: string;
   onRemove: () => void | Promise<void>;
   onArchive: () => void;
+  /** Copy this note's link — desktop right-click menu only, since the swipe
+   * layout has no room for a third outcome. Omitted, the entry isn't shown. */
+  onCopyLink?: () => void;
   children: ReactNode;
 }) {
   const t = useT();
@@ -481,6 +486,15 @@ export function SwipeToRemove({
             icon: <ArchiveIcon className="h-5 w-5" />,
             onSelect: onArchive,
           },
+          ...(onCopyLink
+            ? [
+                {
+                  label: t("app.copyLink"),
+                  icon: <LinkGlyph className="h-5 w-5" />,
+                  onSelect: onCopyLink,
+                },
+              ]
+            : []),
           {
             label: actionLabel,
             icon: <TrashIcon className="h-5 w-5" />,

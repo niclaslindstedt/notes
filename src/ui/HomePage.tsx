@@ -124,10 +124,11 @@ export function HomePage() {
             </li>
             <li>
               Every note has its own <em>address</em>, so you can copy the link
-              out of the address bar and reopen that exact note later from a
-              bookmark, a calendar entry, or a message to yourself. The address
-              lives after the <code className="text-fg-bright">#</code>, so it
-              is never sent to any server, and it only opens the note on a
+              — out of the address bar, or with <em>Copy link</em> in a
+              note&apos;s right-click menu — and reopen that exact note later
+              from a bookmark, a calendar entry, or a message to yourself. The
+              address lives after the <code className="text-fg-bright">#</code>,
+              so it is never sent to any server, and it only opens the note on a
               device that already has it — your notes are not published or
               shared by a link.
             </li>

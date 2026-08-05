@@ -39,6 +39,7 @@ import {
   applyFaviconHref,
   namespaceFaviconHref,
 } from "../ui/namespace-favicon.ts";
+import { writeClipboard } from "../ui/clipboard.ts";
 import { NavContext } from "../ui/nav-context.ts";
 import { APP_VIEWPORT_RECT } from "../ui/appViewportRect.ts";
 import { ArchiveList, ReadOnlyNote } from "../ui/ArchivedNoteView.tsx";
@@ -64,6 +65,7 @@ import {
   LIST_ROUTE,
   noteRoute,
   routeNamespace,
+  routeUrl,
   useRoute,
   type Route,
 } from "./use-route.ts";
@@ -478,6 +480,20 @@ export function App() {
     go(ARCHIVE_ROUTE);
   }
 
+  // Put a note's own link on the clipboard — the desktop right-click menu's
+  // "Copy link", so the address can be grabbed without going to the note and
+  // reading the bar. An archived note gets its read-only address, matching
+  // where opening it actually lands.
+  function copyNoteLink(id: string) {
+    const note = allNotes.find((n) => n.id === id);
+    if (!note) return;
+    const ns = storage.activeNamespace;
+    const route: Route = note.archived
+      ? { kind: "archived", ns, id }
+      : { kind: "note", ns, id };
+    void writeClipboard(routeUrl(route));
+  }
+
   // Open an archived note read-only (tapped from the archive page).
   function openRead(id: string) {
     go({ kind: "archived", ns: storage.activeNamespace, id });
@@ -626,6 +642,7 @@ export function App() {
                   onAddNote={openNew}
                   onRemoveNote={removeNote}
                   onArchiveNote={archiveNote}
+                  onCopyNoteLink={copyNoteLink}
                   archivedCount={archived.length}
                   onOpenArchive={openArchive}
                   archiveActive={view === "archive" && !editing}
@@ -685,6 +702,7 @@ export function App() {
                       onOpen={openRead}
                       onRestore={restoreNote}
                       onDelete={removeNote}
+                      onCopyLink={copyNoteLink}
                       onBack={() => backTo(LIST_ROUTE)}
                       syncSlot={syncSlot}
                     />
@@ -697,6 +715,7 @@ export function App() {
                       onNew={openNew}
                       onArchive={archiveNote}
                       onDelete={removeNote}
+                      onCopyLink={copyNoteLink}
                       onMoveNote={moveNote}
                       onRenameFolder={renameFolder}
                       onRemoveFolder={removeFolder}

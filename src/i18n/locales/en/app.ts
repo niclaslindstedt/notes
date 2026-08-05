@@ -36,6 +36,9 @@ const app = {
     label: "Copy note",
     copied: "Copied",
   },
+  // Right-click menu entry on a note row: puts the note's own link on the
+  // clipboard, so it can be bookmarked or sent to yourself.
+  copyLink: "Copy link",
   // The editor's delete-line button (left of the copy button) and its
   // Ctrl/Cmd+K shortcut. Mid-line it clears only what follows the caret.
   deleteLine: "Delete line",

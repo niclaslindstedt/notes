@@ -115,6 +115,18 @@ function urlFor(route: Route): string {
   return `${pathname}${search}${routeToHash(route)}`;
 }
 
+/**
+ * The full link to a route — what "Copy link" puts on the clipboard. Built off
+ * the deploy slot's base (`/`, `/preview/`, …) rather than the current path, so
+ * the link is the app's own address plus the route, with no query string from
+ * however this tab happened to be opened.
+ */
+export function routeUrl(route: Route): string {
+  const base = new URL(import.meta.env.BASE_URL, window.location.origin).href;
+  const root = base.endsWith("/") ? base : `${base}/`;
+  return `${root}${routeToHash(route)}`;
+}
+
 // ── The history entry ──────────────────────────────────────────────────────
 
 // What we stash on each history entry. `seq` is the entry's position in the

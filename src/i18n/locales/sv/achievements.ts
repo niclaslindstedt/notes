@@ -238,7 +238,7 @@ const achievements: AchievementsCatalog = {
       name: "Direktlänk",
       condition: "Öppna en länk som går rakt till en anteckning.",
       learnMore:
-        "Anteckningen du har öppen har en egen adress — kopiera den från adressfältet så öppnas exakt den anteckningen igen senare, från ett bokmärke, en kalenderpost eller ett meddelande till dig själv. Länken bär även namnrymden, så att följa en växlar till rätt namnrymd först; en länk till en namnrymd som den här enheten inte har landar helt enkelt i översikten. Adressen ligger efter # och skickas därför aldrig till någon server, och den fungerar bara där dina anteckningar redan finns — länken är en genväg för dig, inte ett sätt att dela en anteckning med någon annan.",
+        "Anteckningen du har öppen har en egen adress — kopiera den från adressfältet, eller högerklicka på en anteckning och välj ”Kopiera länk”, så öppnas exakt den anteckningen igen senare, från ett bokmärke, en kalenderpost eller ett meddelande till dig själv. Länken bär även namnrymden, så att följa en växlar till rätt namnrymd först; en länk till en namnrymd som den här enheten inte har landar helt enkelt i översikten. Adressen ligger efter # och skickas därför aldrig till någon server, och den fungerar bara där dina anteckningar redan finns — länken är en genväg för dig, inte ett sätt att dela en anteckning med någon annan.",
     },
 
     // ── Proffs ────────────────────────────────────────────────────────

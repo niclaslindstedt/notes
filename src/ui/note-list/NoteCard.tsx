@@ -11,6 +11,7 @@ import { useAppearance } from "../../theme/useTheme.ts";
 import { useMediaQuery } from "../hooks/useMediaQuery.ts";
 import { useRowSwipe } from "../hooks/useRowSwipe.ts";
 import { RowActionMenu } from "../RowActionMenu.tsx";
+import { LinkGlyph } from "../format-glyphs.tsx";
 import { LockIcon, NoteIcon, SpinnerIcon, TrashIcon } from "../icons.tsx";
 
 function NoteLock({ loaded }: { loaded: boolean }) {
@@ -141,6 +142,7 @@ export function SwipeableNoteCard({
   onOpen,
   onPrimary,
   onDelete,
+  onCopyLink,
   primaryLabel,
   primaryIcon,
   encrypted = false,
@@ -151,6 +153,9 @@ export function SwipeableNoteCard({
   /** The swipe-right outcome — archive in the overview, restore in the archive. */
   onPrimary: () => void;
   onDelete: () => void;
+  /** Copy this note's link — desktop right-click menu only, since the swipe
+   * layout has no room for a third outcome. Omitted, the entry isn't shown. */
+  onCopyLink?: () => void;
   /** Backdrop label revealed by the swipe-right gesture. */
   primaryLabel: string;
   /** Backdrop icon revealed by the swipe-right gesture. */
@@ -174,6 +179,17 @@ export function SwipeableNoteCard({
         ariaLabel={t("app.noteActions")}
         actions={[
           { label: primaryLabel, icon: primaryIcon, onSelect: onPrimary },
+          // Only where a link can be built (the app supplies the handler; a
+          // card rendered on its own has no route to name).
+          ...(onCopyLink
+            ? [
+                {
+                  label: t("app.copyLink"),
+                  icon: <LinkGlyph className="h-4 w-4" />,
+                  onSelect: onCopyLink,
+                },
+              ]
+            : []),
           {
             label: t("app.delete"),
             icon: <TrashIcon className="h-4 w-4" />,

@@ -119,7 +119,7 @@ Honour these when naming a new file, key, or string.
 | **Settings sync** / **theme travels with the folder**      | `useSettingsSync` (`src/app/use-settings-sync.ts`); `SettingsStore` (`src/storage/settings-store.ts`). [→](overview.md#settings-sync) |
 | **Nav state** / **drawer open state**                      | `useNavState`, `NavContextValue` (`src/app/use-nav.ts`, `src/ui/nav-context.ts`). [→](overview.md#nav-state) |
 | **Route** / **router** / **browser back** / **back button** / **back and forward** / **go back to the previous note** / **history entry** | `Route`, `useRoute`, `go` / `replace` / `backTo`, `noteRoute` (`src/app/use-route.ts`); projected to `editingId` / `readingId` / `view` in `src/app/App.tsx`; the `retrace` achievement. [→](overview.md#route--note-link--browser-back--forward) |
-| **Note link** / **URL to a note** / **link a note to myself** / **deep link** / **address bar** / **bookmark a note** / **the hash** | `routeToHash` / `hashToRoute` (`#/n/<ns>/<id>`), `routeNamespace`, `fromLink` (`src/app/use-route.ts`); the namespace-switch effect in `src/app/App.tsx`; the `deepLink` achievement. [→](overview.md#route--note-link--browser-back--forward) |
+| **Note link** / **URL to a note** / **link a note to myself** / **deep link** / **address bar** / **bookmark a note** / **the hash** / **Copy link** | `routeToHash` / `hashToRoute` (`#/n/<ns>/<id>`), `routeNamespace`, `routeUrl`, `fromLink` (`src/app/use-route.ts`); the namespace-switch effect and `copyNoteLink` in `src/app/App.tsx`; `writeClipboard` (`src/ui/clipboard.ts`); the `deepLink` achievement. [→](overview.md#route--note-link--browser-back--forward) |
 
 ## Navigation, drawer, and gestures
 
@@ -132,7 +132,7 @@ Honour these when naming a new file, key, or string.
 | **Swipe the drawer closed** / **drag to close**            | `useDrawerSwipeClose` (`src/ui/hooks/useDrawerSwipeClose.ts`). [→](overview.md#drawer-swipe-to-close)         |
 | **Swipe to archive** / **swipe to delete** (note card)     | `useRowSwipe` (`src/ui/hooks/useRowSwipe.ts`); desktop uses the right-click menu instead. [→](overview.md#row-swipe) |
 | **Swipe to remove** (sidebar row)                          | `useSwipeReveal` (`src/ui/hooks/useSwipeReveal.ts`); desktop uses the right-click menu instead. [→](overview.md#swipe-reveal-sidebar) |
-| **Right-click menu** / **context menu** / **row actions** (desktop) | `RowActionMenu` (`src/ui/RowActionMenu.tsx`); built on `FloatingPanel`. [→](overview.md#right-click-menu) |
+| **Right-click menu** / **context menu** / **row actions** (desktop) | `RowActionMenu` (`src/ui/RowActionMenu.tsx`); built on `FloatingPanel`; its **Copy link** entry is `onCopyLink` on `SwipeableNoteCard` / `SwipeToRemove`, fed by `copyNoteLink` in `src/app/App.tsx`. [→](overview.md#right-click-menu) |
 | **Pull to refresh** / **pull down to sync**                | `usePullToRefresh` (`src/ui/hooks/usePullToRefresh.ts`); `PullToRefreshIndicator` (`src/ui/PullToRefreshIndicator.tsx`). [→](overview.md#pull-to-refresh) |
 | **Pinned sidebar** / **docked on tablet** / **media query** | `pinned` in `nav-context.ts`; `useMediaQuery` (`src/ui/hooks/useMediaQuery.ts`). [→](overview.md#pinned-sidebar) |
 | **Viewport height** / **soft-keyboard height** / **scroll a tapped line / field clear of the keyboard** | `useViewportHeight` (`src/ui/hooks/useViewportHeight.ts`); `appViewportRect` (`src/ui/appViewportRect.ts`); `scrollFocusedIntoView` (`src/ui/hooks/scrollFocusedIntoView.ts`). [→](overview.md#viewport-height) |

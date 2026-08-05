@@ -9,6 +9,7 @@ import {
   noteRoute,
   routeNamespace,
   routeToHash,
+  routeUrl,
   sameRoute,
   useRoute,
   type Route,
@@ -252,6 +253,17 @@ describe("route helpers", () => {
     ]) {
       expect(hashToRoute(routeToHash(route))).toEqual(route);
     }
+  });
+
+  it("builds the full link 'Copy link' puts on the clipboard", () => {
+    // Off the deploy slot's base, not the current path — so a tab opened with
+    // a query string, or sitting on another note, still yields the app's own
+    // address plus this route.
+    expect(routeUrl(NOTE_A)).toBe(`${window.location.origin}/#/n/work/a`);
+    expect(routeUrl({ kind: "archived", ns: "work", id: "old" })).toBe(
+      `${window.location.origin}/#/archive/work/old`,
+    );
+    expect(routeUrl(LIST_ROUTE)).toBe(`${window.location.origin}/`);
   });
 
   it("escapes and unescapes the parts of an address", () => {

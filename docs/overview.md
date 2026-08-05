@@ -1073,7 +1073,9 @@ switches surfaces on a plain value — `Route` is `{ kind: "list" }`,
   and Back returns to A). Android's back button and the desktop keyboard
   shortcut ride the same history.
 - **an open note has a link** you can copy out of the address bar and reopen
-  later — bookmark it, or send it to yourself.
+  later — bookmark it, or send it to yourself. On a computer the note's
+  [right-click menu](#right-click-menu) also carries a **Copy link** entry, so
+  the address can be grabbed without opening the note.
 
 There is no routing library and the tree stays a single mounted shell.
 
@@ -1129,6 +1131,13 @@ Three verbs, so each caller says what kind of move it is:
   archive's, "Show all"): steps the browser back when the entry behind is
   exactly `target`, otherwise navigates. Keeps list → note → back → note from
   growing the stack each round.
+
+`copyNoteLink` in `App` is what that menu entry calls: it resolves the id to a
+route (an archived note gets its read-only address, matching where opening it
+lands) and writes `routeUrl(route)` — the deploy slot's base plus the hash, not
+whatever path this tab happens to sit on — through
+`writeClipboard` (`src/ui/clipboard.ts`, shared with the editor's
+[copy button](#copy-button)).
 
 `App` passes an `onPop` that runs the same side effects an in-app tap does for
 any move the app didn't initiate — a Back / Forward step, or a hash pasted into
@@ -1236,8 +1245,10 @@ the overview card, `SwipeToRemove` swaps the swipe for a
 two swipe gestures above. On a hover/fine-pointer device both the overview
 card (`SwipeableNoteCard`) and the side-menu row (`SwipeToRemove`) wrap their
 content in this component instead of arming a swipe: right-clicking the row
-opens a menu of the same actions — archive/restore and delete — and a plain
-click still opens/selects the note. It is built on the same
+opens a menu of the same actions — archive/restore and delete — plus
+**Copy link**, which puts the note's own address on the clipboard (see
+[route / note link](#route--note-link--browser-back--forward)); a plain click
+still opens/selects the note. It is built on the same
 [`FloatingPanel`](#custom-dropdown) the custom dropdown uses (anchored to the
 row, portalled to `document.body` so it escapes the drawer's `translateX`,
 Escape / outside-click to dismiss, arrow-key nav), and fires the `rightClick`

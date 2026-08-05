@@ -98,6 +98,32 @@ describe("SwipeableNoteCard", () => {
     expect(onDelete).not.toHaveBeenCalled();
   });
 
+  it("offers Copy link between the two, but only when there's a link", () => {
+    stubMatchMedia(true);
+    const onCopyLink = vi.fn();
+    render(
+      <SwipeableNoteCard
+        note={note()}
+        onOpen={vi.fn()}
+        onPrimary={vi.fn()}
+        onDelete={vi.fn()}
+        onCopyLink={onCopyLink}
+        primaryLabel="Archive"
+        primaryIcon={null}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByText("Groceries"));
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+      "Archive",
+      "Copy link",
+      "Delete",
+    ]);
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy link" }));
+    expect(onCopyLink).toHaveBeenCalledTimes(1);
+  });
+
   it("exposes the swipe backdrops and a delete button on touch devices", () => {
     stubMatchMedia(false);
     const onDelete = vi.fn();

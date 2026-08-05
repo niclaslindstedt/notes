@@ -242,7 +242,7 @@ const achievements = {
       name: "Deep link",
       condition: "Open a link that goes straight to a note.",
       learnMore:
-        "The note you have open has its own address — copy it out of the address bar and it reopens that exact note later, from a bookmark, a calendar entry, or a message to yourself. The link carries the namespace too, so following one switches to the right namespace first; a link to a namespace this device doesn't have simply lands on the overview. The address lives after the # so it is never sent to any server, and it only works where your notes already are — the link is a shortcut for you, not a way to share a note with someone else.",
+        "The note you have open has its own address — copy it out of the address bar, or right-click any note for “Copy link”, and it reopens that exact note later, from a bookmark, a calendar entry, or a message to yourself. The link carries the namespace too, so following one switches to the right namespace first; a link to a namespace this device doesn't have simply lands on the overview. The address lives after the # so it is never sent to any server, and it only works where your notes already are — the link is a shortcut for you, not a way to share a note with someone else.",
     },
 
     // ── Pro ───────────────────────────────────────────────────────────
