@@ -232,7 +232,13 @@ const achievements: AchievementsCatalog = {
       condition:
         "Använd webbläsarens bakåtknapp för att gå till en anteckning.",
       learnMore:
-        "Varje förflyttning du gör — att öppna en anteckning, hoppa till en annan, kliva in i arkivet — lämnar ett steg i webbläsarens historik, så bakåtknappen tar dig genom anteckningarna du besökt (och framåtknappen tillbaka ut igen). Det fungerar med bakåtknappen, tangentbordsgenvägen och Androids bakåtgest. Adressfältet ändras aldrig: anteckningar stannar på den här enheten, så det finns ingen länk till en anteckning att dela ut.",
+        "Varje förflyttning du gör — att öppna en anteckning, hoppa till en annan, kliva in i arkivet — lämnar ett steg i webbläsarens historik, så bakåtknappen tar dig genom anteckningarna du besökt (och framåtknappen tillbaka ut igen). Det fungerar med bakåtknappen, tangentbordsgenvägen och Androids bakåtgest.",
+    },
+    deepLink: {
+      name: "Direktlänk",
+      condition: "Öppna en länk som går rakt till en anteckning.",
+      learnMore:
+        "Anteckningen du har öppen har en egen adress — kopiera den från adressfältet så öppnas exakt den anteckningen igen senare, från ett bokmärke, en kalenderpost eller ett meddelande till dig själv. Länken bär även namnrymden, så att följa en växlar till rätt namnrymd först; en länk till en namnrymd som den här enheten inte har landar helt enkelt i översikten. Adressen ligger efter # och skickas därför aldrig till någon server, och den fungerar bara där dina anteckningar redan finns — länken är en genväg för dig, inte ett sätt att dela en anteckning med någon annan.",
     },
 
     // ── Proffs ────────────────────────────────────────────────────────

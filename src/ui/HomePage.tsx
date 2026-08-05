@@ -120,9 +120,16 @@ export function HomePage() {
             <li>
               Your browser&apos;s <em>Back</em> and <em>Forward</em> walk the
               notes you have visited — open one note, then another, and Back
-              returns you to the first (Android&apos;s back gesture too). The
-              address bar never changes: your notes stay on your device, so
-              there is no per-note link to share.
+              returns you to the first (Android&apos;s back gesture too).
+            </li>
+            <li>
+              Every note has its own <em>address</em>, so you can copy the link
+              out of the address bar and reopen that exact note later from a
+              bookmark, a calendar entry, or a message to yourself. The address
+              lives after the <code className="text-fg-bright">#</code>, so it
+              is never sent to any server, and it only opens the note on a
+              device that already has it — your notes are not published or
+              shared by a link.
             </li>
             <li>
               On a computer, drag and drop Markdown files anywhere onto the app

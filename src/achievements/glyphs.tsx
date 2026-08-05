@@ -29,7 +29,10 @@ import {
   SearchIcon,
   UndoIcon,
 } from "../ui/icons.tsx";
-import { FormatIcon } from "../ui/format-glyphs.tsx";
+import {
+  FormatIcon,
+  LinkGlyph as LinkFormatIcon,
+} from "../ui/format-glyphs.tsx";
 
 // Every glyph is a function component taking an optional `className`, so a
 // caller controls size and colour through Tailwind utilities (the strokes
@@ -374,4 +377,5 @@ export const PaletteGlyph: Glyph = PaletteIcon;
 export const CopyGlyph: Glyph = CopyIcon;
 export const SearchGlyph: Glyph = SearchIcon;
 export const FormatGlyph: Glyph = FormatIcon;
+export const LinkGlyph: Glyph = LinkFormatIcon;
 export const DeleteLineGlyph: Glyph = DeleteLineIcon;

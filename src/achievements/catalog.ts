@@ -32,6 +32,7 @@ import {
   ImportGlyph,
   KeyGlyph,
   LayersGlyph,
+  LinkGlyph,
   LockGlyph,
   MedalGlyph,
   MergeGlyph,
@@ -430,6 +431,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     // Fired when a browser Back / Forward step lands back on a note (the pop
     // handler in `App`) — session history lives outside the document, so
     // there is nothing to derive it from.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "deepLink",
+    tier: "intermediate",
+    glyph: LinkGlyph,
+    learnMore: true,
+    // Fired when the app applies a route it read from the address bar — a
+    // note link opened cold or pasted in while running (`fromLink` in
+    // `useRoute`), which is invisible to the document.
     trigger: { kind: "manual" },
   },
   {

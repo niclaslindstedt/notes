@@ -236,7 +236,13 @@ const achievements = {
       name: "Retrace",
       condition: "Use your browser's Back button to return to a note.",
       learnMore:
-        "Every move you make — opening a note, hopping to another, stepping into the archive — leaves a step in your browser's history, so Back walks you through the notes you visited (and Forward walks you out again). It works with the back button, the keyboard shortcut, and Android's back gesture. The address bar never changes: notes stay private to this device, so there is no link to a note to hand out.",
+        "Every move you make — opening a note, hopping to another, stepping into the archive — leaves a step in your browser's history, so Back walks you through the notes you visited (and Forward walks you out again). It works with the back button, the keyboard shortcut, and Android's back gesture.",
+    },
+    deepLink: {
+      name: "Deep link",
+      condition: "Open a link that goes straight to a note.",
+      learnMore:
+        "The note you have open has its own address — copy it out of the address bar and it reopens that exact note later, from a bookmark, a calendar entry, or a message to yourself. The link carries the namespace too, so following one switches to the right namespace first; a link to a namespace this device doesn't have simply lands on the overview. The address lives after the # so it is never sent to any server, and it only works where your notes already are — the link is a shortcut for you, not a way to share a note with someone else.",
     },
 
     // ── Pro ───────────────────────────────────────────────────────────

@@ -63,6 +63,7 @@ import {
   ARCHIVE_ROUTE,
   LIST_ROUTE,
   noteRoute,
+  routeNamespace,
   useRoute,
   type Route,
 } from "./use-route.ts";
@@ -76,8 +77,9 @@ import { useUploadStatus } from "./use-upload-status.ts";
 // overview, the archive page (the same overview filtered to archived notes — a
 // real page, not a modal, so the side menu's edge-swipe still works over it),
 // a full-screen editor (`editingId`), or a read-only view of an archived note
-// (`readingId`). `useRoute` mirrors that value into the browser's session
-// history, so Back / Forward walk the notes you visited (see `use-route.ts`).
+// (`readingId`). `useRoute` gives that value an address and a history entry,
+// so Back / Forward walk the notes you visited and an open note has a link you
+// can send yourself (see `use-route.ts`).
 // `NavContext` carries the drawer state down to `SideMenu`; `ModalBusProvider`
 // lets any button open the settings dialog without threading openers through
 // the tree.
@@ -114,14 +116,15 @@ export function App() {
     }),
     [editor.trimTrailingSpaces, editor.trailingNewline],
   );
-  // Which surface the main area shows, as a browser history entry: every move
-  // between the overview, a note, the archive, and an archived note leaves a
-  // back step, so Back / Forward (and Android's back button) walk the notes
-  // you visited. The initial route restores the note that was open in the
-  // active namespace before the last reload / PWA upgrade, so a refresh lands
-  // back where you left off instead of dropping to the overview. Once the
-  // (possibly async-loading) document arrives, `editing` below resolves the id
-  // to the note; a stale id (the note was deleted elsewhere) simply resolves to
+  // Which surface the main area shows, as an addressed browser history entry:
+  // every move between the overview, a note, the archive, and an archived note
+  // leaves a back step (so Back / Forward walk the notes you visited) and puts
+  // the open note's link in the address bar. The initial route comes from that
+  // link when there is one, else from the note that was open in the active
+  // namespace before the last reload / PWA upgrade, so a refresh lands back
+  // where you left off instead of dropping to the overview. Once the (possibly
+  // async-loading) document arrives, `editing` below resolves the id to the
+  // note; a stale id (the note was deleted elsewhere) simply resolves to
   // nothing and falls back to the overview. Declared before `useNotes` so the
   // open note scopes its undo timeline (undo/redo act on the note you're
   // looking at). A Back / Forward step is applied through `popHandlerRef`,
@@ -130,21 +133,52 @@ export function App() {
   const handlePop = useCallback((next: Route) => {
     popHandlerRef.current(next);
   }, []);
-  const { route, go, replace, backTo } = useRoute({
-    initial: () => noteRoute(getActiveNote(storage.activeNamespace)),
-    namespace: storage.activeNamespace,
+  const { route, fromLink, go, replace, backTo } = useRoute({
+    initial: () =>
+      noteRoute(
+        getActiveNote(storage.activeNamespace),
+        storage.activeNamespace,
+      ),
     onPop: handlePop,
   });
+  // A route naming a note carries the namespace that note lives in, so a link
+  // lands in the right document: switch to it if we're somewhere else. A slug
+  // this device doesn't have (a link from a namespace that hasn't synced here,
+  // or was deleted) is left alone — the ids below then resolve to nothing and
+  // the overview shows, and if the namespace does turn up later this runs then.
+  const linkedNamespace = routeNamespace(route);
+  const { switchNamespace: switchStorageNamespace } = storage;
+  useEffect(() => {
+    if (!linkedNamespace || linkedNamespace === storage.activeNamespace) return;
+    if (!storage.namespaces.some((n) => n.slug === linkedNamespace)) return;
+    switchStorageNamespace(linkedNamespace);
+  }, [
+    linkedNamespace,
+    storage.activeNamespace,
+    storage.namespaces,
+    switchStorageNamespace,
+  ]);
+
   // The three pieces of view state the shell renders from, projected off the
-  // route so there is one source of truth for "where am I".
-  const editingId = route.kind === "note" ? route.id : null;
+  // route so there is one source of truth for "where am I". A note id is only
+  // meaningful inside its own namespace's document, so while the route names
+  // another one (the switch above hasn't landed, or can't) neither id applies.
+  const inActiveNamespace =
+    linkedNamespace === null || linkedNamespace === storage.activeNamespace;
+  const editingId =
+    route.kind === "note" && inActiveNamespace ? route.id : null;
   // An archived note opened read-only (tapped from the archive page). Distinct
   // from `editingId` so the editor stays the editable surface and the reader
   // the read-only one.
-  const readingId = route.kind === "archived" ? route.id : null;
+  const readingId =
+    route.kind === "archived" && inActiveNamespace ? route.id : null;
   // Which list the main area shows when nothing is open in the editor / reader.
   const view: "notes" | "archive" =
     route.kind === "archive" || route.kind === "archived" ? "archive" : "notes";
+  // Following a link straight to a note is the "Deep link" trophy.
+  useEffect(() => {
+    if (fromLink && route.kind === "note") unlock("deepLink");
+  }, [fromLink, route]);
   const {
     notes,
     allNotes,
@@ -296,7 +330,7 @@ export function App() {
   // we're leaving would resolve against the wrong document.
   function switchNamespace(slug: string) {
     storage.switchNamespace(slug);
-    replace(noteRoute(getActiveNote(slug)));
+    replace(noteRoute(getActiveNote(slug), slug));
   }
 
   const editing = editingId
@@ -394,7 +428,7 @@ export function App() {
   function switchTo(id: string | null) {
     if (editing && discardable(editing) && editing.id !== id)
       remove(editing.id);
-    go(noteRoute(id));
+    go(noteRoute(id, storage.activeNamespace));
     if (id !== null) void sync.refresh();
   }
 
@@ -413,7 +447,7 @@ export function App() {
     if (storage.backend !== "browser") sync.holdSaves();
     const id = create(title, folderId);
     pristineNew.current = { id, title };
-    go({ kind: "note", id });
+    go({ kind: "note", ns: storage.activeNamespace, id });
   }
 
   // Land a batch of dropped markdown files in the library, then surface them:
@@ -446,7 +480,7 @@ export function App() {
 
   // Open an archived note read-only (tapped from the archive page).
   function openRead(id: string) {
-    go({ kind: "archived", id });
+    go({ kind: "archived", ns: storage.activeNamespace, id });
   }
 
   // Deleting the note that's open leaves its surface without a back step —
@@ -539,7 +573,7 @@ export function App() {
   // editable editor, so the user can keep writing without another tap.
   function restoreAndEdit(id: string) {
     restore(id);
-    go({ kind: "note", id });
+    go({ kind: "note", ns: storage.activeNamespace, id });
   }
 
   // Encryption on, no passphrase held this session — block the app behind the

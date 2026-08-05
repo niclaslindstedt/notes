@@ -1060,26 +1060,63 @@ persisted `position`, and `showButton`. It is published through `NavContext`
 (`src/ui/nav-context.ts`) so components read it via `useNav()` rather than
 threaded props.
 
-### Route / browser back & forward
+### Route / note link / browser back & forward
 
-`useRoute` (`src/app/use-route.ts`) is the shell's route model and its bridge
-to the browser's session history. The main area still switches surfaces on a
-plain value — `Route` is `{ kind: "list" }`, `{ kind: "note", id }`,
-`{ kind: "archive" }`, or `{ kind: "archived", id }`, and `App` projects
-`editingId` / `readingId` / `view` off it — but every move leaves a history
-entry, so **Back and Forward walk the notes you visited** (open note A, then
-note B, and Back returns to A). Android's back button and the desktop
-keyboard shortcut ride the same history. There is no routing library and the
-tree stays a single mounted shell.
+`useRoute` (`src/app/use-route.ts`) is the shell's route model, the address it
+wears, and its bridge to the browser's session history. The main area still
+switches surfaces on a plain value — `Route` is `{ kind: "list" }`,
+`{ kind: "note", ns, id }`, `{ kind: "archive" }`, or
+`{ kind: "archived", ns, id }`, and `App` projects `editingId` / `readingId` /
+`view` off it — but every move leaves a history entry with a URL, so:
 
-The **URL is deliberately untouched**: the app is served as static files from
-GitHub Pages under three [deploy slots](../AGENTS.md), so a `/note/<id>` path
-would 404 on a cold load, and a note id only names a note inside its own
-namespace's document — it isn't a shareable link. Everything rides in the
-entry's `history.state` (merged, not overwritten, so `useCloudBackend`'s OAuth
-URL cleanup keeps its own state), which the browser restores on a step *and*
-across a reload — so a refresh resumes on the surface the tab was showing,
-ahead of the per-namespace [active note cursor](#active-note-cursor).
+- **Back and Forward walk the notes you visited** (open note A, then note B,
+  and Back returns to A). Android's back button and the desktop keyboard
+  shortcut ride the same history.
+- **an open note has a link** you can copy out of the address bar and reopen
+  later — bookmark it, or send it to yourself.
+
+There is no routing library and the tree stays a single mounted shell.
+
+#### The address
+
+The URL rides in the **hash**, not the path:
+
+| Surface              | Address                |
+| -------------------- | ---------------------- |
+| overview             | _(no hash)_            |
+| a note in the editor | `#/n/<namespace>/<id>` |
+| the archive page     | `#/archive`            |
+| an archived note     | `#/archive/<ns>/<id>`  |
+
+A path would 404 on a cold load — the app is static files under three
+[deploy slots](../AGENTS.md) with nothing rewriting `/note/<id>` to
+`index.html` — while a hash is never sent to the server, so a link resolves on
+any slot, offline from the service worker, and from the `file://` bundle inside
+the native wrapper. It also keeps note ids out of every request (and every
+server log). `routeToHash` / `hashToRoute` are the pure pair; an address the
+app never wrote (hand-edited, or from a future version) parses to `null` and is
+ignored rather than guessed at.
+
+A note id only names a note inside its own namespace's document, so **the
+namespace slug is part of the link**. `App` watches `routeNamespace(route)` and
+switches namespace when a route names another one, so following a link lands in
+the right document; a slug this device doesn't have is left alone (the ids then
+resolve to nothing and the overview shows, and if that namespace turns up later
+the switch runs then). While the route names another namespace, `editingId` /
+`readingId` read as `null`, so a foreign id can never reach the document or the
+[active note cursor](#active-note-cursor).
+
+#### The history entry
+
+`history.state` carries the same route as the hash, plus the entry's position
+in the stack. The hash is what makes a _link_ work; the state is what survives
+a `replaceState` from elsewhere (`useCloudBackend`'s OAuth URL cleanup nulls
+it — hence the merge rather than overwrite) and what tells a `popstate` where
+it landed. Either alone can drive the app: a `popstate` whose state was wiped
+falls back to reading the address. State also survives a reload, so a refresh
+resumes on the surface the tab was showing, ahead of the per-namespace
+[remembered note](#active-note-cursor) — while a link, being the one input
+another device may have written, beats both on a cold start.
 
 Three verbs, so each caller says what kind of move it is:
 
@@ -1093,17 +1130,17 @@ Three verbs, so each caller says what kind of move it is:
   exactly `target`, otherwise navigates. Keeps list → note → back → note from
   growing the stack each round.
 
-Each entry also carries the namespace its ids belong to. The active namespace
-is a per-device cursor rather than part of the route, so a step onto an entry
-from another namespace resolves to the overview instead of applying an id this
-document has never heard of (which would also poison the remembered-note
-cursor). A `popstate` the hook didn't stamp is left alone.
-
-`App` passes an `onPop` that runs the same side effects an in-app tap does: a
-never-typed-into new note is discarded on the way out (see
+`App` passes an `onPop` that runs the same side effects an in-app tap does for
+any move the app didn't initiate — a Back / Forward step, or a hash pasted into
+the bar: a never-typed-into new note is discarded on the way out (see
 [blank note](#blank-note)), the note being landed on is refreshed from the
-backend, and the `retrace` achievement fires. The
-[swipe-back suppression](#suppress-swipe-navigation) is unchanged — the iOS
+backend, and the `retrace` achievement fires. `fromLink` distinguishes the
+address-bar case (which fires `deepLink`) from a history step. Some browsers
+fire both `popstate` and `hashchange` for a fragment navigation, so the two
+handlers are order-independent — whichever lands first applies the route and
+the other reads as a no-op.
+
+The [swipe-back suppression](#suppress-swipe-navigation) is unchanged — the iOS
 edge-swipe still belongs to the side menu's gestures, not to history.
 
 ## Navigation, drawer, and gestures
