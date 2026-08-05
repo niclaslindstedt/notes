@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyLines,
+  codeBlockCopyAnchors,
   fencedRanges,
   hasClosedFence,
   hiddenFenceLines,
@@ -131,6 +132,46 @@ describe("hiddenFenceLines", () => {
   it("never hides an unterminated fence", () => {
     const open = classifyLines("a\n```\ncode");
     expect(hiddenFenceLines(open, 0).size).toBe(0);
+  });
+});
+
+describe("codeBlockCopyAnchors", () => {
+  it("anchors to the first code line while the fences are folded away", () => {
+    const blocks = classifyLines("a\n```\none\ntwo\n```\nb");
+    expect([...codeBlockCopyAnchors(blocks, null)]).toEqual([[2, "one\ntwo"]]);
+    expect([...codeBlockCopyAnchors(blocks, 0)]).toEqual([[2, "one\ntwo"]]);
+  });
+
+  it("anchors to the opening fence once the caret unfolds it", () => {
+    const blocks = classifyLines("a\n```\none\ntwo\n```\nb");
+    expect([...codeBlockCopyAnchors(blocks, 3)]).toEqual([[1, "one\ntwo"]]);
+  });
+
+  it("steps past the active line rather than planting the button on it", () => {
+    const blocks = classifyLines("a\n```\none\ntwo\n```\nb");
+    // The caret is on the opening fence, so the button drops to the first
+    // code line under it.
+    expect([...codeBlockCopyAnchors(blocks, 1)]).toEqual([[2, "one\ntwo"]]);
+  });
+
+  it("copies the code verbatim, fences and their info string excluded", () => {
+    const blocks = classifyLines("```js\nconst a = 1;\n\n// #2\n```");
+    expect(codeBlockCopyAnchors(blocks, null).get(1)).toBe(
+      "const a = 1;\n\n// #2",
+    );
+  });
+
+  it("gives every closed block its own button", () => {
+    const blocks = classifyLines("```\na\n```\nb\n```\nc\n```");
+    expect([...codeBlockCopyAnchors(blocks, null)]).toEqual([
+      [1, "a"],
+      [5, "c"],
+    ]);
+  });
+
+  it("skips an empty block and an unterminated fence", () => {
+    expect(codeBlockCopyAnchors(classifyLines("```\n```"), null).size).toBe(0);
+    expect(codeBlockCopyAnchors(classifyLines("```\ncode"), null).size).toBe(0);
   });
 });
 

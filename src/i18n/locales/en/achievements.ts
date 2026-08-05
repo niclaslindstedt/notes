@@ -226,6 +226,12 @@ const achievements = {
       learnMore:
         "The copy button in a note's header puts the open note on your clipboard. Settings → Editor chooses how much it takes — just the body, the title and body, or the whole .md file with its YAML frontmatter.",
     },
+    snippetSnatcher: {
+      name: "Snippet snatcher",
+      condition: "Copy a code block with its copy button.",
+      learnMore:
+        "Every closed code block wears a small copy button in its top-right corner. One press puts the code — everything between the ``` fences, and nothing else — on your clipboard, without placing the caret in the note or selecting a single line by hand.",
+    },
     seeker: {
       name: "Seeker",
       condition: "Search your notes.",

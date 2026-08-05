@@ -27,7 +27,11 @@ import {
   replaceRange,
   type SourcePoint,
 } from "../domain/line-edit.ts";
-import { classifyLines, hiddenFenceLines } from "../domain/markdown.ts";
+import {
+  classifyLines,
+  codeBlockCopyAnchors,
+  hiddenFenceLines,
+} from "../domain/markdown.ts";
 import {
   applyFormat,
   lineFormatOf,
@@ -56,6 +60,7 @@ import {
 } from "./hooks/scrollFocusedIntoView.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
+import { CodeCopyButton } from "./CodeCopyButton.tsx";
 import { RenderedLine, type LineHighlight } from "./MarkdownLine.tsx";
 import {
   extractSourceRange,
@@ -308,6 +313,14 @@ export function MarkdownEditor({
   // structural edits are untouched.
   const hiddenFences = useMemo(
     () => hiddenFenceLines(blocks, clampedIndex),
+    [blocks, clampedIndex],
+  );
+
+  // Which drawn lines carry a code block's copy button, and the code each one
+  // copies. Keyed by the block's first *visible* line so the button rides the
+  // top-right corner of the block as drawn (see `codeBlockCopyAnchors`).
+  const copyAnchors = useMemo(
+    () => codeBlockCopyAnchors(blocks, clampedIndex),
     [blocks, clampedIndex],
   );
 
@@ -1228,17 +1241,19 @@ export function MarkdownEditor({
             // and structural edits are unaffected) and reveals its raw markdown
             // when the caret lands on it (making it the active line).
             if (hidden.has(index) || hiddenFences.has(index)) return null;
+            const code = copyAnchors.get(index);
             return (
               <div
                 key={index}
                 data-line-index={index}
-                className={`cursor-text ${wrapClass}`}
+                className={`cursor-text ${wrapClass} ${code === undefined ? "" : "relative"}`}
               >
                 <RenderedLine
                   block={blocks[index]!}
                   shortenLinkChars={shortenLinkChars}
                   highlights={highlightsByLine.get(index)}
                 />
+                {code !== undefined && <CodeCopyButton code={code} />}
               </div>
             );
           })}

@@ -491,6 +491,49 @@ cheap line-level scan (no blocks built) behind the
 [Fenced in](#unlock-triggers) achievement, which fires the first time a note
 holds a closed block.
 
+### Code block copy button
+
+Every **closed** code block wears a small copy button in its top-right corner,
+so the code can be lifted out with one tap — without placing the caret in the
+note, dragging a selection over the block, or opening the raw source.
+`CodeCopyButton` (`src/ui/CodeCopyButton.tsx`) draws it, and one press puts the
+block's lines on the clipboard through the shared `writeClipboard`
+(`src/ui/clipboard.ts`) — the code **only**, with the ` ``` ` fences and any
+info string (` ```sh `) left off — then flips its glyph to a check for a moment
+to confirm the write. It fires the [Snippet snatcher](#unlock-triggers)
+achievement.
+
+`codeBlockCopyAnchors(blocks, activeLine)` (`src/domain/markdown.ts`) decides
+where each button hangs: it returns a map from a source line index to the code
+that line's button copies, and `MarkdownEditor` renders the button into that
+line's wrapper. Because the editor draws one element per source line (there is
+no per-block container to hang anything off — see [Code block](#code-block)),
+the anchor is the block's first line that *actually renders*: the opening fence
+while it is visible (the caret is inside the block), otherwise the first code
+line under it. The active line is skipped as well — it renders as raw source —
+so the button steps to the line below instead of being planted in the line
+being typed on. A block with nothing between its fences gets no button: there
+is no code to copy.
+
+Living inside the `contenteditable` surface puts three constraints on the
+button, all of them in `CodeCopyButton`:
+
+- It is `contentEditable={false}` and unselectable, so the browser treats it as
+  an atom — it never lands in the note's source, and dragging a selection
+  across the note doesn't sweep it up with the code.
+- Its `mousedown` is cancelled (the same trick [a link in the
+  preview](#rendered-line) uses), so pressing it doesn't roll the caret into
+  the block — which would unfold the block's fences and shuffle it down a line
+  under the user's finger mid-press.
+- It is a `sticky` float on a zero-height rail across the anchor line, centred
+  on that line's first *row* (a code line is a fixed 20px tall). Centring on
+  the row rather than on the line's box keeps the button inside the slab on a
+  one-line block and in the corner on a tall or wrapped one; the stickiness
+  matters when word wrap ([Editor settings](#editor-settings)) is off and the note scrolls sideways —
+  every line is then as wide as the widest line in the note, and without it the
+  button would park a screen or two off to the right where nobody would find
+  it.
+
 ### Bullet characters
 
 An unordered list draws one of three fixed glyphs per nesting level:

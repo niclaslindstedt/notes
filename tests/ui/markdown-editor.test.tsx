@@ -321,6 +321,45 @@ describe("MarkdownEditor", () => {
       renderEditor("```\na\n```\ntext\n```\nb\n```", { focusOnMount: false });
       expect(renderedIndices()).toEqual(["1", "3", "5"]);
     });
+
+    // The button that copies a block. It hangs inside the block's first drawn
+    // line, so its wrapper says which source line it is anchored to.
+    function copyButtons(): HTMLElement[] {
+      return [
+        ...surface().querySelectorAll<HTMLElement>("button[aria-label]"),
+      ].filter((el) => /copy code/i.test(el.getAttribute("aria-label") ?? ""));
+    }
+
+    function anchorOf(button: HTMLElement): string | null {
+      return (
+        button.closest("[data-line-index]")?.getAttribute("data-line-index") ??
+        null
+      );
+    }
+
+    it("hangs a copy button on the first drawn line of every closed block", () => {
+      renderEditor("```\na\n```\ntext\n```\nb\n```", { focusOnMount: false });
+      // The fences are folded away, so each button rides the block's code.
+      expect(copyButtons().map(anchorOf)).toEqual(["1", "5"]);
+    });
+
+    it("gives an empty block and an unterminated fence no button", () => {
+      renderEditor("```\n```\n```\ndangling", { focusOnMount: false });
+      expect(copyButtons()).toHaveLength(0);
+    });
+
+    it("copies the block's code without its fences", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+      renderEditor("```sh\nnpm run build\nnpm test\n```", {
+        focusOnMount: false,
+      });
+      await act(async () => {
+        fireEvent.click(copyButtons()[0]!);
+      });
+      expect(writeText).toHaveBeenCalledWith("npm run build\nnpm test");
+      vi.unstubAllGlobals();
+    });
   });
 
   describe("blur reformats the note", () => {

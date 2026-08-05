@@ -136,6 +136,47 @@ export function hiddenFenceLines(
 }
 
 /**
+ * Where the live preview hangs a code block's **copy button**, and what that
+ * button puts on the clipboard: a map from the source line the button is
+ * anchored to → the block's code (its lines between the fences, verbatim).
+ *
+ * The button belongs at the top-right of the block as it is *drawn*, so the
+ * anchor is the block's first line that actually renders: the opening fence
+ * when it is visible (the caret is inside the block), otherwise the first code
+ * line under it. The active line is skipped too — it renders as raw source and
+ * is the one line the editor owns outright — so the button simply steps to the
+ * line below rather than being planted in the line being typed on.
+ *
+ * A block with nothing between its fences is left out: there is no code to
+ * copy, and an empty block is a shape the user is still building.
+ */
+export function codeBlockCopyAnchors(
+  blocks: readonly LineBlock[],
+  activeLine: number | null,
+): Map<number, string> {
+  const anchors = new Map<number, string>();
+  const hidden = hiddenFenceLines(blocks, activeLine);
+  for (const { open, close } of fencedRanges(blocks)) {
+    if (close <= open + 1) continue;
+    let anchor: number | null = null;
+    for (let i = open; i <= close; i += 1) {
+      if (hidden.has(i) || i === activeLine) continue;
+      anchor = i;
+      break;
+    }
+    if (anchor === null) continue;
+    anchors.set(
+      anchor,
+      blocks
+        .slice(open + 1, close)
+        .map((b) => b.raw)
+        .join("\n"),
+    );
+  }
+  return anchors;
+}
+
+/**
  * Whether `body` holds at least one closed fenced code block. A line-level
  * scan rather than a full `classifyLines` pass, so the achievement watcher can
  * run it over every note on each edit without building blocks it throws away.
