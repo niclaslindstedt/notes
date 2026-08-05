@@ -7,10 +7,12 @@ import {
   type InlineNode,
   type LineBlock,
 } from "../domain/markdown.ts";
+import { youtubeVideo } from "../domain/youtube.ts";
 import { FileAttachment } from "./attachments/FileAttachment.tsx";
 import { InlineImage } from "./attachments/InlineImage.tsx";
 import { useAttachmentsContext } from "./attachments/context.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
+import { YouTubeEmbed } from "./YouTubeEmbed.tsx";
 
 // Presentational rendering for the live-preview editor: turns a parsed
 // `LineBlock` into the formatted React it shows on every line the caret is
@@ -252,6 +254,17 @@ function LinkNode({
       return <FileAttachment attachment={attachment} srcOffset={offset} />;
     }
     return <span data-src={offset}>{`[${text}](${href})`}</span>;
+  }
+  // A YouTube URL typed on its own renders as a player instead of an anchor.
+  // Only a *bare* one: an explicit `[label](url)` is a link the writer chose to
+  // put words on, and swapping their label for a video would throw those words
+  // away. A link the find bar has a hit on also stays an anchor, so the match
+  // it just told you about is actually on screen to see.
+  const video = bare && hit === null ? youtubeVideo(href) : null;
+  if (video) {
+    return (
+      <YouTubeEmbed video={video} srcOffset={offset} srcLength={text.length} />
+    );
   }
   return (
     <a

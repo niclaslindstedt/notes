@@ -8,6 +8,7 @@
 import { isImageAttachment } from "../domain/attachment.ts";
 import { hasClosedFence, hasMultiLineQuote } from "../domain/markdown.ts";
 import type { Snapshot } from "../domain/note.ts";
+import { hasYouTubeLink } from "../domain/youtube.ts";
 import {
   AccessibilityGlyph,
   ArchiveGlyph,
@@ -53,6 +54,7 @@ import {
   TextSearchGlyph,
   TypeGlyph,
   UndoGlyph,
+  VideoGlyph,
   WandGlyph,
   WorkflowGlyph,
 } from "./glyphs.tsx";
@@ -88,6 +90,11 @@ const hasCodeBlock = (snap: Snapshot) =>
 // writes, so this is the trophy for discovering that a quote keeps going.
 const hasLongQuote = (snap: Snapshot) =>
   snap.notes.some((n) => hasMultiLineQuote(n.body ?? ""));
+
+// A note holding a YouTube link — which renders as a player, so this is the
+// trophy for discovering that a pasted video plays where it was pasted.
+const hasVideoNote = (snap: Snapshot) =>
+  snap.notes.some((n) => hasYouTubeLink(n.body ?? ""));
 
 // A note that has been swiped into the archive — the first time someone tidies
 // a note away without deleting it.
@@ -366,6 +373,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       predicate: (prev, next) =>
         prev.appearance.editor.shortenLinkChars === 0 &&
         next.appearance.editor.shortenLinkChars > 0,
+    },
+  },
+  {
+    id: "nowPlaying",
+    tier: "intermediate",
+    glyph: VideoGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasVideoNote(prev.snapshot) && hasVideoNote(next.snapshot),
     },
   },
   {

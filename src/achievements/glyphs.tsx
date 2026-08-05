@@ -262,6 +262,18 @@ export function ImageGlyph({ className }: IconProps) {
   );
 }
 
+// A screen with a play triangle — the inline video glyph (a YouTube link in a
+// note renders as a player you can watch without leaving the note).
+export function VideoGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="2" y="4" width="20" height="14" rx="2" />
+      <path d="M10 9.5v3l3-1.5z" />
+      <path d="M8 21h8" />
+    </Svg>
+  );
+}
+
 // A broom sweeping — the format-on-save glyph (tidy a note as it's saved:
 // trim trailing spaces, end with a newline).
 export function BroomGlyph({ className }: IconProps) {

@@ -89,6 +89,15 @@ const app = {
     count: "{index} of {total}",
     none: "No matches",
   },
+  // The inline YouTube player a bare YouTube link renders as: the press that
+  // starts the video, and the widescreen button that lifts the player out of
+  // the note over a blurred backdrop (and puts it back).
+  youtube: {
+    player: "YouTube video",
+    play: "Play video",
+    widescreen: "Widescreen",
+    exitWidescreen: "Exit widescreen",
+  },
   // Screen-reader label for the gray lock shown on a note that is encrypted at
   // rest but whose body hasn't been decrypted/loaded yet this session.
   encryptedNote: "Encrypted at rest",
