@@ -152,6 +152,19 @@ export function HomePage() {
               and files in a block at the end of the note instead of inline.
             </li>
             <li>
+              Paste a <em>YouTube link</em> into a note and it becomes a video
+              player right where you pasted it — every link shape works (the
+              mobile site, <code className="text-fg-bright">youtu.be</code>,
+              Shorts, an embed address), and the tracking parameters that ride
+              along are trimmed off. Nothing is loaded from YouTube until you
+              press play: the card shows the video&apos;s poster image until
+              then, and the player itself is loaded from YouTube&apos;s
+              cookie-free address. The button in the player&apos;s corner lifts
+              it into <em>widescreen</em> — the note blurs away behind it and
+              the video fills the screen, without losing your place in it — and
+              puts it back again.
+            </li>
+            <li>
               <em>Find text inside the note you have open</em> — the magnifier
               in a note's header drops a search bar under the top bar, lights up
               every match as you type, and steps between them with arrows (or
@@ -296,8 +309,11 @@ export function HomePage() {
           <p>
             notes sets no cookies, loads no analytics or tracking scripts, and
             shows no ads. There is no backend of our own collecting anything
-            about you. For the full details — what is stored, where, and why —
-            read the{" "}
+            about you. The one thing that reaches a third party without you
+            turning it on is a YouTube link you put in a note yourself, which
+            fetches that video&apos;s poster image from YouTube — and only
+            fetches the player once you press play. For the full details — what
+            is stored, where, and why — read the{" "}
             <a href={privacyUrl} className="text-link hover:underline">
               privacy policy
             </a>

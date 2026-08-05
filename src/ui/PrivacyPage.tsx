@@ -1,10 +1,12 @@
 // Standalone privacy policy, served at `/privacy` (see `app/main.tsx`'s
 // path switch and the `emit-privacy-alias` plugin in `vite.config.ts`).
 // notes is local-first with no backend of our own, no accounts, and no
-// analytics — by default everything stays in the browser. The one way data
-// leaves the device is the opt-in sync backends (a picked local folder, the
-// user's own Dropbox, the user's own Google Drive), which this policy
-// describes in full because the Google Drive scope is verified against it.
+// analytics — by default everything stays in the browser. Two things reach
+// anyone else: the opt-in sync backends (a picked local folder, the user's own
+// Dropbox, the user's own Google Drive), which this policy describes in full
+// because the Google Drive scope is verified against it, and the inline
+// YouTube player a link in a note renders as, which fetches a poster frame
+// from YouTube and the player itself only once it is played.
 // It is English-only by design (a legal page, not chrome), mirroring
 // checklist's PrivacyPage.
 import { ArrowLeftIcon } from "./icons.tsx";
@@ -52,6 +54,16 @@ export function PrivacyPage() {
               Optional sync
             </a>{" "}
             section below explains exactly what is sent, where, and why.
+          </p>
+          <p>
+            One feature does reach a third party without being switched on: a
+            YouTube link you write in a note is shown as a video player, which
+            loads that video&apos;s poster image — and, once you press play, the
+            player — from YouTube. See{" "}
+            <a className="text-link hover:underline" href="#embedded-videos">
+              Embedded YouTube videos
+            </a>{" "}
+            below.
           </p>
         </Section>
 
@@ -112,12 +124,13 @@ export function PrivacyPage() {
 
         <Section title="Network requests">
           <p>
-            With no sync backend enabled, the app makes no third-party network
-            calls. The only requests your browser makes are to fetch the
-            app&apos;s own static files (HTML, JavaScript, CSS, fonts, and
-            icons) from its origin, and once loaded it works fully offline as an
-            installed PWA. No fonts, analytics scripts, error-reporting
-            services, or advertising networks are ever loaded.
+            With no sync backend enabled, and no YouTube link in the note you
+            are looking at, the app makes no third-party network calls. The only
+            requests your browser makes are to fetch the app&apos;s own static
+            files (HTML, JavaScript, CSS, fonts, and icons) from its origin, and
+            once loaded it works fully offline as an installed PWA. No fonts,
+            analytics scripts, error-reporting services, or advertising networks
+            are ever loaded.
           </p>
           <p>
             If you opt in to Dropbox or Google Drive sync, the app additionally
@@ -125,6 +138,51 @@ export function PrivacyPage() {
             sign you in and to read and write your notes. Those requests go to
             the provider, not to us. See <em>Optional sync</em> below.
           </p>
+        </Section>
+
+        <Section title="Embedded YouTube videos" id="embedded-videos">
+          <p>
+            A YouTube link in a note is shown as a video player instead of a
+            link. This is the one feature that reaches a third party without you
+            turning anything on, so it is deliberately kept as small as
+            possible:
+          </p>
+          <ul className="ml-5 list-disc space-y-2">
+            <li>
+              While such a note is on screen, your browser fetches that
+              video&apos;s <span className="text-fg-bright">poster image</span>{" "}
+              from <code className="text-fg-bright">i.ytimg.com</code>. Like any
+              image request it tells Google your IP address and browser; the
+              request is sent without a referrer, so it does not say which page
+              you are on.
+            </li>
+            <li>
+              The{" "}
+              <span className="text-fg-bright">
+                player itself is not loaded until you press play
+              </span>
+              . When you do, it is loaded from{" "}
+              <code className="text-fg-bright">youtube-nocookie.com</code>,
+              Google&apos;s privacy-enhanced host, which does not set
+              advertising cookies for browsing a video. Once playing, YouTube
+              may store playback data in your browser and receives the usual
+              information about the request; that part is covered by{" "}
+              <a
+                href="https://policies.google.com/privacy"
+                className="text-link hover:underline"
+              >
+                Google&apos;s privacy policy
+              </a>
+              .
+            </li>
+            <li>
+              Only the <em>video id</em> and, if the link carried one, the
+              timestamp to start at are ever sent — every other parameter your
+              link contained is stripped before the player is built. Neither
+              your note, its title, nor anything else you have written leaves
+              your device.
+            </li>
+          </ul>
         </Section>
 
         <Section title="Optional sync" id="cloud-sync">
@@ -209,7 +267,10 @@ export function PrivacyPage() {
         <Section title="Cookies">
           <p>
             The app sets no cookies. All persistence uses{" "}
-            <code className="text-fg-bright">localStorage</code>.
+            <code className="text-fg-bright">localStorage</code>. Playing an
+            embedded YouTube video loads a player from Google&apos;s cookie-free
+            host, which may still keep playback data in your browser — see{" "}
+            <em>Embedded YouTube videos</em> above.
           </p>
         </Section>
 

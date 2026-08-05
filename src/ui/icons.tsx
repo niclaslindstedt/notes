@@ -147,6 +147,70 @@ export function CutIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * A solid play triangle — the inline YouTube player's press-to-play affordance.
+ * Filled rather than stroked like the rest of the set: it sits at 28px on top
+ * of a video poster frame, where an outlined triangle disappears into the
+ * picture behind it.
+ */
+export function PlayIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="M8 5.5v13a1 1 0 0 0 1.53.85l10-6.5a1 1 0 0 0 0-1.7l-10-6.5A1 1 0 0 0 8 5.5Z" />
+    </svg>
+  );
+}
+
+/** Four corners pushing outward — lift the video player into widescreen. */
+export function WidescreenIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+      <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+      <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+      <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+    </svg>
+  );
+}
+
+/** Four corners pulling inward — put the widescreen player back in the note. */
+export function MinimizeIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+      <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+      <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+      <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+    </svg>
+  );
+}
+
 /** The app's wordmark glyph — a dog-eared note sheet. App-specific. */
 export function NotesMarkIcon({ className }: IconProps) {
   return (

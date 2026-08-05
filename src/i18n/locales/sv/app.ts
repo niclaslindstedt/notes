@@ -56,6 +56,12 @@ const app: AppCatalog = {
     count: "{index} av {total}",
     none: "Inga träffar",
   },
+  youtube: {
+    player: "YouTube-video",
+    play: "Spela upp videon",
+    widescreen: "Bredbild",
+    exitWidescreen: "Lämna bredbild",
+  },
   encryptedNote: "Krypterad i vila",
   encryptedNoteLoaded: "Krypterad i vila, dekrypterad",
   uploadingNote: "Synkar…",

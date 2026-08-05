@@ -185,6 +185,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Inställningar → Redigerare kortar ned långa inklistrade URL:er i förhandsvisningen till domänen plus några tecken på var sida om en [...]-markör, så att en spårningslänk inte längre breder ut sig över anteckningen. Hela länken sparas och öppnas fortfarande när du klickar — bara visningen förkortas.",
     },
+    nowPlaying: {
+      name: "På spelning",
+      condition: "Lägg in en YouTube-länk i en anteckning.",
+      learnMore:
+        "En YouTube-länk du klistrar in i en anteckning blir en spelare precis där den står — alla länkformer fungerar (youtu.be, /shorts/, mobilsajten, en embed-adress), och spårningsparametrarna som följer med trimmas bort. Ingenting hämtas från YouTube förrän du trycker på play; knappen i spelarens hörn lyfter upp den i bredbild över en suddad anteckning, och lägger tillbaka den utan att du tappar din plats i videon.",
+    },
     archivist: {
       name: "Arkivarie",
       condition: "Arkivera en anteckning.",

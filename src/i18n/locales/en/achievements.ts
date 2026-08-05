@@ -190,6 +190,12 @@ const achievements = {
       learnMore:
         "Settings → Editor trims long pasted URLs in the preview down to the domain plus a few characters either side of an [...] marker, so a tracking link no longer sprawls across the note. The whole link is still saved and still opens when clicked — only the display is shortened.",
     },
+    nowPlaying: {
+      name: "Now playing",
+      condition: "Put a YouTube link in a note.",
+      learnMore:
+        "A YouTube link you paste into a note becomes a player right where it sits — every link shape works (youtu.be, /shorts/, the mobile site, an embed URL), and the tracking parameters that ride along are trimmed off. Nothing is fetched from YouTube until you press play; the button in the player's corner lifts it into widescreen over a blurred note, and puts it back without losing your place in the video.",
+    },
     archivist: {
       name: "Archivist",
       condition: "Archive a note.",

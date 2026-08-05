@@ -465,6 +465,53 @@ short URL (where head + marker + tail would meet or overlap) is shown in full.
 [Short and sweet](#unlock-triggers) achievement fires the first time it's
 switched on.
 
+### YouTube player
+
+A **bare** YouTube URL on a rendered line becomes an inline **video player**
+instead of a link: `YouTubeEmbed` (`src/ui/YouTubeEmbed.tsx`), swapped in by the
+`link` case in `LinkNode` (`src/ui/MarkdownLine.tsx`) whenever `youtubeVideo`
+(`src/domain/youtube.ts`) recognises the href. The note's source is untouched —
+the URL is still exactly what was typed, and it comes back as raw text the
+moment the caret lands on its line, like any other [rendered
+line](#rendered-line).
+
+`youtubeVideo` is the whole URL-shape story, and it is pure: it accepts
+`youtube.com/watch?v=…`, any subdomain (`m.`, `music.`), `youtu.be/…`,
+`/shorts/…`, `/live/…`, `/embed/…`, the legacy `/v/…` and `/e/…`,
+`youtube-nocookie.com`, and a scheme-less `www.youtube.com/…` (what
+[autolinking](#markdown-parser) hands it). Out of all that it keeps exactly two
+things — the eleven-character video id and the start offset (`?t=90`, `?t=1h2m3s`,
+`?start=90`, `#t=30`) — and **trims everything else**: `si`, `pp`, `feature`,
+`ab_channel`, `ra`, the playlist it was watched from. Anything whose id isn't
+id-shaped (a channel, a search, a playlist, `/embed/videoseries`) is not a video
+and stays an ordinary link. `youtubeEmbedSrc` then rebuilds the player URL from
+those two values alone.
+
+Two carve-outs keep the swap from taking something away: an explicit
+`[label](url)` stays a link (the writer chose words to put on it, and a player
+would throw them away), and so does a link the [find bar](#find-in-note)
+currently has a hit on, so the match it just reported is on screen to see.
+
+**Nothing is fetched from YouTube until the video is played.** The card shows
+the poster frame (`i.ytimg.com`, `hqdefault` — the one size every video has,
+4:3, cropped back to 16:9 by the card) and only the press swaps in the player
+iframe, served from `youtube-nocookie.com`. A note full of links therefore opens
+without pulling in a megabyte of player code per link, and without YouTube
+hearing about it on the reader's behalf. The poster failing (offline, or a
+blocked host) leaves the play card, not a broken image.
+
+**Widescreen** is the button in the player's corner: the card goes full-screen
+over a blurred, dimmed backdrop, as wide as the viewport allows while still
+leaving the note showing around it. It is a **class swap on the element the
+iframe already lives in** — deliberately not a second player rendered in an
+overlay — so the DOM node survives and the video plays straight through the
+transition instead of restarting. A placeholder box holds the line's height
+while the player is lifted out, so the note doesn't reflow underneath. Escape,
+the backdrop, or the same button (now a minimise glyph) puts it back. Going wide
+from a card that hasn't been played starts the video, since that is what the
+gesture means. The [Now playing](#unlock-triggers) achievement fires the first
+time a note holds a YouTube link.
+
 ### Code block
 
 Lines wrapped in a pair of ` ``` ` (or `~~~`) fences are a **fenced code
