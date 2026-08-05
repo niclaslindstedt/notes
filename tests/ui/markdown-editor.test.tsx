@@ -198,6 +198,61 @@ describe("MarkdownEditor", () => {
     });
   });
 
+  // A note erased down to the "start writing" prompt, then Backspaced again,
+  // then blurred by dismissing the soft keyboard — the reported sequence. The
+  // last two steps must leave the source alone and, above all, must not hand
+  // the browser an edit at the very start of the document, where the only thing
+  // to delete is whatever sits before the first line.
+  describe("an already-empty note", () => {
+    it("draws the prompt outside the editing host", () => {
+      renderEditor("", { focusOnMount: false });
+      // The host holds lines and nothing the browser can normalise away: a
+      // `contenteditable={false}` island inside it is a node React has to
+      // remove again on the first keystroke, and a `removeChild` of a node the
+      // browser has already moved unmounts the app.
+      expect(
+        surface().querySelector("[contenteditable=false]")?.textContent,
+      ).not.toBe("Start writing…");
+      expect(screen.getByText("Start writing…")).toBeTruthy();
+    });
+
+    it("swallows a Backspace at the start of the document", () => {
+      const { onChange } = renderEditor("", { focusOnMount: true });
+      const e = new InputEvent("beforeinput", {
+        inputType: "deleteContentBackward",
+        cancelable: true,
+        bubbles: true,
+      });
+      act(() => {
+        surface().dispatchEvent(e);
+      });
+      expect(e.defaultPrevented).toBe(true);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("survives the blur that dismissing the keyboard brings", () => {
+      const { onChange } = renderEditor("", { focusOnMount: true });
+      beforeInput("deleteContentBackward");
+      // Dropping the active line re-renders the empty note fully formatted —
+      // the render that used to throw on a surface the browser had rewritten.
+      expect(() => {
+        act(() => {
+          fireEvent.blur(surface());
+        });
+      }).not.toThrow();
+      expect(screen.getByText("Start writing…")).toBeTruthy();
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("types the first character back into an emptied note", () => {
+      const { onChange } = renderEditor("", { focusOnMount: true });
+      caretIn(rawLine()!, 0);
+      beforeInput("insertText", "a");
+      expect(onChange).toHaveBeenLastCalledWith("a");
+      expect(screen.queryByText("Start writing…")).toBeNull();
+    });
+  });
+
   it("deletes the character after the caret on Delete mid-line", () => {
     const { onChange } = renderEditor("abc");
     caretIn(rawLine()!, 1);

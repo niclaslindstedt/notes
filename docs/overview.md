@@ -251,8 +251,20 @@ listener that maps the caret's DOM position to a source `(line, col)`, makes tha
 line raw, and restores the caret there — or when the title hands focus down
 through the editor's imperative `focus()` handle (`MarkdownEditorHandle`, consumed
 by `focusBody` in `App`) on Enter / Arrow-Down / Tab (see
-[Editor tab order](#editor-tab-order)). A brand-new empty note shows the
-"Start writing" placeholder (a non-editable overlay span).
+[Editor tab order](#editor-tab-order)). An empty note shows the "Start writing"
+prompt.
+
+**The prompt is drawn outside the editing host**, as an absolutely-positioned
+overlay in the scroll container, mirroring the host's padding and width so it
+lands exactly where the first character will (the host's `aria-label` already
+announces it, so the overlay is `aria-hidden`). It used to be a
+`contentEditable={false}` span *inside* the host, which put a node the browser
+feels entitled to normalise around at the very start of the document — right
+where a Backspace on an already-empty note aims — and left React having to
+remove that node again on the first keystroke. Either way round, a browser that
+had moved or eaten it in the meantime turned the next render into a
+`removeChild` `NotFoundError` and unmounted the app. Out of the host, the
+editing surface holds nothing but its lines.
 
 **Leaving the body clears the active line.** When focus moves out of the editor
 — to the title field, a header button, the side menu — the `onBlur` handler nulls
