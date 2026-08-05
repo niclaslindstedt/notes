@@ -427,6 +427,13 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     trigger: { kind: "manual" },
   },
   {
+    id: "snippetSnatcher",
+    tier: "intermediate",
+    glyph: CodeGlyph,
+    learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
     id: "seeker",
     tier: "intermediate",
     glyph: SearchGlyph,

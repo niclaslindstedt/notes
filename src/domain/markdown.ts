@@ -136,6 +136,106 @@ export function hiddenFenceLines(
 }
 
 /**
+ * The line an unterminated opening fence sits on, or null when every fence in
+ * `blocks` is matched. Its block runs from there to the end of the note — the
+ * classifier keeps every following line `code` — which is the span the preview
+ * paints as one open-ended slab.
+ */
+function danglingFence(blocks: readonly LineBlock[]): number | null {
+  let open: number | null = null;
+  for (let i = 0; i < blocks.length; i += 1) {
+    if (blocks[i]!.kind !== "fence") continue;
+    open = open === null ? i : null;
+  }
+  return open;
+}
+
+/** The first and last *drawn* line of every fenced code block, by line index. */
+export type CodeBlockEdges = { top: Set<number>; bottom: Set<number> };
+
+/**
+ * Which lines are a code block's top and bottom edge **as the preview draws
+ * it**, so those lines can round the block's corners and give it the vertical
+ * breathing room its interior lines don't need.
+ *
+ * The editor renders one element per source line, so a block has no container
+ * to round or pad — its slab is the stacked backgrounds of its lines meeting
+ * (see `lineTextClass`). Rounding and padding therefore belong to the block's
+ * outermost drawn lines, which shift as the fences fold and unfold: with the
+ * caret outside the block the ``` delimiters are hidden and the edges are the
+ * first and last *code* lines; with it inside, the delimiters are back and
+ * they are the edges. An unterminated fence counts from its opener to the end
+ * of the note, so a half-typed block reads as a block too.
+ */
+export function codeBlockEdges(
+  blocks: readonly LineBlock[],
+  activeLine: number | null,
+): CodeBlockEdges {
+  const hidden = hiddenFenceLines(blocks, activeLine);
+  const top = new Set<number>();
+  const bottom = new Set<number>();
+  const mark = (open: number, close: number) => {
+    let first: number | null = null;
+    let last: number | null = null;
+    for (let i = open; i <= close; i += 1) {
+      if (hidden.has(i)) continue;
+      if (first === null) first = i;
+      last = i;
+    }
+    // Every line of the block is hidden — an empty block whose two fences are
+    // folded away. Nothing is drawn, so there are no edges.
+    if (first === null || last === null) return;
+    top.add(first);
+    bottom.add(last);
+  };
+  for (const { open, close } of fencedRanges(blocks)) mark(open, close);
+  const dangling = danglingFence(blocks);
+  if (dangling !== null) mark(dangling, blocks.length - 1);
+  return { top, bottom };
+}
+
+/**
+ * Where the live preview hangs a code block's **copy button**, and what that
+ * button puts on the clipboard: a map from the source line the button is
+ * anchored to → the block's code (its lines between the fences, verbatim).
+ *
+ * The button belongs at the top-right of the block as it is *drawn*, so the
+ * anchor is the block's first line that actually renders: the opening fence
+ * when it is visible (the caret is inside the block), otherwise the first code
+ * line under it. The active line is skipped too — it renders as raw source and
+ * is the one line the editor owns outright — so the button simply steps to the
+ * line below rather than being planted in the line being typed on.
+ *
+ * A block with nothing between its fences is left out: there is no code to
+ * copy, and an empty block is a shape the user is still building.
+ */
+export function codeBlockCopyAnchors(
+  blocks: readonly LineBlock[],
+  activeLine: number | null,
+): Map<number, string> {
+  const anchors = new Map<number, string>();
+  const hidden = hiddenFenceLines(blocks, activeLine);
+  for (const { open, close } of fencedRanges(blocks)) {
+    if (close <= open + 1) continue;
+    let anchor: number | null = null;
+    for (let i = open; i <= close; i += 1) {
+      if (hidden.has(i) || i === activeLine) continue;
+      anchor = i;
+      break;
+    }
+    if (anchor === null) continue;
+    anchors.set(
+      anchor,
+      blocks
+        .slice(open + 1, close)
+        .map((b) => b.raw)
+        .join("\n"),
+    );
+  }
+  return anchors;
+}
+
+/**
  * Whether `body` holds at least one closed fenced code block. A line-level
  * scan rather than a full `classifyLines` pass, so the achievement watcher can
  * run it over every note on each edit without building blocks it throws away.

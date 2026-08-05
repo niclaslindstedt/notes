@@ -166,6 +166,14 @@ export function HomePage() {
               locally.
             </li>
             <li>
+              Lift a <em>code block</em> out of a note in one tap — every block
+              fenced in <code>```</code> carries a small copy button in its
+              top-right corner that puts the code (and only the code) on your
+              clipboard, without placing the cursor in the note or selecting a
+              line by hand. As with the note copy above, the clipboard is
+              written locally and nothing is sent anywhere.
+            </li>
+            <li>
               Group notes into separate <em>namespaces</em> — independent
               buckets you can switch between, each with its own icon and colour.
             </li>
