@@ -590,4 +590,41 @@ describe("MarkdownEditor", () => {
       expect(onChange).not.toHaveBeenCalled();
     });
   });
+  describe("find-in-note highlights", () => {
+    it("marks every hit and singles out the active one", () => {
+      renderEditor("alpha beta\ngamma alpha", {
+        focusOnMount: false,
+        matches: [
+          { line: 0, from: 0, to: 5 },
+          { line: 1, from: 6, to: 11 },
+        ],
+        activeMatch: 1,
+      });
+      const marks = surface().querySelectorAll("mark");
+      expect(marks.length).toBe(2);
+      expect([...marks].map((m) => m.textContent)).toEqual(["alpha", "alpha"]);
+      // The hit the bar is parked on wears the accent; the other the quieter
+      // "also matches" tint.
+      expect(marks[0]!.className).toContain("bg-link");
+      expect(marks[1]!.className).toContain("bg-accent");
+    });
+
+    it("stamps each segment with its own source column", () => {
+      renderEditor("alpha beta", {
+        focusOnMount: false,
+        matches: [{ line: 0, from: 6, to: 10 }],
+        activeMatch: 0,
+      });
+      // The mark and the text before it are siblings, each carrying the column
+      // it starts at — a caret / selection inside either maps back correctly.
+      const mark = surface().querySelector("mark")!;
+      expect(mark.getAttribute("data-src")).toBe("6");
+      expect(mark.previousElementSibling?.getAttribute("data-src")).toBe("0");
+    });
+
+    it("renders no extra nodes when nothing matches", () => {
+      renderEditor("alpha beta", { focusOnMount: false });
+      expect(surface().querySelectorAll("mark").length).toBe(0);
+    });
+  });
 });

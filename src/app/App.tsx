@@ -601,6 +601,11 @@ export function App() {
     );
   }
 
+  // The cloud glyph, rendered as the last cell of the side menu's button
+  // island (`SideMenuActionBar`) — one sync affordance for the whole app rather
+  // than one per surface header. `SyncIndicator` renders nothing on the local
+  // backend, which has no remote to sync against, and the row is then a cell
+  // shorter.
   const syncSlot = (
     <SyncIndicator
       sync={sync}
@@ -662,6 +667,7 @@ export function App() {
                   onSwitchNamespace={switchNamespace}
                   encStatus={encStatus}
                   uploadingIds={uploadingIds}
+                  syncSlot={syncSlot}
                 />
                 <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
                   {editing ? (
@@ -678,7 +684,6 @@ export function App() {
                       onTitleChange={(title) => retitle(editing.id, title)}
                       onTitleSettle={sync.releaseSaves}
                       undoScrollSeq={undoScrollSeq}
-                      syncSlot={syncSlot}
                       uploading={uploadingIds.has(editing.id)}
                       loading={editingDeferred}
                       canAttach={storage.adapter.capabilities.has(
@@ -694,7 +699,6 @@ export function App() {
                       onBack={() => backTo(ARCHIVE_ROUTE)}
                       onRestore={() => restoreAndEdit(reading.id)}
                       onDelete={() => removeNote(reading.id)}
-                      syncSlot={syncSlot}
                     />
                   ) : view === "archive" ? (
                     <ArchiveList
@@ -704,7 +708,6 @@ export function App() {
                       onDelete={removeNote}
                       onCopyLink={copyNoteLink}
                       onBack={() => backTo(LIST_ROUTE)}
-                      syncSlot={syncSlot}
                     />
                   ) : (
                     <NoteList
@@ -719,7 +722,6 @@ export function App() {
                       onMoveNote={moveNote}
                       onRenameFolder={renameFolder}
                       onRemoveFolder={removeFolder}
-                      syncSlot={syncSlot}
                       encStatus={encStatus}
                       uploadingIds={uploadingIds}
                     />

@@ -94,6 +94,13 @@ const achievements: AchievementsCatalog = {
         "Formateringsknappen uppe till höger i en anteckning fäller ut en rad ovanför texten — rubriker, fet, kursiv, genomstruken, kod i text, punktlistor och numrerade listor, citat, kodblock, indrag, länkar, bilder och avdelare, en knapp var. Den skriver vanlig Markdown, så allt du når där kan du lika gärna skriva för hand; varje knapp är en växel, så ett tryck på en tänd knapp tar bort formateringen igen.",
     },
 
+    pinpoint: {
+      name: "Pricksäker",
+      condition: "Hitta text inuti anteckningen du har öppen.",
+      learnMore:
+        "Förstoringsglaset i en antecknings sidhuvud fäller ut ett sökfält under toppraden, med markören redan i det. Det du skriver matchas ordagrant och utan hänsyn till versaler mot anteckningen du läser — alla träffar lyser upp samtidigt, pilarna stegar mellan dem (Enter och Skift+Enter gör samma sak från tangentbordet) och räknaren säger vilken av hur många du står på. Den söker bara i den öppna anteckningen; förstoringsglaset i sidomenyn är det som söker i allihop.",
+    },
+
     // ── Van ───────────────────────────────────────────────────────────
     collector: {
       name: "Samlaren",
@@ -212,7 +219,7 @@ const achievements: AchievementsCatalog = {
       name: "Kopiekatt",
       condition: "Kopiera en anteckning till urklipp.",
       learnMore:
-        "Kopieringsknappen bredvid synkglyfen lägger den öppna anteckningen på urklipp. Inställningar → Redigerare väljer hur mycket som tas med — bara brödtexten, titel och brödtext, eller hela .md-filen med dess YAML-frontmatter.",
+        "Kopieringsknappen i en antecknings sidhuvud lägger den öppna anteckningen på urklipp. Inställningar → Redigerare väljer hur mycket som tas med — bara brödtexten, titel och brödtext, eller hela .md-filen med dess YAML-frontmatter.",
     },
     seeker: {
       name: "Sökare",

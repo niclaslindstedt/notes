@@ -2,7 +2,7 @@
 // set of note ids whose file is currently being written to the backend. The
 // note list and side menu read it to spin a sync glyph next to exactly the
 // notes uploading right now — the per-note counterpart to the header's single
-// cloud-sync glyph. The file backends drive it through `adapter.watchUploads`
+// side-menu cloud-sync glyph. The file backends drive it through `adapter.watchUploads`
 // (see `directory-adapter.ts`); a backend without that method (the local
 // browser store) yields a permanently-empty set, so no spinner ever shows.
 

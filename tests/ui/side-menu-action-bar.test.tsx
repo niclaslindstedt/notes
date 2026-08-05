@@ -53,6 +53,15 @@ describe("SideMenuActionBar", () => {
     expect(props.onOpenArchive).toHaveBeenCalledTimes(1);
   });
 
+  it("renders the sync glyph as the last cell, and omits it without one", () => {
+    renderBar({ syncSlot: <button type="button">Sync</button> });
+    expect(screen.getByRole("button", { name: "Sync" })).toBeTruthy();
+
+    cleanup();
+    renderBar();
+    expect(screen.queryByRole("button", { name: "Sync" })).toBeNull();
+  });
+
   it("marks the active view with aria-current", () => {
     renderBar({ showAllActive: true, archiveActive: false });
     expect(

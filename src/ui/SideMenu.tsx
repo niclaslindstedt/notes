@@ -3,6 +3,7 @@ import {
   useId,
   useState,
   type DragEvent as ReactDragEvent,
+  type ReactNode,
 } from "react";
 import { flushSync } from "react-dom";
 
@@ -151,6 +152,9 @@ type Props = {
   canUndo: boolean;
   /** Whether there is an undone edit to re-apply. */
   canRedo: boolean;
+  /** The cloud sync glyph, shown as the last cell of the button island. Null on
+   *  the local backend, which has no remote to sync against. */
+  syncSlot?: ReactNode;
   /** Folders defined in the active namespace, in stable creation order. */
   folders: Folder[];
   /** Move a note into `folderId`, or out of any folder when `null`. */
@@ -195,6 +199,7 @@ export function SideMenu({
   onRedo,
   canUndo,
   canRedo,
+  syncSlot,
   folders,
   onMoveNote,
   onMoveNoteToNamespace,
@@ -710,6 +715,7 @@ export function SideMenu({
         onRedo={onRedo}
         canUndo={canUndo}
         canRedo={canRedo}
+        syncSlot={syncSlot}
         archiveIsDropTarget={noteDropActive(NOTE_DROP_ARCHIVE)}
         onArchiveDragOver={(e) => allowDropOn(e, NOTE_DROP_ARCHIVE)}
         onArchiveDragLeave={() => setDropTarget(null)}

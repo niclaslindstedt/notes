@@ -150,8 +150,15 @@ export function HomePage() {
               and files in a block at the end of the note instead of inline.
             </li>
             <li>
-              <em>Copy</em> a note to your clipboard with the button beside the
-              sync glyph — by default just the body, or, if you choose so in
+              <em>Find text inside the note you have open</em> — the magnifier
+              in a note's header drops a search bar under the top bar, lights up
+              every match as you type, and steps between them with arrows (or
+              Enter) while telling you which of how many you are on. It reads
+              only the note in front of you, and never leaves your device.
+            </li>
+            <li>
+              <em>Copy</em> a note to your clipboard with the button in its
+              header — by default just the body, or, if you choose so in
               Settings, the title and body or the whole Markdown file with its
               frontmatter. It stays on your device; the clipboard is written
               locally.
@@ -167,12 +174,12 @@ export function HomePage() {
               move it there with everything in it.
             </li>
             <li>
-              <em>Search</em> every note from the magnifier on the side menu —
-              it matches both titles and body text, is forgiving by default (a
-              rough abbreviation still finds the note), and also understands
-              wildcards and regular expressions. The search runs entirely in
-              your browser, and finds your notes even when they're stored
-              encrypted, without sending anything anywhere.
+              <em>Search across every note</em> from the magnifier on the side
+              menu — it matches both titles and body text, is forgiving by
+              default (a rough abbreviation still finds the note), and also
+              understands wildcards and regular expressions. The search runs
+              entirely in your browser, and finds your notes even when they're
+              stored encrypted, without sending anything anywhere.
             </li>
             <li>
               Pick a theme and appearance that suits you — including whether the

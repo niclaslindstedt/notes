@@ -100,6 +100,13 @@ const achievements = {
         "The formatting button at the top right of a note opens a toolbar above the text — headings, bold, italic, strikethrough, inline code, bullet and numbered lists, quotes, code blocks, indent and outdent, links, images and dividers, one button each. It writes ordinary Markdown, so anything you reach for there you can also just type; every button is a toggle, so pressing a lit one takes the formatting back off.",
     },
 
+    pinpoint: {
+      name: "Pinpoint",
+      condition: "Find text inside the note you have open.",
+      learnMore:
+        "The magnifier in a note's header opens a find bar under the top bar, with the cursor already in it. What you type is matched verbatim and case-insensitively against the note you are reading — every hit lights up at once, the arrows step between them (Enter and Shift+Enter do the same from the keyboard), and the counter says which one of how many you are on. It searches only the open note; the magnifier on the side menu is the one that searches across all of them.",
+    },
+
     // ── Intermediate ──────────────────────────────────────────────────
     collector: {
       name: "Collector",
@@ -217,7 +224,7 @@ const achievements = {
       name: "Copycat",
       condition: "Copy a note to the clipboard.",
       learnMore:
-        "The copy button beside the sync glyph puts the open note on your clipboard. Settings → Editor chooses how much it takes — just the body, the title and body, or the whole .md file with its YAML frontmatter.",
+        "The copy button in a note's header puts the open note on your clipboard. Settings → Editor chooses how much it takes — just the body, the title and body, or the whole .md file with its YAML frontmatter.",
     },
     seeker: {
       name: "Seeker",

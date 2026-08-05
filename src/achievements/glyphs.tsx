@@ -364,6 +364,20 @@ export function HistoryGlyph({ className }: IconProps) {
   );
 }
 
+// A magnifier over a stack of text lines — finding text *inside* the open
+// note, as opposed to the plain magnifier that searches across every note.
+export function TextSearchGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M4 5h16" />
+      <path d="M4 10h6" />
+      <path d="M4 19h6" />
+      <circle cx="15.5" cy="14.5" r="4" />
+      <path d="M18.5 17.5 21.5 20.5" />
+    </Svg>
+  );
+}
+
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;

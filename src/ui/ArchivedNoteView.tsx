@@ -1,5 +1,3 @@
-import { type ReactNode } from "react";
-
 import { hiddenAttachmentLines } from "../domain/attachment.ts";
 import { classifyLines } from "../domain/markdown.ts";
 import { type Note } from "../domain/note.ts";
@@ -24,7 +22,6 @@ export function ArchiveList({
   onDelete,
   onCopyLink,
   onBack,
-  syncSlot,
 }: {
   notes: Note[];
   onOpen: (id: string) => void;
@@ -33,7 +30,6 @@ export function ArchiveList({
   /** Copy an archived note's link — desktop right-click menu only. */
   onCopyLink?: (id: string) => void;
   onBack: () => void;
-  syncSlot: ReactNode;
 }) {
   const t = useT();
   return (
@@ -53,7 +49,6 @@ export function ArchiveList({
             {t("nav.archiveHeading")}
           </h1>
         </div>
-        <div className="flex items-center gap-2">{syncSlot}</div>
       </header>
 
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 py-3">
@@ -97,14 +92,12 @@ export function ReadOnlyNote({
   onBack,
   onRestore,
   onDelete,
-  syncSlot,
 }: {
   note: Note;
   editor: EditorSettings;
   onBack: () => void;
   onRestore: () => void;
   onDelete: () => void;
-  syncSlot: ReactNode;
 }) {
   const t = useT();
   const maxWidth = editorMarginMaxWidth(editor.margin);
@@ -140,7 +133,6 @@ export function ReadOnlyNote({
         </button>
         <div className="flex items-center gap-2">
           <CopyNoteButton note={note} copyScope={editor.copyScope} />
-          {syncSlot}
         </div>
       </header>
 

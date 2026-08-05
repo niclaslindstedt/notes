@@ -42,8 +42,9 @@ into the browser's session history so Back / Forward walk the notes you
 visited (see [route](#route--browser-back--forward)). It wires the
 cross-cutting hooks (`useNotes`, `useNotesSync` via the store, `useNavState`,
 `useTheme`/appearance, `usePullToRefresh`, `useFileDrop`, `useEdgeSwipeOpen`,
-`useUndoRedoShortcuts`) plus the five modal hosts and the header (app title,
-the sync glyph `SyncStatus`, and the `TrophyButton`).
+`useUndoRedoShortcuts`) plus the five modal hosts and the header (app title and
+the `TrophyButton`; the sync glyph `SyncStatus` lives in the side menu's
+[button island](#folders-in-the-side-menu) instead).
 
 ### Entry point / path switch
 
@@ -415,7 +416,8 @@ focus is moved explicitly instead:
 
 Keeping the surfaces out of the natural order is what makes the sequence a
 straight line: nothing tabs back *into* the body from the toolbar, so tabbing on
-past the sync glyph leaves the editor instead of cycling around the header.
+past the last header action leaves the editor instead of cycling around the
+header.
 
 ### Editor settings
 
@@ -608,9 +610,8 @@ the **Appendix** achievement.
 
 ### Copy button
 
-`CopyNoteButton` (`src/ui/CopyNoteButton.tsx`) — a single button to the left of
-the [sync glyph](#sync-status) in the editor and the read-only archived-note
-view. One tap copies the open note to the clipboard; what it copies is the saved
+`CopyNoteButton` (`src/ui/CopyNoteButton.tsx`) — the last button in the editor's
+and the read-only archived-note view's header action cluster. One tap copies the open note to the clipboard; what it copies is the saved
 `copyScope` [editor setting](#editor-settings), chosen from the dropdown in the
 Editor tab of the settings modal (`EditorSection`). The three scopes are a
 `CopyScope` (`src/domain/note.ts`): `body` (the body verbatim — the default,
@@ -664,9 +665,9 @@ does nothing rather than guess at a line. Cutting something unlocks the
 
 `FormatToolbar` + `FormatToolbarButton` (`src/ui/FormatToolbar.tsx`) — a row of
 one button per Markdown construct the app renders, brought up by the
-`FormatToolbarButton` sitting top-right in the editor header (leftmost of the
-header's action cluster, before the [copy button](#copy-button) and the
-[sync glyph](#sync-status)). Pressing that button opens the toolbar; pressing it
+`FormatToolbarButton` sitting top-right in the editor header (after the
+[find bar](#find-in-note)'s magnifier, before the
+[delete-line](#delete-line-button) and [copy](#copy-button) buttons). Pressing that button opens the toolbar; pressing it
 again takes it away, and the choice is remembered across notes and reloads under
 the `notes/format-toolbar` localStorage key.
 
@@ -746,6 +747,81 @@ the line elements instead, which is what lets presses **chain** — bullet three
 lines, then indent the same three into children. `PlainEditor` (Markdown rendering
 off) runs the same formatter, converting between the textarea's flat offsets and
 source points. The first press of any button unlocks the **Stylist** achievement.
+
+### Find in note
+
+`NoteFindBar` + `NoteFindButton` (`src/ui/NoteFindBar.tsx`) — a one-line search
+bar for the note that is **open**, raised by the magnifier in the editor header
+and rendered directly beneath it, in the content column, with the same
+`format-toolbar-in` unfold the [styling toolbar](#styling-toolbar) uses. The two
+are independent and can both be up at once; the find bar sits above, closest to
+the header its button lives in. Opening it pushes the note's text down rather
+than covering the line you were looking for.
+
+This is deliberately **not** the cross-note [search modal](#search). That one
+answers "which note mentions this" — fuzzy, wildcard- and regex-aware, over
+every note's title and preview — and opens a result list. This one answers
+"where in *this* note", and so matches the typed characters **verbatim and
+case-insensitively**: a fuzzy hit has no span to highlight, and someone scanning
+their own text expects the literal characters they typed, spaces and punctuation
+included. `findMatches` (`src/domain/note-find.ts`) is the whole engine: a pure
+scan returning every `NoteMatch` as `(line, from, to)` in the same source
+coordinates the editor speaks. It compares through a case-insensitive `RegExp`
+over the original text rather than lowercasing both sides, because a handful of
+characters change *length* when lowercased (`İ` becomes two code units), which
+would slide every later column out of step with the source being highlighted.
+
+What the bar shows and does:
+
+- the field, **focused on mount** — the host opens it inside the tap through
+  `flushSync`, and the bar focuses in a layout effect, which together are the
+  only arrangement that raises the soft keyboard on iOS for a programmatic
+  focus (the same trick the side menu uses for the search modal);
+- **every hit painted at once**, the one you're parked on in the accent and the
+  rest in a quieter tint;
+- **previous / next** arrows, wrapping at either end, with **Enter** and
+  **Shift+Enter** doing the same from the field so a phone can walk the note
+  from its own keyboard (`inputMode="search"` / `enterKeyHint="next"` label that
+  key). The arrows cancel their `mousedown`, so stepping never drops focus — or
+  the keyboard — out of the field;
+- a **counter** — "3 of 12", or "No matches" — so wrapping past the last hit is
+  legible rather than a mystery;
+- **Escape**, the close button, or the header toggle puts it away.
+
+The browser's own find bar (⌘F, "find on page") is not reachable from a web
+page — it can't be opened, positioned, or read, and there is no way to put its
+prev/next arrows on a phone's keyboard accessory bar — so this is the app's own.
+
+The hits reach the live-preview editor as the `matches` / `activeMatch` props on
+[`MarkdownEditor`](#markdown-editor), which buckets them by line and hands each
+[rendered line](#rendered-line) only its own. `markSource`
+(`src/ui/MarkdownLine.tsx`) splits a rendered run of source text at the hits
+inside it and wraps each in a `<mark>`. Every emitted segment carries its **own**
+`data-src`: the segments are siblings rather than nesting inside the leaf's span,
+because [selection mapping](#selection-mapping) resolves a DOM position by
+walking up to the nearest `data-src` element and adding the offset within it, so
+a `<mark>` without one would land the caret (and any copied text) at the wrong
+column. A link's rendered text can be *shorter* than its source (a
+[shortened URL](#shorten-links)), so a hit overlapping one tints the whole anchor
+instead of splitting it. A line with no hits keeps a shared empty list, so the
+per-line memo bails out and an open bar costs nothing on the lines it doesn't
+touch. Stepping onto a hit scrolls its line into view, leaving an
+already-visible one alone.
+
+Only the raw **active line** goes unpainted — it renders as verbatim source
+rather than through `RenderedLine`. In practice it never has to be: focusing the
+find field blurs the editing surface, which drops the active line, so the whole
+note renders formatted (and highlighted) while you search.
+
+The Markdown-off fallback is a plain `<textarea>`, which can carry no per-match
+markup, so there the current hit shows as the field's **own selection** (the
+browser paints it greyed while unfocused) and its line is scrolled to. Every hit
+is still counted, so the counter stays honest; focus is restored afterwards in
+case the browser moved it on `setSelectionRange`.
+
+The query is **not** remembered across notes the way the toolbar's open state is
+— a query is about the note you were reading, so the next note starts clean.
+Opening the bar is the **Pinpoint** achievement.
 
 ### Editor position memory
 
@@ -1160,7 +1236,8 @@ edge-swipe still belongs to the side menu's gestures, not to history.
 dimmed backdrop on phones, an always-docked panel on tablets+. It holds the
 namespace switcher, the recent-notes list (with swipe-to-remove rows), a
 bordered [button island](#folders-in-the-side-menu) (New note / New folder /
-Show all / Archive over Undo / Redo) pinned to the foot of the list, and a
+Show all / Archive over Undo / Redo / Search / the sync glyph) pinned to the foot
+of the list, and a
 footer (an optional donate, the trophy, an **About** dropdown that folds away the
 project links — What's new, source, privacy — and settings). It reads state from
 `NavContext` and dispatches modal-open
@@ -1351,6 +1428,10 @@ removes it and its notes from the active backend (`removeNamespace` +
 backend-specific delete). See [namespaces](#namespaces).
 
 ### Search
+
+> Not to be confused with **[find in note](#find-in-note)** — the editor's own
+> bar, which searches the open note verbatim and highlights the hits in place.
+> This section is the cross-note search: which *note* mentions something.
 
 `SearchModal` (`src/ui/SearchModal.tsx`) — find any note across the whole
 namespace at once. Opened from the magnifier on the [action bar](#folders-in-the-side-menu)
@@ -1633,17 +1714,27 @@ dismissal (`useEscapeKey`, `DismissBackdrop`), and the `document.body` portal
 mount. Portalling keeps the menu out of the settings modal's `overflow-y-auto`
 body, so a picker on a control near the bottom of the modal isn't clipped.
 
-## Sync and storage status (header)
+## Sync and storage status
 
 ### Sync status
 
-`SyncStatus` (`src/ui/SyncStatus.tsx`) — the single header glyph that morphs
+`SyncStatus` (`src/ui/SyncStatus.tsx`) — the single glyph that morphs
 with sync state (cloud-upload when dirty, spinner when saving, cloud-check when
 in sync, cloud-alert on error/offline). Tapping it always opens the [sync
 details modal](#sync-details-modal) — the command centre where the status is
 spelled out and Save now lives — whatever the state, including mid-save, so the
 glyph stays one predictable way in. Errors take precedence over the dirty state
 for which glyph shows.
+
+It lives as the **last cell of the side menu's
+[button island](#folders-in-the-side-menu)**, right of the (cross-note) Search
+button — one sync affordance for the whole app rather than one per surface
+header, which also hands the editor header its width back for the controls that
+act on the note in front of you. It is therefore styled as a `BarButton` cell
+(flush, borderless, icon-only, tinted by tone) rather than as a bordered header
+button; `App` threads it down as `SideMenu`'s `syncSlot`. Nothing renders on the
+local backend, which has no remote to sync against, and the row is then a cell
+shorter.
 
 ### Sync indicator
 
@@ -1652,7 +1743,7 @@ for which glyph shows.
 
 ### Per-note upload spinner
 
-The header [sync glyph](#sync-status) reports one global save state; this is its
+The [sync glyph](#sync-status) reports one global save state; this is its
 per-note counterpart — a small spinner next to exactly the notes whose file is
 being pushed to the backend right now, shown on the overview
 [note card](#note-card), the side-menu note row, and (for the note open in the
@@ -2307,8 +2398,8 @@ self-contained `SideMenuActionBar` (`src/ui/SideMenuActionBar.tsx`) the drawer
 renders below the list, pinned to its foot (`mt-auto`) instead of full-width
 rows, to save vertical space: a top
 row of **New note / New folder / Show all / Archive** and a bottom row of
-**Undo / Redo**, split by a divider so the six icon buttons read as one coherent
-unit rather than competing widgets. The cells sit flush against one another (the
+**Undo / Redo / Search** and the [sync glyph](#sync-status), split by a divider
+so the icon buttons read as one coherent unit rather than competing widgets. The cells sit flush against one another (the
 parent owns the border, rounding, and the inner `divide-x` / `divide-y`
 dividers) and split their row's width evenly so each row reads symmetric. The
 buttons are **icon-only** — the label rides on `aria-label` / `title` rather than
@@ -2316,7 +2407,9 @@ visible text. New folder drops the inline `FolderEditRow` into the list above;
 Show all and Archive tint accent when their view is showing; Archive carries the
 archived-note count as a corner badge and doubles as a drop target; Undo / Redo
 dim and go inert (`disabled`) at the ends of the timeline but keep the drawer
-open so a burst of reverts can be applied without reopening it.
+open so a burst of reverts can be applied without reopening it. The row's last
+cell is the `syncSlot` — the [sync glyph](#sync-status), which styles itself as a
+cell of this island and is absent entirely on the local backend.
 
 The drawer's **footer** — pinned below the island — is the relocated burger
 menu, extracted as a self-contained `SideMenuFooter`

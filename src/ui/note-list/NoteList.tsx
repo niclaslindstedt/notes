@@ -3,7 +3,6 @@ import {
   useRef,
   useState,
   type DragEvent as ReactDragEvent,
-  type ReactNode,
 } from "react";
 
 import { noteTitle, type Folder, type Note } from "../../domain/note.ts";
@@ -50,7 +49,6 @@ export function NoteList({
   onMoveNote,
   onRenameFolder,
   onRemoveFolder,
-  syncSlot,
   encStatus,
   uploadingIds,
 }: {
@@ -70,7 +68,6 @@ export function NoteList({
   onRenameFolder: (id: string, name: string) => void;
   /** Delete a folder (its notes fall back to the top level). */
   onRemoveFolder: (id: string) => void;
-  syncSlot: ReactNode;
   encStatus?: Map<string, "encrypted" | "pending">;
   /** Ids of notes whose file is being uploaded to the backend right now. */
   uploadingIds?: ReadonlySet<string>;
@@ -190,7 +187,6 @@ export function NoteList({
     <div className="flex h-full flex-col select-none">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
         <AppTitle />
-        <div className="flex items-center gap-2">{syncSlot}</div>
       </header>
 
       <div className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto overscroll-none px-4 pt-3 pb-24 md:pb-3">

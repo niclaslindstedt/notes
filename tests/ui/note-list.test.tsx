@@ -53,15 +53,7 @@ function renderList(props: Partial<Parameters<typeof NoteList>[0]> = {}) {
     onRenameFolder: vi.fn(),
     onRemoveFolder: vi.fn(),
   };
-  render(
-    <NoteList
-      notes={[]}
-      folders={[]}
-      syncSlot={null}
-      {...handlers}
-      {...props}
-    />,
-  );
+  render(<NoteList notes={[]} folders={[]} {...handlers} {...props} />);
   return handlers;
 }
 

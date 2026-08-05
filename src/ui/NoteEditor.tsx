@@ -3,13 +3,14 @@ import {
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
   type Ref,
   type RefObject,
 } from "react";
+import { flushSync } from "react-dom";
 
 import { unlock } from "../achievements/index.ts";
 import { type Attachment } from "../domain/attachment.ts";
@@ -21,6 +22,7 @@ import {
   type FormatAction,
   type LineFormat,
 } from "../domain/markdown-format.ts";
+import { findMatches, type NoteMatch } from "../domain/note-find.ts";
 import { isBlank, type Folder, type Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
@@ -42,6 +44,7 @@ import {
   MarkdownEditor,
   type MarkdownEditorHandle,
 } from "./MarkdownEditor.tsx";
+import { NoteFindBar, NoteFindButton } from "./NoteFindBar.tsx";
 
 // A compact folder picker for the editor header — the cross-platform way to
 // file the open note (drag-to-folder works on a pointer device; this works
@@ -106,6 +109,10 @@ function readToolbarOpen(): boolean {
   return localStorage.getItem(TOOLBAR_OPEN_KEY) === "true";
 }
 
+// A stable empty hit list for the closed find bar, so the editing surfaces keep
+// seeing the identical reference and their per-line memos bail out.
+const NO_MATCHES: readonly NoteMatch[] = [];
+
 /** What the plain-textarea fallback exposes, mirroring the live-preview one. */
 type PlainEditorHandle = {
   format: (action: FormatAction) => void;
@@ -122,7 +129,6 @@ export function Editor({
   onTitleChange,
   onTitleSettle,
   undoScrollSeq = 0,
-  syncSlot,
   uploading = false,
   loading = false,
   canAttach,
@@ -142,7 +148,6 @@ export function Editor({
   /** Ticks when undo / redo swaps the body — cues the editor to scroll the
    *  reverted / re-applied region back into view. */
   undoScrollSeq?: number;
-  syncSlot: ReactNode;
   /** The open note's file is being uploaded — swap the glyph for a spinner. */
   uploading?: boolean;
   /** The note's body is still being decrypted (lazy encrypted backend) — show a
@@ -160,14 +165,14 @@ export function Editor({
   const titleFirst = useRef(isBlank(note)).current;
   const bodyRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
-  // The header's action cluster (folder picker, copy, sync), which the body
-  // hands focus on to — see `firstAction`.
+  // The header's action cluster (folder picker, find, formatting, copy), which
+  // the body hands focus on to — see `firstAction`.
   const actionsRef = useRef<HTMLDivElement>(null);
   // Handle on the live-preview editor so the title can hand focus down into the
   // body even when no line is active yet (the body has no textarea until then).
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null);
   const plainEditorRef = useRef<PlainEditorHandle>(null);
-  // The header centres a single-line title against the glyph and the copy/sync
+  // The header centres a single-line title against the glyph and the action
   // buttons, and top-aligns once the title wraps so those stay pinned to the
   // first line (the title field reports the transition as it grows).
   const [titleMultiline, setTitleMultiline] = useState(false);
@@ -179,6 +184,45 @@ export function Editor({
   // toolbar costs nothing.
   const [toolbarOpen, setToolbarOpen] = useState(readToolbarOpen);
   const [lineFormat, setLineFormat] = useState<LineFormat | null>(null);
+
+  // Find in note: whether the bar is up, what is typed in it, and which hit it
+  // is parked on. Deliberately *not* remembered across notes the way the
+  // styling toolbar is — a query is about the note you were reading, so opening
+  // the next note starts clean.
+  const [findOpen, setFindOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [matchCursor, setMatchCursor] = useState(0);
+
+  // Every hit in the note, recomputed as the query (or the note) changes. A
+  // closed bar matches nothing, so nothing downstream pays for it.
+  const matches = useMemo<readonly NoteMatch[]>(
+    () => (findOpen ? findMatches(note.body ?? "", query) : NO_MATCHES),
+    [findOpen, note.body, query],
+  );
+  // The cursor is clamped rather than corrected: editing the note (or the
+  // query) can shrink the list under it, and clamping keeps the bar on the
+  // last hit instead of flipping it back to the first.
+  const activeMatch =
+    matches.length === 0 ? -1 : Math.min(matchCursor, matches.length - 1);
+
+  function stepMatch(delta: number) {
+    if (matches.length === 0) return;
+    setMatchCursor((activeMatch + delta + matches.length) % matches.length);
+  }
+
+  function toggleFind() {
+    if (findOpen) {
+      setFindOpen(false);
+      return;
+    }
+    unlock("pinpoint");
+    setMatchCursor(0);
+    // Open synchronously *inside this tap* so the bar's mount-time focus (a
+    // layout effect) runs within the user gesture — the only context in which
+    // iOS raises the soft keyboard for a programmatic focus. The same trick the
+    // side menu uses to open the cross-note search modal.
+    flushSync(() => setFindOpen(true));
+  }
 
   function toggleToolbar() {
     setToolbarOpen((open) => {
@@ -225,14 +269,14 @@ export function Editor({
   }
 
   // The editor's tab order is spelled out by hand as back → title → body →
-  // folder / copy / sync, because that's the order you actually work in: name
+  // folder / find / formatting / copy, because that's the order you work in: name
   // the note, write it, and only then reach for the toolbar. Document order
   // can't say that — the header (and its buttons) precede the body — so the
   // two editing surfaces are kept out of the browser's sequential order
   // (`tabIndex={-1}`) and focus is moved here instead: Tab in the title drops
   // into the body, Tab in the body climbs to the first header action, and both
   // are reversible with Shift+Tab. Nothing tabs back into the body from the
-  // toolbar, so tabbing on past the sync glyph leaves the editor for good.
+  // toolbar, so tabbing on past the last action leaves the editor for good.
   function firstAction(): HTMLElement | null {
     return actionsRef.current?.querySelector<HTMLElement>(FOCUSABLE) ?? null;
   }
@@ -304,10 +348,10 @@ export function Editor({
               onChange={(id) => onMoveFolder(id || null)}
             />
           )}
+          <NoteFindButton open={findOpen} onToggle={toggleFind} />
           <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
           {!loading && <DeleteLineButton onDelete={runDeleteLine} />}
           <CopyNoteButton note={note} copyScope={editor.copyScope} />
-          {syncSlot}
         </div>
       </header>
 
@@ -315,6 +359,26 @@ export function Editor({
         {/* The toolbar sits *in* the content column rather than floating over
             it: opening it pushes the note's text down, so the line you are
             about to format is never the line it covers. */}
+        {/* The find bar sits above the styling toolbar and below the header —
+            closest to the top bar its button lives in. Both can be up at once;
+            each pushes the note's text down rather than covering it. */}
+        {findOpen && !loading && (
+          <NoteFindBar
+            query={query}
+            onQueryChange={(next) => {
+              setQuery(next);
+              // A fresh query starts at the first hit; keeping the old cursor
+              // would park the bar somewhere arbitrary in the new list.
+              setMatchCursor(0);
+            }}
+            total={matches.length}
+            current={activeMatch}
+            onNext={() => stepMatch(1)}
+            onPrevious={() => stepMatch(-1)}
+            onClose={() => setFindOpen(false)}
+            maxWidth={maxWidth}
+          />
+        )}
         {toolbarOpen && !loading && (
           <FormatToolbar
             line={lineFormat}
@@ -350,6 +414,8 @@ export function Editor({
             shortenLinkChars={editor.shortenLinkChars}
             onTabOut={onBodyTab}
             onLineFormat={toolbarOpen ? setLineFormat : undefined}
+            matches={matches}
+            activeMatch={activeMatch}
           />
         ) : (
           <PlainEditor
@@ -365,6 +431,8 @@ export function Editor({
             maxWidth={maxWidth}
             focusOnMount={false}
             noteId={note.id}
+            matches={matches}
+            activeMatch={activeMatch}
           />
         )}
       </div>
@@ -548,6 +616,8 @@ function PlainEditor({
   noteId,
   onTabOut,
   onLineFormat,
+  matches = NO_MATCHES,
+  activeMatch = -1,
   ref,
 }: {
   body: string;
@@ -566,6 +636,11 @@ function PlainEditor({
   /** Report the caret's line to the styling toolbar; only passed while it's
    *  open, so a closed toolbar never pays for the classification. */
   onLineFormat?: (line: LineFormat | null) => void;
+  /** The find bar's hits. A textarea can't paint them, so only the one the bar
+   *  is parked on shows — as the field's own selection (see below). */
+  matches?: readonly NoteMatch[];
+  /** Index into `matches` of the hit the bar is parked on, or -1 for none. */
+  activeMatch?: number;
   /** Imperative handle so the toolbar can apply an action here. */
   ref?: Ref<PlainEditorHandle>;
 }) {
@@ -663,6 +738,34 @@ function PlainEditor({
     el.focus();
     el.select();
   });
+
+  // --- Find in note --------------------------------------------------------
+  //
+  // A textarea can't carry per-match markup, so the plain fallback shows the
+  // hit the find bar is parked on as the field's *own* selection — which the
+  // browser paints (greyed while the field is unfocused) — and scrolls it into
+  // view. Every hit is still counted, so the bar's "3 of 12" is honest; only
+  // the "all matches at once" tint is beyond a textarea.
+  //
+  // Focus is put back where it was afterwards: some browsers focus a field on
+  // `setSelectionRange`, and stealing focus out of the find field mid-search
+  // would drop the soft keyboard on a phone.
+  const hit = activeMatch >= 0 ? matches[activeMatch] : undefined;
+  const hitLine = hit?.line ?? null;
+  const hitFrom = hit?.from ?? null;
+  const hitTo = hit?.to ?? null;
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || hitLine === null || hitFrom === null || hitTo === null) return;
+    const focused = document.activeElement;
+    el.setSelectionRange(
+      pointToOffset(el.value, { line: hitLine, col: hitFrom }),
+      pointToOffset(el.value, { line: hitLine, col: hitTo }),
+    );
+    if (focused instanceof HTMLElement && document.activeElement !== focused)
+      focused.focus();
+    scrollTextareaToLine(el, hitLine);
+  }, [hitLine, hitFrom, hitTo]);
 
   // --- The styling toolbar -------------------------------------------------
   //
