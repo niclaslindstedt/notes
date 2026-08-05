@@ -1466,6 +1466,20 @@ single body up front and without bloating the index. Picking a result calls
 if it was deferred). Searching is what unlocks the **Seeker** achievement (manual
 `unlock("seeker")`).
 
+### Clear button
+
+The control that empties a text field, as opposed to the one that closes the
+dialog around it. It paints `ClearFieldIcon` (`src/ui/icons.tsx`) — a cross
+inside a circle — rather than the bare `CloseIcon` every dialog's close button
+uses, and its hover halo is a full circle (`rounded-full`) to match.
+
+The distinction exists because the two controls end up adjacent: in the
+[search modal](#search) the clear button sits immediately left of the modal's
+close button, and when both were a plain cross the header read as one control
+accidentally drawn twice. The ring is what separates them at a glance, and it's
+the conventional "empty this field" affordance besides. Any future field that
+grows a clear button should reuse `ClearFieldIcon` for the same reason.
+
 ### Changelog modal
 
 `ChangelogModal` (`src/ui/changelog/ChangelogModal.tsx`) — the in-app "What's

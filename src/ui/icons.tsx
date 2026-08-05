@@ -93,6 +93,31 @@ export function ImportIcon({ className }: IconProps) {
 }
 
 /**
+ * A cross inside a circle — the "empty this field" affordance. Deliberately
+ * *not* the bare `CloseIcon`: a clear button usually sits a few pixels from a
+ * dialog's close button, and two identical crosses side by side read as one
+ * control repeated. The ring is what tells them apart at a glance.
+ */
+export function ClearFieldIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9 9 6 6M15 9l-6 6" />
+    </svg>
+  );
+}
+
+/**
  * A cross followed by a stroke — "X—", the editor's delete-line button. Reads
  * as taking a line of text away rather than the note itself, which is what the
  * trash can already means everywhere else in the app.
