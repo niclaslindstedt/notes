@@ -1,0 +1,34 @@
+{
+  // Type-checks this directory's plain JavaScript against Electron's own
+  // `electron.d.ts` (which ships in the npm package) WITHOUT a build step.
+  //
+  // The shell is deliberately not TypeScript: it is one file, and compiling it
+  // would mean a `dist/`, a build to run before both `electron .` and
+  // packaging, and a `main` field pointing at generated output — so the file
+  // that runs would stop being the file you read. `checkJs` buys the type
+  // safety without any of that; `noEmit` is the whole point.
+  //
+  // A `jsconfig` rather than a `tsconfig` because that is exactly what this is
+  // — a checked JavaScript project — and editors pick it up for IntelliSense
+  // on the same terms CI checks it.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    // node16 resolves this package's CommonJS `require` and the `.mjs` build
+    // script's ESM imports by their file extensions, which is what they are.
+    "module": "node16",
+    "moduleResolution": "node16",
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    // `electron-builder.config.cjs` reads the app's real version out of the
+    // root `package.json`.
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": ["main.js", "electron-builder.config.cjs", "scripts/**/*.mjs"]
+}

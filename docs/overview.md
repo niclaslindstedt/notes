@@ -3130,7 +3130,12 @@ scheme, serves `electron/webroot/` (the embedded build, written by
 `electron/scripts/bundle-web.mjs`) from it, opens one sandboxed
 context-isolated window, and sends off-origin links to the system browser.
 There is no preload, no IPC, and no storage the renderer can see — the embedded
-app runs its own `localStorage`, exactly as it does in a browser tab.
+app runs its own `localStorage`, exactly as it does in a browser tab. It is
+plain CommonJS rather than TypeScript (compiling one file would put generated
+output between the source and what runs), but not unchecked: `// @ts-check`
+plus `electron/jsconfig.json` type-check it against Electron's own
+`electron.d.ts` with no emit, run by the `electron` job in `ci.yml` because the
+root `make lint` / `make test` stop at that directory's edge.
 
 The one thing the shell owns is the window's **remembered size and position**
 (`window-state.json` in the app's user-data directory, written on `close`),
