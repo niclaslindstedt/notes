@@ -30,6 +30,7 @@ import {
 import {
   classifyLines,
   codeBlockCopyAnchors,
+  codeBlockEdges,
   hiddenFenceLines,
 } from "../domain/markdown.ts";
 import {
@@ -59,7 +60,7 @@ import {
   scrollFocusedIntoView,
 } from "./hooks/scrollFocusedIntoView.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
-import { lineTextClass } from "./markdown-line-class.ts";
+import { codeBlockEdgeClass, lineTextClass } from "./markdown-line-class.ts";
 import { CodeCopyButton } from "./CodeCopyButton.tsx";
 import { RenderedLine, type LineHighlight } from "./MarkdownLine.tsx";
 import {
@@ -321,6 +322,14 @@ export function MarkdownEditor({
   // top-right corner of the block as drawn (see `codeBlockCopyAnchors`).
   const copyAnchors = useMemo(
     () => codeBlockCopyAnchors(blocks, clampedIndex),
+    [blocks, clampedIndex],
+  );
+
+  // The drawn lines that are a code block's top / bottom edge, which is where
+  // the block's rounded corners and its vertical padding go — there is no
+  // per-block container to put them on (see `codeBlockEdges`).
+  const codeEdges = useMemo(
+    () => codeBlockEdges(blocks, clampedIndex),
     [blocks, clampedIndex],
   );
 
@@ -1223,6 +1232,7 @@ export function MarkdownEditor({
             </span>
           )}
           {lines.map((line, index) => {
+            const edgeClass = codeBlockEdgeClass(codeEdges, index);
             if (index === clampedIndex) {
               return (
                 <ActiveLine
@@ -1232,7 +1242,7 @@ export function MarkdownEditor({
                   setRef={(el) => {
                     activeElRef.current = el;
                   }}
-                  className={`cursor-text ${wrapClass} ${lineTextClass(blocks[index]!)}`}
+                  className={`cursor-text ${wrapClass} ${lineTextClass(blocks[index]!)} ${edgeClass}`}
                 />
               );
             }
@@ -1252,8 +1262,14 @@ export function MarkdownEditor({
                   block={blocks[index]!}
                   shortenLinkChars={shortenLinkChars}
                   highlights={highlightsByLine.get(index)}
+                  edgeClass={edgeClass}
                 />
-                {code !== undefined && <CodeCopyButton code={code} />}
+                {code !== undefined && (
+                  <CodeCopyButton
+                    code={code}
+                    padded={codeEdges.top.has(index)}
+                  />
+                )}
               </div>
             );
           })}

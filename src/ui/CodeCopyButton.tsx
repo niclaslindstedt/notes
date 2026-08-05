@@ -24,7 +24,20 @@ import { CheckIcon, CopyIcon } from "./icons.tsx";
 // - it is unselectable, so dragging a selection across the note doesn't sweep
 //   the button up with the code.
 
-export function CodeCopyButton({ code }: { code: string }) {
+export function CodeCopyButton({
+  code,
+  padded,
+}: {
+  code: string;
+  /**
+   * Whether the line this button hangs on is the block's **top edge**, and so
+   * carries the block's top padding — which pushes its first row of text down
+   * by that much, and the button with it. False in the one case where the two
+   * come apart: the caret sitting on the opening fence, which hands the button
+   * to the (unpadded) code line below.
+   */
+  padded: boolean;
+}) {
   const t = useT();
   const [copied, setCopied] = useState(false);
   const copiedTimer = useRef<number | undefined>(undefined);
@@ -48,11 +61,12 @@ export function CodeCopyButton({ code }: { code: string }) {
     //
     // - The rail is centred on the block's first *row* rather than on the
     //   anchor line's box: a code line is 20px tall (`text-sm`, a fixed rem
-    //   line-height the app font scale doesn't touch) and the button is 24px,
-    //   so `-2px` centres it on that row whether the line fits on one row or
-    //   wraps onto several. On a one-line block the button then sits in the
-    //   slab instead of hanging out of it, and on a tall one it lands in the
-    //   corner — where GitHub puts it.
+    //   line-height the app font scale doesn't touch) and the button is 28px,
+    //   so the rail sits 4px above that row's midline whether the line fits on
+    //   one row or wraps onto several. The block's own top padding (8px, from
+    //   `codeBlockEdgeClass`) offsets the row, so the rail follows it down —
+    //   the button then has room inside the slab even on a one-line block,
+    //   and lands in the corner on a tall one, where GitHub puts it.
     // - The float is `sticky`, so with word wrap off (the note scrolls
     //   sideways and every line is as wide as the widest one in the note) the
     //   button is pulled back to the visible right edge instead of parking a
@@ -60,7 +74,9 @@ export function CodeCopyButton({ code }: { code: string }) {
     //   on there is nothing to scroll, so it simply sits at the line's end.
     <div
       contentEditable={false}
-      className="absolute inset-x-0 top-[-2px] z-10 h-0 select-none"
+      className={`absolute inset-x-0 z-10 h-0 select-none ${
+        padded ? "top-1" : "top-[-4px]"
+      }`}
     >
       <button
         type="button"
@@ -69,14 +85,14 @@ export function CodeCopyButton({ code }: { code: string }) {
         title={label}
         aria-label={label}
         draggable={false}
-        className={`sticky right-4 float-right mr-1 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-[6px] border border-line bg-surface-3 transition-colors hover:border-muted/60 hover:bg-surface focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none ${
+        className={`sticky right-6 float-right mr-2 inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-line bg-surface-3 transition-colors hover:border-muted/60 hover:bg-surface focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none ${
           copied ? "text-accent" : "text-muted hover:text-fg-bright"
         }`}
       >
         {copied ? (
-          <CheckIcon className="h-3.5 w-3.5" />
+          <CheckIcon className="h-4 w-4" />
         ) : (
-          <CopyIcon className="h-3.5 w-3.5" />
+          <CopyIcon className="h-4 w-4" />
         )}
       </button>
     </div>

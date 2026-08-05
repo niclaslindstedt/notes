@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyLines,
   codeBlockCopyAnchors,
+  codeBlockEdges,
   fencedRanges,
   hasClosedFence,
   hiddenFenceLines,
@@ -132,6 +133,53 @@ describe("hiddenFenceLines", () => {
   it("never hides an unterminated fence", () => {
     const open = classifyLines("a\n```\ncode");
     expect(hiddenFenceLines(open, 0).size).toBe(0);
+  });
+});
+
+describe("codeBlockEdges", () => {
+  // The edges as line indices, for readable assertions.
+  function edges(body: string, activeLine: number | null) {
+    const e = codeBlockEdges(classifyLines(body), activeLine);
+    return { top: [...e.top], bottom: [...e.bottom] };
+  }
+
+  it("puts the edges on the code lines while the fences are folded away", () => {
+    expect(edges("a\n```\none\ntwo\n```\nb", null)).toEqual({
+      top: [2],
+      bottom: [3],
+    });
+  });
+
+  it("moves the edges onto the fences once the caret unfolds them", () => {
+    expect(edges("a\n```\none\ntwo\n```\nb", 2)).toEqual({
+      top: [1],
+      bottom: [4],
+    });
+  });
+
+  it("makes a one-line block its own top and bottom", () => {
+    expect(edges("```\nonly\n```", null)).toEqual({ top: [1], bottom: [1] });
+  });
+
+  it("runs an unterminated block from its fence to the end of the note", () => {
+    expect(edges("a\n```\nstill typing", null)).toEqual({
+      top: [1],
+      bottom: [2],
+    });
+  });
+
+  it("gives a folded-away empty block no edges at all", () => {
+    // Both fences hidden and nothing between them — nothing is drawn.
+    expect(edges("a\n```\n```\nb", null)).toEqual({ top: [], bottom: [] });
+    // With the caret inside, the fences are back and they are the edges.
+    expect(edges("a\n```\n```\nb", 1)).toEqual({ top: [1], bottom: [2] });
+  });
+
+  it("closes every block's box independently", () => {
+    expect(edges("```\na\n```\ntext\n```\nb\n```", null)).toEqual({
+      top: [1, 5],
+      bottom: [1, 5],
+    });
   });
 });
 

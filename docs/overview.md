@@ -483,6 +483,21 @@ hiding something the user needs:
   `RenderedLine` (`src/ui/MarkdownLine.tsx`) then only varies the ink: a
   visible fence is muted (it is markup), the code it wraps is bright (it is
   content).
+- The block's **box is closed at its outermost drawn lines**:
+  `codeBlockEdges(blocks, activeLine)` (`src/domain/markdown.ts`) names the
+  block's first and last drawn line, and `codeBlockEdgeClass`
+  (`src/ui/markdown-line-class.ts`) gives them the rounded corners
+  (`var(--radius)`, so the block follows the user's radius preference) and the
+  vertical padding — top on the first, bottom on the last, so a one-line block
+  closes the box on its own and a tall one keeps its interior lines tight
+  rather than turning airy. The padding is also what gives the block's first
+  row room to hold the [copy button](#code-block-copy-button). Which lines are
+  the edges shifts as the fences fold: with the caret outside they are the
+  first and last *code* lines, with it inside they are the delimiters. An
+  unterminated fence counts from its opener to the end of the note, so a
+  half-typed block reads as a block too. Like `lineTextClass`, the classes go
+  on the active raw line as well, so the caret landing on an edge doesn't
+  change the block's height.
 
 The lines stay in the source throughout — hiding is purely a render-time skip,
 so line indices, structural edits, and [selection
@@ -526,9 +541,12 @@ button, all of them in `CodeCopyButton`:
   the block — which would unfold the block's fences and shuffle it down a line
   under the user's finger mid-press.
 - It is a `sticky` float on a zero-height rail across the anchor line, centred
-  on that line's first *row* (a code line is a fixed 20px tall). Centring on
-  the row rather than on the line's box keeps the button inside the slab on a
-  one-line block and in the corner on a tall or wrapped one; the stickiness
+  on that line's first *row* (a code line is a fixed 20px tall) and following
+  the block's own top padding down when the anchor is the block's top edge.
+  Centring on the row rather than on the line's box keeps the button in the
+  corner on a tall or wrapped block and inside the slab on a one-line one —
+  which is why a block pads its [top and bottom edges](#code-block): a bare
+  20px row has no room to hold a 28px button. The stickiness
   matters when word wrap ([Editor settings](#editor-settings)) is off and the note scrolls sideways —
   every line is then as wide as the widest line in the note, and without it the
   button would park a screen or two off to the right where nobody would find
