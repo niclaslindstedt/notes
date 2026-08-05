@@ -825,4 +825,78 @@ describe("MarkdownEditor", () => {
       expect(surface().querySelectorAll("mark").length).toBe(0);
     });
   });
+
+  describe("line numbers", () => {
+    // The gutter's press targets, in document order.
+    function gutter(): HTMLElement[] {
+      return [
+        ...surface().querySelectorAll<HTMLElement>(
+          "button[aria-label^='Select line']",
+        ),
+      ];
+    }
+
+    it("renders nothing extra while the setting is off", () => {
+      renderEditor("one\ntwo", { focusOnMount: false });
+      expect(gutter().length).toBe(0);
+      // Every line element is still a direct child of the surface — the DOM the
+      // editor has always rendered.
+      for (const el of surface().querySelectorAll("[data-line-index]"))
+        expect(el.parentElement).toBe(surface());
+    });
+
+    it("numbers every rendered line from one", () => {
+      renderEditor("one\ntwo\nthree", {
+        focusOnMount: false,
+        lineNumbers: true,
+      });
+      expect(gutter().map((b) => b.textContent)).toEqual(["1", "2", "3"]);
+    });
+
+    it("keeps the number out of the line's own text", () => {
+      // A digit inside the line element would shift every source column by its
+      // width, so the button must be a sibling of `[data-line-index]`.
+      renderEditor("hello", { lineNumbers: true });
+      expect(rawLine()?.textContent).toBe("hello");
+      expect(surface().querySelector("[data-line-index]")).not.toBe(
+        gutter()[0]!.parentElement,
+      );
+    });
+
+    it("selects the whole line when its number is pressed", () => {
+      renderEditor("alpha\nbeta", { focusOnMount: false, lineNumbers: true });
+      act(() => {
+        fireEvent.mouseDown(gutter()[0]!);
+      });
+      const sel = window.getSelection()!;
+      expect(sel.isCollapsed).toBe(false);
+      expect(sel.toString()).toBe("alpha");
+    });
+
+    it("drops the active raw line so the selection covers the formatted one", () => {
+      // The caret opens on the last line (raw); pressing another line's number
+      // takes the whole note back to formatted and selects that line.
+      renderEditor("**bold**\nplain", { lineNumbers: true });
+      expect(rawLine()).not.toBeNull();
+      act(() => {
+        fireEvent.mouseDown(gutter()[0]!);
+      });
+      expect(rawLine()).toBeNull();
+      expect(window.getSelection()!.toString()).toBe("bold");
+    });
+
+    it("cuts the pressed line through the editor's own cut", () => {
+      // The selection a press draws is an ordinary ranged one, so everything
+      // that reads the selection — cut, copy, typing over it — sees it.
+      const { onChange } = renderEditor("alpha\nbeta", {
+        focusOnMount: false,
+        lineNumbers: true,
+      });
+      act(() => {
+        fireEvent.mouseDown(gutter()[0]!);
+      });
+      beforeInput("insertText", "X");
+      expect(onChange).toHaveBeenLastCalledWith("X\nbeta");
+    });
+  });
 });

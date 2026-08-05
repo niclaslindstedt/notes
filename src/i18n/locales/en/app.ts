@@ -14,6 +14,9 @@ const app = {
   newNote: "New note",
   back: "Back",
   startWriting: "Start writing…",
+  // Label of one line-number press target in the editor's gutter (line numbers
+  // are opt-in); pressing it selects that whole line.
+  selectLine: "Select line {n}",
   titlePlaceholder: "Title",
   // Heading of the collected attachments block at the foot of a note, shown
   // when images / files are set to render at the end rather than inline.

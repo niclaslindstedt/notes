@@ -9,6 +9,7 @@ import {
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
   type Ref,
 } from "react";
 
@@ -137,6 +138,9 @@ type Props = {
   placement?: AttachmentPlacement;
   /** Trim bare URLs in the preview to this many characters either side (0 = off). */
   shortenLinkChars?: number;
+  /** Number every line in a gutter down the left edge, code-editor style, each
+   *  number a press target that selects its whole line. */
+  lineNumbers?: boolean;
   /** The open note's id, keying its session-remembered caret / scroll position
    *  so switching away and back reopens where you left off. */
   noteId?: string;
@@ -199,6 +203,7 @@ export function MarkdownEditor({
   onAttach,
   placement = INLINE_PLACEMENT,
   shortenLinkChars = 0,
+  lineNumbers = false,
   noteId,
   onTabOut,
   onLineFormat,
@@ -1161,6 +1166,30 @@ export function MarkdownEditor({
     selectLineSpan(span.from, span.to);
   });
 
+  // A press on the line-number gutter: take the whole line. The line stops
+  // being the active raw one first — a whole-line selection reads as the
+  // formatted line the rest of the note shows, and both endpoints then map back
+  // to source the same way a block format's multi-line result does. Clearing
+  // the active line is what re-renders it, so the selection is queued for the
+  // effect above to draw afterwards; with no active line to clear there is no
+  // re-render to wait for and it is drawn straight away.
+  function selectLine(index: number) {
+    const len = (linesRef.current[index] ?? "").length;
+    lastCaret.current = { line: index, col: len };
+    // No single line is active, so the toolbar reads the pressed one instead
+    // (see `reportIndex`) — bulleting a gutter-selected line lights the button.
+    setSpanLine(index);
+    markCaret(index, 0, len);
+    if (activeRef.current.index === null) {
+      selectLineSpan(index, index);
+      return;
+    }
+    pendingCaret.current = null;
+    pendingRange.current = null;
+    pendingLineSpan.current = { from: index, to: index };
+    setActive((a) => ({ index: null, key: a.key + 1 }));
+  }
+
   // Tell the toolbar what is already in effect at the caret, so the H2 /
   // bullet / quote button can light up — and, from `caretSpan`, so can Bold
   // when the caret sits inside a `**…**` run. Skipped entirely when nobody is
@@ -1303,7 +1332,7 @@ export function MarkdownEditor({
             composing.current = false;
             readBackComposition();
           }}
-          className={`relative px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
+          className={`relative ${lineNumbers ? "pr-4 pl-14" : "px-4"} pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
           style={widthStyle}
         >
           {value === "" && (
@@ -1318,42 +1347,60 @@ export function MarkdownEditor({
             const edgeClass = codeBlockEdgeClass(codeEdges, index);
             if (index === clampedIndex) {
               return (
-                <ActiveLine
-                  key={`active-${active.key}`}
+                <LineRow
+                  key={index}
                   index={index}
-                  text={line}
-                  setRef={(el) => {
-                    activeElRef.current = el;
-                  }}
-                  className={`cursor-text ${wrapClass} ${lineTextClass(blocks[index]!)} ${edgeClass}`}
-                />
+                  numbered={lineNumbers}
+                  current
+                  onSelect={selectLine}
+                  label={t("app.selectLine", { n: index + 1 })}
+                >
+                  <ActiveLine
+                    key={`active-${active.key}`}
+                    index={index}
+                    text={line}
+                    setRef={(el) => {
+                      activeElRef.current = el;
+                    }}
+                    className={`cursor-text ${wrapClass} ${lineTextClass(blocks[index]!)} ${edgeClass}`}
+                  />
+                </LineRow>
               );
             }
             // An at-end attachment reference is drawn in the collected block, not
             // in place; skip its line here. It stays in the source (so indices
             // and structural edits are unaffected) and reveals its raw markdown
-            // when the caret lands on it (making it the active line).
+            // when the caret lands on it (making it the active line). A hidden
+            // line takes its number with it, the way a folded region does.
             if (hidden.has(index) || hiddenFences.has(index)) return null;
             const code = copyAnchors.get(index);
             return (
-              <div
+              <LineRow
                 key={index}
-                data-line-index={index}
-                className={`cursor-text ${wrapClass} ${code === undefined ? "" : "relative"}`}
+                index={index}
+                numbered={lineNumbers}
+                current={false}
+                onSelect={selectLine}
+                label={t("app.selectLine", { n: index + 1 })}
               >
-                <RenderedLine
-                  block={blocks[index]!}
-                  shortenLinkChars={shortenLinkChars}
-                  highlights={highlightsByLine.get(index)}
-                  edgeClass={edgeClass}
-                />
-                {code !== undefined && (
-                  <CodeCopyButton
-                    code={code}
-                    padded={codeEdges.top.has(index)}
+                <div
+                  data-line-index={index}
+                  className={`cursor-text ${wrapClass} ${code === undefined ? "" : "relative"}`}
+                >
+                  <RenderedLine
+                    block={blocks[index]!}
+                    shortenLinkChars={shortenLinkChars}
+                    highlights={highlightsByLine.get(index)}
+                    edgeClass={edgeClass}
                   />
-                )}
-              </div>
+                  {code !== undefined && (
+                    <CodeCopyButton
+                      code={code}
+                      padded={codeEdges.top.has(index)}
+                    />
+                  )}
+                </div>
+              </LineRow>
             );
           })}
           <div contentEditable={false}>
@@ -1362,6 +1409,61 @@ export function MarkdownEditor({
         </div>
       </div>
     </AttachmentsProvider>
+  );
+}
+
+// One line of the note, optionally carrying its number in the gutter.
+//
+// With numbering off this is the line element itself, so the default editor
+// renders exactly the DOM it always has. With it on, the line is wrapped in a
+// positioning context and the number hangs in the surface's left padding —
+// deliberately a *sibling* of the `[data-line-index]` element rather than a
+// child of it. Everything that reads the editor's text (`offsetWithin` on the
+// active raw line, the caret walker in `placeCaret`, the composition read-back)
+// measures that element's own text, so a digit inside it would shift every
+// column by its width and corrupt each edit.
+function LineRow({
+  index,
+  numbered,
+  current,
+  label,
+  onSelect,
+  children,
+}: {
+  index: number;
+  numbered: boolean;
+  /** This is the line the caret sits on — lit the way a code editor lights it. */
+  current: boolean;
+  label: string;
+  onSelect: (index: number) => void;
+  children: ReactNode;
+}) {
+  if (!numbered) return children;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        // Out of the tab order for the same reason the surface itself is: the
+        // editor hands focus on via `onTabOut`, and one tab stop per line would
+        // make tabbing out of a long note impossible.
+        tabIndex={-1}
+        contentEditable={false}
+        aria-label={label}
+        onMouseDown={(e) => {
+          // Take the press before the browser moves the caret / focus with it,
+          // so the selection we draw is the only one. A tap on a touch screen
+          // arrives here as a synthesized mousedown, so this covers both.
+          e.preventDefault();
+          onSelect(index);
+        }}
+        className={`absolute top-0 -left-12 w-9 cursor-pointer text-right text-xs tabular-nums select-none ${
+          current ? "text-fg-bright" : "text-muted/50 hover:text-muted"
+        }`}
+      >
+        {index + 1}
+      </button>
+      {children}
+    </div>
   );
 }
 

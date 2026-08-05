@@ -74,6 +74,9 @@ const settings = {
     renderMarkdown: "Render Markdown",
     renderMarkdownHint:
       "Format Markdown as you type — every line but the one you're on shows formatted, like Obsidian.",
+    lineNumbers: "Line numbers",
+    lineNumbersHint:
+      "Number every line down the editor's left edge, the way a code editor does. Press a number to select that whole line. Needs Markdown rendering on.",
     shortenLinks: "Shorten links",
     shortenLinksHint:
       "Trim long pasted URLs in the preview to the domain, a few characters either side of an [...] marker. The full link is still saved and still opens — only the display is shortened.",

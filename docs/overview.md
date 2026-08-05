@@ -479,7 +479,8 @@ header.
 ### Editor settings
 
 `EditorSettings` (`src/theme/themes.ts`) — margin (writing-column max width via
-`editorMarginMaxWidth`), `wordWrap`, `renderMarkdown`, `disableSpellcheck`,
+`editorMarginMaxWidth`), `wordWrap`, `renderMarkdown`, `lineNumbers` (see
+[Line numbers](#line-numbers)), `disableSpellcheck`,
 `disableAutocorrect`, `shortenLinkChars` (see [Shorten links](#shorten-links)),
 the `defaultTitle` scheme, and the `copyScope` (see
 [Copy button](#copy-button)). They live in the
@@ -487,10 +488,49 @@ the `defaultTitle` scheme, and the `copyScope` (see
 are edited in the Editor tab of the settings modal, `EditorSection`
 (`src/ui/settings/EditorSection.tsx`), which groups them into focused bordered
 sections (mirroring the General tab) — **New notes** (the default-title scheme),
-**Writing column** (margins, word wrap), **Markdown** (live render + link
-shortening), **Typing aids** (spell-check / auto-correct), **Formatting on
-save** (see [Format on save](#format-on-save)), and **Copying** (the copy scope)
-— see [Storage settings](#storage-settings) and its sibling sections.
+**Writing column** (margins, word wrap), **Markdown** (live render, line
+numbers, link shortening), **Typing aids** (spell-check / auto-correct),
+**Formatting on save** (see [Format on save](#format-on-save)), and **Copying**
+(the copy scope) — see [Storage settings](#storage-settings) and its sibling
+sections.
+
+### Line numbers
+
+Off by default. With the `lineNumbers` editor setting on, the
+[live-preview editor](#markdown-editor) numbers every line in a gutter hanging
+in its left padding, the way a code editor does — the line the caret sits on lit
+brighter than the rest — and each number is a press target that **selects that
+whole line**.
+
+`LineRow` (`src/ui/MarkdownEditor.tsx`) is the whole feature. With the setting
+off it renders its child — the line element — verbatim, so the default editor
+produces exactly the DOM it always has; with it on it wraps the line in a
+positioning context and hangs a `<button>` beside it. That button is
+deliberately a **sibling** of the `[data-line-index]` element rather than a
+child: everything that measures the editor's text works within that element
+(`offsetWithin` on the active raw line, `domPointAt`'s tree walk in
+`placeCaret`, the composition read-back's `textContent` — see
+[Markdown editor](#markdown-editor)), so a digit inside it would shift every
+source column by its width and corrupt each edit. It is `contentEditable={false}`
+and `tabIndex={-1}`, keeping it out of both the editable text and the tab order
+(the editor hands focus on via `onTabOut`, and one tab stop per line would trap
+a long note).
+
+A press runs `selectLine`, which reuses the same machinery a multi-line block
+format does: the line stops being the active raw one, and the whole-line
+selection is queued in `pendingLineSpan` for the layout effect to draw with
+`selectLineSpan` once the re-render lands (with no active line to clear there is
+no re-render to wait for, so it is drawn straight away). The result is an
+ordinary ranged selection over the formatted line, so cut / copy / type-over and
+the styling toolbar all treat it exactly as a hand-drawn one — `spanLine` keeps
+the toolbar reporting the pressed line while no single line is active.
+
+Numbers are the *source* line numbers, so a line hidden from the preview — an
+[at-end attachment](#attachments-at-the-end) reference, or a
+[fence](#code-block) the caret is outside of — takes its number with it, leaving
+a gap the way a folded region does. The Markdown-off
+[plain textarea](#markdown-editor) has no per-line elements to hang a gutter on
+and ignores the setting, which the toggle's hint says outright.
 
 ### Shorten links
 

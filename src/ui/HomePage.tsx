@@ -85,9 +85,11 @@ export function HomePage() {
               the note — the full link is still saved and still opens. Tapping
               the text puts the cursor at the end of the word under your finger,
               which is something a fingertip can actually aim at, while a mouse
-              click lands exactly where you point. While the app is open,
-              hopping between notes drops you back at the exact spot and cursor
-              position you left each one at.
+              click lands exactly where you point. Line numbers can be switched
+              on down the editor's left edge, code-editor style, where pressing
+              a number selects that whole line. While the app is open, hopping
+              between notes drops you back at the exact spot and cursor position
+              you left each one at.
             </li>
             <li>
               Reach for the formatting button at the top right of a note to open

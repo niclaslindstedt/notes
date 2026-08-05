@@ -43,6 +43,20 @@ describe("EditorSection", () => {
     });
   });
 
+  it("offers line numbers, off by default, in the Markdown group", () => {
+    const onUpdate = vi.fn();
+    render(
+      <EditorSection appearance={DEFAULT_APPEARANCE} onUpdate={onUpdate} />,
+    );
+    const toggle = screen.getByLabelText("Line numbers") as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    fireEvent.click(toggle);
+    expect(onUpdate).toHaveBeenCalledWith("editor", {
+      ...DEFAULT_APPEARANCE.editor,
+      lineNumbers: true,
+    });
+  });
+
   it("toggles word wrap off", () => {
     const onUpdate = vi.fn();
     render(

@@ -26,6 +26,7 @@ describe("editor margin helpers", () => {
       margin: "none",
       wordWrap: true,
       renderMarkdown: true,
+      lineNumbers: false,
       disableSpellcheck: false,
       disableAutocorrect: false,
       trimTrailingSpaces: true,
@@ -65,6 +66,15 @@ describe("appearance coercion of editor settings", () => {
     });
     expect(getAppearance().editor.trimTrailingSpaces).toBe(false);
     expect(getAppearance().editor.trailingNewline).toBe(false);
+  });
+
+  it("leaves line numbers off unless the document says otherwise", () => {
+    replaceAppearance({ theme: "light" });
+    expect(getAppearance().editor.lineNumbers).toBe(false);
+    replaceAppearance({ editor: { lineNumbers: "yes" } });
+    expect(getAppearance().editor.lineNumbers).toBe(false);
+    replaceAppearance({ editor: { lineNumbers: true } });
+    expect(getAppearance().editor.lineNumbers).toBe(true);
   });
 
   it("keeps a valid copyScope and repairs an unknown one", () => {
