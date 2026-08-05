@@ -7,6 +7,7 @@ import {
   fencedRanges,
   hasClosedFence,
   hasMultiLineQuote,
+  hasNestedListItem,
   hiddenFenceLines,
   parseInline,
   shortenUrl,
@@ -299,6 +300,47 @@ describe("classifyLines — list numbering", () => {
   it("assigns unordered items a nesting depth from indentation", () => {
     const blocks = classifyLines("- a\n  - b\n    - c\n- d");
     expect(blocks.map((b) => b.depth)).toEqual([0, 1, 2, 0]);
+  });
+
+  it("keeps a list going across an indented continuation row", () => {
+    // What Shift+Enter inside an item writes: a plain row padded out to the
+    // item's text column, which belongs to the item rather than ending the list.
+    const blocks = classifyLines("1. a\n   more\n1. b");
+    expect(blocks.filter((b) => b.kind === "ol").map((b) => b.marker)).toEqual([
+      "1.",
+      "2.",
+    ]);
+    const nested = classifyLines("- a\n  more\n  - b");
+    expect(nested.filter((b) => b.kind === "ul").map((b) => b.depth)).toEqual([
+      0, 1,
+    ]);
+  });
+
+  it("still ends a list at an unindented paragraph", () => {
+    const blocks = classifyLines("1. a\nmore\n1. b");
+    expect(blocks.filter((b) => b.kind === "ol").map((b) => b.marker)).toEqual([
+      "1.",
+      "1.",
+    ]);
+  });
+});
+
+describe("hasNestedListItem", () => {
+  it("finds a list row indented under a shallower one", () => {
+    expect(hasNestedListItem("")).toBe(false);
+    expect(hasNestedListItem("- a\n- b")).toBe(false);
+    expect(hasNestedListItem("  - a\n  - b")).toBe(false);
+    expect(hasNestedListItem("- a\n  - b")).toBe(true);
+    expect(hasNestedListItem("1. a\n   1) b")).toBe(true);
+    expect(hasNestedListItem("intro\n- a\n\t- b\nafter")).toBe(true);
+  });
+
+  it("does not count a nested-looking row across a break in the list", () => {
+    expect(hasNestedListItem("- a\nprose\n  - b")).toBe(false);
+  });
+
+  it("ignores indented dashes inside a fenced code block", () => {
+    expect(hasNestedListItem("```\n- a\n  - b\n```")).toBe(false);
   });
 });
 

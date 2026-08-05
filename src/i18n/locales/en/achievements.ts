@@ -154,6 +154,12 @@ const achievements = {
       learnMore:
         "Pressing Enter inside a quote opens another quote row, so a long passage can be typed straight through instead of marking each row by hand. The quote keeps going until you leave it: press Quote again to unmark the row, or put the caret on a row that isn't quoted.",
     },
+    subPoint: {
+      name: "Sub-point",
+      condition: "Nest a list item under another one.",
+      learnMore:
+        "Pressing Enter on a bullet or numbered row opens the next one, so a list is written straight through — and Tab on a row nests it under the row above (Shift+Tab pulls it back out). An empty item ends the list: one Enter steps a nested item back out a level, the next clears the row. Shift+Enter opens another row inside the item you are on instead of starting a new one.",
+    },
     plainText: {
       name: "Plain and simple",
       condition: "Turn live Markdown rendering off.",

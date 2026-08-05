@@ -31,6 +31,7 @@ import {
 } from "../ui/icons.tsx";
 import {
   FormatIcon,
+  IndentGlyph as IndentFormatIcon,
   LinkGlyph as LinkFormatIcon,
   QuoteGlyph as QuoteFormatIcon,
 } from "../ui/format-glyphs.tsx";
@@ -420,4 +421,5 @@ export const SearchGlyph: Glyph = SearchIcon;
 export const FormatGlyph: Glyph = FormatIcon;
 export const LinkGlyph: Glyph = LinkFormatIcon;
 export const QuoteGlyph: Glyph = QuoteFormatIcon;
+export const IndentGlyph: Glyph = IndentFormatIcon;
 export const CutGlyph: Glyph = CutIcon;

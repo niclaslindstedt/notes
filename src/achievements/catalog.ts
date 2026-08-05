@@ -6,7 +6,11 @@
 // `learnMore: true` flags entries that carry an expanded body.
 
 import { isImageAttachment } from "../domain/attachment.ts";
-import { hasClosedFence, hasMultiLineQuote } from "../domain/markdown.ts";
+import {
+  hasClosedFence,
+  hasMultiLineQuote,
+  hasNestedListItem,
+} from "../domain/markdown.ts";
 import type { Snapshot } from "../domain/note.ts";
 import { hasYouTubeLink } from "../domain/youtube.ts";
 import {
@@ -31,6 +35,7 @@ import {
   HistoryGlyph,
   ImageGlyph,
   ImportGlyph,
+  IndentGlyph,
   KeyGlyph,
   LayersGlyph,
   LinkGlyph,
@@ -90,6 +95,11 @@ const hasCodeBlock = (snap: Snapshot) =>
 // writes, so this is the trophy for discovering that a quote keeps going.
 const hasLongQuote = (snap: Snapshot) =>
   snap.notes.some((n) => hasMultiLineQuote(n.body ?? ""));
+
+// A list item nested under another — what Tab on a list row writes, so this is
+// the trophy for discovering that a list nests from the keyboard.
+const hasSubPoint = (snap: Snapshot) =>
+  snap.notes.some((n) => hasNestedListItem(n.body ?? ""));
 
 // A note holding a YouTube link — which renders as a player, so this is the
 // trophy for discovering that a pasted video plays where it was pasted.
@@ -285,6 +295,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       slices: (s) => [s.snapshot.notes],
       predicate: (prev, next) =>
         !hasLongQuote(prev.snapshot) && hasLongQuote(next.snapshot),
+    },
+  },
+  {
+    id: "subPoint",
+    tier: "intermediate",
+    glyph: IndentGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasSubPoint(prev.snapshot) && hasSubPoint(next.snapshot),
     },
   },
   {

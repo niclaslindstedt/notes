@@ -648,6 +648,15 @@ export function MarkdownEditor({
     return pts ? { start: pts.start, end: pts.end } : null;
   }
 
+  // Whether the Enter now being processed was pressed with Shift, read from the
+  // `keydown` that precedes the `beforeinput` rather than from its `inputType`.
+  // `insertLineBreak` vs `insertParagraph` is meant to say exactly this, but the
+  // two are not reliably split that way across browsers in a plaintext-only
+  // host — and getting it wrong would stop plain Enter continuing a list. Left
+  // false wherever no keydown arrived (a soft keyboard, which has no Shift+Enter
+  // to report anyway).
+  const softBreak = useRef(false);
+
   // The single source of edits. Every mutation the browser proposes — typing,
   // autocorrect, delete, word/line delete, Enter — is intercepted here and
   // applied through the pure engine, so React fully owns the DOM and the browser
@@ -677,13 +686,31 @@ export function MarkdownEditor({
     const pts = editPoints(e);
     if (!pts) return;
     if (it === "insertParagraph" || it === "insertLineBreak") {
-      // A quote carries its marker onto the row the split opens, so pressing
-      // Enter keeps writing the same quote (see `newlineFor`).
-      replaceSelection(
-        pts.start,
-        pts.end,
-        newlineFor(blocksRef.current[pts.start.line], pts.start.col),
+      // A quote or a list item carries its marker onto the row the split opens,
+      // so pressing Enter keeps writing the same construct; Shift+Enter opens a
+      // plain row inside the item instead (see `newlineFor`).
+      const line = pts.start.line;
+      const edit = newlineFor(
+        blocksRef.current,
+        line,
+        pts.start.col,
+        softBreak.current,
       );
+      // Emptying the row is a bare-caret answer (Enter on an empty list item);
+      // with a range to delete, Enter splits like any other press.
+      if (edit.kind === "replaceLine" && pointsEqual(pts.start, pts.end)) {
+        replaceSelection(
+          { line, col: 0 },
+          { line, col: (linesRef.current[line] ?? "").length },
+          edit.line,
+        );
+      } else {
+        replaceSelection(
+          pts.start,
+          pts.end,
+          edit.kind === "insert" ? edit.text : "\n",
+        );
+      }
     } else if (it.startsWith("insert")) {
       replaceSelection(
         pts.start,
@@ -972,7 +999,33 @@ export function MarkdownEditor({
     sel.addRange(range);
   }
 
+  // Tab on a bullet or numbered row nests it one step deeper (Shift+Tab pulls it
+  // back out) — the keyboard twin of the styling toolbar's indent / outdent
+  // buttons, so a sub-point is written without leaving the keyboard. Answers
+  // false — leaving Tab to move focus on — when the selection holds no list row,
+  // and when a Shift+Tab has nothing left to unindent, so the outer level of a
+  // list is never a place the keyboard can't tab out of.
+  function indentList(outdent: boolean): boolean {
+    const pts = selectionPoints();
+    const at = lastCaret.current;
+    const span = pts ?? (at ? { start: at, end: at } : null);
+    if (!span) return false;
+    let onList = false;
+    let indented = false;
+    for (let i = span.start.line; i <= span.end.line; i += 1) {
+      const kind = blocksRef.current[i]?.kind;
+      if (kind === "ul" || kind === "ol") onList = true;
+      if (/^[ \t]/.test(linesRef.current[i] ?? "")) indented = true;
+    }
+    if (!onList || (outdent && !indented)) return false;
+    format({ kind: "indent", outdent });
+    return true;
+  }
+
   function onKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    // Read before anything else consumes the press: the `beforeinput` this
+    // keydown is about to produce asks for it (see `softBreak`).
+    softBreak.current = e.key === "Enter" && e.shiftKey;
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
       e.preventDefault();
       selectAllLines();
@@ -989,13 +1042,13 @@ export function MarkdownEditor({
       e.preventDefault();
       cut();
     }
-    // Tab hands focus on rather than indenting — the host places the editor in
-    // the page's tab order (the surface itself is skipped by the browser). Only
-    // when the caret is in the surface: an attachment thumbnail inside the note
-    // is its own tab stop, and its Tab bubbles through here.
+    // Tab indents a list row and otherwise hands focus on — the host places the
+    // editor in the page's tab order (the surface itself is skipped by the
+    // browser). Only when the caret is in the surface: an attachment thumbnail
+    // inside the note is its own tab stop, and its Tab bubbles through here.
     if (e.key === "Tab" && e.target === e.currentTarget) {
       e.preventDefault();
-      onTabOut(e.shiftKey);
+      if (!indentList(e.shiftKey)) onTabOut(e.shiftKey);
     }
   }
 
