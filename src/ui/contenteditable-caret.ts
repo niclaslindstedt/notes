@@ -52,6 +52,32 @@ export function collapsedCaret(): { node: Node; offset: number } | null {
   return { node: range.startContainer, offset: range.startOffset };
 }
 
+/**
+ * The caret's own on-screen rect inside `lineEl`, or null when the selection
+ * isn't in this element (or the browser reports no geometry for it — a
+ * collapsed range on an empty line).
+ *
+ * A soft-wrapped line can be many screens tall, so the *element's* rect says
+ * nothing about where the caret sits within it. Anything scrolling the caret
+ * into view measures this instead, or the two ends and the middle of one long
+ * line all reveal the same place: the middle of the element's box.
+ */
+export function caretRectWithin(lineEl: HTMLElement): DOMRect | null {
+  const sel = lineEl.ownerDocument.defaultView?.getSelection?.();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!lineEl.contains(range.startContainer)) return null;
+  // A range that spans wrapped rows reports one rect per row, so the first is
+  // the row the selection *starts* on — the end the user is anchored to. The
+  // bounding rect is the fallback for engines that hand back an empty list for
+  // a collapsed caret; a zero-height result means neither knew, so the caller
+  // falls back to the element.
+  const rects = range.getClientRects?.();
+  const rect =
+    rects && rects.length > 0 ? rects[0]! : range.getBoundingClientRect?.();
+  return rect && rect.height > 0 ? rect : null;
+}
+
 // Resolve column `col` of `lineEl`'s text to the (node, offset) the DOM speaks.
 // Walks the line's text nodes to find the one that contains the column; falls
 // back to the element itself (an empty line rendered as a lone <br>) so a caret
