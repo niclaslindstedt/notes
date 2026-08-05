@@ -46,7 +46,7 @@ import { Modal } from "./Modal.tsx";
 
 // Cloud-sync command centre, ported from checklist's `SyncDetailsModal` and
 // grown into the one place that answers "what is sync doing right now". The
-// header sync glyph always opens it (whatever the state), and it lays out, in
+// sync glyph always opens it (whatever the state), and it lays out, in
 // columns: the headline status and *why* a save failed; the live activity —
 // which note files are uploading this second and the background encryption
 // conversion's per-note / per-attachment progress; the backend, its at-rest

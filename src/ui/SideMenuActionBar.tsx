@@ -13,18 +13,21 @@ import {
 import { NOTE_DROP_ARCHIVE, NOTE_DROP_ATTR } from "./note-drag-context.ts";
 
 // The button island: New note / New folder / Show all / Archive and
-// Undo / Redo / Search share one bordered block pinned to the foot of the list
-// (mt-auto), so it falls under the thumb no matter how long the note list is. A
-// top row of create/navigate actions and a bottom row of history actions (with
-// Search, which opens the full-text search modal, on the right) are split by a
-// divider, so the icon buttons read as one coherent unit rather than competing
-// widgets. Each cell splits its row's width evenly; the parent owns the
+// Undo / Redo / Search / the sync glyph share one bordered block pinned to the
+// foot of the list (mt-auto), so it falls under the thumb no matter how long
+// the note list is. A top row of create/navigate actions and a bottom row of
+// history actions (with Search, which opens the full-text search modal, and
+// then the sync glyph on the right) are split by a divider, so the icon buttons
+// read as one coherent unit rather than competing widgets. Each cell splits its row's width evenly; the parent owns the
 // border, rounding, and the inner dividers. Show all and Archive light up
 // (accent) when their view is showing; Archive carries the archived-note count
 // and accepts a dragged note as a drop target. New folder drops the inline name
 // input into the list above. Undo / redo dim and go inert at the ends of the
 // timeline but keep the drawer open so a burst of reverts can be applied without
-// reopening it.
+// reopening it. The `syncSlot` is the cloud glyph (`SyncStatus`, which styles
+// itself as a cell of this island); it is absent entirely on the local backend,
+// which has no remote to sync against, and the bottom row then holds three
+// cells instead of four.
 //
 // Self-contained except for the Archive row's drop-target wiring, which the
 // drawer owns (the live drag state lives in `SideMenu`) and threads down as the
@@ -33,6 +36,7 @@ export function SideMenuActionBar({
   onNewNote,
   onNewFolder,
   onSearch,
+  syncSlot,
   onShowAll,
   showAllActive,
   onOpenArchive,
@@ -53,6 +57,9 @@ export function SideMenuActionBar({
   onNewFolder: () => void;
   /** Open the full-text search modal (the drawer closes behind it). */
   onSearch: () => void;
+  /** The cloud sync glyph, rendered as the bottom row's last cell. Null on the
+   *  local backend, where there is nothing to sync. */
+  syncSlot?: ReactNode;
   /** Leave the editor and show the full overview (the drawer closes behind it). */
   onShowAll: () => void;
   /** Whether the overview is the view currently showing. */
@@ -129,6 +136,7 @@ export function SideMenuActionBar({
             label={t("search.title")}
             onClick={onSearch}
           />
+          {syncSlot}
         </div>
       </div>
     </div>

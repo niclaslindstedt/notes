@@ -30,7 +30,7 @@ const app = {
   // Accessible label for the desktop right-click menu that replaces the
   // swipe actions on a note row (overview card and side-menu row).
   noteActions: "Note actions",
-  // The editor's copy-to-clipboard button (left of the sync glyph). What it
+  // The editor's copy-to-clipboard button (last in the header cluster). What it
   // copies is the copy-scope editor setting; see settings.editor.copy*.
   copy: {
     label: "Copy note",
@@ -66,6 +66,21 @@ const app = {
     link: "Link",
     image: "Image",
     rule: "Divider",
+  },
+  // The find bar: the header toggle that raises it, the field's chrome, and
+  // the match counter. It searches the open note only — verbatim and
+  // case-insensitive — and is a different thing from the cross-note `search`
+  // namespace (the magnifier on the side menu).
+  find: {
+    show: "Find in note",
+    hide: "Close find",
+    bar: "Find in note",
+    placeholder: "Find in note…",
+    previous: "Previous match",
+    next: "Next match",
+    close: "Close",
+    count: "{index} of {total}",
+    none: "No matches",
   },
   // Screen-reader label for the gray lock shown on a note that is encrypted at
   // rest but whose body hasn't been decrypted/loaded yet this session.

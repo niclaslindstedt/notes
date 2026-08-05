@@ -34,6 +34,7 @@ import {
   type FormatAction,
   type LineFormat,
 } from "../domain/markdown-format.ts";
+import type { NoteMatch } from "../domain/note-find.ts";
 import type { Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { getEditorPosition, setEditorPosition } from "./editor-position.ts";
@@ -55,7 +56,7 @@ import {
 } from "./hooks/scrollFocusedIntoView.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { lineTextClass } from "./markdown-line-class.ts";
-import { RenderedLine } from "./MarkdownLine.tsx";
+import { RenderedLine, type LineHighlight } from "./MarkdownLine.tsx";
 import {
   extractSourceRange,
   snapStartToLineEdge,
@@ -139,9 +140,21 @@ type Props = {
    * is otherwise work nobody reads.
    */
   onLineFormat?: (line: LineFormat | null) => void;
+  /**
+   * Find-bar hits to paint over the note, in source coordinates. Empty (the
+   * default) while the bar is closed, so nothing is highlighted and no extra
+   * nodes are rendered.
+   */
+  matches?: readonly NoteMatch[];
+  /** Index into `matches` of the hit the bar is parked on, or -1 for none. */
+  activeMatch?: number;
   /** Imperative handle so the title field can hand focus down into the body. */
   ref?: Ref<MarkdownEditorHandle>;
 };
+
+// A stable empty hit list, so a closed find bar hands every line the identical
+// `NO_HIGHLIGHTS` reference and each `RenderedLine` memo bails out.
+const NO_MATCHES: readonly NoteMatch[] = [];
 
 /** What the editor exposes to its parent: a way to start editing from outside. */
 export type MarkdownEditorHandle = {
@@ -177,6 +190,8 @@ export function MarkdownEditor({
   noteId,
   onTabOut,
   onLineFormat,
+  matches = NO_MATCHES,
+  activeMatch = -1,
   ref,
 }: Props) {
   const t = useT();
@@ -476,6 +491,36 @@ export function MarkdownEditor({
     pendingScrollLine.current = null;
     scrollLineIntoView(rootRef.current, Math.min(line, lines.length - 1));
   }, [lines]);
+
+  // --- Find in note --------------------------------------------------------
+  //
+  // The find bar's hits, bucketed by the line they sit on, so each rendered
+  // line is handed only its own (`RenderedLine` paints them as `<mark>` runs).
+  // Lines with no hits are left `undefined`, which the renderer resolves to its
+  // shared empty list — so an open bar costs nothing on the lines it doesn't
+  // touch, and a closed one costs nothing at all.
+  const highlightsByLine = useMemo(() => {
+    const byLine = new Map<number, LineHighlight[]>();
+    for (const [i, m] of matches.entries()) {
+      const hit = { from: m.from, to: m.to, active: i === activeMatch };
+      const list = byLine.get(m.line);
+      if (list) list.push(hit);
+      else byLine.set(m.line, [hit]);
+    }
+    return byLine;
+  }, [matches, activeMatch]);
+
+  // Reveal the hit the bar just stepped onto. `scrollLineIntoView` leaves an
+  // already-visible line alone, so walking matches within the viewport doesn't
+  // jog the note; one that has scrolled off is centred.
+  const activeMatchLine = matches[activeMatch]?.line ?? null;
+  useEffect(() => {
+    if (activeMatchLine === null) return;
+    scrollLineIntoView(
+      rootRef.current,
+      Math.min(activeMatchLine, linesRef.current.length - 1),
+    );
+  }, [activeMatchLine, activeMatch]);
 
   // --- Structural edits (cross-line) ---------------------------------------
   //
@@ -1192,6 +1237,7 @@ export function MarkdownEditor({
                 <RenderedLine
                   block={blocks[index]!}
                   shortenLinkChars={shortenLinkChars}
+                  highlights={highlightsByLine.get(index)}
                 />
               </div>
             );

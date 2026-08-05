@@ -17,6 +17,86 @@ import { lineTextClass } from "./markdown-line-class.ts";
 // *not* on. Leaf inline nodes carry their source-column `offset` through to a
 // `data-src` attribute so the editor can map a click on rendered text back to
 // a caret position in the raw source (see `MarkdownEditor.tsx`).
+//
+// A line can also be handed the find bar's hits for it, which are painted as
+// `<mark>` runs over the rendered text — see `markSource`.
+
+/**
+ * One find-bar hit to paint on this line, in the line's own source columns.
+ * `active` marks the single hit the bar is currently parked on, which reads
+ * as the accent rather than the quieter "also matches" tint.
+ */
+export type LineHighlight = { from: number; to: number; active: boolean };
+
+// A stable empty list, so a line with no hits keeps handing `RenderedLine` the
+// identical reference and its memo bails out (see the comparator at the foot).
+const NO_HIGHLIGHTS: readonly LineHighlight[] = [];
+
+const MARK_CLASS = "rounded-[2px] bg-link/35 text-fg-bright";
+const MARK_ACTIVE_CLASS = "rounded-[2px] bg-accent text-page-bg";
+
+/**
+ * Split a rendered run of source text at the find-bar hits that fall inside it,
+ * wrapping each hit in a `<mark>`. Returns the bare string when nothing on this
+ * line matches, so the common case adds no nodes at all.
+ *
+ * Every emitted segment carries its **own** `data-src` — the segments are
+ * siblings rather than nesting inside the leaf's span — because
+ * `sourcePointFromDom` maps a DOM position by walking up to the nearest
+ * `data-src` element and adding the offset *within it*. A `<mark>` without one
+ * would resolve against its parent's base column and land the caret (and any
+ * copied selection) at the wrong place.
+ */
+function markSource(
+  text: string,
+  offset: number,
+  highlights: readonly LineHighlight[],
+): ReactNode {
+  if (highlights.length === 0) return text;
+  const end = offset + text.length;
+  const hits = highlights.filter((h) => h.to > offset && h.from < end);
+  if (hits.length === 0) return text;
+  const out: ReactNode[] = [];
+  let at = 0;
+  for (const [i, hit] of hits.entries()) {
+    const from = Math.max(0, hit.from - offset);
+    const to = Math.min(text.length, hit.to - offset);
+    if (from > at) {
+      out.push(
+        <span key={`t${i}`} data-src={offset + at}>
+          {text.slice(at, from)}
+        </span>,
+      );
+    }
+    out.push(
+      <mark
+        key={`m${i}`}
+        data-src={offset + from}
+        className={hit.active ? MARK_ACTIVE_CLASS : MARK_CLASS}
+      >
+        {text.slice(from, to)}
+      </mark>,
+    );
+    at = to;
+  }
+  if (at < text.length) {
+    out.push(
+      <span key="tail" data-src={offset + at}>
+        {text.slice(at)}
+      </span>,
+    );
+  }
+  return out;
+}
+
+/** Whether any hit overlaps the source span `[from, to)`. */
+function overlaps(
+  highlights: readonly LineHighlight[],
+  from: number,
+  to: number,
+): LineHighlight | null {
+  return highlights.find((h) => h.to > from && h.from < to) ?? null;
+}
 
 // The bullet glyph for an unordered item, rotating by nesting depth: parent →
 // sub → sub-sub, then repeat. All three glyphs are present in the app's
@@ -37,13 +117,14 @@ function indentStyle(depth = 0): { marginLeft: string } | undefined {
 function renderInline(
   nodes: InlineNode[],
   shortenLinkChars: number,
+  highlights: readonly LineHighlight[],
 ): ReactNode[] {
   return nodes.map((node, i) => {
     switch (node.type) {
       case "text":
         return (
           <span key={i} data-src={node.offset}>
-            {node.text}
+            {markSource(node.text, node.offset, highlights)}
           </span>
         );
       case "code":
@@ -53,7 +134,7 @@ function renderInline(
             data-src={node.offset}
             className="rounded bg-surface-2 px-1 py-0.5 text-[0.9em] text-fg-bright"
           >
-            {node.text}
+            {markSource(node.text, node.offset, highlights)}
           </code>
         );
       case "link":
@@ -67,6 +148,15 @@ function renderInline(
             // A bare URL may be trimmed for display; an explicit link's label
             // is the user's own text and is always shown verbatim.
             display={node.bare ? shortenUrl(node.text, shortenLinkChars) : null}
+            // A link's rendered text can be shorter than its source (a trimmed
+            // URL), so its hits are painted as a tint over the whole anchor
+            // rather than split into `<mark>` runs that would map back to the
+            // wrong columns.
+            hit={overlaps(
+              highlights,
+              node.offset,
+              node.offset + node.text.length,
+            )}
           />
         );
       case "image":
@@ -81,15 +171,19 @@ function renderInline(
       case "strong":
         return (
           <strong key={i} className="font-bold text-fg-bright">
-            {renderInline(node.children, shortenLinkChars)}
+            {renderInline(node.children, shortenLinkChars, highlights)}
           </strong>
         );
       case "em":
-        return <em key={i}>{renderInline(node.children, shortenLinkChars)}</em>;
+        return (
+          <em key={i}>
+            {renderInline(node.children, shortenLinkChars, highlights)}
+          </em>
+        );
       case "strikethrough":
         return (
           <s key={i} className="text-muted">
-            {renderInline(node.children, shortenLinkChars)}
+            {renderInline(node.children, shortenLinkChars, highlights)}
           </s>
         );
     }
@@ -135,6 +229,7 @@ function LinkNode({
   offset,
   bare,
   display,
+  hit = null,
 }: {
   text: string;
   href: string;
@@ -145,6 +240,9 @@ function LinkNode({
   // The text to render in place of `text` — a shortened bare URL, or null to
   // show the source verbatim. The href and `data-src` keep the full URL.
   display: string | null;
+  // The find-bar hit this link's source overlaps, if any — painted as a tint
+  // over the whole anchor.
+  hit?: LineHighlight | null;
 }) {
   const ctx = useAttachmentsContext();
   if (attachmentFilenameFromHref(href) !== null) {
@@ -182,7 +280,9 @@ function LinkNode({
         e.preventDefault();
         window.open(href, "_blank", "noreferrer,noopener");
       }}
-      className="text-link underline underline-offset-2"
+      className={`text-link underline underline-offset-2 ${
+        hit ? (hit.active ? MARK_ACTIVE_CLASS : MARK_CLASS) : ""
+      }`}
     >
       {display ?? text}
     </a>
@@ -191,13 +291,18 @@ function LinkNode({
 
 // Inline content, falling back to a non-breaking space so an empty line keeps
 // a full line-box (and stays clickable to place the caret there).
-function inlineContent(block: LineBlock, shortenLinkChars: number): ReactNode {
+function inlineContent(
+  block: LineBlock,
+  shortenLinkChars: number,
+  highlights: readonly LineHighlight[],
+): ReactNode {
   if (block.content.length === 0) {
     return <span data-src={block.contentStart}>{" "}</span>;
   }
   return renderInline(
     parseInline(block.content, block.contentStart),
     shortenLinkChars,
+    highlights,
   );
 }
 
@@ -205,10 +310,13 @@ function inlineContent(block: LineBlock, shortenLinkChars: number): ReactNode {
 function RenderedLineImpl({
   block,
   shortenLinkChars = 0,
+  highlights = NO_HIGHLIGHTS,
 }: {
   block: LineBlock;
   /** Trim bare URLs to this many characters either side (0 = show in full). */
   shortenLinkChars?: number;
+  /** Find-bar hits on this line, in its own source columns (see `markSource`). */
+  highlights?: readonly LineHighlight[];
 }) {
   const sizeClass = lineTextClass(block);
 
@@ -226,14 +334,14 @@ function RenderedLineImpl({
     case "heading":
       return (
         <div className={sizeClass}>
-          {inlineContent(block, shortenLinkChars)}
+          {inlineContent(block, shortenLinkChars, highlights)}
         </div>
       );
 
     case "quote":
       return (
         <div className="border-l-2 border-line pl-3 text-muted italic">
-          {inlineContent(block, shortenLinkChars)}
+          {inlineContent(block, shortenLinkChars, highlights)}
         </div>
       );
 
@@ -257,7 +365,7 @@ function RenderedLineImpl({
             </span>
           </span>
           <span className="min-w-0 flex-1">
-            {inlineContent(block, shortenLinkChars)}
+            {inlineContent(block, shortenLinkChars, highlights)}
           </span>
         </div>
       );
@@ -269,7 +377,7 @@ function RenderedLineImpl({
             {block.marker ?? block.ordinal}
           </span>
           <span className="min-w-0 flex-1">
-            {inlineContent(block, shortenLinkChars)}
+            {inlineContent(block, shortenLinkChars, highlights)}
           </span>
         </div>
       );
@@ -290,7 +398,7 @@ function RenderedLineImpl({
       );
 
     case "paragraph":
-      return <div>{inlineContent(block, shortenLinkChars)}</div>;
+      return <div>{inlineContent(block, shortenLinkChars, highlights)}</div>;
   }
 }
 
@@ -302,10 +410,26 @@ function RenderedLineImpl({
 // comparing the block's primitive fields lets every untouched line bail out of the
 // re-render: the per-keystroke cost drops from O(lines) to O(1). Attachment changes
 // still flow in through `useAttachmentsContext` (memo doesn't block context).
+// The find bar rebuilds its hit list on every keystroke in its field, so the
+// per-line lists are compared by value; a line with no hits keeps the shared
+// `NO_HIGHLIGHTS` reference and short-circuits on the first test.
+function sameHighlights(
+  a: readonly LineHighlight[] = NO_HIGHLIGHTS,
+  b: readonly LineHighlight[] = NO_HIGHLIGHTS,
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every(
+    (h, i) =>
+      h.from === b[i]!.from && h.to === b[i]!.to && h.active === b[i]!.active,
+  );
+}
+
 export const RenderedLine = memo(
   RenderedLineImpl,
   (a, b) =>
     a.shortenLinkChars === b.shortenLinkChars &&
+    sameHighlights(a.highlights, b.highlights) &&
     a.block.kind === b.block.kind &&
     a.block.raw === b.block.raw &&
     a.block.content === b.block.content &&

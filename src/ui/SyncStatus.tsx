@@ -10,7 +10,7 @@ import {
   SpinnerIcon,
 } from "./icons.tsx";
 
-// Single header affordance for cloud / folder-backed sessions, ported from
+// The single sync affordance for cloud / folder-backed sessions, ported from
 // checklist's `SyncStatus`. One glyph that morphs with state: a cloud-upload
 // (link ring) when there are unsaved edits to push, a spinner while a save is
 // in flight, a green cloud-check when the backend is in sync, and a coloured
@@ -18,6 +18,13 @@ import {
 // state, tapping it opens the sync-details modal — the command centre where the
 // status is spelled out and Save now / Reconnect / Reload live — so the glyph
 // stays a single, predictable way in even mid-save.
+//
+// It lives as the last cell of the side menu's button island, right of the
+// (cross-note) Search button, rather than in each surface's header — so it is
+// one glyph in one place instead of one per surface, and the editor header
+// keeps its width for the controls that act on the note in front of you. It is
+// therefore styled as a `BarButton` cell (flush, borderless, icon-only, tinted
+// by tone) rather than as a bordered header button.
 
 type Props = {
   providerName: string;
@@ -104,12 +111,16 @@ function viewFor(
   }
 }
 
+// Tone → the icon's ink. The cell itself stays transparent (like every other
+// button in the island); only the glyph carries the state's colour, with the
+// unsaved-edits state also tinting the cell so "there is something to push"
+// reads without looking at the glyph.
 const TONE_CLASS: Record<Tone, string> = {
-  ok: "border-accent/40 text-accent hover:bg-accent/10",
-  busy: "border-line text-muted",
-  warn: "border-link/50 text-link hover:bg-link/10",
-  err: "border-danger/50 text-danger hover:bg-danger/10",
-  push: "border-link bg-link/15 text-link hover:bg-link/25",
+  ok: "text-accent",
+  busy: "text-muted",
+  warn: "text-link",
+  err: "text-danger",
+  push: "text-link",
 };
 
 export function SyncStatus({
@@ -125,14 +136,19 @@ export function SyncStatus({
   return (
     <button
       type="button"
+      role="menuitem"
       onClick={onOpenDetails}
       title={view.label}
       aria-label={view.label}
       aria-busy={busy || undefined}
-      className={`inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--radius)] border bg-transparent focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none ${TONE_CLASS[view.tone]}`}
+      className={`relative flex flex-1 cursor-pointer items-center justify-center py-2.5 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none ${
+        view.tone === "push"
+          ? "bg-link/15 hover:bg-link/25"
+          : "hover:bg-surface-2"
+      }`}
     >
       <view.Icon
-        className={`h-[18px] w-[18px] ${view.spin ? "animate-spin" : ""}`}
+        className={`h-5 w-5 ${TONE_CLASS[view.tone]} ${view.spin ? "animate-spin" : ""}`}
       />
     </button>
   );

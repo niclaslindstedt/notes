@@ -32,7 +32,6 @@ describe("ArchiveList", () => {
         onRestore={vi.fn()}
         onDelete={vi.fn()}
         onBack={vi.fn()}
-        syncSlot={null}
       />,
     );
     expect(
@@ -49,7 +48,6 @@ describe("ArchiveList", () => {
         onRestore={vi.fn()}
         onDelete={vi.fn()}
         onBack={onBack}
-        syncSlot={null}
       />,
     );
 
@@ -72,7 +70,6 @@ describe("ReadOnlyNote", () => {
         onBack={vi.fn()}
         onRestore={onRestore}
         onDelete={onDelete}
-        syncSlot={null}
       />,
     );
 

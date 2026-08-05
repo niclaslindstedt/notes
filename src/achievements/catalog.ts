@@ -48,6 +48,7 @@ import {
   ServerGlyph,
   ShieldGlyph,
   SmartphoneGlyph,
+  TextSearchGlyph,
   TypeGlyph,
   UndoGlyph,
   WandGlyph,
@@ -461,6 +462,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     // Fired by the first press of any styling-toolbar button (`runFormat` in
     // `src/ui/NoteEditor.tsx`) — the markup it writes is indistinguishable
     // from typing it by hand, so there is nothing in the document to derive.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "pinpoint",
+    tier: "beginner",
+    glyph: TextSearchGlyph,
+    learnMore: true,
+    // Fired by opening the find bar (`toggleFind` in `src/ui/NoteEditor.tsx`)
+    // — searching reads the note without changing it, so there is nothing in
+    // the document to derive.
     trigger: { kind: "manual" },
   },
 

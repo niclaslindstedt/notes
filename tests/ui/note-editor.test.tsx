@@ -48,7 +48,6 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
       onChange={onChange}
       onTitleChange={onTitleChange}
       onTitleSettle={onTitleSettle}
-      syncSlot={null}
       canAttach={false}
       onAttach={onAttach}
       {...props}
@@ -132,16 +131,16 @@ describe("Editor", () => {
   });
 
   it("tabs from the body up to the header actions, and back on Shift+Tab", () => {
-    renderEditor({ syncSlot: <button type="button">Sync</button> });
+    renderEditor();
     const title = screen.getByDisplayValue("My note") as HTMLTextAreaElement;
     const body = screen.getByDisplayValue("the body") as HTMLTextAreaElement;
     body.focus();
 
     fireEvent.keyDown(body, { key: "Tab" });
-    // The leftmost action in the header cluster — the styling toolbar's toggle,
-    // with no folders to put a folder picker before it.
+    // The leftmost action in the header cluster — the find bar's toggle, with
+    // no folders to put a folder picker before it.
     expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "Formatting" }),
+      screen.getByRole("button", { name: "Find in note" }),
     );
 
     fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
