@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MarkdownEditor } from "../../src/ui/MarkdownEditor.tsx";
 import {
@@ -526,6 +526,121 @@ describe("MarkdownEditor", () => {
         );
         // The link's line stayed formatted (the anchor is still in the DOM).
         expect(screen.getByText("google").closest("a")).not.toBeNull();
+      } finally {
+        open.mockRestore();
+      }
+    });
+  });
+
+  describe("where a press lands the caret", () => {
+    // A touch press also arms the soft-keyboard reveal, which scrolls the line
+    // it lands on; jsdom has no `scrollIntoView`.
+    const originalScroll = HTMLElement.prototype.scrollIntoView;
+    beforeEach(() => {
+      HTMLElement.prototype.scrollIntoView = vi.fn();
+    });
+    afterEach(() => {
+      HTMLElement.prototype.scrollIntoView = originalScroll;
+    });
+
+    // A press arrives as a pointerdown (which says what pressed) followed by a
+    // click (by which time the browser has placed its own caret — stood in for
+    // here by `caretIn` / `caretAt`, since jsdom does no hit-testing).
+    function press(target: Element, pointerType: "touch" | "mouse") {
+      fireEvent.pointerDown(surface(), { pointerType });
+      fireEvent.click(target, { detail: 1 });
+    }
+
+    // Point the collapsed caret at `offset` inside an arbitrary text node.
+    function caretAt(node: Node, offset: number) {
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(node, offset);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    /** The caret's offset within the raw active line. */
+    function caretOffset(): number {
+      return window.getSelection()!.anchorOffset;
+    }
+
+    it("snaps a touch tap to the end of the word it hit", () => {
+      renderEditor("hello world");
+      caretIn(rawLine()!, 2);
+      press(rawLine()!, "touch");
+      expect(caretOffset()).toBe(5);
+    });
+
+    it("keeps the exact column a mouse click landed on", () => {
+      renderEditor("hello world");
+      caretIn(rawLine()!, 2);
+      press(rawLine()!, "mouse");
+      expect(caretOffset()).toBe(2);
+    });
+
+    it("leaves a touch tap that landed on whitespace where it is", () => {
+      renderEditor("hello world");
+      caretIn(rawLine()!, 5);
+      press(rawLine()!, "touch");
+      expect(caretOffset()).toBe(5);
+    });
+
+    it("snaps a tap on a formatted line, opening it raw at the word end", () => {
+      renderEditor("hello world\nsecond");
+      const word = screen.getByText("hello world");
+      caretAt(word.firstChild!, 2);
+      press(word, "touch");
+      // The tapped line is now the raw active line, caret past "hello".
+      expect(rawLine()?.getAttribute("data-line-index")).toBe("0");
+      expect(caretOffset()).toBe(5);
+    });
+
+    it("lands at the end of a horizontal rule so it can be erased", () => {
+      // A rule renders as a lone <hr> with no text to anchor a caret in, so the
+      // browser leaves the caret elsewhere and a phone (no forward-delete key)
+      // could never remove the line. The press takes the end of it instead.
+      const { container } = renderEditor("---\nsecond");
+      const rule = container.querySelector("hr")!;
+      press(rule, "touch");
+      expect(rawLine()?.getAttribute("data-line-index")).toBe("0");
+      expect(rawLine()?.textContent).toBe("---");
+      expect(caretOffset()).toBe(3);
+    });
+
+    it("lands at the end of a horizontal rule for a mouse too", () => {
+      const { container } = renderEditor("---\nsecond");
+      press(container.querySelector("hr")!, "mouse");
+      expect(rawLine()?.getAttribute("data-line-index")).toBe("0");
+      expect(caretOffset()).toBe(3);
+    });
+
+    it("leaves a ranged selection the press ended on alone", () => {
+      // A drag-select (or a double-click's word) must keep exactly what the
+      // browser drew rather than collapsing to a word end.
+      renderEditor("hello world");
+      const line = rawLine()!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(line.firstChild!, 0);
+      range.setEnd(line.firstChild!, 5);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      press(line, "touch");
+      expect(sel.isCollapsed).toBe(false);
+      expect(sel.toString()).toBe("hello");
+    });
+
+    it("leaves the caret alone when the press opened a link", () => {
+      // The link handler answers the press (`preventDefault`) and opens the
+      // URL; the caret must not be dragged onto the link's line behind it.
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      try {
+        renderEditor("[google](https://example.com)\nplain");
+        press(screen.getByText("google"), "touch");
+        expect(open).toHaveBeenCalled();
+        expect(rawLine()?.getAttribute("data-line-index")).toBe("1");
       } finally {
         open.mockRestore();
       }

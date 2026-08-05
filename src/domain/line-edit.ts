@@ -179,6 +179,27 @@ export function cutLine(
 }
 
 /**
+ * The column at the end of the word `col` sits in — where a **touch** tap
+ * lands the caret (see `MarkdownEditor`'s tap handling).
+ *
+ * A fingertip covers roughly a word, so the exact character the browser picks
+ * out from under it is a coin toss; snapping forward to the end of the word
+ * gives a position the tap can actually aim at, and the one a Backspace can
+ * work back from — which is the only delete key a phone has.
+ *
+ * A "word" here is any run of non-whitespace, punctuation and Markdown markers
+ * included: tapping inside `**bold**` lands past the closing `**` (the end of
+ * the word as it is *drawn*), and tapping a `---` rule lands at the end of the
+ * rule, ready to be erased. A tap that already sits on whitespace is left where
+ * it is — it is the end of the preceding word.
+ */
+export function wordEndAt(text: string, col: number): number {
+  let i = clamp(col, 0, text.length);
+  while (i < text.length && !/\s/u.test(text[i]!)) i++;
+  return i;
+}
+
+/**
  * The index of the first line that differs between two versions of a note's
  * source, or `null` when they are identical. Used to anchor the scroll when
  * undo / redo swaps the body out from under the editor: the view jumps to the
