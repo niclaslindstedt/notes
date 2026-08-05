@@ -6,11 +6,19 @@ files. Everything the user sees is the web app.
 
 ## Why it's thin
 
-The whole main process is [`main.js`](main.js) — about a hundred lines, most
-of them comments. There is **no** preload, **no** IPC, **no** native storage,
-and no UI of the shell's own. The desktop build has nothing the browser build
-lacks; it exists so the app can be downloaded, launched from the dock or Start
-menu, and kept out of a browser tab.
+The whole main process is [`main.js`](main.js) — most of it comments. There is
+**no** preload, **no** IPC, **no** storage the renderer can see, and no UI of
+the shell's own. The desktop build has nothing the browser build lacks; it
+exists so the app can be downloaded, launched from the dock or Start menu, and
+kept out of a browser tab.
+
+The one thing the shell does own is the **window's remembered size and
+position**, because a web page cannot size or place its own OS window — there
+is nowhere in `../src/` to put it. Saved to `window-state.json` in the app's
+user-data directory on close, and read back defensively: a rectangle that no
+longer overlaps any connected display keeps its size but loses its position
+(otherwise unplugging a monitor leaves a window you cannot reach), and an
+unreadable file falls through to the defaults.
 
 **Anything that looks like a feature belongs in `../src/`, not here.** If a
 change would add logic to this directory, that is the signal it should be
@@ -66,6 +74,3 @@ to notarize — and the same job signs for real and the prompt goes away.
   origin is not. Local storage and the picked-folder backend work as they do
   on the web. Use the web app at
   [notes.niclaslindstedt.se](https://notes.niclaslindstedt.se) for cloud sync.
-- **The window does not remember its size or position** between launches.
-  That is shell state, so fixing it means code here — deliberately deferred
-  rather than added by default.

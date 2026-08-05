@@ -3052,8 +3052,17 @@ entire main process is `electron/main.js`: it registers a private `notes://app`
 scheme, serves `electron/webroot/` (the embedded build, written by
 `electron/scripts/bundle-web.mjs`) from it, opens one sandboxed
 context-isolated window, and sends off-origin links to the system browser.
-There is no preload, no IPC, and no storage of its own — the embedded app runs
-its own `localStorage`, exactly as it does in a browser tab.
+There is no preload, no IPC, and no storage the renderer can see — the embedded
+app runs its own `localStorage`, exactly as it does in a browser tab.
+
+The one thing the shell owns is the window's **remembered size and position**
+(`window-state.json` in the app's user-data directory, written on `close`),
+because a web page cannot size or place its own OS window. It reads that file
+defensively: bounds are saved from `getNormalBounds` so a maximized window does
+not restore at screen size forever, a rectangle that no longer overlaps any
+connected display keeps its size but drops its position (an unplugged monitor
+would otherwise strand the window off-screen), and an unreadable or malformed
+file falls through to the 1100×800 default.
 
 The private scheme rather than `loadFile` is the one load-bearing decision:
 `localStorage` is keyed by origin and a `file://` page is an *opaque* origin, so

@@ -463,9 +463,10 @@ The rule for both, and the one to check a change against:
 For `native/` that is a short, closed list — haptics, SPKI-pinned HTTPS, QR
 camera scan — each behind the `postMessage` bridge in
 [`src/platform/native-bridge.ts`](src/platform/native-bridge.ts), which is
-inert on the web. For `electron/` the list is currently **empty**: the whole
-main process is one file that opens a window on the bundled app, with no
-preload, no IPC, and no storage of its own. Keep it that way.
+inert on the web. For `electron/` the list is **one item long**: the remembered
+window bounds, because a web page cannot size or place its own OS window. The
+whole main process is still one file, with no preload, no IPC, and no storage
+the renderer can see. Keep it that way.
 
 So when a feature request arrives while you are working in a wrapper:
 
