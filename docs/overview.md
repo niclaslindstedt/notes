@@ -305,6 +305,50 @@ verbatim **source** is placed on the clipboard — Markdown syntax and full,
 un-shortened URLs survive the copy rather than the rendered text. See
 [Selection mapping](#selection-mapping).
 
+Where a press *lands* the caret within the line it hit is its own rule — see
+[Caret placement on press](#caret-placement-on-press).
+
+### Caret placement on press
+
+`onSurfaceClick` (`src/ui/MarkdownEditor.tsx`) + `wordEndAt`
+(`src/domain/line-edit.ts`) — how precisely a press is taken, which differs by
+what pressed.
+
+**A mouse keeps the browser's exact column.** Clicking rendered text maps
+through the leaf's `data-src` offset ([selection mapping](#selection-mapping))
+to the character under the pointer, and the press is left there.
+
+**A touch snaps forward to the end of the word it hit.** A fingertip covers
+roughly a word, so which of the characters under it the browser picks out is a
+coin toss — and on a phone there is no way to nudge the caret one character over
+afterwards. `wordEndAt` runs the mapped column out to the end of the run of
+non-whitespace it sits in, giving a position a tap can actually aim at and the
+one **Backspace** works back from. A press that landed *on* whitespace is left
+where it is: that already is the end of the word before it. A "word" is any run
+of non-whitespace, punctuation and Markdown markers included, so tapping inside
+`**bold**` lands past the closing `**` — the end of the word as it is drawn. The
+pointer type comes from the `pointerdown` that opened the press, and only an
+explicit `touch` / `pen` snaps: an engine reporting no `pointerType` is treated
+as a mouse, so a desktop click is never snapped.
+
+**A press on a line the browser can't put a caret in lands at the end of that
+line.** A [horizontal rule](#markdown-parser) renders as a lone `<hr>` with no
+text to anchor in, so the browser drops the caret at the line's start or onto a
+neighbour — leaving nothing to Backspace, and a phone has no forward-delete key,
+so the rule could not be removed at all. Pressing one now takes the end of its
+source line (`---`, caret at column 3), and three Backspaces erase it. This one
+applies to **every** pointer type, mouse included, since the caret the browser
+offers is unusable either way. The same fallback covers any press whose caret
+the browser resolved onto a different line than the one under the pointer.
+
+It runs on `click` rather than `pointerup`: by then the browser has placed its
+own caret (so there is something to read and adjust), and the presses that must
+*not* move the caret never produce one — dragging a selection handle, a
+long-press selection. A press the content already answered (`preventDefault` —
+a [link](#rendered-line) opening, an [attachment](#attachments) opening), a
+ranged selection the press ended on (a drag-select, a double-click's word), and
+a keyboard-synthesised click (`detail === 0`) are all left alone.
+
 ### Selection mapping
 
 `src/ui/markdown-selection.ts` — translates a live-preview DOM selection back

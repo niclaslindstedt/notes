@@ -8,6 +8,7 @@ import {
   type ClipboardEvent as ReactClipboardEvent,
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type Ref,
 } from "react";
 
@@ -25,6 +26,7 @@ import {
   orderPoints,
   pointsEqual,
   replaceRange,
+  wordEndAt,
   type SourcePoint,
 } from "../domain/line-edit.ts";
 import {
@@ -299,6 +301,11 @@ export function MarkdownEditor({
   // The last active-line key we revealed for, so typing within a line (which
   // re-runs the effect without changing the key) never re-triggers a scroll.
   const lastRevealKey = useRef<number | null>(null);
+  // Whether the press being handled came from a finger / pen rather than a
+  // mouse, which decides how precisely its caret is taken (see `onSurfaceClick`).
+  // Only an explicit touch/pen counts: an engine that reports no `pointerType`
+  // is treated as a mouse, so a desktop click is never snapped.
+  const touchPress = useRef(false);
 
   // Undo/redo scroll bookkeeping. `lastUndoSeq` remembers the tick we last acted
   // on (seeded to the current one so a fresh mount never scrolls); when it
@@ -1002,6 +1009,61 @@ export function MarkdownEditor({
     }
     activate(last, 0);
   }
+
+  // --- Where a press lands the caret ---------------------------------------
+  //
+  // The browser's own placement is exact to the pixel, which is what a mouse
+  // wants and what a fingertip cannot use: a tap covers about a word, so which
+  // of the characters under it the browser picks is a coin toss. A touch press
+  // therefore snaps forward to the end of the word it hit (`wordEndAt`) — an
+  // aimable position, and the one Backspace works back from. A mouse press is
+  // left exactly where it landed.
+  //
+  // Either way, a press on a line the browser can't anchor a caret in at all —
+  // a horizontal rule is a lone `<hr>` with no text, so the caret falls to the
+  // line's start or onto a neighbour — lands at the *end* of that line instead.
+  // Without this a rule can't be removed on a phone at all: the caret sits
+  // before it with nothing to Backspace, and there is no forward-delete key.
+  //
+  // Runs on `click` rather than `pointerup`: by then the browser has placed its
+  // caret (so there is something to read and adjust), and the presses that must
+  // not move the caret — dragging a selection handle, a long-press selection —
+  // never produce one.
+  function onSurfaceClick(e: ReactMouseEvent<HTMLElement>) {
+    // A press the content already answered (a link opened, an attachment
+    // opened) or one no pointer made (a keyboard-synthesised click).
+    if (e.defaultPrevented || e.detail === 0) return;
+    const root = rootRef.current;
+    const lineEl = (e.target as Element | null)?.closest?.("[data-line-index]");
+    if (!root || !(lineEl instanceof HTMLElement) || !root.contains(lineEl))
+      return;
+    const line = lineIndexOf(lineEl);
+    if (line === null) return;
+    // A drag-select (or a double-click's word) that happens to end here keeps
+    // exactly the range the browser drew.
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) return;
+    const raw = linesRef.current[line] ?? "";
+    const pt =
+      sel && sel.anchorNode
+        ? sourcePointFromDom(
+            root,
+            blocksRef.current,
+            sel.anchorNode,
+            sel.anchorOffset,
+          )
+        : null;
+    // Nothing to anchor in (the rule), or the browser anchored somewhere other
+    // than the line that was pressed: take the end of the pressed line.
+    if (!pt || pt.line !== line || (lineEl.textContent ?? "") === "") {
+      activate(line, raw.length);
+      return;
+    }
+    if (!touchPress.current) return;
+    const col = wordEndAt(raw, pt.col);
+    if (col !== pt.col) activate(line, col);
+  }
+
   // --- The styling toolbar -------------------------------------------------
   //
   // A toolbar press arrives here with the caret and any selection untouched
@@ -1175,6 +1237,9 @@ export function MarkdownEditor({
           // line the caret lands on is scrolled clear of the soft keyboard; a
           // mouse never needs it (no keyboard steals the caret's space).
           if (e.pointerType !== "mouse") revealPending.current = true;
+          // Remember what pressed, for the caret placement the click brings.
+          touchPress.current =
+            e.pointerType === "touch" || e.pointerType === "pen";
         }}
         onMouseDown={(e) => {
           // A click in the empty space below the text lands the caret at the end
@@ -1206,6 +1271,7 @@ export function MarkdownEditor({
           autoCorrect={disableAutocorrect ? "off" : "on"}
           autoCapitalize={disableAutocorrect ? "off" : "sentences"}
           onKeyDown={onKeyDown}
+          onClick={onSurfaceClick}
           onPaste={onPaste}
           onBlur={() => {
             // Focus left the editing surface (the title field, a header button,
