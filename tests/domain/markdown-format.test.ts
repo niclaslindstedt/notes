@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { classifyLines } from "../../src/domain/markdown.ts";
 import {
   applyFormat,
   lineFormatAt,
+  newlineFor,
   type FormatAction,
 } from "../../src/domain/markdown-format.ts";
 
@@ -333,5 +335,40 @@ describe("lineFormatAt", () => {
 
   it("returns null past the end", () => {
     expect(lineFormatAt(["a"], 4)).toBeNull();
+  });
+});
+
+describe("newlineFor", () => {
+  // What Enter inserts with the caret at `col` of the line at `line`.
+  const enterAt = (source: string, line: number, col: number) =>
+    newlineFor(classifyLines(source)[line], col);
+
+  it("inserts a bare newline outside a quote", () => {
+    expect(enterAt("plain text", 0, 5)).toBe("\n");
+    expect(enterAt("- item", 0, 6)).toBe("\n");
+    expect(newlineFor(undefined, 0)).toBe("\n");
+  });
+
+  it("carries the quote marker onto the next row", () => {
+    expect(enterAt("> quoted", 0, 8)).toBe("\n> ");
+    expect(enterAt("> quoted", 0, 4)).toBe("\n> ");
+  });
+
+  it("reproduces the marker as it was written, indent included", () => {
+    expect(enterAt("  > quoted", 0, 10)).toBe("\n  > ");
+    expect(enterAt(">tight", 0, 6)).toBe("\n>");
+  });
+
+  it("keeps quoting from an empty quote row (leaving one is explicit)", () => {
+    expect(enterAt("> a\n> ", 1, 2)).toBe("\n> ");
+  });
+
+  it("leaves a caret inside the marker alone, so the row is pushed down", () => {
+    expect(enterAt("> quoted", 0, 0)).toBe("\n");
+    expect(enterAt("> quoted", 0, 1)).toBe("\n");
+  });
+
+  it("does not quote a `>` line inside a fenced code block", () => {
+    expect(enterAt("```\n> not a quote\n```", 1, 14)).toBe("\n");
   });
 });

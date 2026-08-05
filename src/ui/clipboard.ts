@@ -12,18 +12,20 @@ export async function writeClipboard(text: string): Promise<boolean> {
   } catch {
     // Fall through to the legacy path below.
   }
+  const ta = document.createElement("textarea");
   try {
-    const ta = document.createElement("textarea");
     ta.value = text;
     ta.style.position = "fixed";
     ta.style.opacity = "0";
     document.body.appendChild(ta);
     ta.focus();
     ta.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(ta);
-    return ok;
+    return document.execCommand("copy");
   } catch {
     return false;
+  } finally {
+    // Always, even when `execCommand` threw: a stranded off-screen textarea
+    // would sit in the document stealing queries (and the caret) forever.
+    ta.remove();
   }
 }

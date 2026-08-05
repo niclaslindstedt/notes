@@ -21,7 +21,7 @@ import {
   CloudIcon,
   CodeIcon,
   CopyIcon,
-  DeleteLineIcon,
+  CutIcon,
   ImportIcon,
   PaletteIcon,
   PlusIcon,
@@ -32,6 +32,7 @@ import {
 import {
   FormatIcon,
   LinkGlyph as LinkFormatIcon,
+  QuoteGlyph as QuoteFormatIcon,
 } from "../ui/format-glyphs.tsx";
 
 // Every glyph is a function component taking an optional `className`, so a
@@ -392,4 +393,5 @@ export const CopyGlyph: Glyph = CopyIcon;
 export const SearchGlyph: Glyph = SearchIcon;
 export const FormatGlyph: Glyph = FormatIcon;
 export const LinkGlyph: Glyph = LinkFormatIcon;
-export const DeleteLineGlyph: Glyph = DeleteLineIcon;
+export const QuoteGlyph: Glyph = QuoteFormatIcon;
+export const CutGlyph: Glyph = CutIcon;

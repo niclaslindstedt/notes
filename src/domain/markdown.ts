@@ -250,6 +250,31 @@ export function hasClosedFence(body: string): boolean {
   return false;
 }
 
+/**
+ * Whether `body` holds a quote running over two or more consecutive lines —
+ * the shape Enter's quote continuation writes. A line-level scan rather than a
+ * full `classifyLines` pass for the same reason as {@link hasClosedFence}, but
+ * fence-aware, so a `>` inside a code block isn't counted as a quote.
+ */
+export function hasMultiLineQuote(body: string): boolean {
+  let inFence = false;
+  let run = 0;
+  for (const raw of body.split("\n")) {
+    if (FENCE_RE.test(raw)) {
+      inFence = !inFence;
+      run = 0;
+      continue;
+    }
+    if (inFence || !QUOTE_RE.test(raw)) {
+      run = 0;
+      continue;
+    }
+    run += 1;
+    if (run >= 2) return true;
+  }
+  return false;
+}
+
 // Second pass over the classified blocks: assign every `ul`/`ol` item a nesting
 // `depth` from its indentation, and every `ol` item a sequential `marker`. The
 // per-line classifier can't do this — the displayed number of `1.`/`1.` (→ `1.`

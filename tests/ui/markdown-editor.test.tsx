@@ -96,6 +96,35 @@ describe("MarkdownEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith("he\nllo");
   });
 
+  it("opens another quote row on Enter inside a quote", () => {
+    const { onChange } = renderEditor("> quoted");
+    caretIn(rawLine()!, 8);
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("> quoted\n> ");
+  });
+
+  it("quotes the tail when Enter splits a quote mid-row", () => {
+    const { onChange } = renderEditor("> abcd");
+    caretIn(rawLine()!, 4);
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("> ab\n> cd");
+  });
+
+  it("keeps quoting from an empty quote row", () => {
+    // Leaving a quote is explicit — unmark the row, or move to another one.
+    const { onChange } = renderEditor("> one\n> ");
+    caretIn(rawLine()!, 2);
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("> one\n> \n> ");
+  });
+
+  it("does not quote the next row from an unquoted one", () => {
+    const { onChange } = renderEditor("> quoted\nplain");
+    caretIn(rawLine()!, 5);
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("> quoted\nplain\n");
+  });
+
   it("merges into the previous line on Backspace at column 0", () => {
     const { onChange } = renderEditor("a\nb");
     const raw = rawLine()!;
@@ -574,7 +603,7 @@ describe("MarkdownEditor", () => {
     });
   });
 
-  describe("deleting a line", () => {
+  describe("cutting", () => {
     // Ctrl/Cmd+K on the surface; the header button reaches the same code
     // through the editor's imperative handle.
     function ctrlK() {
@@ -583,7 +612,7 @@ describe("MarkdownEditor", () => {
       });
     }
 
-    it("removes the caret's line whole from its start", () => {
+    it("cuts the caret's line whole from its start", () => {
       // The caret opens on the last line, so that is the one that goes.
       const { onChange } = renderEditor("one\ntwo\nthree");
       caretIn(rawLine()!, 0);
@@ -591,14 +620,29 @@ describe("MarkdownEditor", () => {
       expect(onChange).toHaveBeenLastCalledWith("one\ntwo");
     });
 
-    it("clears only the text after a mid-line caret", () => {
+    it("cuts only the text after a mid-line caret", () => {
       const { onChange } = renderEditor("keep this. drop this.");
       caretIn(rawLine()!, 11);
       ctrlK();
       expect(onChange).toHaveBeenLastCalledWith("keep this. ");
     });
 
-    it("leaves the note alone when there is nothing to remove", () => {
+    it("puts what it took on the clipboard", () => {
+      const writeText = vi.fn(() => Promise.resolve());
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText },
+        configurable: true,
+      });
+      renderEditor("one\ntwo\nthree");
+      caretIn(rawLine()!, 0);
+      ctrlK();
+      // The caret opens on the last line, and a whole line is cut with its
+      // newline so pasting it back makes a line again.
+      expect(writeText).toHaveBeenCalledWith("three\n");
+      Reflect.deleteProperty(navigator, "clipboard");
+    });
+
+    it("leaves the note alone when there is nothing to cut", () => {
       const { onChange } = renderEditor("");
       caretIn(rawLine()!, 0);
       ctrlK();

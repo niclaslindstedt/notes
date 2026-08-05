@@ -83,9 +83,9 @@ const achievements: AchievementsCatalog = {
     },
     guillotine: {
       name: "Giljotinen",
-      condition: "Kapa en rad med raderingsknappen (eller Ctrl/Cmd+K).",
+      condition: "Klipp ut något med klipp ut-knappen (eller Ctrl/Cmd+K).",
       learnMore:
-        "X—-knappen uppe till höger i en anteckning tar bort raden som markören står på, så att städa en anteckning blir ett tryck i stället för att markera och sudda eller hålla in Backsteg. Står markören mitt i en mening rensas bara det som kommer efter den på raden, så det du ville behålla står kvar. Ctrl/Cmd+K gör samma sak från tangentbordet, och Ångra lägger tillbaka raden.",
+        "Saxknappen uppe till höger i en anteckning klipper ut till urklipp: det du har markerat, eller — utan markering — hela raden som markören står på, så att städa en anteckning blir ett tryck i stället för att markera och sudda eller hålla in Backsteg. Står markören mitt i en mening tas bara det som kommer efter den på raden, så det du ville behålla står kvar. Ctrl/Cmd+K gör samma sak från tangentbordet, och Ångra lägger tillbaka det.",
     },
     stylist: {
       name: "Stilisten",
@@ -143,6 +143,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Omslut rader med ``` så visar redigeraren dem som ett kodblock — ordagrant, utan någon Markdown-formatering inuti. Själva staketraderna döljs när blocket är stängt och kommer tillbaka så fort du placerar markören inuti det.",
     },
+    quoteUnquote: {
+      name: "Citat, slut citat",
+      condition: "Skriv ett citat som löper över mer än en rad.",
+      learnMore:
+        "Tryck Enter inuti ett citat så öppnas ytterligare en citatrad, så att ett långt stycke kan skrivas i ett svep i stället för att varje rad märks upp för hand. Citatet fortsätter tills du lämnar det: tryck Citat igen för att ta bort märkningen från raden, eller placera markören på en rad som inte är ett citat.",
+    },
     plainText: {
       name: "Enkelt och rent",
       condition: "Stäng av direkt Markdown-visning.",
@@ -195,7 +201,7 @@ const achievements: AchievementsCatalog = {
       name: "Arkiveringssystem",
       condition: "Skapa en mapp för att gruppera anteckningar.",
       learnMore:
-        "Mappar grupperar anteckningar inuti en namnrymd — en ”Inloggningsfunktion”, en ”Semester 2025”. Tryck på mappknappen vid Anteckningar-rubriken i sidomenyn för att skapa en, och dra sedan anteckningar till den (eller använd en antecknings ”Flytta till mapp”) för att lägga undan dem. En mapp kan fällas ut för att skapa en ny anteckning direkt i den.",
+        "Mappar grupperar anteckningar inuti en namnrymd — en ”Inloggningsfunktion”, en ”Semester 2025”. Tryck på mappknappen vid Anteckningar-rubriken i sidomenyn för att skapa en, och dra sedan anteckningar till den för att lägga undan dem. En mapp kan fällas ut för att skapa en ny anteckning direkt i den.",
     },
     polyglot: {
       name: "Polyglott",

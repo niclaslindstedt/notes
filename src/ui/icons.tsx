@@ -93,11 +93,12 @@ export function ImportIcon({ className }: IconProps) {
 }
 
 /**
- * A cross followed by a stroke — "X—", the editor's delete-line button. Reads
- * as taking a line of text away rather than the note itself, which is what the
- * trash can already means everywhere else in the app.
+ * A cross inside a circle — the "empty this field" affordance. Deliberately
+ * *not* the bare `CloseIcon`: a clear button usually sits a few pixels from a
+ * dialog's close button, and two identical crosses side by side read as one
+ * control repeated. The ring is what tells them apart at a glance.
  */
-export function DeleteLineIcon({ className }: IconProps) {
+export function ClearFieldIcon({ className }: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -110,8 +111,38 @@ export function DeleteLineIcon({ className }: IconProps) {
       focusable={false}
       className={className}
     >
-      <path d="m3 8 8 8M11 8l-8 8" />
-      <path d="M14.5 12H21" />
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9 9 6 6M15 9l-6 6" />
+    </svg>
+  );
+}
+
+/**
+ * A pair of scissors, the editor's cut button — the one glyph that reads as
+ * "take this text away *and* keep it" rather than as deleting it, which is what
+ * the trash can already means everywhere else in the app.
+ *
+ * The blades cross at the same 12,12 centre the rest of the set is drawn
+ * around, and the finger holes are hairline circles: at the 18px the header
+ * renders it, filled bows would close up into two dots.
+ */
+export function CutIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable={false}
+      className={className}
+    >
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="6" cy="18" r="3" />
+      <path d="M8.12 8.12 20 20" />
+      <path d="M20 4 8.12 15.88" />
     </svg>
   );
 }

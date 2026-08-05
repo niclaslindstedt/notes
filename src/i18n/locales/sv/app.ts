@@ -23,7 +23,7 @@ const app: AppCatalog = {
   },
   copyCode: "Kopiera kod",
   copyLink: "Kopiera länk",
-  deleteLine: "Ta bort rad",
+  cut: "Klipp ut",
   format: {
     show: "Formatering",
     hide: "Dölj formatering",

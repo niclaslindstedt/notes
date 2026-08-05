@@ -174,6 +174,24 @@ export function lineFormatAt(
 }
 
 /**
+ * The text an Enter at column `col` of `block` should insert. A bare newline
+ * everywhere but inside a quote, where it carries the line's own `> ` marker
+ * (indent included) across, so the row the split opens is a quote row too and
+ * a quote can be written as a paragraph rather than re-marked line by line.
+ *
+ * Quote mode is deliberately **sticky**: an empty quote row continues into
+ * another one rather than dropping out, so leaving a quote is an explicit act —
+ * press Quote to unmark the row, or put the caret on a row that isn't quoted.
+ *
+ * A caret still inside the marker isn't *in* the quote — Enter there pushes the
+ * whole row down, exactly as on any other line.
+ */
+export function newlineFor(block: LineBlock | undefined, col: number): string {
+  if (!block || block.kind !== "quote" || col < block.contentStart) return "\n";
+  return `\n${block.raw.slice(0, block.contentStart)}`;
+}
+
+/**
  * Apply `action` to `lines` over the span `sel` covers, returning the new
  * source and the selection to restore. The endpoints may arrive in any order
  * (a backwards drag) and are ordered here; a collapsed selection is a bare

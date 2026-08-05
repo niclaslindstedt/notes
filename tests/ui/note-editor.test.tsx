@@ -33,7 +33,6 @@ const PLAIN = { ...DEFAULT_EDITOR_SETTINGS, renderMarkdown: false };
 
 function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
   const onBack = vi.fn();
-  const onMoveFolder = vi.fn();
   const onChange = vi.fn();
   const onTitleChange = vi.fn();
   const onTitleSettle = vi.fn();
@@ -42,9 +41,7 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
     <Editor
       note={note()}
       editor={PLAIN}
-      folders={[]}
       onBack={onBack}
-      onMoveFolder={onMoveFolder}
       onChange={onChange}
       onTitleChange={onTitleChange}
       onTitleSettle={onTitleSettle}
@@ -53,7 +50,7 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
       {...props}
     />,
   );
-  return { onBack, onMoveFolder, onChange, onTitleChange, onTitleSettle };
+  return { onBack, onChange, onTitleChange, onTitleSettle };
 }
 
 describe("Editor", () => {
@@ -137,8 +134,7 @@ describe("Editor", () => {
     body.focus();
 
     fireEvent.keyDown(body, { key: "Tab" });
-    // The leftmost action in the header cluster — the find bar's toggle, with
-    // no folders to put a folder picker before it.
+    // The leftmost action in the header cluster — the find bar's toggle.
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: "Find in note" }),
     );
@@ -159,24 +155,34 @@ describe("Editor", () => {
     expect(body.tabIndex).toBe(-1);
   });
 
-  it("hides the folder picker when there are no folders", () => {
-    renderEditor({ folders: [] });
+  it("keeps the header free of a folder control — filing is a side-menu drag", () => {
+    renderEditor();
     expect(screen.queryByLabelText("Move to folder")).toBeNull();
-  });
-
-  it("offers the folder picker when folders exist", () => {
-    renderEditor({ folders: [{ id: "f1", name: "Work", createdAt: 0 }] });
-    expect(screen.getByLabelText("Move to folder")).toBeTruthy();
   });
 });
 
-describe("the delete-line button", () => {
+describe("the cut button", () => {
   // The note body, which a multi-line value can't be found by: the display-value
   // query collapses whitespace, so "one\ntwo" never matches.
   const bodyField = () =>
     screen.getByPlaceholderText("Start writing…") as HTMLTextAreaElement;
 
-  it("removes the line the caret sits on", () => {
+  // jsdom ships no Clipboard API, so stand one in and watch what the cut hands
+  // it. Configurable, so `afterEach`'s cleanup can drop it again.
+  function stubClipboard() {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    return writeText;
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  it("cuts the line the caret sits on", () => {
     const { onChange } = renderEditor({
       note: note({ body: "one\ntwo\nthree" }),
     });
@@ -184,11 +190,11 @@ describe("the delete-line button", () => {
     body.focus();
     body.setSelectionRange(4, 4); // start of "two"
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete line" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cut" }));
     expect(onChange).toHaveBeenCalledWith("one\nthree");
   });
 
-  it("clears only what follows a mid-line caret", () => {
+  it("cuts only what follows a mid-line caret", () => {
     const { onChange } = renderEditor({
       note: note({ body: "keep this. drop this." }),
     });
@@ -198,10 +204,37 @@ describe("the delete-line button", () => {
     body.focus();
     body.setSelectionRange(11, 11);
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete line" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cut" }));
     expect(onChange).toHaveBeenCalledWith("keep this. ");
     // The caret stays put so typing carries straight on.
     expect(body.selectionStart).toBe(11);
+  });
+
+  it("cuts exactly the selection when there is one", () => {
+    const writeText = stubClipboard();
+    const { onChange } = renderEditor({
+      note: note({ body: "one\ntwo\nthree" }),
+    });
+    const body = bodyField();
+    body.focus();
+    body.setSelectionRange(4, 7); // "two", without its newline
+
+    fireEvent.click(screen.getByRole("button", { name: "Cut" }));
+    // The selected text goes and the line it sat on stays behind, empty.
+    expect(onChange).toHaveBeenCalledWith("one\n\nthree");
+    expect(writeText).toHaveBeenCalledWith("two");
+  });
+
+  it("puts what it took on the clipboard", () => {
+    const writeText = stubClipboard();
+    renderEditor({ note: note({ body: "one\ntwo\nthree" }) });
+    const body = bodyField();
+    body.focus();
+    body.setSelectionRange(4, 4);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cut" }));
+    // A whole line goes with its newline, so pasting it back makes a line.
+    expect(writeText).toHaveBeenCalledWith("two\n");
   });
 
   it("answers Ctrl+K in the body the same way", () => {
@@ -219,7 +252,7 @@ describe("the delete-line button", () => {
     const body = bodyField();
     body.focus();
 
-    const button = screen.getByRole("button", { name: "Delete line" });
+    const button = screen.getByRole("button", { name: "Cut" });
     const down = fireEvent.mouseDown(button);
     // A cancelled mousedown is what leaves focus (and the caret) where it is.
     expect(down).toBe(false);
@@ -227,7 +260,7 @@ describe("the delete-line button", () => {
 
   it("is withheld while the note is still decrypting", () => {
     renderEditor({ loading: true });
-    expect(screen.queryByRole("button", { name: "Delete line" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cut" })).toBeNull();
   });
 });
 

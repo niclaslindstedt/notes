@@ -10,7 +10,13 @@ import {
   type NoteResult,
 } from "../domain/search.ts";
 import { useT } from "../i18n/index.ts";
-import { ChevronRightIcon, CloseIcon, NoteIcon, SearchIcon } from "./icons.tsx";
+import {
+  ChevronRightIcon,
+  ClearFieldIcon,
+  CloseIcon,
+  NoteIcon,
+  SearchIcon,
+} from "./icons.tsx";
 import { Modal } from "./Modal.tsx";
 
 // The search surface: a full-screen sheet on mobile, a centred card from `sm`
@@ -156,9 +162,9 @@ export function SearchModal({ open, onClose, snapshot, onOpen }: Props) {
             }}
             aria-label={t("search.clear")}
             title={t("search.clear")}
-            className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-muted hover:bg-surface-2 hover:text-fg-bright"
+            className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-fg-bright"
           >
-            <CloseIcon className="h-4 w-4" />
+            <ClearFieldIcon className="h-[18px] w-[18px]" />
           </button>
         )}
         <button

@@ -89,9 +89,9 @@ const achievements = {
     },
     guillotine: {
       name: "Guillotine",
-      condition: "Cut a line with the delete-line button (or Ctrl/Cmd+K).",
+      condition: "Cut something with the cut button (or Ctrl/Cmd+K).",
       learnMore:
-        "The X— button at the top right of a note removes the line the cursor is on, so tidying a note is one tap instead of a select-and-erase or a held Backspace. Park the cursor mid-sentence and it clears only what comes after it on that line, leaving what you wanted to keep. Ctrl/Cmd+K does the same from the keyboard, and Undo puts the line back.",
+        "The scissors button at the top right of a note cuts to the clipboard: whatever you have selected, or — with nothing selected — the whole line the cursor is on, so tidying a note is one tap instead of a select-and-erase or a held Backspace. Park the cursor mid-sentence and it takes only what comes after it on that line, leaving what you wanted to keep. Ctrl/Cmd+K does the same from the keyboard, and Undo puts it back.",
     },
     stylist: {
       name: "Stylist",
@@ -148,6 +148,12 @@ const achievements = {
       learnMore:
         "Wrap lines in ``` and the editor renders them as a block of code — verbatim, with no Markdown formatting applied inside. The fences themselves disappear once the block is closed, and come back the moment you put the caret inside it.",
     },
+    quoteUnquote: {
+      name: "Quote, unquote",
+      condition: "Write a quote that runs over more than one row.",
+      learnMore:
+        "Pressing Enter inside a quote opens another quote row, so a long passage can be typed straight through instead of marking each row by hand. The quote keeps going until you leave it: press Quote again to unmark the row, or put the caret on a row that isn't quoted.",
+    },
     plainText: {
       name: "Plain and simple",
       condition: "Turn live Markdown rendering off.",
@@ -200,7 +206,7 @@ const achievements = {
       name: "Filing system",
       condition: "Create a folder to group notes.",
       learnMore:
-        "Folders group notes inside a namespace — a “Login feature”, a “Vacation 2025”. Tap the folder button on the Notes heading in the side menu to make one, then drag notes onto it (or use a note's “Move to folder”) to file them away. A folder can expand to make a new note straight inside it.",
+        "Folders group notes inside a namespace — a “Login feature”, a “Vacation 2025”. Tap the folder button on the Notes heading in the side menu to make one, then drag notes onto it to file them away. A folder can expand to make a new note straight inside it.",
     },
     polyglot: {
       name: "Polyglot",

@@ -244,18 +244,31 @@ sticky header (a first line vanishing off screen, caret and all). It is scoped
 to touch (a mouse never loses the caret to a keyboard) and gated on the
 active-line key so typing within a line never re-scrolls.
 
+What it centres is the **caret**, not the line's box (`revealRect`,
+`src/ui/hooks/scrollFocusedIntoView.ts`, reading the caret's own client rect via
+`caretRectWithin` in `src/ui/contenteditable-caret.ts`). One source line
+soft-wraps into as many rows as it needs, so a long sentence can be several
+screens tall; centring that element lands on the middle of the sentence wherever
+the caret actually is — tapping its start, its middle, or its end all scrolled to
+the same place, with the caret often off screen. A short line's caret rect is its
+text row, so the reveal is unchanged there. Targets with no document selection to
+read (the Storage settings passphrase `<input>`) fall back to the element box.
+
 **Typing keeps the caret on screen with a one-line buffer.** Because every edit
 is intercepted and the caret re-placed programmatically, the browser runs no
 native "keep the caret visible" pass — so on desktop, pressing Enter on the
 bottom line would push the new line off the foot of the viewport. The same
 caret-placement effect that handles the touch reveal falls through, on any
 non-touch edit, to `scrollCaretLineIntoView` (`src/ui/MarkdownEditor.tsx`), which
-keeps the caret's line clear of the container's top and bottom edges by a
+keeps the caret clear of the container's top and bottom edges by a
 one-line-height buffer via the pure `bufferedScrollTop`
 (`src/ui/hooks/scrollFocusedIntoView.ts`). It scrolls the editor's own container
 to an **absolute** target (so a call issued mid-animation retargets rather than
-compounds) and is a no-op whenever the line already sits inside the buffered
-band, so ordinary mid-note typing never jumps the view.
+compounds) and is a no-op whenever the caret already sits inside the buffered
+band, so ordinary mid-note typing never jumps the view. Its geometry comes from
+the same caret rect (`revealRect`) for the same reason: a line that wraps past
+the viewport is never "inside the band", so measuring its box would scroll on
+every keystroke, and towards the paragraph's middle rather than the caret.
 
 Clicking the empty space below the note lands the caret on a blank line at the
 very bottom, **appending one when the document doesn't already end in a newline**
@@ -395,7 +408,7 @@ title settles.
 ### Editor tab order
 
 `Editor` (`src/ui/NoteEditor.tsx`) spells out the editor's keyboard tab order by
-hand: **back button → title → body → folder picker / copy / sync**. That is the
+hand: **back button → title → body → find / formatting / cut / copy**. That is the
 order the work happens in — name the note, write it, and only then reach for the
 toolbar — but document order can't express it, because the header (and every
 button in it) precedes the body. So the two editing surfaces (the live-preview
@@ -406,8 +419,8 @@ focus is moved explicitly instead:
 - Tab in the title focuses the body (the same `focusBody` hand-down as Enter /
   Arrow-Down; the [live-preview editor](#markdown-editor) opens a line at the end
   through its imperative handle).
-- Tab in the body focuses the first header action — the folder picker when the
-  note has folders to file into, otherwise the [copy button](#copy-button).
+- Tab in the body focuses the first header action — the
+  [find button](#find-in-note).
   Both surfaces report the keystroke up through an `onTabOut(backwards)` prop
   rather than acting themselves, and only when the caret is on the surface: an
   attachment thumbnail inside the note is its own tab stop and its Tab bubbles
@@ -551,6 +564,41 @@ button, all of them in `CodeCopyButton`:
   every line is then as wide as the widest line in the note, and without it the
   button would park a screen or two off to the right where nobody would find
   it.
+### Quote continuation
+
+Pressing **Enter** inside a quote opens another quote row, so a passage can be
+typed straight through instead of re-marking every row from the
+[styling toolbar](#styling-toolbar). `newlineFor(block, col)`
+(`src/domain/markdown-format.ts`) is the pure decision — the text the split
+inserts: a bare `"\n"` everywhere else, and `"\n"` plus the line's **own**
+marker inside a quote, so the indent and the exact spelling (`> ` or a bare
+`>`) carry across rather than being normalised. The
+[live-preview editor](#markdown-editor) calls it from the
+`insertParagraph` / `insertLineBreak` branch of its `beforeinput` handler and
+feeds the result to the same `replaceRange` engine every other structural edit
+goes through, so splitting mid-row quotes the tail too (`> one|two` →
+`> one` / `> two`). It reads the caret's line from the classification the
+editor already holds, so a `>` inside a
+[fenced code block](#code-block) is code, not a quote.
+
+Quote mode is deliberately **sticky**: an empty quote row opens another one
+rather than dropping out of the quote, so leaving one is an explicit act —
+press **Quote** on the [styling toolbar](#styling-toolbar) to unmark the row,
+or put the caret on a row that isn't quoted (the decision is per-line, so the
+next Enter simply follows whichever row the caret sits on). The one caret
+position that doesn't continue is one still *inside* the marker: Enter there
+pushes the whole row down, exactly as on any other line.
+
+Only the live-preview editor does this. The Markdown-off
+[plain fallback](#editor-settings) is a real `<textarea>` whose Enter the
+browser handles natively; intercepting it there would cost the browser's own
+undo history for the commonest keystroke in the note, which is a worse trade
+than the inconsistency.
+
+`hasMultiLineQuote(body)` (`src/domain/markdown.ts`) is the cheap, fence-aware
+line-level scan (no blocks built) behind the [Quote, unquote](#unlock-triggers)
+achievement, which fires the first time a note holds a quote running over two
+or more consecutive rows.
 
 ### Bullet characters
 
@@ -683,37 +731,50 @@ case reuses the [markdown codec](#markdown-codec)'s `noteToMarkdown` so a copied
 note is byte-identical to its on-disk file. Copying is the **Copycat**
 achievement (fired via `unlock("copycat")`).
 
-### Delete-line button
+### Cut button
 
-`DeleteLineButton` (`src/ui/DeleteLineButton.tsx`) — the "X—" glyph immediately
-left of the [copy button](#copy-button) in the editor header. It removes the
-line the caret sits on, because clearing a line by hand is otherwise a
-select-and-erase or a held Backspace. `Ctrl/Cmd+K` is the same edit from the
-keyboard, bound by each editing surface itself (so the browser only loses the
-shortcut while the note body has focus). Neither is offered in the read-only
-archived-note view (see [Archive view](#archive-view)), and the button is
-withheld while a note is still [decrypting](#encryption) — there is no surface
-to cut in.
+`CutButton` (`src/ui/CutButton.tsx`) — the scissors glyph immediately left of
+the [copy button](#copy-button) in the editor header. It cuts at the caret: what it
+takes leaves the note *and* lands on the clipboard, because clearing a line by
+hand is otherwise a select-and-erase or a held Backspace, and text you pulled
+out is text you often want to put somewhere else. `Ctrl/Cmd+K` is the same edit
+from the keyboard, bound by each editing surface itself (so the browser only
+loses the shortcut while the note body has focus). Neither is offered in the
+read-only archived-note view (see [Archive view](#archive-view)), and the button
+is withheld while a note is still [decrypting](#encryption) — there is no
+surface to cut in.
 
-What exactly goes is decided by the pure `deleteLine`
-(`src/domain/line-edit.ts`), so both surfaces agree:
+What exactly goes is decided by the pure `cutLine` (`src/domain/line-edit.ts`),
+so both surfaces agree:
 
+- **A ranged selection** — exactly what is highlighted goes, to the column, and
+  the caret lands where the selection started. What you can see is selected is
+  what ends up on the clipboard. In the [live-preview
+  editor](#markdown-editor) a selection reaching a line's content start is first
+  snapped over that line's block marker (`snapStartToLineEdge`), so cutting a
+  bulleted line takes its `- ` too.
 - **Caret in the middle of a line** — only the text *after* it goes, and the
   caret stays at its column. This is the kill-to-end-of-line every terminal
-  binds to Ctrl+K, and it's what makes the button useful for dropping the rest
+  binds to Ctrl+K, and it's what makes the button useful for lifting the rest
   of a sentence rather than only whole lines.
 - **Caret at either end of a line** — the whole line goes, newline and all, so
-  the lines below move up. At the end of a line trimming the tail would delete
+  the lines below move up. At the end of a line trimming the tail would cut
   nothing, and a button that sometimes does nothing reads as broken.
-- **A ranged selection** — every line it touches goes; an endpoint resting at
-  column 0 hasn't visually taken that line, so it survives.
 
-The caret lands at the start of whichever line moved up into the gap (or at the
-end of the new last line when the note's tail was what went), which is what lets
-presses repeat: hold the button (or Ctrl+K) and lines peel off one after
-another. A one-line note empties to a single blank line rather than to no lines
-at all, and the edit runs through the same commit path as typing — so it is one
-step on the [undo timeline](#undo--redo) and syncs like any other edit.
+A whole line is cut *with* its trailing newline, so pasting it back re-creates a
+line rather than splicing it into the one the caret is on; a selection is cut
+verbatim. The text goes out through `writeClipboard` (`src/ui/clipboard.ts`,
+shared with the [copy button](#copy-button)) and the write is deliberately
+fire-and-forget — a refused or unavailable clipboard must not hold up the edit,
+and [undo](#undo--redo) is right there.
+
+After a whole-line cut the caret lands at the start of whichever line moved up
+into the gap (or at the end of the new last line when the note's tail was what
+went), which is what lets presses repeat: hold the button (or Ctrl+K) and lines
+peel off one after another. A one-line note empties to a single blank line
+rather than to no lines at all, and the edit runs through the same commit path
+as typing — so it is one step on the [undo timeline](#undo--redo) and syncs like
+any other edit.
 
 Like the [styling toolbar](#styling-toolbar)'s buttons, the header button cancels
 its own `mousedown`: the press must not blur the editing surface, or there would
@@ -728,7 +789,7 @@ does nothing rather than guess at a line. Cutting something unlocks the
 one button per Markdown construct the app renders, brought up by the
 `FormatToolbarButton` sitting top-right in the editor header (after the
 [find bar](#find-in-note)'s magnifier, before the
-[delete-line](#delete-line-button) and [copy](#copy-button) buttons). Pressing that button opens the toolbar; pressing it
+[cut](#cut-button) and [copy](#copy-button) buttons). Pressing that button opens the toolbar; pressing it
 again takes it away, and the choice is remembered across notes and reloads under
 the `notes/format-toolbar` localStorage key.
 
@@ -1423,7 +1484,11 @@ side: it scrolls a freshly-focused field or tapped line clear of the soft
 keyboard by re-centring it on every visual-viewport change until the
 keyboard-settling burst goes quiet — the keyboard animates in as a series of
 intermediate heights, so centring only on the first would leave the last line
-(which can't scroll any further up) behind the keyboard. It centres by setting
+(which can't scroll any further up) behind the keyboard. What it centres is the
+target's *reveal rect* (`revealRect`): the caret's own client rect when the
+target is an editable line holding the caret, so a sentence that soft-wraps
+across several screens reveals where the caret is rather than the middle of its
+box; the element's rect otherwise. It centres by setting
 the **nearest scrollable ancestor's `scrollTop`** (the pure `centeredScrollTop`
 clamps to the container's scroll range), *not* `Element.scrollIntoView`: the
 latter walks up every scroll container and, on iOS, nudges the visual viewport
@@ -1526,6 +1591,20 @@ single body up front and without bloating the index. Picking a result calls
 `switchTo`, opening the note in the editor (which then decrypts its body on demand
 if it was deferred). Searching is what unlocks the **Seeker** achievement (manual
 `unlock("seeker")`).
+
+### Clear button
+
+The control that empties a text field, as opposed to the one that closes the
+dialog around it. It paints `ClearFieldIcon` (`src/ui/icons.tsx`) — a cross
+inside a circle — rather than the bare `CloseIcon` every dialog's close button
+uses, and its hover halo is a full circle (`rounded-full`) to match.
+
+The distinction exists because the two controls end up adjacent: in the
+[search modal](#search) the clear button sits immediately left of the modal's
+close button, and when both were a plain cross the header read as one control
+accidentally drawn twice. The ring is what separates them at a glance, and it's
+the conventional "empty this field" affordance besides. Any future field that
+grows a clear button should reuse `ClearFieldIcon` for the same reason.
 
 ### Changelog modal
 
@@ -2514,8 +2593,8 @@ root zone to take it out of one. On a pointer device this is native HTML5 drag
 (`NOTE_DND_TYPE` carries the note id; the highlight follows `dropTarget`, and a
 drop on a folder calls `stopPropagation` so it doesn't bubble to the root
 zone); on a touchscreen it's a **press-and-hold** gesture (see
-[note drag](#note-drag-touch--pointer)), with the
-[folder picker](#folder-picker) as a keyboard/quick alternative.
+[note drag](#note-drag-touch--pointer)). Dragging is the only way to file a
+note: the editor header carries no folder control.
 
 ### Folders in the overview
 
@@ -2614,18 +2693,6 @@ keeps its `folderId`, so it stays filed under the folder there — and saves;
 (`removeFolderWithNotes`). Same best-effort contract as the per-note move (a
 failed target write leaves the source untouched). If the open note belonged to
 the moved folder, `App` leaves the editor since it's gone from this namespace.
-
-### Folder picker
-
-`FolderPicker` (`src/ui/NoteEditor.tsx`) is a compact `SelectPicker` in the editor
-header (shown only when folders exist) listing "No folder" plus every folder —
-the cross-platform way to file the open note, since it works on touch where
-drag-and-drop doesn't. Choosing an entry calls `moveNote` for the open note.
-Its trigger collapses to just the folder icon on a narrow viewport (the name
-eats scarce header width there) and brings the label back once the window is at
-least 640px wide; the icon glows in the accent colour when the note is filed
-and stays muted grey for "No folder", so the filed-vs-unfiled state reads at a
-glance.
 
 ### Folders sidecar
 
