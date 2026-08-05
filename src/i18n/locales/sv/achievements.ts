@@ -227,6 +227,19 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Så länge appen är öppen kommer den ihåg var markören satt och hur långt du rullat i varje anteckning, så att hoppa mellan anteckningar tar dig tillbaka precis dit du var — samma rad, samma plats på skärmen — i stället för till toppen. På en telefon kommer tangentbordet upp igen med markören redan på plats. Det gäller per session: en ny omladdning börjar varje anteckning på nytt.",
     },
+    retrace: {
+      name: "Tillbakaspårning",
+      condition:
+        "Använd webbläsarens bakåtknapp för att gå till en anteckning.",
+      learnMore:
+        "Varje förflyttning du gör — att öppna en anteckning, hoppa till en annan, kliva in i arkivet — lämnar ett steg i webbläsarens historik, så bakåtknappen tar dig genom anteckningarna du besökt (och framåtknappen tillbaka ut igen). Det fungerar med bakåtknappen, tangentbordsgenvägen och Androids bakåtgest.",
+    },
+    deepLink: {
+      name: "Direktlänk",
+      condition: "Öppna en länk som går rakt till en anteckning.",
+      learnMore:
+        "Anteckningen du har öppen har en egen adress — kopiera den från adressfältet, eller högerklicka på en anteckning och välj ”Kopiera länk”, så öppnas exakt den anteckningen igen senare, från ett bokmärke, en kalenderpost eller ett meddelande till dig själv. Länken bär även namnrymden, så att följa en växlar till rätt namnrymd först; en länk till en namnrymd som den här enheten inte har landar helt enkelt i översikten. Adressen ligger efter # och skickas därför aldrig till någon server, och den fungerar bara där dina anteckningar redan finns — länken är en genväg för dig, inte ett sätt att dela en anteckning med någon annan.",
+    },
 
     // ── Proffs ────────────────────────────────────────────────────────
     localVault: {

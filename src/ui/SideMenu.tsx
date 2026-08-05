@@ -135,6 +135,8 @@ type Props = {
   onRemoveNote: (id: string) => void;
   /** Archive a note (a right swipe files it into the Archive view). */
   onArchiveNote: (id: string) => void;
+  /** Copy a note's link — desktop right-click menu only. */
+  onCopyNoteLink?: (id: string) => void;
   /** How many notes are archived — shown as a count on the Archive entry. */
   archivedCount: number;
   /** Open the archive page (the list of archived notes). */
@@ -185,6 +187,7 @@ export function SideMenu({
   onAddNote,
   onRemoveNote,
   onArchiveNote,
+  onCopyNoteLink,
   archivedCount,
   onOpenArchive,
   archiveActive,
@@ -466,6 +469,9 @@ export function SideMenu({
           archiveLabel={t("nav.archive")}
           onRemove={() => onRemoveNote(note.id)}
           onArchive={() => onArchiveNote(note.id)}
+          onCopyLink={
+            onCopyNoteLink ? () => onCopyNoteLink(note.id) : undefined
+          }
         >
           {row}
         </SwipeToRemove>

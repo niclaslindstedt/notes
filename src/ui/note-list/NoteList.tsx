@@ -46,6 +46,7 @@ export function NoteList({
   onNew,
   onArchive,
   onDelete,
+  onCopyLink,
   onMoveNote,
   onRenameFolder,
   onRemoveFolder,
@@ -61,6 +62,8 @@ export function NoteList({
   onNew: (folderId?: string) => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
+  /** Copy a note's link — desktop right-click menu only. */
+  onCopyLink?: (id: string) => void;
   /** Move a note into `folderId`, or out of any folder when `null`. */
   onMoveNote: (id: string, folderId: string | null) => void;
   /** Rename a folder. */
@@ -172,6 +175,7 @@ export function NoteList({
             onOpen={() => onOpen(note.id)}
             onPrimary={() => onArchive(note.id)}
             onDelete={() => onDelete(note.id)}
+            onCopyLink={onCopyLink ? () => onCopyLink(note.id) : undefined}
             primaryLabel={t("app.archive")}
             primaryIcon={<ArchiveIcon className="h-4 w-4" />}
             encrypted={encStatus?.get(note.id) === "encrypted"}

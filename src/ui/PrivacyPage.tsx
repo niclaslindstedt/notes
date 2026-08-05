@@ -12,7 +12,7 @@ import { ArrowLeftIcon } from "./icons.tsx";
 // Last meaningful change to the policy text below. Bump this whenever the
 // wording is edited — it renders verbatim at the top of the page and is the
 // only line readers have to look at to see how fresh the policy is.
-const LAST_UPDATED = "2026-06-20";
+const LAST_UPDATED = "2026-08-05";
 
 export function PrivacyPage() {
   // The deploy-slot root (`/`, `/preview/`, …) — the link back to the app.
@@ -97,6 +97,16 @@ export function PrivacyPage() {
             browser&apos;s site data for this origin erases the local copy
             permanently — if you have not enabled sync, there is no copy
             elsewhere to restore from.
+          </p>
+          <p>
+            While a note is open, the address bar shows a link to it — the
+            note&apos;s identifier and the namespace it lives in, after the{" "}
+            <code className="text-fg-bright">#</code>. A fragment after the{" "}
+            <code className="text-fg-bright">#</code> is never sent to any
+            server by any browser, so it is not transmitted or logged anywhere;
+            it does reach your browser&apos;s own history, so anyone with access
+            to this browser can see it there. The link opens the note only on a
+            device that already holds it — it publishes nothing.
           </p>
         </Section>
 

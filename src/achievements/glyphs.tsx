@@ -29,7 +29,10 @@ import {
   SearchIcon,
   UndoIcon,
 } from "../ui/icons.tsx";
-import { FormatIcon } from "../ui/format-glyphs.tsx";
+import {
+  FormatIcon,
+  LinkGlyph as LinkFormatIcon,
+} from "../ui/format-glyphs.tsx";
 
 // Every glyph is a function component taking an optional `className`, so a
 // caller controls size and colour through Tailwind utilities (the strokes
@@ -349,6 +352,18 @@ export function MousePointerGlyph({ className }: IconProps) {
   );
 }
 
+// A clock wound backwards — the browser-history glyph (Back / Forward stepping
+// through the notes you visited).
+export function HistoryGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l3 2" />
+    </Svg>
+  );
+}
+
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;
@@ -362,4 +377,5 @@ export const PaletteGlyph: Glyph = PaletteIcon;
 export const CopyGlyph: Glyph = CopyIcon;
 export const SearchGlyph: Glyph = SearchIcon;
 export const FormatGlyph: Glyph = FormatIcon;
+export const LinkGlyph: Glyph = LinkFormatIcon;
 export const DeleteLineGlyph: Glyph = DeleteLineIcon;

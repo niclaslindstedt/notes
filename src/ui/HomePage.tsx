@@ -118,6 +118,21 @@ export function HomePage() {
               +<kbd>Z</kbd> or the side menu.
             </li>
             <li>
+              Your browser&apos;s <em>Back</em> and <em>Forward</em> walk the
+              notes you have visited — open one note, then another, and Back
+              returns you to the first (Android&apos;s back gesture too).
+            </li>
+            <li>
+              Every note has its own <em>address</em>, so you can copy the link
+              — out of the address bar, or with <em>Copy link</em> in a
+              note&apos;s right-click menu — and reopen that exact note later
+              from a bookmark, a calendar entry, or a message to yourself. The
+              address lives after the <code className="text-fg-bright">#</code>,
+              so it is never sent to any server, and it only opens the note on a
+              device that already has it — your notes are not published or
+              shared by a link.
+            </li>
+            <li>
               On a computer, drag and drop Markdown files anywhere onto the app
               to <em>import</em> them — each file becomes a note, with its
               filename as the title. The files are read in your browser and

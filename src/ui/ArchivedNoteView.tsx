@@ -22,6 +22,7 @@ export function ArchiveList({
   onOpen,
   onRestore,
   onDelete,
+  onCopyLink,
   onBack,
   syncSlot,
 }: {
@@ -29,6 +30,8 @@ export function ArchiveList({
   onOpen: (id: string) => void;
   onRestore: (id: string) => void;
   onDelete: (id: string) => void;
+  /** Copy an archived note's link — desktop right-click menu only. */
+  onCopyLink?: (id: string) => void;
   onBack: () => void;
   syncSlot: ReactNode;
 }) {
@@ -67,6 +70,9 @@ export function ArchiveList({
                   onOpen={() => onOpen(note.id)}
                   onPrimary={() => onRestore(note.id)}
                   onDelete={() => onDelete(note.id)}
+                  onCopyLink={
+                    onCopyLink ? () => onCopyLink(note.id) : undefined
+                  }
                   primaryLabel={t("nav.restore")}
                   primaryIcon={<RestoreIcon className="h-4 w-4" />}
                 />
