@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { classifyLines } from "../../src/domain/markdown.ts";
@@ -174,5 +174,35 @@ describe("sourcePointFromDom", () => {
     expect(
       sourcePointFromDom(root, blocks, stray.firstChild as Text, 0),
     ).toBeNull();
+  });
+
+  // iOS Safari's native "Select All" (the text-selection callout) anchors its
+  // range on the editing host rather than inside a line, and so does WebKit for
+  // whole-document deletes. Unmapped, the editor declined to intercept the
+  // delete and the browser tore out React's nodes — blanking the app.
+  it("maps an endpoint anchored on the editing surface to the line edges", () => {
+    const body = "alpha\nbeta\ngamma";
+    const { blocks } = setup(body);
+    const surface = screen.getByRole("textbox");
+    expect(sourcePointFromDom(surface, blocks, surface, 0)).toEqual({
+      line: 0,
+      col: 0,
+    });
+    // Past the last child: the end of the last line, so a select-all delete
+    // covers the whole note.
+    expect(
+      sourcePointFromDom(surface, blocks, surface, surface.childNodes.length),
+    ).toEqual({ line: 2, col: "gamma".length });
+  });
+
+  it("maps a mid-surface boundary to the start of the line it precedes", () => {
+    const body = "alpha\nbeta\ngamma";
+    const { blocks } = setup(body);
+    const surface = screen.getByRole("textbox");
+    // The boundary before the second child sits at the start of line 1.
+    expect(sourcePointFromDom(surface, blocks, surface, 1)).toEqual({
+      line: 1,
+      col: 0,
+    });
   });
 });

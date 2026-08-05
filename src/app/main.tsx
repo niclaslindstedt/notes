@@ -17,6 +17,7 @@ import "@fontsource/jetbrains-mono/latin-700.css";
 import "@fontsource/jetbrains-mono/latin-ext-700.css";
 import { maybeSeedDevData } from "../dev/seed.ts";
 import { LanguageRoot } from "../i18n/LanguageRoot.tsx";
+import { ErrorBoundary } from "../ui/ErrorBoundary.tsx";
 import { HomePage } from "../ui/HomePage.tsx";
 import { PrivacyPage } from "../ui/PrivacyPage.tsx";
 import { App } from "./App.tsx";
@@ -43,6 +44,12 @@ const isHome = path.endsWith("/home");
 // surfaces (the privacy policy and the Google-verification showcase), so they
 // render outside `LanguageRoot` and aren't translated. Only the app shell is
 // wrapped, so it picks up the active language and the first-paint gate.
+//
+// The shell is additionally wrapped in `ErrorBoundary` — inside `LanguageRoot`
+// so the fallback speaks the user's language. Without it a throw anywhere in
+// the tree unmounts the root and leaves a blank page that only a cold restart
+// clears. The two static pages don't need one: they render no state and can't
+// throw. See `ui/ErrorBoundary.tsx`.
 createRoot(root).render(
   <StrictMode>
     {isPrivacy ? (
@@ -51,7 +58,9 @@ createRoot(root).render(
       <HomePage />
     ) : (
       <LanguageRoot>
-        <App />
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
       </LanguageRoot>
     )}
   </StrictMode>,

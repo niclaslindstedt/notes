@@ -68,6 +68,12 @@ const app: AppCatalog = {
   encryptedNoteLoaded: "Krypterad i vila, dekrypterad",
   uploadingNote: "Synkar…",
   decrypting: "Dekrypterar…",
+  crash: {
+    title: "Något gick fel",
+    body: "Appen stötte på ett oväntat fel. Dina anteckningar är sparade — ladda om så fortsätter du där du var.",
+    reload: "Ladda om appen",
+    details: "Felinformation",
+  },
 };
 
 export default app;

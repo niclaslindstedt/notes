@@ -111,6 +111,15 @@ const app = {
   // demand (the encrypted file/cloud backends load each body lazily, so opening
   // a note fetches and decrypts just that note's file).
   decrypting: "Decrypting…",
+  // The last-resort screen shown when a render throws, in place of the blank
+  // page the app would otherwise be left as (see `ErrorBoundary`). Notes are
+  // already on disk at this point — nothing is lost by reloading.
+  crash: {
+    title: "Something went wrong",
+    body: "The app hit an unexpected error. Your notes are saved — reloading should pick up where you left off.",
+    reload: "Reload the app",
+    details: "Error details",
+  },
 } as const;
 
 export type AppCatalog = Widen<typeof app>;

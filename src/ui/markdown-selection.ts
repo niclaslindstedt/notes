@@ -1,6 +1,6 @@
 import { type SourcePoint } from "../domain/line-edit.ts";
 import { type LineBlock } from "../domain/markdown.ts";
-import { offsetWithin } from "./contenteditable-caret.ts";
+import { lineIndexOf, offsetWithin } from "./contenteditable-caret.ts";
 
 // Maps a live-preview text selection back onto the raw note source.
 //
@@ -20,6 +20,9 @@ export type { SourcePoint };
 // `data-src` (its first character's source column) and, where its rendered text
 // differs in length from the source — a shortened bare URL — `data-len` (the
 // source length) so the end of the leaf maps to the end of the *source* token.
+// An endpoint anchored on a container *between* the surface and its lines — or
+// on the surface itself — is resolved to the nearest line edge by
+// `containerPoint` rather than given up on.
 export function sourcePointFromDom(
   root: HTMLElement,
   blocks: LineBlock[],
@@ -32,7 +35,8 @@ export function sourcePointFromDom(
       : (node as Element | null);
   if (!startEl) return null;
   const lineEl = startEl.closest("[data-line-index]");
-  if (!lineEl || !root.contains(lineEl)) return null;
+  if (!lineEl || !root.contains(lineEl))
+    return containerPoint(root, blocks, node, offset);
   const line = Number.parseInt(
     lineEl.getAttribute("data-line-index") ?? "",
     10,
@@ -82,6 +86,59 @@ export function sourcePointFromDom(
   const col =
     local >= renderedLen ? base + srcLen : base + Math.min(local, srcLen);
   return { line, col };
+}
+
+// Resolve a selection endpoint anchored on the editing surface itself (or on a
+// wrapper between it and the lines) to the nearest line edge.
+//
+// The editor's own Ctrl/Cmd+A anchors its range inside the first and last line
+// elements precisely so both endpoints map back to source — but a selection the
+// *browser* draws has no such manners. iOS Safari's native "Select All" (the
+// one in the text-selection callout, which is how a note gets erased on a
+// phone) runs the range from `(surface, 0)` to `(surface, childCount)`, and
+// WebKit anchors on the surface for whole-document deletes besides. Returning
+// null for those endpoints meant the editor couldn't map the edit, so it
+// declined to intercept it and the browser applied the delete itself — tearing
+// out the line elements React believes it owns. The next render then tried to
+// reconcile against nodes that were gone, threw, and took the whole app down
+// with it (a blank screen until the app is restarted).
+//
+// A DOM boundary `(el, offset)` sits *before* `el.childNodes[offset]`, so the
+// endpoint maps to the start of the first line at or after that child, and to
+// the end of the last line when the offset runs past the children.
+function containerPoint(
+  root: HTMLElement,
+  blocks: LineBlock[],
+  node: Node,
+  offset: number,
+): SourcePoint | null {
+  const el =
+    node.nodeType === Node.TEXT_NODE
+      ? node.parentElement
+      : (node as Element | null);
+  if (!el || !root.contains(el)) return null;
+  const lineEls = root.querySelectorAll<HTMLElement>("[data-line-index]");
+  if (lineEls.length === 0) return null;
+
+  // A stray text node the browser parked outside every line carries a character
+  // offset, not a child index, so the boundary is taken as sitting before the
+  // node itself.
+  const next =
+    node.nodeType === Node.TEXT_NODE ? node : (el.childNodes[offset] ?? null);
+  if (next) {
+    for (const lineEl of lineEls) {
+      const atOrAfter =
+        lineEl === next ||
+        (next.compareDocumentPosition(lineEl) &
+          Node.DOCUMENT_POSITION_FOLLOWING) !==
+          0;
+      const line = atOrAfter ? lineIndexOf(lineEl) : null;
+      if (line !== null) return { line, col: 0 };
+    }
+  }
+
+  const line = lineIndexOf(lineEls[lineEls.length - 1] ?? null);
+  return line === null ? null : { line, col: blocks[line]?.raw.length ?? 0 };
 }
 
 // A block marker (`# `, `- `, `> `, `1. `) is drawn as a non-selectable glyph

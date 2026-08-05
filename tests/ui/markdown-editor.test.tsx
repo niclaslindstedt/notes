@@ -134,6 +134,70 @@ describe("MarkdownEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith("ab");
   });
 
+  // Erasing a whole note on iOS: the selection callout's "Select All" anchors
+  // its range on the editing host itself, not inside a line, and Backspace then
+  // arrives as an ordinary delete. The editor has to map it and splice the
+  // source; letting it through instead has WebKit erase the surface React owns,
+  // and the next render throws and blanks the app until it's restarted cold.
+  describe("erasing the whole note from a surface-anchored selection", () => {
+    // A selection the browser drew across the whole editing host.
+    function selectSurface() {
+      const root = surface();
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(root, 0);
+      range.setEnd(root, root.childNodes.length);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    it("empties the note through the engine", () => {
+      const { onChange } = renderEditor("alpha\nbeta\ngamma", {
+        focusOnMount: false,
+      });
+      selectSurface();
+      beforeInput("deleteContentBackward");
+      expect(onChange).toHaveBeenLastCalledWith("");
+    });
+
+    it("takes the delete from the browser", () => {
+      renderEditor("alpha\nbeta", { focusOnMount: false });
+      selectSurface();
+      const e = new InputEvent("beforeinput", {
+        inputType: "deleteContentBackward",
+        cancelable: true,
+        bubbles: true,
+      });
+      act(() => {
+        surface().dispatchEvent(e);
+      });
+      expect(e.defaultPrevented).toBe(true);
+    });
+
+    it("types over the selection rather than letting the browser replace it", () => {
+      const { onChange } = renderEditor("alpha\nbeta", { focusOnMount: false });
+      selectSurface();
+      beforeInput("insertText", "X");
+      expect(onChange).toHaveBeenLastCalledWith("X");
+    });
+
+    // The belt to the mapping's braces: an edit that still can't be expressed
+    // as a source splice is refused outright, never handed to the browser.
+    it("refuses an edit it cannot map at all", () => {
+      renderEditor("alpha", { focusOnMount: false });
+      window.getSelection()!.removeAllRanges();
+      const e = new InputEvent("beforeinput", {
+        inputType: "deleteContentBackward",
+        cancelable: true,
+        bubbles: true,
+      });
+      act(() => {
+        surface().dispatchEvent(e);
+      });
+      expect(e.defaultPrevented).toBe(true);
+    });
+  });
+
   it("deletes the character after the caret on Delete mid-line", () => {
     const { onChange } = renderEditor("abc");
     caretIn(rawLine()!, 1);
