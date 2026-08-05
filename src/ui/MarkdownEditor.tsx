@@ -21,6 +21,7 @@ import {
   INLINE_PLACEMENT,
 } from "../domain/attachment.ts";
 import { unlock } from "../achievements/index.ts";
+import { createLogger } from "../dev/logger.ts";
 import {
   cutLine,
   firstChangedLine,
@@ -170,6 +171,11 @@ type Props = {
 // A stable empty hit list, so a closed find bar hands every line the identical
 // `NO_HIGHLIGHTS` reference and each `RenderedLine` memo bails out.
 const NO_MATCHES: readonly NoteMatch[] = [];
+
+// The editor's own channel into the in-app log. It only ever reports an edit it
+// had to refuse — the one failure mode that is otherwise completely silent on a
+// phone, where the console is out of reach (see `dev/logger.ts`).
+const log = createLogger("editor");
 
 /** What the editor exposes to its parent: a way to start editing from outside. */
 export type MarkdownEditorHandle = {
@@ -683,8 +689,18 @@ export function MarkdownEditor({
     // render — reconciling against nodes that are no longer there — throws and
     // takes the whole app down.
     e.preventDefault();
-    const pts = editPoints(e);
-    if (!pts) return;
+    // An edit we can't map is refused above but must not simply vanish: for an
+    // insertion, fall back to the last caret we tracked so the character still
+    // lands. Refusing *and* dropping it is indistinguishable from a dead
+    // keyboard — the user types and nothing at all happens, with no crash and
+    // no way back. A delete gets no such fallback: guessing the span would
+    // remove text the browser never pointed at.
+    const pts =
+      editPoints(e) ?? (it.startsWith("insert") ? lastCaretSpan() : null);
+    if (!pts) {
+      log.warn("unmapped edit refused", it);
+      return;
+    }
     if (it === "insertParagraph" || it === "insertLineBreak") {
       // A quote or a list item carries its marker onto the row the split opens,
       // so pressing Enter keeps writing the same construct; Shift+Enter opens a
@@ -730,6 +746,19 @@ export function MarkdownEditor({
     }
     // Any other input type (formatting commands etc.) is simply swallowed.
   };
+
+  // The last caret we tracked, as a collapsed span clamped to the current
+  // source — the landing spot for an edit whose own position the DOM couldn't
+  // give up. Null before the caret has ever been placed, where there is
+  // genuinely nowhere to put the edit.
+  function lastCaretSpan(): { start: SourcePoint; end: SourcePoint } | null {
+    const at = lastCaret.current;
+    if (!at) return null;
+    const cur = linesRef.current;
+    const line = Math.min(Math.max(at.line, 0), cur.length - 1);
+    const col = Math.min(Math.max(at.col, 0), (cur[line] ?? "").length);
+    return { start: { line, col }, end: { line, col } };
+  }
 
   // The span a collapsed Backspace / Delete removes: the character on the
   // relevant side of the caret, or — at a line edge — the newline joining it to
@@ -1071,7 +1100,12 @@ export function MarkdownEditor({
       const next = [...cur, ""];
       setValue(next.join("\n"));
       pendingCaret.current = 0;
-      setActive((a) => ({ index: next.length, key: a.key + 1 }));
+      // The blank line just appended, not one past it: an out-of-range active
+      // index survives rendering (`clampedIndex` clamps it) but is read raw by
+      // everything that indexes the source off it — the composition read-back
+      // would write a whole extra line.
+      lastCaret.current = { line: next.length - 1, col: 0 };
+      setActive((a) => ({ index: next.length - 1, key: a.key + 1 }));
       return;
     }
     activate(last, 0);
@@ -1479,9 +1513,24 @@ export function MarkdownEditor({
               </LineRow>
             );
           })}
-          <div contentEditable={false}>
-            <AttachmentsEndBlock />
-          </div>
+        </div>
+        {/* The collected attachments block, drawn *after* the editing host
+            rather than as its last child — the same reason the empty-note
+            prompt above is: a `contenteditable={false}` island inside the host
+            is a node the browser feels entitled to normalise around, and this
+            one sat at the very end of the document, exactly where a caret on
+            the last line forward-deletes into. React then has to remove or
+            rebuild it whenever the placement setting or the note's attachments
+            change, so anything WebKit did to it in the meantime surfaces as a
+            `removeChild` `NotFoundError` that unmounts the app. Out here the
+            host holds nothing but lines. It mirrors the host's horizontal
+            padding and width so the block lines up with the text, and carries
+            the bottom safe-area inset the host would otherwise have to. */}
+        <div
+          style={widthStyle}
+          className={`empty:hidden ${lineNumbers ? "pr-4 pl-14" : "px-4"} pb-[max(1rem,env(safe-area-inset-bottom))]`}
+        >
+          <AttachmentsEndBlock />
         </div>
       </div>
     </AttachmentsProvider>

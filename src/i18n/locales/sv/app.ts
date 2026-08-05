@@ -73,6 +73,9 @@ const app: AppCatalog = {
     body: "Appen stötte på ett oväntat fel. Dina anteckningar är sparade — ladda om så fortsätter du där du var.",
     reload: "Ladda om appen",
     details: "Felinformation",
+    copy: "Kopiera rapport",
+    copied: "Kopierat",
+    copyFailed: "Kopieringen misslyckades",
   },
 };
 

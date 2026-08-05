@@ -119,6 +119,13 @@ const app = {
     body: "The app hit an unexpected error. Your notes are saved — reloading should pick up where you left off.",
     reload: "Reload the app",
     details: "Error details",
+    // The crash screen's copy button. It puts the error, the component stack,
+    // and the tail of the in-app log on the clipboard — the only way to get a
+    // phone-only crash off the device, since Settings → Logs is inside the app
+    // this screen has replaced.
+    copy: "Copy report",
+    copied: "Copied",
+    copyFailed: "Copy failed",
   },
 } as const;
 
