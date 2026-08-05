@@ -73,7 +73,7 @@ versions with the commands above — the shape holds, the numbers drift):
   ```
 - **TypeScript major** → confirm `typescript-eslint`'s `typescript` peer
   still spans it. Bumping the `@typescript-eslint/*` pair to latest `8.x`
-  (above) covers this — as of `8.64` the peer is still `>=4.8.4 <6.1.0`,
+  (above) covers this — as of `8.66` the peer is still `>=4.8.4 <6.1.0`,
   which spans TS `6.0.x` but **not** `6.1+` or `7.x`. The grouped dev-deps
   PR will happily propose a TS caret the plugin can't accept (seen: it
   bumped `typescript` to `^7.0.2` while the newest typescript-eslint
@@ -91,6 +91,13 @@ rm -rf node_modules package-lock.json && npm install
 Read the first ERESOLVE block top-to-bottom — it names the exact package
 and the peer range that conflicts. Bump that package, re-install. Two or
 three rounds clears it.
+
+`npm install` ends by reporting high-severity advisories against `sharp`,
+pulled in transitively by `@vite-pwa/assets-generator` (the `make icons`
+generator). **Leave them.** `npm audit fix --force` "fixes" them by
+downgrading `vite-plugin-pwa` to `0.18.2` — a multi-major regression of a
+shipping dependency to patch a build-time-only tool. Note it in the PR
+body and move on; the real fix is upstream.
 
 ## 3. Make the code compile against the new majors
 
@@ -186,6 +193,9 @@ package-lock.json` before trusting the trace.
   grouped dev-deps PR — bump both to latest `8.x` so their `eslint` peer
   spans a new ESLint major and their `typescript` peer spans a new TS
   major.
+- `npm audit`'s high-severity `sharp` advisories are transitive under
+  `@vite-pwa/assets-generator` and its only `--force` "fix" downgrades
+  `vite-plugin-pwa` several majors → leave them, mention in the PR.
 - A lint/format plugin whose peer lags the host's major → `overrides`
   shim, not a downgrade of the host. Both `eslint-plugin-import` and
   `eslint-plugin-jsx-a11y` cap `eslint` at `^9` and need the shim on an
