@@ -39,9 +39,10 @@ const app = {
   // Right-click menu entry on a note row: puts the note's own link on the
   // clipboard, so it can be bookmarked or sent to yourself.
   copyLink: "Copy link",
-  // The editor's delete-line button (left of the copy button) and its
-  // Ctrl/Cmd+K shortcut. Mid-line it clears only what follows the caret.
-  deleteLine: "Delete line",
+  // The editor's cut button (left of the copy button) and its Ctrl/Cmd+K
+  // shortcut: the selection, or the rest of the line from a mid-line caret,
+  // or the whole line — onto the clipboard on its way out.
+  cut: "Cut",
   // The styling toolbar: its header toggle, its accessible name, and one
   // label per button — each names the Markdown construct it applies, since
   // the buttons are glyph-only and the label is both tooltip and a11y name.
