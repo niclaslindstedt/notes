@@ -3030,6 +3030,54 @@ diagnostics through it.
 `define` at build time (`__APP_VERSION__` / `__BUILD_LABEL__`) and re-exported
 typed.
 
+### Embedded (wrapper) builds
+
+`isEmbedded` / `__EMBEDDED__` (`vite.config.ts`, `src/vite-env.d.ts`) — true
+when the bundle is being built for one of the two wrappers that ship the app as
+a downloadable binary: `VITE_TARGET=native` (the React Native WebView shell in
+`native/`) or `VITE_TARGET=electron` (the desktop shell in `electron/`). It
+flips three things at once: the asset base becomes relative (`./`) so
+`/assets/...` URLs resolve under a `file://` or private-scheme origin; VitePWA
+is disabled, because offline is already guaranteed by the on-device bundle and
+a service worker has no HTTP origin to attach to; and the sidecar emitters
+(`version.json`, `precache-manifest.json`, the `/privacy` and `/home` aliases)
+are skipped, since nothing in a wrapper reads them. `usePwaUpdate`
+(`src/pwa/usePwaUpdate.ts`) reads `__EMBEDDED__` to know there is no service
+worker to register.
+
+### Desktop app (Electron)
+
+`electron/` — a **thin** Electron window around the same compiled web app. The
+entire main process is `electron/main.js`: it registers a private `notes://app`
+scheme, serves `electron/webroot/` (the embedded build, written by
+`electron/scripts/bundle-web.mjs`) from it, opens one sandboxed
+context-isolated window, and sends off-origin links to the system browser.
+There is no preload, no IPC, and no storage of its own — the embedded app runs
+its own `localStorage`, exactly as it does in a browser tab.
+
+The private scheme rather than `loadFile` is the one load-bearing decision:
+`localStorage` is keyed by origin and a `file://` page is an *opaque* origin, so
+notes would depend on where the app happened to be installed. `notes://app` is
+a constant, so notes survive updates and moves. It must be registered before
+Electron's `ready` event — a scheme registered late loads the page as an opaque
+origin anyway, with no `localStorage` at all.
+
+`electron-builder.config.cjs` packages an **archive** per platform (Windows
+zip, macOS zip for x64 and arm64 separately, Linux tar.gz) rather than an
+installer, because an unsigned installer trips SmartScreen / Gatekeeper; it
+reads the app's real version from the root `package.json`, and always signs the
+macOS build — ad hoc when no Apple credentials are present, since Apple Silicon
+refuses to execute unsigned arm64 code at all. The `desktop` job in
+`.github/workflows/release.yml` builds all four on one runner per platform and
+attaches them to the draft release, which the `publish` job then makes public.
+
+The cloud backends (Dropbox, Google Drive) do not work in the desktop app:
+their OAuth flows redirect to a registered `https://` URL, which the
+`notes://app` origin is not. Local storage and the picked-folder backend work
+as they do on the web. See `electron/README.md`, and AGENTS.md's "The wrappers
+are thin" for the rule about what may live in this directory (in short:
+nothing that could live in `src/`).
+
 ### The shared framework
 
 `@niclaslindstedt/oss-framework` — the npm package (GitHub Packages

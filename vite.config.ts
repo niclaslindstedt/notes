@@ -6,18 +6,22 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig, type Plugin } from "vitest/config";
 
-// The native WebView wrapper (see `native/`) embeds a compiled copy of this
-// app and loads it from local file assets, so it is built with
-// `VITE_TARGET=native`. That flips the base to relative (`./`) so the
-// origin-absolute `/assets/...` URLs become `./assets/...` and resolve under
-// a `file://` origin, and disables the service worker below (offline is
-// already guaranteed by the local bundle; updates ride app releases).
-const isNative = process.env.VITE_TARGET === "native";
+// Both wrappers — the native WebView shell (`native/`) and the Electron
+// desktop shell (`electron/`) — embed a compiled copy of this app and load it
+// from local files rather than over HTTP, so they build with
+// `VITE_TARGET=native` / `VITE_TARGET=electron`. That flips the base to
+// relative (`./`) so the origin-absolute `/assets/...` URLs become
+// `./assets/...` and resolve under a `file://` (or private-scheme) origin, and
+// disables the service worker below (offline is already guaranteed by the
+// local bundle; updates ride app releases).
+const isEmbedded =
+  process.env.VITE_TARGET === "native" ||
+  process.env.VITE_TARGET === "electron";
 
 // The GitHub Pages base path is injected by the `pages.yml` workflow via
 // VITE_BASE so the same bundle works at `/`, `/preview/`, or `/branch/`.
 // Production serves at `/` under the custom domain (see `public/CNAME`).
-const base = isNative ? "./" : (process.env.VITE_BASE ?? "/");
+const base = isEmbedded ? "./" : (process.env.VITE_BASE ?? "/");
 
 const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
@@ -210,10 +214,10 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      // The native build embeds the bundle locally, so the service worker is
-      // redundant (assets are already on-device) and would misbehave off a
-      // `file://` origin — disable it there entirely.
-      disable: isNative,
+      // The wrapper builds embed the bundle locally, so the service worker
+      // is redundant (assets are already on-device) and would misbehave off a
+      // `file://` / private-scheme origin — disable it there entirely.
+      disable: isEmbedded,
       // `UpdateToast` registers the SW itself via `workbox-window` (so it
       // can pass `updateViaCache: "none"`) and the new build parks in the
       // `waiting` state until the user clicks Reload — no silent swap, no
@@ -275,9 +279,9 @@ export default defineConfig({
     }),
     // These emit the service-worker sidecar files (`version.json`,
     // `precache-manifest.json`) and the standalone `/privacy` + `/home`
-    // pages, none of which the native bundle uses — skip them there so the
-    // embedded output stays minimal.
-    ...(isNative
+    // pages, none of which an embedded bundle uses — skip them there so the
+    // wrapper output stays minimal.
+    ...(isEmbedded
       ? []
       : [
           emitVersionJson(),
@@ -289,9 +293,10 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_LABEL__: JSON.stringify(BUILD_LABEL),
-    // True only in the native WebView build; gates the SW-registration and
-    // update-prompt paths that have no service worker to talk to there.
-    __NATIVE__: JSON.stringify(isNative),
+    // True only in the wrapper builds (native WebView / Electron); gates the
+    // SW-registration and update-prompt paths that have no service worker to
+    // talk to there.
+    __EMBEDDED__: JSON.stringify(isEmbedded),
   },
   test: {
     // Domain/storage tests run in node. UI tests opt into jsdom with a

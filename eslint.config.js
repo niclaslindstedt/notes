@@ -18,12 +18,17 @@ export default [
     // Expo project with its own toolchain and dependency tree. It will
     // share the platform-agnostic core under `src/` but is linted by its
     // own setup, so it is out of scope for the web app's linter here.
+    //
+    // `electron/**` is the desktop wrapper — likewise its own dependency
+    // tree, and CommonJS Node code rather than browser ESM. It is one file
+    // plus its packaging config (see electron/README.md).
     ignores: [
       "dist/**",
       "node_modules/**",
       "dev-dist/**",
       ".agent/**",
       "native/**",
+      "electron/**",
     ],
   },
   js.configs.recommended,

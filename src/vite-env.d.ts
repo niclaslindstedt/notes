@@ -4,9 +4,11 @@
 // Injected by `define` in `vite.config.ts`.
 declare const __APP_VERSION__: string;
 declare const __BUILD_LABEL__: string;
-// True only in the native WebView build (`VITE_TARGET=native`); false on the
-// web. Gates paths that assume a service worker / HTTP origin.
-declare const __NATIVE__: boolean;
+// True only in the wrapper builds that embed the bundle locally — the native
+// WebView shell (`VITE_TARGET=native`) and the Electron desktop shell
+// (`VITE_TARGET=electron`); false on the web. Gates paths that assume a
+// service worker / HTTP origin.
+declare const __EMBEDDED__: boolean;
 
 interface ImportMetaEnv {
   // Optional donate link surfaced in the side menu. A blank / unset value

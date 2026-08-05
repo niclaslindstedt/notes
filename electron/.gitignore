@@ -1,0 +1,10 @@
+# Build artifacts — regenerated, never committed.
+
+# The built web app, written by scripts/bundle-web.mjs.
+webroot/
+
+# electron-builder output.
+release/
+
+# This tree has its OWN dependency tree — it is not an npm workspace member.
+node_modules/

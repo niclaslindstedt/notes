@@ -5,10 +5,16 @@ name: Release
 # (their front-matter carries the Added/Changed/Fixed/... type and an
 # optional `breaking: true` — see scripts/release/compute-bump.mjs),
 # then consumes those fragments into a new CHANGELOG section, bumps
-# package.json, tags vX.Y.Z, pushes, creates a GitHub Release, then
-# chains into pages.yml so the new tag is served at `/` (and the same
-# code at `/preview/` because main now matches the tag) without waiting
-# for the next push.
+# package.json, tags vX.Y.Z, pushes, creates a DRAFT GitHub Release,
+# packages the Electron desktop app for Windows / macOS (Intel and Apple
+# Silicon) / Linux and attaches those archives to it, publishes the
+# release once every archive is up, and chains into pages.yml so the new
+# tag is served at `/` (and the same code at `/preview/` because main
+# now matches the tag) without waiting for the next push.
+#
+# The web deploy does NOT wait for the desktop packaging: the site is the
+# app, it builds from the tag that already exists, and holding it back
+# for four Electron builds would delay every user who never downloads one.
 #
 # `bump` defaults to `auto` — the fragment-derived bump above. Set it to
 # an explicit patch/minor/major only to override that derivation.
@@ -133,8 +139,34 @@ jobs:
       - name: Collate changelog
         run: node scripts/release/collate-changelog.mjs "${{ steps.bump.outputs.version }}"
 
+      # The notes are the changelog section plus a standing footer about the
+      # desktop downloads. The macOS half of that footer is not decoration:
+      # the archives are signed but not notarized unless the Apple secrets are
+      # set (see electron/README.md), so Gatekeeper refuses the first launch,
+      # and someone with no answer to that prompt has no app.
       - name: Extract release-notes body
-        run: node scripts/release/extract-section.mjs "${{ steps.bump.outputs.version }}" > .release-notes.md
+        run: |
+          node scripts/release/extract-section.mjs "${{ steps.bump.outputs.version }}" > .release-notes.md
+          cat >> .release-notes.md <<'NOTES'
+
+          ---
+
+          ### Desktop downloads
+
+          The app also runs in the browser at
+          [notes.niclaslindstedt.se](https://notes.niclaslindstedt.se) — these
+          are the same app in a window. Pick the archive for your machine:
+          `mac-arm64` for Apple Silicon (M1 and later), `mac-x64` for an Intel
+          Mac.
+
+          **macOS:** the app is signed but not notarized, so the first launch
+          is refused. Open **System Settings → Privacy & Security**, scroll to
+          the message about Notes and choose **Open Anyway**. macOS remembers
+          after that.
+
+          Cloud sync (Dropbox, Google Drive) is browser-only — the desktop
+          build stores notes locally or in a folder you pick.
+          NOTES
 
       - name: Sanity build
         run: npm run build
@@ -165,13 +197,139 @@ jobs:
           fi
           git push origin "$TAG"
 
-      - name: Create GitHub Release
+      # A DRAFT — the `publish` job at the bottom is what makes it public,
+      # once every platform's archive is attached to it. Published here
+      # instead, the release would be visible the moment the tag exists, which
+      # is many minutes before the four desktop archives finish uploading and
+      # regardless of whether they succeed at all: a Windows packaging failure
+      # (`fail-fast: false`, so the others carry on) would leave a public
+      # release whose Windows download simply is not there. A draft is
+      # invisible to everyone but the maintainer, accepts asset uploads
+      # exactly the same way, and needs one flag flipped at the end.
+      #
+      # Idempotent on purpose: the tag is already pushed by the step above, so
+      # a bare `gh release create` that fails (or a re-run after one did)
+      # would leave a tagged version with no release at all. The edit branch
+      # deliberately does NOT pass `--draft`, so re-running against a release
+      # that is already public refreshes its notes instead of retracting it.
+      - name: Create GitHub Release (draft)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists — updating its notes."
+            gh release edit "$TAG" --title "$TAG" --notes-file .release-notes.md
+          else
+            gh release create "$TAG" --draft --title "$TAG" --notes-file .release-notes.md
+          fi
+
+  # The downloadable desktop builds, attached to the release the job above
+  # created. One runner per platform, because each one packages that platform's
+  # Electron binary and the archive has to be built where the app was. macOS
+  # builds BOTH slices — Intel and Apple Silicon — as separate artifacts rather
+  # than one universal binary, so neither download carries a copy of Chromium
+  # the machine will never run.
+  #
+  # Four archives come out: two macOS zips, a Windows zip, a Linux tar.gz.
+  # Archives rather than installers — see electron/electron-builder.config.cjs
+  # for why an unsigned installer is a promise this project cannot keep.
+  desktop:
+    needs: release
+    name: desktop (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows
+            script: dist:win
+          - os: macos-latest
+            target: macos
+            script: dist:mac
+          - os: ubuntu-latest
+            target: linux
+            script: dist
+    runs-on: ${{ matrix.os }}
+    permissions:
+      # contents: write — the archives are uploaded onto the GitHub Release.
+      contents: write
+      # packages: read — the root `npm ci` pulls @niclaslindstedt from
+      # GitHub Packages when GITHUB_PAT falls back to the workflow token.
+      packages: read
+    env:
+      # The release commit is on the tag, so the build is made from exactly
+      # what was tagged rather than from whatever main looks like by now.
+      TAG: ${{ needs.release.outputs.tag }}
+      # macOS SIGNING — optional here, but the build is never unsigned. Apple
+      # Silicon refuses to EXECUTE unsigned arm64 code and reports that as
+      # "the app is damaged", so electron-builder signs ad hoc when none of
+      # these are set (see electron/electron-builder.config.cjs). Set them and
+      # the same job signs and notarizes for real. Every one is empty until
+      # somebody adds it, and empty means "not provided" to electron-builder.
+      CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Two installs: the web app builds from the root tree, and `electron/`
+      # has its own dependency tree (it is not a workspace member).
+      - run: npm ci
+      - run: npm ci
+        working-directory: electron
+
+      - name: Package
+        shell: bash
+        run: npm --prefix electron run ${{ matrix.script }}
+
+      # Matched by extension rather than by filename, so a job that changed
+      # target suffix fails loudly instead of silently uploading nothing.
+      - name: Attach to the release
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.bump.outputs.tag }}" \
-            --title "${{ steps.bump.outputs.tag }}" \
-            --notes-file .release-notes.md
+          shopt -s nullglob
+          assets=(electron/release/*.zip electron/release/*.tar.gz)
+          if [ ${#assets[@]} -eq 0 ]; then
+            echo "::error::${{ matrix.target }} produced no distributable files"
+            ls -R electron/release || true
+            exit 1
+          fi
+          printf 'uploading %s\n' "${assets[@]}"
+          gh release upload "$TAG" "${assets[@]}" --clobber
+
+  # THE RELEASE BECOMES VISIBLE HERE, and nowhere else: `needs: desktop` means
+  # every platform has packaged AND uploaded before anybody can see the
+  # release page. If one target fails, the draft stays a draft — a release
+  # missing a download is a bug report from everyone on that platform, and the
+  # fix (re-dispatch, or upload the archive by hand) is much cheaper while
+  # nobody has seen it yet.
+  publish:
+    needs: [release, desktop]
+    runs-on: ubuntu-latest
+    permissions:
+      # contents: write — this is the flag flip on the release itself.
+      contents: write
+    steps:
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          gh release edit "$TAG" --draft=false --latest
+          gh release view "$TAG" --json assets \
+            --jq '.assets[] | "published asset: \(.name)"'
 
   deploy:
     # Chain straight into pages.yml so the new tag is served at `/`

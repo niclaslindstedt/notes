@@ -26,7 +26,8 @@ time using the `copy-feature` agent skill.
 - **Local-first.** Notes are saved to the browser, instantly, with no network
   round-trip and no sign-in. It works on a plane.
 - **Installable.** Add it to your home screen and it behaves like a native
-  app — its own icon, full-screen, offline-capable.
+  app — its own icon, full-screen, offline-capable. There are downloadable
+  desktop builds for Windows, macOS, and Linux too.
 - **Mobile-first.** The primary testing device is a phone; the desktop layout
   is the same UI given more room.
 - **Cross-platform by design.** The note model is framework-free, so a planned
@@ -70,6 +71,24 @@ npm run preview
 Open the deployed app (or your `preview` URL) in mobile Safari or Chrome, then
 use **Share → Add to Home Screen**. The app installs with its own icon and
 launches full-screen and offline-capable.
+
+### Install on your desktop
+
+Grab the archive for your platform from the
+[latest release](https://github.com/niclaslindstedt/notes/releases/latest) —
+Windows, Linux, and macOS (Intel and Apple Silicon). It is the same app in its
+own window rather than a browser tab, built by the thin Electron wrapper in
+[`electron/`](electron/README.md). Cloud sync is browser-only; the desktop
+build stores notes locally or in a folder you pick.
+
+To build it yourself:
+
+```sh
+make build-electron               # build the web app into electron/webroot/
+npm --prefix electron ci
+npm --prefix electron start       # launch it
+npm --prefix electron run dist    # package an archive for this platform
+```
 
 ## Usage
 

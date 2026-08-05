@@ -18,6 +18,12 @@ for the self-hosted **notesd** backend, bridged over `postMessage` through
 longer imports the web source or ships its own storage backends — the
 embedded app runs its own `localStorage`.
 
+An Electron desktop app lives under [`electron/`](electron/README.md) — a
+**thin window** around the same compiled web app (built by `make
+build-electron`), served from a private `notes://app` scheme so
+`localStorage` gets a stable origin. It adds no capabilities at all; it is
+one file, `electron/main.js`. See "The wrappers are thin" below.
+
 Mobile is the primary testing device. Every visible change should be checked
 at a phone viewport first.
 
@@ -120,6 +126,7 @@ When you close any deferred item above, delete its bullet here in the same PR.
 make dev         # vite dev server (hot reload)
 make dev-seed    # dev server seeded with realistic fake data (VITE_SEED)
 make build       # production build → dist/ (also emits the service worker)
+make build-electron  # build the app into electron/webroot/ for the desktop shell
 make preview     # serve the production build locally
 make test        # vitest run
 make lint        # eslint + tsc --noEmit, zero warnings
@@ -242,10 +249,18 @@ override that derivation. Preview the auto-derived bump locally with
 `make bump` (read-only).
 
 The workflow collates `.changes/unreleased/` into a dated `CHANGELOG.md`
-section, bumps `package.json`, tags `vX.Y.Z`, creates a GitHub Release from
-that section, and chains into `pages.yml` so the tag is served at `/`
-immediately. Preview the changelog locally with `make changelog VERSION=X.Y.Z`
-(consumes the fragments — run on a scratch branch).
+section, bumps `package.json`, tags `vX.Y.Z`, creates a **draft** GitHub
+Release from that section, and chains into `pages.yml` so the tag is served at
+`/` immediately. Preview the changelog locally with `make changelog
+VERSION=X.Y.Z` (consumes the fragments — run on a scratch branch).
+
+In parallel it packages the [Electron desktop app](electron/README.md) on one
+runner per platform — Windows zip, macOS zip for Intel **and** Apple Silicon,
+Linux tar.gz — attaches the four archives to that draft, and only then
+publishes it. A packaging failure therefore leaves the release a draft rather
+than a public page with a missing download; the fix is to re-dispatch, or to
+flip the draft by hand once the archive is uploaded. The **web** deploy does
+not wait for any of that.
 
 ### Changeset fragments
 
@@ -430,6 +445,41 @@ Dependency direction: `app → ui → domain`, `app → storage → domain`.
 Nothing in `domain/` may import from `ui/`, `storage/`, `app/`, or touch
 the DOM. This keeps `domain/` pure and trivially testable (no I/O, no DOM).
 
+### The wrappers are thin — put the logic in the PWA
+
+Two directories ship the same web app as a downloadable binary:
+[`native/`](native/README.md) (React Native WebView, iOS + Android) and
+[`electron/`](electron/README.md) (Electron, desktop). **Both are shells, and
+they stay shells.** They embed a compiled copy of the app — built by `make
+build-native` / `make build-electron`, which set `VITE_TARGET` so the bundle
+gets a relative asset base and no service worker — and show it. Neither
+imports anything from `src/`.
+
+The rule for both, and the one to check a change against:
+
+> **Anything that could live in the PWA, does.** A wrapper may only hold what
+> is *impossible* in a web page on that platform, and nothing else.
+
+For `native/` that is a short, closed list — haptics, SPKI-pinned HTTPS, QR
+camera scan — each behind the `postMessage` bridge in
+[`src/platform/native-bridge.ts`](src/platform/native-bridge.ts), which is
+inert on the web. For `electron/` the list is currently **empty**: the whole
+main process is one file that opens a window on the bundled app, with no
+preload, no IPC, and no storage of its own. Keep it that way.
+
+So when a feature request arrives while you are working in a wrapper:
+
+- **Build it in `src/`** and let both wrappers pick it up for free. A feature
+  written in the shell exists on one platform, is untested (the wrappers are
+  outside `make lint` / `make test`), and has to be written again for the
+  other shell and for the web.
+- **If it genuinely cannot be done in a web page**, add the *smallest possible*
+  capability to the wrapper, expose it through the platform seam, and put the
+  decision of when to use it in `src/` — the wrapper answers a question, it
+  does not decide anything.
+- **Wanting to add a second file to `electron/`** is the signal to stop and
+  re-ask whether the PWA can do it. Usually it can.
+
 ### Where new code goes
 
 | Adding…                                  | Put it in…                         |
@@ -442,6 +492,7 @@ the DOM. This keeps `domain/` pure and trivially testable (no I/O, no DOM).
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |
 | PWA / service-worker behaviour           | `src/pwa/`                         |
 | A native-wrapper capability (bridge)     | `src/platform/native-bridge.ts` + `native/` |
+| Anything a wrapper seems to need         | `src/` — see "The wrappers are thin" |
 | A new achievement / its unlock trigger   | `src/achievements/catalog.ts`      |
 | A user-facing string / its translation   | `src/i18n/locales/{en,sv}/<ns>.ts` |
 
@@ -504,6 +555,7 @@ pasting it verbatim.
 | A user-facing feature / surface (shipped or removed) | **Add (or retire) a matching achievement** in the same PR — see "Achievements". Every feature is also an unlockable trophy. |
 | What data the app reads/writes/sends, or an OAuth scope | `src/ui/HomePage.tsx` **and** `src/ui/PrivacyPage.tsx` |
 | Release / deploy / changelog flow | this file's "Releases and changelog"  |
+| Anything under `electron/` or `native/` | that wrapper's `README.md`, and re-read "The wrappers are thin" before adding code there |
 
 ## Achievements
 
