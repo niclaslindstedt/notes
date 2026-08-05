@@ -148,6 +148,12 @@ const achievements = {
       learnMore:
         "Wrap lines in ``` and the editor renders them as a block of code — verbatim, with no Markdown formatting applied inside. The fences themselves disappear once the block is closed, and come back the moment you put the caret inside it.",
     },
+    quoteUnquote: {
+      name: "Quote, unquote",
+      condition: "Write a quote that runs over more than one row.",
+      learnMore:
+        "Pressing Enter inside a quote opens another quote row, so a long passage can be typed straight through instead of marking each row by hand. The quote keeps going until you leave it: press Quote again to unmark the row, or put the caret on a row that isn't quoted.",
+    },
     plainText: {
       name: "Plain and simple",
       condition: "Turn live Markdown rendering off.",

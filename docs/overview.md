@@ -504,6 +504,42 @@ cheap line-level scan (no blocks built) behind the
 [Fenced in](#unlock-triggers) achievement, which fires the first time a note
 holds a closed block.
 
+### Quote continuation
+
+Pressing **Enter** inside a quote opens another quote row, so a passage can be
+typed straight through instead of re-marking every row from the
+[styling toolbar](#styling-toolbar). `newlineFor(block, col)`
+(`src/domain/markdown-format.ts`) is the pure decision — the text the split
+inserts: a bare `"\n"` everywhere else, and `"\n"` plus the line's **own**
+marker inside a quote, so the indent and the exact spelling (`> ` or a bare
+`>`) carry across rather than being normalised. The
+[live-preview editor](#markdown-editor) calls it from the
+`insertParagraph` / `insertLineBreak` branch of its `beforeinput` handler and
+feeds the result to the same `replaceRange` engine every other structural edit
+goes through, so splitting mid-row quotes the tail too (`> one|two` →
+`> one` / `> two`). It reads the caret's line from the classification the
+editor already holds, so a `>` inside a
+[fenced code block](#code-block) is code, not a quote.
+
+Quote mode is deliberately **sticky**: an empty quote row opens another one
+rather than dropping out of the quote, so leaving one is an explicit act —
+press **Quote** on the [styling toolbar](#styling-toolbar) to unmark the row,
+or put the caret on a row that isn't quoted (the decision is per-line, so the
+next Enter simply follows whichever row the caret sits on). The one caret
+position that doesn't continue is one still *inside* the marker: Enter there
+pushes the whole row down, exactly as on any other line.
+
+Only the live-preview editor does this. The Markdown-off
+[plain fallback](#editor-settings) is a real `<textarea>` whose Enter the
+browser handles natively; intercepting it there would cost the browser's own
+undo history for the commonest keystroke in the note, which is a worse trade
+than the inconsistency.
+
+`hasMultiLineQuote(body)` (`src/domain/markdown.ts`) is the cheap, fence-aware
+line-level scan (no blocks built) behind the [Quote, unquote](#unlock-triggers)
+achievement, which fires the first time a note holds a quote running over two
+or more consecutive rows.
+
 ### Bullet characters
 
 An unordered list draws one of three fixed glyphs per nesting level:

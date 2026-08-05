@@ -31,6 +31,7 @@ import { classifyLines, hiddenFenceLines } from "../domain/markdown.ts";
 import {
   applyFormat,
   lineFormatOf,
+  newlineFor,
   type FormatAction,
   type LineFormat,
 } from "../domain/markdown-format.ts";
@@ -636,7 +637,13 @@ export function MarkdownEditor({
     if (!pts) return;
     e.preventDefault();
     if (it === "insertParagraph" || it === "insertLineBreak") {
-      replaceSelection(pts.start, pts.end, "\n");
+      // A quote carries its marker onto the row the split opens, so pressing
+      // Enter keeps writing the same quote (see `newlineFor`).
+      replaceSelection(
+        pts.start,
+        pts.end,
+        newlineFor(blocksRef.current[pts.start.line], pts.start.col),
+      );
     } else if (it.startsWith("insert")) {
       replaceSelection(
         pts.start,
