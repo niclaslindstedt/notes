@@ -40,8 +40,8 @@ export function StorageSection({ storage, conversion }: Props) {
   const t = useT();
   const {
     backend,
-    dropboxConfigured,
-    gdriveConfigured,
+    dropboxAvailable,
+    gdriveAvailable,
     dropboxConnected,
     gdriveConnected,
     folderAvailable,
@@ -84,12 +84,12 @@ export function StorageSection({ storage, conversion }: Props) {
     {
       value: "dropbox",
       label: t("settings.storage.backendDropbox"),
-      disabled: !dropboxConfigured,
+      disabled: !dropboxAvailable,
     },
     {
       value: "gdrive",
       label: t("settings.storage.backendGoogleDrive"),
-      disabled: !gdriveConfigured,
+      disabled: !gdriveAvailable,
     },
     // Self-hosted is native-only: the SPKI-pinned fetch it needs exists only in
     // the app wrapper, so the option simply isn't offered on the plain web.

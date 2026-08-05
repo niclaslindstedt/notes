@@ -407,11 +407,17 @@ The source tree under `src/` is organized by concern, not by file type:
 - `src/styles/` — the CSS-variable token system (`theme.css`).
 - `src/pwa/` — service-worker registration and update lifecycle
   (`usePwaUpdate.ts`), standalone/install detection (`standalone.ts`).
-- `src/platform/` — the seam to the native WebView wrapper
-  (`native-bridge.ts`): `isNative()` detection, `haptics.vibrate` (native
-  else `navigator.vibrate`), and `pinnedFetch`/`createPinnedFetch` (an
+- `src/platform/` — the seam to the wrappers. `native-bridge.ts`:
+  `isNative()` detection, `haptics.vibrate` (native else
+  `navigator.vibrate`), and `pinnedFetch`/`createPinnedFetch` (an
   SPKI-pinned `fetch` routed through native for the notesd backend). Inert
-  on the plain web; only lights up inside `native/`.
+  on the plain web; only lights up inside `native/`. `capabilities.ts`: the
+  single answer to **which surface is this and what can it do** — `web` /
+  `native` / `desktop`, and the three capabilities that differ between them
+  (`folderPicker`, `redirectOauth`, `pinnedFetch`). Every "is this available
+  here?" question routes through it rather than being re-derived at the call
+  site; the page works this out from what it can observe, so no wrapper has
+  to tell it anything.
 - `src/i18n/` — the i18n layer (ported from checklist): a dependency-free,
   typed `t()` runtime (`index.ts`) over per-language catalog modules under
   `locales/<lang>/` (English `en/` is bundled + is the `Catalog`/`MessageKey`
@@ -494,6 +500,7 @@ So when a feature request arrives while you are working in a wrapper:
 | PWA / service-worker behaviour           | `src/pwa/`                         |
 | A native-wrapper capability (bridge)     | `src/platform/native-bridge.ts` + `native/` |
 | Anything a wrapper seems to need         | `src/` — see "The wrappers are thin" |
+| A "can this surface do X?" check          | `src/platform/capabilities.ts` — never re-derive it at the call site |
 | A new achievement / its unlock trigger   | `src/achievements/catalog.ts`      |
 | A user-facing string / its translation   | `src/i18n/locales/{en,sv}/<ns>.ts` |
 

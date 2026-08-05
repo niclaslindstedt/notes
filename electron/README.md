@@ -69,8 +69,11 @@ to notarize — and the same job signs for real and the prompt goes away.
 
 ## Known limitations
 
-- **The cloud backends (Dropbox, Google Drive) do not work here.** Their OAuth
-  flows redirect back to a registered `https://` URL, which the `notes://app`
-  origin is not. Local storage and the picked-folder backend work as they do
-  on the web. Use the web app at
+- **The cloud backends (Dropbox, Google Drive) are not offered here.** Their
+  OAuth flows redirect back to a registered `https://` URL, which the
+  `notes://app` origin is not, so the storage picker shows both rows disabled.
+  That decision is made in the web app, not in this shell — see
+  `../src/platform/capabilities.ts`, which resolves the surface to `desktop`
+  from the `notes:` scheme. Local storage and the picked-folder backend work
+  as they do on the web; use
   [notes.niclaslindstedt.se](https://notes.niclaslindstedt.se) for cloud sync.

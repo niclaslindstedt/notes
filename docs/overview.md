@@ -3045,6 +3045,36 @@ are skipped, since nothing in a wrapper reads them. `usePwaUpdate`
 (`src/pwa/usePwaUpdate.ts`) reads `__EMBEDDED__` to know there is no service
 worker to register.
 
+### Capabilities
+
+`platform()` / `capabilities()` (`src/platform/capabilities.ts`) — the single
+answer to *which surface is this, and what can it do*. `platform()` returns
+`"native"` (the `native/` WebView wrapper, detected by
+`window.ReactNativeWebView`), `"desktop"` (the `electron/` shell, detected by
+its private `notes:` scheme), or `"web"`. `capabilities()` turns that into the
+three things that actually differ:
+
+- **`folderPicker`** — the File System Access API behind the
+  [folder backend](#folder-backend). A browser-engine question (Chromium yes,
+  Firefox/Safari no), so it is true in both wrappers.
+- **`redirectOauth`** — whether a redirect-based OAuth flow can complete on
+  this origin, gating both cloud backends. False on the desktop: `redirectUri()`
+  (`src/storage/oauth-pkce.ts`) is built from `window.location`, so it is
+  `notes://app` there, and no provider will register a custom scheme (Google
+  rejects non-`https` outright).
+- **`pinnedFetch`** — SPKI-pinned HTTPS behind the
+  [notesd backend](#notesd-backend). Native code only.
+
+`useStorageBackend` reads all four of its availability flags from here
+(`dropboxAvailable`, `gdriveAvailable`, `folderAvailable`, `notesdAvailable`)
+rather than re-deriving each at its own call site. That centralisation is the
+point: before it, the desktop build offered no cloud sync only because the
+packaging job happened not to pass `VITE_DROPBOX_APP_KEY` /
+`VITE_GOOGLE_CLIENT_ID` — adding those secrets would have lit both options up
+and then failed at the redirect, because the reason they cannot work there was
+written down nowhere. The module lives in `src/`, not in a wrapper: the page
+works its surface out from what it can observe, and no shell tells it anything.
+
 ### Desktop app (Electron)
 
 `electron/` — a **thin** Electron window around the same compiled web app. The
@@ -3080,12 +3110,14 @@ refuses to execute unsigned arm64 code at all. The `desktop` job in
 `.github/workflows/release.yml` builds all four on one runner per platform and
 attaches them to the draft release, which the `publish` job then makes public.
 
-The cloud backends (Dropbox, Google Drive) do not work in the desktop app:
-their OAuth flows redirect to a registered `https://` URL, which the
-`notes://app` origin is not. Local storage and the picked-folder backend work
-as they do on the web. See `electron/README.md`, and AGENTS.md's "The wrappers
-are thin" for the rule about what may live in this directory (in short:
-nothing that could live in `src/`).
+The cloud backends (Dropbox, Google Drive) are **not offered** in the desktop
+app — `capabilities().redirectOauth` is false there, so the storage picker
+shows both rows disabled the way it already does for the folder backend on
+Safari. Their OAuth flows redirect to a registered `https://` URL, which
+`notes://app` is not. Local storage and the picked-folder backend work as they
+do on the web. See [Capabilities](#capabilities), `electron/README.md`, and
+AGENTS.md's "The wrappers are thin" for the rule about what may live in that
+directory (in short: nothing that could live in `src/`).
 
 ### The shared framework
 

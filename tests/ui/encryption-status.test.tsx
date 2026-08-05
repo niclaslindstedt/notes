@@ -11,8 +11,8 @@ import type { UseStorageBackend } from "../../src/storage/useStorageBackend.ts";
 function stubStorage(over: Partial<UseStorageBackend> = {}): UseStorageBackend {
   return {
     backend: "folder",
-    dropboxConfigured: false,
-    gdriveConfigured: false,
+    dropboxAvailable: false,
+    gdriveAvailable: false,
     dropboxConnected: false,
     gdriveConnected: false,
     folderAvailable: true,

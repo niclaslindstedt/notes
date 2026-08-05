@@ -50,7 +50,7 @@ import {
   useNamespaceRegistry,
 } from "./useNamespaceRegistry.ts";
 import type { SettingsStore } from "./settings-store.ts";
-import { isFolderBackendAvailable } from "./folder/handle-store.ts";
+
 import {
   type EncryptionProgress,
   type EncryptionProgressDetail,
@@ -63,7 +63,8 @@ import { useNotesdBackend } from "./useNotesdBackend.ts";
 import { useNotesdDiscovery } from "./useNotesdDiscovery.ts";
 import { useNamespaceMigration } from "./useNamespaceMigration.ts";
 import { useBackendSelection } from "./useBackendSelection.ts";
-import { createPinnedFetch, isNative } from "../platform/native-bridge.ts";
+import { createPinnedFetch } from "../platform/native-bridge.ts";
+import { capabilities } from "../platform/capabilities.ts";
 import {
   createNotesdNamespaceStore,
   createNotesdSettingsStore,
@@ -116,13 +117,17 @@ export interface UseStorageBackend {
   settingsStore: SettingsStore | null;
   /** Which backend is selected. */
   backend: BackendId;
-  /** Whether each cloud backend's app key / client id is built in. */
-  dropboxConfigured: boolean;
-  gdriveConfigured: boolean;
+  /**
+   * Whether each cloud backend is offerable here: its app key / client id is
+   * built in AND this surface can complete a redirect OAuth flow at all (the
+   * desktop shell cannot — see `platform/capabilities.ts`).
+   */
+  dropboxAvailable: boolean;
+  gdriveAvailable: boolean;
   /** Whether each cloud backend currently holds a usable token. */
   dropboxConnected: boolean;
   gdriveConnected: boolean;
-  /** Whether this browser exposes the File System Access directory picker. */
+  /** Whether this surface exposes the File System Access directory picker. */
   folderAvailable: boolean;
   /** Whether a picked folder is connected and usable right now. */
   folderConnected: boolean;
@@ -314,6 +319,11 @@ export function useStorageBackend(): UseStorageBackend {
   // built from.
   const folderActiveRef = useRef<FolderActiveRef["current"]>(null);
 
+  // What this surface can do at all — browser tab, native wrapper, or desktop
+  // shell. Fixed for the lifetime of the page (nothing here can change without
+  // a reload), so it is read once rather than memoized against anything.
+  const platformCapabilities = capabilities();
+
   // The picked-folder concern: the live FSA handle and its boot-probe
   // rehydration, the revoked-grant reconnect cue, and the connect / reconnect /
   // disconnect verbs. Produces `folderHandle` / `folderHandleLoaded` /
@@ -369,7 +379,7 @@ export function useStorageBackend(): UseStorageBackend {
     dropboxRefresh,
     rememberDropboxAccessToken,
     gdriveToken,
-    enabled: isNative(),
+    enabled: platformCapabilities.pinnedFetch,
   });
 
   // Pair, then publish the daemon's non-secret discovery record (name, endpoint,
@@ -579,11 +589,15 @@ export function useStorageBackend(): UseStorageBackend {
     splitLegacyBlob,
     settingsStore,
     backend,
-    dropboxConfigured: isDropboxConfigured(),
-    gdriveConfigured: isGdriveConfigured(),
+    // Both halves must hold: the key has to be built in, and the surface has
+    // to be able to finish a redirect OAuth flow. The desktop shell fails the
+    // second even when a build passes it the keys.
+    dropboxAvailable:
+      platformCapabilities.redirectOauth && isDropboxConfigured(),
+    gdriveAvailable: platformCapabilities.redirectOauth && isGdriveConfigured(),
     dropboxConnected: dropboxToken !== null,
     gdriveConnected: gdriveToken !== null,
-    folderAvailable: isFolderBackendAvailable(),
+    folderAvailable: platformCapabilities.folderPicker,
     folderConnected: backend === "folder" && folderHandle !== null,
     folderReconnectNeeded,
     encryption,
@@ -598,7 +612,7 @@ export function useStorageBackend(): UseStorageBackend {
     disconnectDropbox,
     connectGdrive,
     disconnectGdrive,
-    notesdAvailable: isNative(),
+    notesdAvailable: platformCapabilities.pinnedFetch,
     notesdConnected: backend === "notesd" && notesdConfig !== null,
     pairNotesd,
     unpairNotesd,
