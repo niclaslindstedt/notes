@@ -160,6 +160,12 @@ const achievements = {
       learnMore:
         "Prefer raw text? Settings → Editor switches the live preview off so notes stay plain, unformatted source.",
     },
+    countTheLines: {
+      name: "Count the lines",
+      condition: "Turn the editor's line numbers on.",
+      learnMore:
+        "Settings → Editor numbers every line down the left edge, the way a code editor does. Press a number to select that whole line — ready to cut, replace, or restyle.",
+    },
     freehand: {
       name: "Freehand",
       condition: "Disable spell check or autocorrect.",

@@ -82,9 +82,11 @@ export function HomePage() {
               note is tidied as it's saved — trailing spaces trimmed and a
               closing newline added, both optional in Settings. Long pasted
               links can be shortened in the preview so they don't sprawl across
-              the note — the full link is still saved and still opens. While the
-              app is open, hopping between notes drops you back at the exact
-              spot and cursor position you left each one at.
+              the note — the full link is still saved and still opens. Line
+              numbers can be switched on down the editor's left edge,
+              code-editor style, where pressing a number selects that whole
+              line. While the app is open, hopping between notes drops you back
+              at the exact spot and cursor position you left each one at.
             </li>
             <li>
               Reach for the formatting button at the top right of a note to open

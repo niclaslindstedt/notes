@@ -8,6 +8,7 @@ const app: AppCatalog = {
   newNote: "Ny anteckning",
   back: "Tillbaka",
   startWriting: "Börja skriva…",
+  selectLine: "Markera rad {n}",
   titlePlaceholder: "Titel",
   attachments: "Bilagor",
   dropTitle: "Släpp för att importera",

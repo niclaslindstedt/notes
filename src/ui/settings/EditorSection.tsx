@@ -104,6 +104,12 @@ export function EditorSection({
           checked={editor.renderMarkdown}
           onChange={(v) => update("renderMarkdown", v)}
         />
+        <ToggleRow
+          label={t("settings.editor.lineNumbers")}
+          hint={t("settings.editor.lineNumbersHint")}
+          checked={editor.lineNumbers}
+          onChange={(v) => update("lineNumbers", v)}
+        />
         <Field label={t("settings.editor.shortenLinks")}>
           <SegmentedRow<number>
             ariaLabel={t("settings.editor.shortenLinks")}

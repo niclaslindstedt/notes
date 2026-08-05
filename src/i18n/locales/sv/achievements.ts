@@ -155,6 +155,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Föredrar du ren text? Inställningar → Redigerare stänger av direktförhandsvisningen så att anteckningar förblir vanlig, oformaterad källtext.",
     },
+    countTheLines: {
+      name: "Räkna raderna",
+      condition: "Slå på radnummer i redigeraren.",
+      learnMore:
+        "Inställningar → Redigerare numrerar varje rad längs vänsterkanten, som i en kodredigerare. Tryck på ett nummer för att markera hela raden — redo att klippa ut, ersätta eller formatera om.",
+    },
     freehand: {
       name: "Frihand",
       condition: "Inaktivera stavningskontroll eller autokorrigering.",

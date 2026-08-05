@@ -33,6 +33,7 @@ import {
   KeyGlyph,
   LayersGlyph,
   LinkGlyph,
+  ListOrderedGlyph,
   LockGlyph,
   MedalGlyph,
   MergeGlyph,
@@ -290,6 +291,19 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       predicate: (prev, next) =>
         prev.appearance.editor.renderMarkdown &&
         !next.appearance.editor.renderMarkdown,
+    },
+  },
+  {
+    id: "countTheLines",
+    tier: "intermediate",
+    glyph: ListOrderedGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.appearance.editor.lineNumbers],
+      predicate: (prev, next) =>
+        !prev.appearance.editor.lineNumbers &&
+        next.appearance.editor.lineNumbers,
     },
   },
   {

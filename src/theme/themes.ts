@@ -195,6 +195,11 @@ export type EditorSettings = {
   // Render Markdown inline as you type, Obsidian-style — every line but the
   // one the caret sits on shows formatted, the active line shows its source.
   renderMarkdown: boolean;
+  // Number every line of the note in a gutter down the editor's left edge, the
+  // way a code editor does; pressing a number selects that whole line. A
+  // live-preview affordance — the Markdown-off textarea has no per-line
+  // elements to hang a gutter on, so it ignores this.
+  lineNumbers: boolean;
   // Stop the browser/OS checking spelling as you type — hides the red
   // squiggles. Handy for code, structured notes, or another language.
   disableSpellcheck: boolean;
@@ -232,6 +237,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   margin: "none",
   wordWrap: true,
   renderMarkdown: true,
+  lineNumbers: false,
   disableSpellcheck: false,
   disableAutocorrect: false,
   trimTrailingSpaces: true,

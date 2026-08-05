@@ -379,6 +379,20 @@ export function TextSearchGlyph({ className }: IconProps) {
   );
 }
 
+// Numbered rules down a left margin — the editor's line-number gutter.
+export function ListOrderedGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M10 6h11" />
+      <path d="M10 12h11" />
+      <path d="M10 18h11" />
+      <path d="M4 4h1v4" />
+      <path d="M4 8h2" />
+      <path d="M3.5 15a1.5 1.5 0 1 1 2.6 1L3.5 20H6.5" />
+    </Svg>
+  );
+}
+
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;

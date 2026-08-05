@@ -414,6 +414,7 @@ export function Editor({
               filesAtEnd: editor.filesAtEnd,
             }}
             shortenLinkChars={editor.shortenLinkChars}
+            lineNumbers={editor.lineNumbers}
             onTabOut={onBodyTab}
             onLineFormat={toolbarOpen ? setLineFormat : undefined}
             matches={matches}
