@@ -408,7 +408,7 @@ title settles.
 ### Editor tab order
 
 `Editor` (`src/ui/NoteEditor.tsx`) spells out the editor's keyboard tab order by
-hand: **back button → title → body → folder picker / copy / sync**. That is the
+hand: **back button → title → body → find / formatting / cut / copy**. That is the
 order the work happens in — name the note, write it, and only then reach for the
 toolbar — but document order can't express it, because the header (and every
 button in it) precedes the body. So the two editing surfaces (the live-preview
@@ -419,8 +419,8 @@ focus is moved explicitly instead:
 - Tab in the title focuses the body (the same `focusBody` hand-down as Enter /
   Arrow-Down; the [live-preview editor](#markdown-editor) opens a line at the end
   through its imperative handle).
-- Tab in the body focuses the first header action — the folder picker when the
-  note has folders to file into, otherwise the [copy button](#copy-button).
+- Tab in the body focuses the first header action — the
+  [find button](#find-in-note).
   Both surfaces report the keystroke up through an `onTabOut(backwards)` prop
   rather than acting themselves, and only when the caret is on the surface: an
   attachment thumbnail inside the note is its own tab stop and its Tab bubbles
@@ -2533,8 +2533,8 @@ root zone to take it out of one. On a pointer device this is native HTML5 drag
 (`NOTE_DND_TYPE` carries the note id; the highlight follows `dropTarget`, and a
 drop on a folder calls `stopPropagation` so it doesn't bubble to the root
 zone); on a touchscreen it's a **press-and-hold** gesture (see
-[note drag](#note-drag-touch--pointer)), with the
-[folder picker](#folder-picker) as a keyboard/quick alternative.
+[note drag](#note-drag-touch--pointer)). Dragging is the only way to file a
+note: the editor header carries no folder control.
 
 ### Folders in the overview
 
@@ -2633,18 +2633,6 @@ keeps its `folderId`, so it stays filed under the folder there — and saves;
 (`removeFolderWithNotes`). Same best-effort contract as the per-note move (a
 failed target write leaves the source untouched). If the open note belonged to
 the moved folder, `App` leaves the editor since it's gone from this namespace.
-
-### Folder picker
-
-`FolderPicker` (`src/ui/NoteEditor.tsx`) is a compact `SelectPicker` in the editor
-header (shown only when folders exist) listing "No folder" plus every folder —
-the cross-platform way to file the open note, since it works on touch where
-drag-and-drop doesn't. Choosing an entry calls `moveNote` for the open note.
-Its trigger collapses to just the folder icon on a narrow viewport (the name
-eats scarce header width there) and brings the label back once the window is at
-least 640px wide; the icon glows in the accent colour when the note is filed
-and stays muted grey for "No folder", so the filed-vs-unfiled state reads at a
-glance.
 
 ### Folders sidecar
 

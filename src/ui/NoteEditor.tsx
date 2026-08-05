@@ -23,7 +23,7 @@ import {
   type LineFormat,
 } from "../domain/markdown-format.ts";
 import { findMatches, type NoteMatch } from "../domain/note-find.ts";
-import { isBlank, type Folder, type Note } from "../domain/note.ts";
+import { isBlank, type Note } from "../domain/note.ts";
 import { useT } from "../i18n/index.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { CipherGlyph } from "./CipherGlyph.tsx";
@@ -37,61 +37,13 @@ import {
   setEditorPosition,
 } from "./editor-position.ts";
 import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
-import { SelectPicker } from "./form/SelectPicker.tsx";
-import { useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
-import { ArrowLeftIcon, FolderIcon, SpinnerIcon } from "./icons.tsx";
+import { ArrowLeftIcon, SpinnerIcon } from "./icons.tsx";
 import {
   MarkdownEditor,
   type MarkdownEditorHandle,
 } from "./MarkdownEditor.tsx";
 import { NoteFindBar, NoteFindButton } from "./NoteFindBar.tsx";
-
-// A compact folder picker for the editor header — the cross-platform way to
-// file the open note (drag-to-folder works on a pointer device; this works
-// anywhere, including touch). Built on the shared `SelectPicker`; the trigger
-// shows the folder glyph plus the current folder's name (or "No folder").
-function FolderPicker({
-  folders,
-  value,
-  onChange,
-}: {
-  folders: Folder[];
-  value: string;
-  onChange: (folderId: string) => void;
-}) {
-  const t = useT();
-  // The folder name eats scarce header width on a narrow viewport; there, show
-  // just the icon. Once the window is wide enough the label comes back.
-  const wideEnough = useMediaQuery("(min-width: 640px)");
-  const options = [
-    { value: "", label: <span className="italic">{t("nav.noFolder")}</span> },
-    ...folders.map((f) => ({ value: f.id, label: f.name })),
-  ];
-  // A note that's in a folder lights its icon up in the accent colour; "no
-  // folder" stays muted grey so the filed-vs-unfiled state reads at a glance.
-  const filed = value !== "";
-  return (
-    <SelectPicker
-      value={value}
-      options={options}
-      onChange={onChange}
-      ariaLabel={t("nav.moveToFolder")}
-      renderValue={(o) => (
-        <span className="flex items-center gap-1.5">
-          <FolderIcon
-            className={`h-4 w-4 shrink-0 ${filed ? "text-accent" : "text-muted"}`}
-          />
-          {wideEnough && (
-            <span className="truncate">{o?.label ?? t("nav.noFolder")}</span>
-          )}
-        </span>
-      )}
-      triggerClassName={`flex h-9 cursor-pointer items-center gap-1 rounded-[var(--radius)] border border-line bg-transparent px-2 text-left text-sm text-fg hover:border-accent focus-visible:border-accent focus-visible:outline-none ${wideEnough ? "max-w-[9rem]" : ""}`}
-      panelClassName="max-h-64 overflow-y-auto"
-    />
-  );
-}
 
 // What counts as a tab stop inside the header's action cluster — enough to find
 // the leftmost one, which is where the body hands focus to (and takes it back
@@ -123,9 +75,7 @@ type PlainEditorHandle = {
 export function Editor({
   note,
   editor,
-  folders,
   onBack,
-  onMoveFolder,
   onChange,
   onTitleChange,
   onTitleSettle,
@@ -137,12 +87,8 @@ export function Editor({
 }: {
   note: Note;
   editor: EditorSettings;
-  /** Folders the note can be filed into, for the header folder picker. */
-  folders: Folder[];
   /** Leave the editor and return to the overview (the header back button). */
   onBack: () => void;
-  /** File the open note into `folderId`, or out of any folder when `null`. */
-  onMoveFolder: (folderId: string | null) => void;
   onChange: (body: string) => void;
   onTitleChange: (title: string) => void;
   onTitleSettle: () => void;
@@ -166,7 +112,7 @@ export function Editor({
   const titleFirst = useRef(isBlank(note)).current;
   const bodyRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
-  // The header's action cluster (folder picker, find, formatting, copy), which
+  // The header's action cluster (find, formatting, cut, copy), which
   // the body hands focus on to — see `firstAction`.
   const actionsRef = useRef<HTMLDivElement>(null);
   // Handle on the live-preview editor so the title can hand focus down into the
@@ -271,7 +217,7 @@ export function Editor({
   }
 
   // The editor's tab order is spelled out by hand as back → title → body →
-  // folder / find / formatting / copy, because that's the order you work in: name
+  // find / formatting / copy, because that's the order you work in: name
   // the note, write it, and only then reach for the toolbar. Document order
   // can't say that — the header (and its buttons) precede the body — so the
   // two editing surfaces are kept out of the browser's sequential order
@@ -343,13 +289,6 @@ export function Editor({
           onKeyDown={onActionsKeyDown}
           className="flex shrink-0 items-center gap-2"
         >
-          {folders.length > 0 && (
-            <FolderPicker
-              folders={folders}
-              value={note.folderId ?? ""}
-              onChange={(id) => onMoveFolder(id || null)}
-            />
-          )}
           <NoteFindButton open={findOpen} onToggle={toggleFind} />
           <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
           {!loading && <CutButton onCut={runCut} />}

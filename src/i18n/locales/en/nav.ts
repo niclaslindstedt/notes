@@ -21,7 +21,6 @@ const nav = {
   renameFolder: "Rename folder",
   deleteFolder: "Delete folder",
   folderActions: "Folder actions",
-  moveToFolder: "Move to folder",
   noFolder: "No folder",
   showAll: "Show all",
   notesEmpty: "No notes yet.",
