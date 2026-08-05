@@ -1264,7 +1264,7 @@ export function MarkdownEditor({
     >
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div
-        className={`min-h-0 flex-1 overscroll-contain ${wordWrap ? "overflow-y-auto" : "overflow-auto"}`}
+        className={`relative min-h-0 flex-1 overscroll-contain ${wordWrap ? "overflow-y-auto" : "overflow-auto"}`}
         onScroll={(e) => {
           // Remember how far the note is scrolled so switching away and back
           // reopens at the same offset (saved on unmount).
@@ -1292,6 +1292,28 @@ export function MarkdownEditor({
           if (canAttach && carriesFiles(e)) e.preventDefault();
         }}
       >
+        {/* The "start writing" prompt for an empty note, drawn as an overlay
+            *outside* the editing host rather than as a child of it.
+            A `contenteditable={false}` island inside the host is a node the
+            browser feels entitled to normalise around — and on an empty note it
+            sits immediately before the caret at position 0, precisely where a
+            Backspace at the start of the document aims. It is also a node React
+            must remove again the moment a character is typed, so anything the
+            browser did to it in the meantime surfaces as a `removeChild`
+            `NotFoundError` that unmounts the app. Out here it is unreachable by
+            either, and the host holds nothing but lines. It mirrors the host's
+            padding and width so the prompt lands exactly where the first
+            character will; the host's `aria-label` already announces it, hence
+            `aria-hidden`. */}
+        {value === "" && (
+          <div
+            aria-hidden="true"
+            style={widthStyle}
+            className={`pointer-events-none absolute inset-x-0 top-0 ${lineNumbers ? "pr-4 pl-14" : "px-4"} pt-4 text-muted/60 select-none`}
+          >
+            {t("app.startWriting")}
+          </div>
+        )}
         <div
           ref={rootRef}
           role="textbox"
@@ -1344,14 +1366,6 @@ export function MarkdownEditor({
           className={`relative ${lineNumbers ? "pr-4 pl-14" : "px-4"} pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
           style={widthStyle}
         >
-          {value === "" && (
-            <span
-              contentEditable={false}
-              className="pointer-events-none absolute text-muted/60 select-none"
-            >
-              {t("app.startWriting")}
-            </span>
-          )}
           {lines.map((line, index) => {
             const edgeClass = codeBlockEdgeClass(codeEdges, index);
             if (index === clampedIndex) {
