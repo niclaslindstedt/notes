@@ -465,6 +465,53 @@ describe("MarkdownEditor", () => {
     });
   });
 
+  describe("task items", () => {
+    // The checkboxes of every rendered task row, in source order.
+    function boxes(): HTMLElement[] {
+      return screen.queryAllByRole("checkbox");
+    }
+
+    it("draws a checkbox per task row, ticked to match the source", () => {
+      renderEditor("- [ ] milk\n- [x] bread\n", { focusOnMount: false });
+      expect(boxes().map((b) => b.getAttribute("aria-checked"))).toEqual([
+        "false",
+        "true",
+      ]);
+      // The box is the marker: the row's text renders without it.
+      expect(screen.getByText("milk")).not.toBeNull();
+    });
+
+    it("ticks the item off in the source when its box is pressed", () => {
+      const { onChange } = renderEditor("- [ ] milk\n- [ ] bread\n", {
+        focusOnMount: false,
+      });
+      fireEvent.click(boxes()[1]!);
+      expect(onChange).toHaveBeenCalledWith("- [ ] milk\n- [x] bread\n");
+      expect(boxes().map((b) => b.getAttribute("aria-checked"))).toEqual([
+        "false",
+        "true",
+      ]);
+    });
+
+    it("unticks a ticked item on a second press", () => {
+      const { onChange } = renderEditor("- [x] milk", { focusOnMount: false });
+      fireEvent.click(boxes()[0]!);
+      expect(onChange).toHaveBeenLastCalledWith("- [ ] milk");
+    });
+
+    it("does not open the editor on the line it ticked", () => {
+      // The point of the gesture: no raw line, so no caret and no soft
+      // keyboard. The press is cancelled on mousedown, before the browser
+      // would place a caret with it.
+      renderEditor("- [ ] milk\n- [ ] bread\n", { focusOnMount: false });
+      const box = boxes()[0]!;
+      const down = fireEvent.mouseDown(box);
+      expect(down).toBe(false); // preventDefault()ed
+      fireEvent.click(box);
+      expect(rawLine()).toBeNull();
+    });
+  });
+
   describe("fenced code blocks", () => {
     // The source lines actually rendered, in order — a hidden line is absent
     // from the DOM entirely (it stays in the source).

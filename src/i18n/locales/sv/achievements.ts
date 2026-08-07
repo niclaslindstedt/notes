@@ -155,6 +155,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Tryck Enter på en punkt- eller nummerrad så öppnas nästa, så att en lista kan skrivas i ett svep — och Tab på en rad lägger den under raden ovanför (Skift+Tab drar ut den igen). En tom punkt avslutar listan: ett Enter drar ut en indragen punkt en nivå, nästa tömmer raden. Skift+Enter öppnar i stället ytterligare en rad inuti punkten du står på i stället för att börja en ny.",
     },
+    checkedOff: {
+      name: "Avbockat",
+      condition: "Bocka av en kryssruta i en anteckning.",
+      learnMore:
+        "En listrad skriven `- [ ] mjölk` visas som en riktig kryssruta. Tryck på den så bockas punkten av direkt — markören flyttas aldrig till raden, så ingenting öppnas och inget tangentbord fälls upp på telefonen. Bockningen skrivs rakt in i Markdown som `- [x]` och följer därför med anteckningen dit den än synkas. Enter på en uppgiftsrad öppnar nästa, alltid obockad.",
+    },
     plainText: {
       name: "Enkelt och rent",
       condition: "Stäng av direkt Markdown-visning.",

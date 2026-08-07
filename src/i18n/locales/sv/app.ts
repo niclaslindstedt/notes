@@ -24,6 +24,11 @@ const app: AppCatalog = {
   },
   copyCode: "Kopiera kod",
   copyLink: "Kopiera länk",
+  task: {
+    toggle: "Växla uppgift",
+    todo: "Inte klar",
+    done: "Klar",
+  },
   cut: "Klipp ut",
   format: {
     show: "Formatering",

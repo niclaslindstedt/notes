@@ -45,6 +45,15 @@ const app = {
   // Right-click menu entry on a note row: puts the note's own link on the
   // clipboard, so it can be bookmarked or sent to yourself.
   copyLink: "Copy link",
+  // A `- [ ] ` / `- [x] ` list row renders as a real checkbox. `toggle` names
+  // the press target in the editor (pressing it ticks the item off in the
+  // Markdown itself); `todo` / `done` name the same box where it is only
+  // showing state, on the read-only archived-note view.
+  task: {
+    toggle: "Toggle task",
+    todo: "Not done",
+    done: "Done",
+  },
   // The editor's cut button (left of the copy button) and its Ctrl/Cmd+K
   // shortcut: the selection, or the rest of the line from a mid-line caret,
   // or the whole line — onto the clipboard on its way out.

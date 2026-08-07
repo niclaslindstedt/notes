@@ -113,6 +113,15 @@ export function HomePage() {
               you are already on. Quotes carry on the same way.
             </li>
             <li>
+              Checklists you can actually tick. A row written{" "}
+              <code>- [ ] milk</code> draws a real checkbox — tap it and the
+              item is checked off there and then, without opening the editor or
+              raising the keyboard on a phone. The tick is written straight into
+              the Markdown as <code>- [x]</code>, so it is part of the note and
+              travels with it wherever you keep it. <kbd>Enter</kbd> opens the
+              next item, always unchecked.
+            </li>
+            <li>
               Cut text out with the <em>scissors</em> button beside the copy
               button: it takes whatever you have selected, or — with nothing
               selected — the whole line the cursor is on, or just the text after

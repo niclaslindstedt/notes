@@ -7,6 +7,7 @@
 
 import { isImageAttachment } from "../domain/attachment.ts";
 import {
+  hasCheckedTask,
   hasClosedFence,
   hasMultiLineQuote,
   hasNestedListItem,
@@ -21,6 +22,7 @@ import {
   BroadcastGlyph,
   BroomGlyph,
   CardsGlyph,
+  CheckSquareGlyph,
   CloudGlyph,
   CodeGlyph,
   CopyGlyph,
@@ -100,6 +102,11 @@ const hasLongQuote = (snap: Snapshot) =>
 // the trophy for discovering that a list nests from the keyboard.
 const hasSubPoint = (snap: Snapshot) =>
   snap.notes.some((n) => hasNestedListItem(n.body ?? ""));
+
+// A task item that has been ticked off — the trophy for discovering that a
+// `- [ ]` row renders as a real checkbox you can press.
+const hasTickedTask = (snap: Snapshot) =>
+  snap.notes.some((n) => hasCheckedTask(n.body ?? ""));
 
 // A note holding a YouTube link — which renders as a player, so this is the
 // trophy for discovering that a pasted video plays where it was pasted.
@@ -307,6 +314,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       slices: (s) => [s.snapshot.notes],
       predicate: (prev, next) =>
         !hasSubPoint(prev.snapshot) && hasSubPoint(next.snapshot),
+    },
+  },
+  {
+    id: "checkedOff",
+    tier: "intermediate",
+    glyph: CheckSquareGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasTickedTask(prev.snapshot) && hasTickedTask(next.snapshot),
     },
   },
   {
