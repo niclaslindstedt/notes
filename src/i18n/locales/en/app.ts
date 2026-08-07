@@ -75,6 +75,7 @@ const app = {
     code: "Inline code",
     bulletList: "Bullet list",
     numberedList: "Numbered list",
+    checklist: "Checklist",
     quote: "Quote",
     codeBlock: "Code block",
     indent: "Indent",

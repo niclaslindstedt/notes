@@ -25,9 +25,12 @@ function unmark(marked: string) {
     const point = pointAt(text, caret);
     return { text, start: point, end: point };
   }
+  // The selection brackets are the outermost pair, so the closer is the *last*
+  // `]` — a task row's `[ ]` box puts literal brackets inside the span, and
+  // taking the first one would end the selection in the middle of the marker.
   const open = marked.indexOf("[");
-  const close = marked.indexOf("]") - 1;
-  const text = marked.replace("[", "").replace("]", "");
+  const close = marked.lastIndexOf("]") - 1;
+  const text = marked.replace("[", "").replace(/]([^\]]*)$/, "$1");
   return { text, start: pointAt(text, open), end: pointAt(text, close) };
 }
 
@@ -118,6 +121,53 @@ describe("lists", () => {
     expect(run("[- a\nb]", { kind: "list", ordered: false })).toBe(
       "[- a\n- b]",
     );
+  });
+});
+
+describe("checklists", () => {
+  const TASK: FormatAction = { kind: "task" };
+  const BULLET: FormatAction = { kind: "list", ordered: false };
+
+  it("opens the caret's line as an unticked task row", () => {
+    expect(run("milk|", TASK)).toBe("- [ ] milk|");
+  });
+
+  it("toggles a task row back to plain text", () => {
+    expect(run("- [ ] milk|", TASK)).toBe("milk|");
+    // A ticked row un-lists the same way — the box goes with the marker.
+    expect(run("- [x] milk|", TASK)).toBe("milk|");
+  });
+
+  it("swaps a bullet's marker for a box rather than stacking one on it", () => {
+    expect(run("- milk|", TASK)).toBe("- [ ] milk|");
+    expect(run("1. milk|", TASK)).toBe("- [ ] milk|");
+    expect(run("## milk|", TASK)).toBe("- [ ] milk|");
+  });
+
+  it("converts a task row to a plain bullet, keeping it a list", () => {
+    // The row is a `ul` either way, so Bullet must *change* it rather than
+    // read it as already-bulleted and un-list it outright.
+    expect(run("- [ ] milk|", BULLET)).toBe("- milk|");
+    expect(run("- [x] milk|", BULLET)).toBe("- milk|");
+    // And pressing Bullet again from there does un-list it.
+    expect(run("- milk|", BULLET)).toBe("milk|");
+  });
+
+  it("keeps a nested row's indent", () => {
+    expect(run("  child|", TASK)).toBe("  - [ ] child|");
+    expect(run("  - [x] child|", TASK)).toBe("  child|");
+  });
+
+  it("opens an empty row to type into on a blank line", () => {
+    expect(run("|", TASK)).toBe("- [ ] |");
+  });
+
+  it("marks every line a selection touches, unticked", () => {
+    expect(run("[a\nb]", TASK)).toBe("[- [ ] a\n- [ ] b]");
+  });
+
+  it("marks a mixed selection as a whole rather than flipping each line", () => {
+    expect(run("[- [ ] a\nb]", TASK)).toBe("[- [ ] a\n- [ ] b]");
   });
 });
 

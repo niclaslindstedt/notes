@@ -97,14 +97,14 @@ export function HomePage() {
             <li>
               Reach for the formatting button at the top right of a note to open
               a styling toolbar above the text — headings, bold, italic,
-              strikethrough, inline code, bullet and numbered lists (with indent
-              and outdent for sub-points), quotes, code blocks, links, images,
-              and dividers, one button each. It writes ordinary Markdown, so
-              anything you reach for there you can just as well type by hand,
-              and every button is a toggle — the toolbar lights up whatever the
-              cursor is already sitting in, from the heading it's on to the bold
-              or italic phrase around it, so pressing a lit button takes that
-              formatting back off.
+              strikethrough, inline code, bullet, numbered and checklist lists
+              (with indent and outdent for sub-points), quotes, code blocks,
+              links, images, and dividers, one button each. It writes ordinary
+              Markdown, so anything you reach for there you can just as well
+              type by hand, and every button is a toggle — the toolbar lights up
+              whatever the cursor is already sitting in, from the heading it's
+              on to the bold or italic phrase around it, so pressing a lit
+              button takes that formatting back off.
             </li>
             <li>
               Lists write themselves. <kbd>Enter</kbd> on a bullet or numbered
@@ -122,7 +122,9 @@ export function HomePage() {
               raising the keyboard on a phone. The tick is written straight into
               the Markdown as <code>- [x]</code>, so it is part of the note and
               travels with it wherever you keep it. <kbd>Enter</kbd> opens the
-              next item, always unchecked.
+              next item, always unchecked — and the formatting toolbar&apos;s{" "}
+              <em>Checklist</em> style turns any lines you have into checkboxes
+              without typing the brackets yourself.
             </li>
             <li>
               Cut text out with the <em>scissors</em> button beside the copy

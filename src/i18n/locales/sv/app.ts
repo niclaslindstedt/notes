@@ -44,6 +44,7 @@ const app: AppCatalog = {
     code: "Kod i text",
     bulletList: "Punktlista",
     numberedList: "Numrerad lista",
+    checklist: "Checklista",
     quote: "Citat",
     codeBlock: "Kodblock",
     indent: "Öka indrag",

@@ -124,6 +124,19 @@ export function BulletListGlyph({ className }: IconProps) {
   );
 }
 
+// Rows led by ticks rather than dots — a checklist. Sibling of
+// `BulletListGlyph` / `OrderedListGlyph`, so the three read as one family in
+// the block menu.
+export function ChecklistGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M13 6h8M13 12h8M13 18h8" />
+      <path d="m3 7 2 2 4-4" />
+      <path d="m3 17 2 2 4-4" />
+    </Svg>
+  );
+}
+
 export function OrderedListGlyph({ className }: IconProps) {
   return (
     <Svg className={className}>
