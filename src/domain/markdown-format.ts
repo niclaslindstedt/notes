@@ -45,6 +45,13 @@ export type FormatAction =
   | { kind: "inline"; delimiter: InlineDelimiter }
   /** `- item` / `1. item` — toggles the selected lines in and out of a list. */
   | { kind: "list"; ordered: boolean }
+  /**
+   * `- [ ] item` — toggles the selected lines in and out of a **checklist**.
+   * Its own action rather than a flag on `list`, because the box is a third
+   * kind of list marker rather than a variation on the bullet: pressing
+   * Bullet on a checklist row takes the box off and leaves the bullet.
+   */
+  | { kind: "task" }
   /** `> quoted`. */
   | { kind: "quote" }
   /** Two spaces of indentation on or off — how a bullet becomes a child. */
@@ -80,6 +87,13 @@ export type LineFormat = {
   kind: BlockKind;
   /** Heading level 1–6, when `kind` is `heading`. */
   level?: number;
+  /**
+   * A task item's ticked state, when `kind` is `ul` and the row carries a
+   * `[ ]` box; absent on a plain bullet. This is what splits one `ul` line
+   * between the Bullet list and Checklist buttons, so exactly one of the two
+   * lights up.
+   */
+  task?: boolean;
   /** Leading-indent width in characters — non-zero means a nested item. */
   indent: number;
   /**
@@ -151,6 +165,7 @@ export function lineFormatOf(
   return {
     kind: block.kind,
     level: block.level,
+    task: block.task,
     indent: leadingWhitespace(block.raw).length,
     inline: span
       ? inlineMarksAt(block, span).map((mark) => mark.delimiter)
@@ -322,6 +337,8 @@ export function applyFormat(
       return applyBlockMarker(lines, start, end, {
         kind: action.ordered ? "ol" : "ul",
       });
+    case "task":
+      return applyBlockMarker(lines, start, end, { kind: "task" });
     case "indent":
       return applyIndent(lines, start, end, action.outdent === true);
     case "inline":
@@ -343,7 +360,8 @@ type BlockTarget =
   | { kind: "heading"; level: number }
   | { kind: "quote" }
   | { kind: "ul" }
-  | { kind: "ol" };
+  | { kind: "ol" }
+  | { kind: "task" };
 
 /**
  * Re-mark every line the selection touches. The decision is made once, from
@@ -378,12 +396,20 @@ function applyBlockMarker(
 }
 
 function matchesTarget(
-  block: { kind: BlockKind; level?: number } | undefined,
+  block: { kind: BlockKind; level?: number; task?: boolean } | undefined,
   target: BlockTarget,
 ): boolean {
   if (!block) return false;
   if (target.kind === "heading")
     return block.kind === "heading" && block.level === target.level;
+  // A checklist row and a plain bullet are both `ul`, so the box is what tells
+  // them apart. Keeping them distinct is what makes Bullet on a checklist row
+  // *convert* it (box off, bullet kept) instead of un-listing it outright —
+  // and what lets exactly one of the two buttons light up.
+  if (target.kind === "task")
+    return block.kind === "ul" && block.task !== undefined;
+  if (target.kind === "ul")
+    return block.kind === "ul" && block.task === undefined;
   return block.kind === target.kind;
 }
 
@@ -397,6 +423,10 @@ function markerFor(target: BlockTarget, ordinal: number): string {
       return "- ";
     case "ol":
       return `${ordinal}. `;
+    case "task":
+      // A fresh checklist row always opens unticked, the same reason Enter's
+      // continuation does (see `newlineFor`).
+      return "- [ ] ";
   }
 }
 

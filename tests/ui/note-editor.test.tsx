@@ -367,6 +367,7 @@ describe("the styling toolbar", () => {
     expect(rows.map((r) => r.textContent)).toEqual([
       "Bullet list",
       "Numbered list",
+      "Checklist",
       "Quote",
       "Code block",
     ]);

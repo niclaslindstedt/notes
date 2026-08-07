@@ -17,6 +17,7 @@ import { FloatingPanel } from "./FloatingPanel.tsx";
 import {
   BoldGlyph,
   BulletListGlyph,
+  ChecklistGlyph,
   CodeBlockGlyph,
   FormatIcon,
   HeadingGlyph,
@@ -40,10 +41,10 @@ import { ChevronDownIcon } from "./icons.tsx";
 // about to format — and the toggle lives in the editor header (see
 // `FormatToolbarButton`).
 //
-// Nineteen constructs would be nineteen buttons, which wraps to three rows on a
+// Twenty constructs would be twenty buttons, which wraps to three rows on a
 // phone. So the ones that form a natural family collapse into a **menu**: the
-// six heading levels, the four block styles (bullet / numbered list, quote, code
-// block), and the three inserts (link, image, divider). Each menu's trigger
+// six heading levels, the five block styles (bullet / numbered / checklist,
+// quote, code block), and the three inserts (link, image, divider). Each menu's trigger
 // wears the glyph of whichever member is currently applied — so a caret on an H2
 // line shows `H2`, lit — and its rows carry both the glyph and its name, which
 // the bare icon buttons never could. That takes the row to nine controls, which
@@ -171,7 +172,10 @@ function buildGroups(t: TFunction): ToolbarGroup[] {
           action: { kind: "list", ordered: false },
           label: t("app.format.bulletList"),
           glyph: <BulletListGlyph className={ICON} />,
-          active: (line) => line?.kind === "ul",
+          // A checklist row is a `ul` too, so the box is what splits the two
+          // buttons — exactly one of them is ever lit, and pressing this one
+          // on a checklist row converts it to a plain bullet.
+          active: (line) => line?.kind === "ul" && line.task === undefined,
         },
         {
           id: "ol",
@@ -179,6 +183,13 @@ function buildGroups(t: TFunction): ToolbarGroup[] {
           label: t("app.format.numberedList"),
           glyph: <OrderedListGlyph className={ICON} />,
           active: (line) => line?.kind === "ol",
+        },
+        {
+          id: "task",
+          action: { kind: "task" },
+          label: t("app.format.checklist"),
+          glyph: <ChecklistGlyph className={ICON} />,
+          active: (line) => line?.kind === "ul" && line.task !== undefined,
         },
         {
           id: "quote",

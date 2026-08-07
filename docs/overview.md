@@ -1033,9 +1033,34 @@ Enter on a task row opens the next one with an **empty** box: `listItemAt`
 (`src/domain/markdown-format.ts`) unticks the marker it carries over, so a
 checklist is written straight through and no fresh item arrives pre-ticked
 (see [list continuation](#list-continuation)). An empty task row ends the list
-like any other empty item. There is no toolbar button for task rows — the
-[styling toolbar](#styling-toolbar)'s bullet button strips the whole marker,
-box included, when it un-lists a row.
+like any other empty item.
+
+**Writing one without typing the brackets** is the [styling
+toolbar](#styling-toolbar)'s job: **Checklist** sits in the Block style menu
+beside Bullet list and Numbered list, and marks every line the selection
+touches as `- [ ] `. Typing `- [ ] ` by hand is fiddly on a phone keyboard —
+two bracket keys and a space, in the right order — which is the whole reason
+the button exists.
+
+It is its own `FormatAction` (`{ kind: "task" }` → the `task` `BlockTarget`)
+rather than a flag on `list`, because the box is a *third* kind of list marker
+rather than a variation on the bullet. That distinction is what
+`matchesTarget` encodes: a checklist row and a plain bullet are both `ul`, so
+the `task` flag is what tells them apart, and it buys three behaviours that
+would otherwise be wrong —
+
+- **Bullet list on a checklist row converts it** (box off, bullet kept)
+  instead of reading it as already-bulleted and un-listing it outright. A
+  second press then un-lists it, as on any bullet.
+- **Checklist on a bullet, a numbered item, or a heading swaps the marker**
+  rather than stacking a box on top of one (`splitMarker` strips the old
+  marker first, exactly as every other block action does).
+- **Exactly one of the two buttons is ever lit**, so the menu never claims a
+  row is both.
+
+Pressing Checklist on a row that already has a box takes the whole marker off,
+tick and all — every toolbar action toggles. A fresh row always opens
+unticked, the same reason Enter's continuation does.
 
 `hasCheckedTask(body)` is the cheap, fence-aware line-level scan behind the
 **Checked off** [achievement](#unlock-triggers), which fires the first time a
@@ -1229,7 +1254,7 @@ covers. It aligns with the writing column ([editor margin](#editor-settings)) an
 unfolds with the `format-toolbar-in` animation in `src/styles/theme.css` (a grid
 `0fr → 1fr` track, so the text below slides rather than jumps).
 
-Nineteen constructs would be nineteen buttons, which wraps to three rows on a
+Twenty constructs would be twenty buttons, which wraps to three rows on a
 phone — so the families collapse into **menus** and the row carries nine
 controls, which fits one line down to a 360px viewport:
 
@@ -1237,7 +1262,7 @@ controls, which fits one line down to a 360px viewport:
 | ------------- | ---------------------------------------------------------------- |
 | Heading ▾     | menu — the six heading levels                                     |
 | inline        | buttons — **bold**, *italic*, ~~strikethrough~~, `inline code`     |
-| Block style ▾ | menu — bullet list, numbered list, quote, fenced code block        |
+| Block style ▾ | menu — bullet list, numbered list, checklist, quote, fenced code block |
 | nesting       | buttons — outdent, indent (how a bullet becomes a **child**)       |
 | Insert ▾      | menu — link, image, divider                                       |
 
