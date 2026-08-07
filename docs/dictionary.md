@@ -186,7 +186,7 @@ Honour these when naming a new file, key, or string.
 | **Language picker** / **switch language**                  | `LanguagePicker` (`src/ui/settings/LanguagePicker.tsx`). [→](overview.md#language-picker)                     |
 | **Settings layout helpers** (Section / Field / ToggleRow)  | `src/ui/settings/shared.tsx`. [→](overview.md#settings-layout-helpers)                                        |
 | **Settings footer** / **the save row** / **Reset to defaults / Cancel / Save** / **draft / live preview** | `SettingsFooter` in `SettingsModal` (`src/ui/settings/SettingsModal.tsx`); `setAppearancePreview`, `commitAppearance` (`src/theme/useTheme.ts`). [→](overview.md#settings-modal) |
-| **Custom dropdown** / **select picker** / **floating panel** | `SelectPicker` (`src/ui/form/SelectPicker.tsx`); `FloatingPanel` (`src/ui/FloatingPanel.tsx`); `useFloatingPosition` (`src/ui/hooks/useFloatingPosition.ts`). [→](overview.md#custom-dropdown) |
+| **Custom dropdown** / **select picker** / **floating panel** / **the menu opens upward** / **dropdown hidden behind the status bar** / **it should drop down not up** | `SelectPicker` (`src/ui/form/SelectPicker.tsx`); `FloatingPanel` + its `drop` prop (`src/ui/FloatingPanel.tsx`); `useFloatingPosition` (`src/ui/hooks/useFloatingPosition.ts`). [→](overview.md#custom-dropdown) |
 
 ## Sync and storage status
 

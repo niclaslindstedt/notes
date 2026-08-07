@@ -665,10 +665,20 @@ export function MarkdownEditor({
   // `keydown` that precedes the `beforeinput` rather than from its `inputType`.
   // `insertLineBreak` vs `insertParagraph` is meant to say exactly this, but the
   // two are not reliably split that way across browsers in a plaintext-only
-  // host — and getting it wrong would stop plain Enter continuing a list. Left
-  // false wherever no keydown arrived (a soft keyboard, which has no Shift+Enter
-  // to report anyway).
+  // host — and getting it wrong would stop plain Enter continuing a list.
+  //
+  // Read through `takeSoftBreak`, which **consumes** it. Only a keydown ever
+  // sets this flag, so a `beforeinput` that arrives without one (a soft
+  // keyboard, an autocorrect commit, a dictated line break) would otherwise
+  // inherit whatever the *last* physical press happened to say — a Shift+Enter
+  // minutes ago silently turning a later plain Enter into a soft break.
   const softBreak = useRef(false);
+
+  function takeSoftBreak(): boolean {
+    const soft = softBreak.current;
+    softBreak.current = false;
+    return soft;
+  }
 
   // The single source of edits. Every mutation the browser proposes — typing,
   // autocorrect, delete, word/line delete, Enter — is intercepted here and
@@ -717,7 +727,7 @@ export function MarkdownEditor({
         blocksRef.current,
         line,
         pts.start.col,
-        softBreak.current,
+        takeSoftBreak(),
       );
       // Emptying the row is a bare-caret answer (Enter on an empty list item);
       // with a range to delete, Enter splits like any other press.
