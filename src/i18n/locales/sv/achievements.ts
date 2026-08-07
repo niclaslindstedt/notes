@@ -51,6 +51,13 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "En antecknings titel är ett eget fält högst upp; allt nedanför är brödtexten. Anteckningar visar Markdown medan du skriver.",
     },
+    emphasis: {
+      name: "Betoning",
+      condition:
+        "Märk upp ett ord som fetstilt, kursivt, överstruket eller kod.",
+      learnMore:
+        "Omge ett ord med `**` för fetstil, `*` för kursiv, `~~` för överstruket eller bakåtfnuttar för kod, så formaterar redigeraren det medan du skriver. Raden du står på behåller formateringen den också — markörerna dyker bara upp bredvid, nedtonade, så att du ser vad som håller ordet uppe och kan ta bort det igen.",
+    },
     headliner: {
       name: "Rubriksättaren",
       condition: "Ge en anteckning en titel.",

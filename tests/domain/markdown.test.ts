@@ -6,10 +6,12 @@ import {
   codeBlockEdges,
   fencedRanges,
   hasClosedFence,
+  hasEmphasis,
   hasMultiLineQuote,
   hasNestedListItem,
   hiddenFenceLines,
   parseInline,
+  rawLineSegments,
   shortenUrl,
   type InlineNode,
 } from "../../src/domain/markdown.ts";
@@ -504,5 +506,170 @@ describe("shortenUrl", () => {
     const url = "https://host.example/" + "a".repeat(40);
     const out = shortenUrl(url, 4);
     expect(out.length).toBeLessThanOrEqual(url.length);
+  });
+});
+
+describe("rawLineSegments", () => {
+  // The active line's DOM text *is* the source, so a caret offset into it reads
+  // as a source column directly. Every case below must hold this invariant.
+  function segmentsOf(source: string, line = 0) {
+    const blocks = classifyLines(source);
+    const block = blocks[line]!;
+    const segments = rawLineSegments(block);
+    expect(segments.map((s) => block.raw.slice(s.from, s.to)).join("")).toBe(
+      block.raw,
+    );
+    return segments.map((s) => ({
+      text: block.raw.slice(s.from, s.to),
+      marks: s.marks,
+    }));
+  }
+
+  it("keeps the delimiters visible and marks them as markup", () => {
+    expect(segmentsOf("a **b** c")).toEqual([
+      { text: "a ", marks: [] },
+      { text: "**", marks: ["strong", "markup"] },
+      { text: "b", marks: ["strong"] },
+      { text: "**", marks: ["strong", "markup"] },
+      { text: " c", marks: [] },
+    ]);
+  });
+
+  it("marks all three asterisks of a bold-italic run", () => {
+    // `***x***` is one run wearing both marks, and each mark knows only its own
+    // delimiter's width — so neither alone covers the middle asterisk.
+    expect(segmentsOf("***x***")).toEqual([
+      { text: "***", marks: ["strong", "em", "markup"] },
+      { text: "x", marks: ["strong", "em"] },
+      { text: "***", marks: ["strong", "em", "markup"] },
+    ]);
+  });
+
+  it("nests an italic run inside a bold one", () => {
+    expect(segmentsOf("**a *b* c**")).toEqual([
+      { text: "**", marks: ["strong", "markup"] },
+      { text: "a ", marks: ["strong"] },
+      { text: "*", marks: ["strong", "em", "markup"] },
+      { text: "b", marks: ["strong", "em"] },
+      { text: "*", marks: ["strong", "em", "markup"] },
+      { text: " c", marks: ["strong"] },
+      { text: "**", marks: ["strong", "markup"] },
+    ]);
+  });
+
+  it("takes both tildes of a strikethrough", () => {
+    expect(segmentsOf("~~gone~~")).toEqual([
+      { text: "~~", marks: ["strikethrough", "markup"] },
+      { text: "gone", marks: ["strikethrough"] },
+      { text: "~~", marks: ["strikethrough", "markup"] },
+    ]);
+  });
+
+  it("marks the backticks of inline code", () => {
+    expect(segmentsOf("run `npm ci` now")).toEqual([
+      { text: "run ", marks: [] },
+      { text: "`", marks: ["code", "markup"] },
+      { text: "npm ci", marks: ["code"] },
+      { text: "`", marks: ["code", "markup"] },
+      { text: " now", marks: [] },
+    ]);
+  });
+
+  it("dims a link's brackets and target but not its label", () => {
+    expect(segmentsOf("[docs](https://x.io)")).toEqual([
+      { text: "[", marks: ["link", "markup"] },
+      { text: "docs", marks: ["link"] },
+      { text: "](https://x.io)", marks: ["link", "markup"] },
+    ]);
+  });
+
+  it("treats a bare URL as all content — there is no syntax to dim", () => {
+    expect(segmentsOf("see https://x.io end")).toEqual([
+      { text: "see ", marks: [] },
+      { text: "https://x.io", marks: ["link"] },
+      { text: " end", marks: [] },
+    ]);
+  });
+
+  it("dims an image's syntax around its alt text", () => {
+    expect(segmentsOf("![shot](attachments/a/b.png)")).toEqual([
+      { text: "![", marks: ["markup"] },
+      { text: "shot", marks: [] },
+      { text: "](attachments/a/b.png)", marks: ["markup"] },
+    ]);
+  });
+
+  it("marks a block marker so the content reads as the content", () => {
+    expect(segmentsOf("## Title")).toEqual([
+      { text: "## ", marks: ["markup"] },
+      { text: "Title", marks: [] },
+    ]);
+    expect(segmentsOf("- item")).toEqual([
+      { text: "- ", marks: ["markup"] },
+      { text: "item", marks: [] },
+    ]);
+    expect(segmentsOf("> quoted")).toEqual([
+      { text: "> ", marks: ["markup"] },
+      { text: "quoted", marks: [] },
+    ]);
+  });
+
+  it("styles inline markup inside a list item's content", () => {
+    expect(segmentsOf("- a **b**")).toEqual([
+      { text: "- ", marks: ["markup"] },
+      { text: "a ", marks: [] },
+      { text: "**", marks: ["strong", "markup"] },
+      { text: "b", marks: ["strong"] },
+      { text: "**", marks: ["strong", "markup"] },
+    ]);
+  });
+
+  it("takes a rule as markup end to end", () => {
+    expect(segmentsOf("---")).toEqual([{ text: "---", marks: ["markup"] }]);
+  });
+
+  it("leaves a fenced block's lines verbatim — inside a fence nothing is markup", () => {
+    expect(segmentsOf("```\n**not bold**\n```", 1)).toEqual([
+      { text: "**not bold**", marks: [] },
+    ]);
+    expect(segmentsOf("```js\ncode\n```", 0)).toEqual([
+      { text: "```js", marks: ["markup"] },
+    ]);
+  });
+
+  it("leaves an unclosed delimiter as plain text", () => {
+    expect(segmentsOf("**oops")).toEqual([{ text: "**oops", marks: [] }]);
+  });
+
+  it("returns nothing for an empty line", () => {
+    expect(rawLineSegments(classifyLines("")[0]!)).toEqual([]);
+  });
+});
+
+describe("hasEmphasis", () => {
+  it("sees each of the four inline marks", () => {
+    expect(hasEmphasis("a **b** c")).toBe(true);
+    expect(hasEmphasis("a *b* c")).toBe(true);
+    expect(hasEmphasis("a ~~b~~ c")).toBe(true);
+    expect(hasEmphasis("a `b` c")).toBe(true);
+  });
+
+  it("ignores markup that never closes", () => {
+    expect(hasEmphasis("**oops")).toBe(false);
+    expect(hasEmphasis("a ` b")).toBe(false);
+  });
+
+  it("ignores a horizontal rule and a bullet's own marker", () => {
+    expect(hasEmphasis("***")).toBe(false);
+    expect(hasEmphasis("* an item\n* another")).toBe(false);
+  });
+
+  it("ignores markup inside a fenced code block", () => {
+    expect(hasEmphasis("```\n**not markup**\n```")).toBe(false);
+    expect(hasEmphasis("```\ncode\n```\n**yes**")).toBe(true);
+  });
+
+  it("says no for prose with no delimiter in it at all", () => {
+    expect(hasEmphasis("just a plain note\nover two lines")).toBe(false);
   });
 });
