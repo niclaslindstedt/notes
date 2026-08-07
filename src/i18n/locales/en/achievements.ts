@@ -166,6 +166,12 @@ const achievements = {
       learnMore:
         "Pressing Enter on a bullet or numbered row opens the next one, so a list is written straight through — and Tab on a row nests it under the row above (Shift+Tab pulls it back out). An empty item ends the list: one Enter steps a nested item back out a level, the next clears the row. Shift+Enter opens another row inside the item you are on instead of starting a new one.",
     },
+    checkedOff: {
+      name: "Checked off",
+      condition: "Tick a checkbox off in a note.",
+      learnMore:
+        "A list row written `- [ ] milk` renders as a real checkbox. Press it and the item is ticked off there and then — the caret never moves onto the line, so nothing opens and no keyboard comes up on a phone. The tick is written straight into the Markdown as `- [x]`, so it travels with the note wherever it syncs. Enter on a task row opens the next one, always unticked.",
+    },
     plainText: {
       name: "Plain and simple",
       condition: "Turn live Markdown rendering off.",

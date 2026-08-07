@@ -36,6 +36,7 @@ import {
   codeBlockCopyAnchors,
   codeBlockEdges,
   hiddenFenceLines,
+  toggleTaskLine,
   type LineBlock,
 } from "../domain/markdown.ts";
 import {
@@ -70,7 +71,12 @@ import {
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { codeBlockEdgeClass, lineTextClass } from "./markdown-line-class.ts";
 import { CodeCopyButton } from "./CodeCopyButton.tsx";
-import { RawLine, RenderedLine, type LineHighlight } from "./MarkdownLine.tsx";
+import {
+  RawLine,
+  RenderedLine,
+  TASK_TOGGLE_ATTR,
+  type LineHighlight,
+} from "./MarkdownLine.tsx";
 import {
   extractSourceRange,
   snapStartToLineEdge,
@@ -1112,6 +1118,31 @@ export function MarkdownEditor({
     activate(last, 0);
   }
 
+  // --- Task items ----------------------------------------------------------
+  //
+  // Tick `lines[index]`'s checkbox off (or back on) by flipping its `[ ]` in
+  // the source. Deliberately *not* routed through `commit`: the whole point of
+  // the gesture is to check something off without opening the editor, so this
+  // touches neither the active line nor the caret — no raw line appears, and
+  // no soft keyboard comes up on a phone. That it can skip the caret entirely
+  // is `toggleTaskLine`'s doing: `[ ]` and `[x]` are the same width, so every
+  // column in the note still means what it did (see `domain/markdown.ts`).
+  //
+  // The arming a touch press did on the way in is dropped too — nothing here
+  // moves the caret, so there is no line to reveal, and leaving it set would
+  // yank the view on whatever the *next* tap happens to be.
+  function toggleTask(index: number) {
+    const cur = linesRef.current;
+    const flipped = toggleTaskLine(cur[index] ?? "");
+    if (flipped === null) return;
+    revealPending.current = false;
+    const next = [...cur];
+    next[index] = flipped;
+    const joined = next.join("\n");
+    setValue(joined);
+    onChange(joined);
+  }
+
   // --- Where a press lands the caret ---------------------------------------
   //
   // The browser's own placement is exact to the pixel, which is what a mouse
@@ -1132,6 +1163,20 @@ export function MarkdownEditor({
   // not move the caret — dragging a selection handle, a long-press selection —
   // never produce one.
   function onSurfaceClick(e: ReactMouseEvent<HTMLElement>) {
+    // A press on a task item's checkbox ticks it off instead of landing a
+    // caret. Checked before the `defaultPrevented` bail below because the
+    // checkbox itself cancels the press (that is what keeps the caret — and
+    // the soft keyboard — away); the line is the one the box is drawn on.
+    const box = (e.target as Element | null)?.closest?.(
+      `[${TASK_TOGGLE_ATTR}]`,
+    );
+    if (box) {
+      const onLine = lineIndexOf(
+        box.closest("[data-line-index]") as HTMLElement | null,
+      );
+      if (onLine !== null) toggleTask(onLine);
+      return;
+    }
     // A press the content already answered (a link opened, an attachment
     // opened) or one no pointer made (a keyboard-synthesised click).
     if (e.defaultPrevented || e.detail === 0) return;
@@ -1503,6 +1548,7 @@ export function MarkdownEditor({
                     shortenLinkChars={shortenLinkChars}
                     highlights={highlightsByLine.get(index)}
                     edgeClass={edgeClass}
+                    interactiveTasks
                   />
                   {code !== undefined && (
                     <CodeCopyButton

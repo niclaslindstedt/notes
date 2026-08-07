@@ -474,7 +474,8 @@ column); a shortened bare URL also carries `data-len` (its full source length).
 `markdownLineClass` (`src/ui/markdown-line-class.ts`) maps a block kind to its
 CSS classes. List items indent by their `depth` and pick a marker from it: an
 unordered item cycles through the three [bullet characters](#bullet-characters)
-(`•` → `-` → `+`), an ordered item shows its computed sequential `marker`.
+(`•` → `-` → `+`), an ordered item shows its computed sequential `marker`, and a
+[task item](#task-items) draws a pressable checkbox in place of the bullet.
 
 A rendered **link** (and an inline image) is the exception to click-to-caret:
 inside the contenteditable surface a plain click would drop the caret (turning
@@ -569,7 +570,11 @@ the start value and rotating the style by depth (decimal → lower-alpha →
 lower-roman, `1.` → `a.` → `i.`). Blank lines are skipped so a gap between items
 keeps a list going; any other non-list line ends it. A line that is just a
 single `-` (as well as `---`/`***`/`___`) classifies as an `hr`, a quick divider
-without counting out three dashes.
+without counting out three dashes. An unordered item whose text opens with a
+`[ ]` / `[x]` box is a [task item](#task-items) and carries a `task` flag; the
+box is folded into the block marker, so `contentStart` — and every inline
+offset past it — behaves exactly as on a bare bullet (and on the [styled raw
+line](#styled-raw-line) the whole `- [x] ` dims as the markup it is).
 
 It is pure (no DOM/IO) and fast enough to run on every
 keystroke, which is why it lives in `domain/`.
@@ -894,6 +899,9 @@ answer carries the marker across, exactly as written:
 - **A numbered item** bumps its number by one (`2. ` → `3. `, `9) ` → `10) `),
   so the source reads the way it renders. The preview renumbers regardless
   (`numberLists`), so a hand-edited file is never a column of `1.`.
+- **A [task item](#task-items)** carries its `[ ]` box over too, but always an
+  empty one — `- [x] milk` opens `- [ ] `, never a row that arrives
+  pre-ticked.
 - **Splitting mid-row** carries the tail into the new item, the same as a
   quote: `- one|two` → `- one` / `- two`.
 - **A caret still inside the marker** isn't in the item at all — Enter there
@@ -963,6 +971,75 @@ platform; the `◦` / `▪` the list used to cycle through are **not** in that
 font, so a device substituted them from another font and drew them off-centre.
 The marker sits in a fixed-width, one-line-tall flex box centred on both axes,
 which keeps every level's text starting at the same column.
+
+### Task items
+
+A list row written `- [ ] milk` (or `- [x] milk`) is a **task item**: the live
+preview draws it with a real, pressable checkbox instead of a bullet, and
+pressing that checkbox ticks the item off in the Markdown itself.
+
+`classifyLine` (`src/domain/markdown.ts`) matches `TASK_RE` against whatever
+follows the bullet and, on a hit, sets `LineBlock.task` to the box's state
+(`false` for `[ ]`, `true` for `[x]` / `[X]`) — absent on every other line, a
+bare bullet included, so `task !== undefined` is what says "this row is a
+checkbox". The box counts as part of the **block marker**, not the content:
+`contentStart` points past it, so the item's text renders and its inline
+offsets map exactly as on any other list row, and nesting / numbering /
+indenting all keep working untouched. `- []`, `- [todo]`, and an ordered
+`1. [ ]` are deliberately *not* task rows.
+
+`TaskCheckbox` (`src/ui/MarkdownLine.tsx`) draws the marker, reusing the app's
+own checkbox artwork — `CheckboxGlyph` from the [shared
+framework](#the-shared-framework), re-exported through `src/ui/form/Checkbox.tsx`
+— so a note's checkboxes are the same accent-filled box as every checkbox in
+Settings. It sits in the same fixed-width, one-line-tall `MARKER_BOX` the bullet
+glyph does, so a mixed list keeps one text column; a nested item draws the
+smaller box. A ticked item's text is struck through and dimmed. The
+`aria-hidden` bullet is replaced by a `role="checkbox"` press target carrying
+`TASK_TOGGLE_ATTR` (`data-task-toggle`), which is how the press is routed.
+
+**Ticking one off never opens the editor.** That is the whole point of the
+gesture — on a phone, checking off a shopping item shouldn't raise the soft
+keyboard. Two things get it there:
+
+- The checkbox cancels its own `mousedown`, exactly as a [rendered
+  link](#rendered-line) does, so the browser never places a caret with the
+  press and the row never becomes the raw active line.
+- `onSurfaceClick` (`src/ui/MarkdownEditor.tsx`) looks for
+  `TASK_TOGGLE_ATTR` on the way up from the click **before** its
+  `defaultPrevented` bail (the checkbox is what cancelled the press), resolves
+  the row from the enclosing `[data-line-index]`, and calls `toggleTask`. The
+  press is routed through the DOM rather than a callback prop because
+  `RenderedLine` is memoized on its block's primitive fields, and the editor
+  already resolves a pressed line this way.
+
+`toggleTask` deliberately does **not** go through `commit`: it rewrites the one
+line via the pure `toggleTaskLine` and pushes the new body out, touching neither
+the active line nor the caret. It can skip the caret arithmetic entirely because
+`[ ]` and `[x]` are the same three characters wide — the swap is
+length-preserving, so every column in the note still means what it did. The
+touch-reveal a press armed is dropped too, since there is no line to scroll to.
+
+Read-only surfaces (the archive's [note view](#archive-view)) leave
+`RenderedLine`'s `interactiveTasks` off, and the box renders as inert state —
+labelled "Done" / "Not done" — rather than as a control that would do nothing.
+
+The row the caret is *on* shows its source instead, so there is no checkbox to
+press there — the `[x]` is right in front of you to type over. Because the box
+is part of the block marker, the [styled raw line](#styled-raw-line) dims the
+whole `- [x] ` as one markup run, exactly as it dims a `- ` or a `## `.
+
+Enter on a task row opens the next one with an **empty** box: `listItemAt`
+(`src/domain/markdown-format.ts`) unticks the marker it carries over, so a
+checklist is written straight through and no fresh item arrives pre-ticked
+(see [list continuation](#list-continuation)). An empty task row ends the list
+like any other empty item. There is no toolbar button for task rows — the
+[styling toolbar](#styling-toolbar)'s bullet button strips the whole marker,
+box included, when it un-lists a row.
+
+`hasCheckedTask(body)` is the cheap, fence-aware line-level scan behind the
+**Checked off** [achievement](#unlock-triggers), which fires the first time a
+note holds a ticked item.
 
 ### Format on save
 

@@ -82,4 +82,23 @@ describe("ReadOnlyNote", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
+
+  it("draws a task item's box as state, not as a control", () => {
+    // The archive is read-only, so the checkbox shows whether the item is
+    // done rather than offering a press that would go nowhere.
+    render(
+      <ReadOnlyNote
+        note={note({ body: "- [x] milk\n- [ ] bread" })}
+        editor={DEFAULT_EDITOR_SETTINGS}
+        onBack={vi.fn()}
+        onRestore={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    expect(screen.getByLabelText("Done")).toBeTruthy();
+    expect(screen.getByLabelText("Not done")).toBeTruthy();
+    expect(screen.getByText("milk")).toBeTruthy();
+  });
 });

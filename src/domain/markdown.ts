@@ -47,6 +47,14 @@ export type LineBlock = {
    * (numeric → alpha → roman). Falls back to `ordinal` when unset.
    */
   marker?: string;
+  /**
+   * A **task item**'s ticked state: `false` for `- [ ] milk`, `true` for
+   * `- [x] milk`. Absent on every other line, a plain bullet included — so
+   * `task !== undefined` is what says "this row is a checkbox". The `[ ]` is
+   * part of the block marker, not the content: `contentStart` points past it,
+   * so the text renders (and its inline offsets map) as on any other item.
+   */
+  task?: boolean;
   /** The text after any block marker — the part inline parsing runs over. */
   content: string;
   /** Column in `raw` where `content` begins (so leaf offsets stay absolute). */
@@ -59,6 +67,11 @@ const UL_RE = /^(\s*)([-*+])(\s+)(.*)$/;
 const OL_RE = /^(\s*)(\d+[.)])(\s+)(.*)$/;
 const QUOTE_RE = /^(\s*>\s?)(.*)$/;
 const FENCE_RE = /^\s*(```|~~~)/;
+// The `[ ]` / `[x]` box that turns a list item into a task item, matched
+// against what follows the bullet. The trailing gap is part of the marker (so
+// the item's text starts after it), and a box with nothing after it is still a
+// task — an empty row waiting to be typed into.
+const TASK_RE = /^\[([ xX])\](?:[ \t]+|$)/;
 
 /**
  * Split `body` into one `LineBlock` per line, tracking fenced-code state so
@@ -336,6 +349,49 @@ export function hasNestedListItem(body: string): boolean {
   return false;
 }
 
+/**
+ * Flip a task item's box — `- [ ] milk` ↔ `- [x] milk` — returning the new
+ * line, or null when `raw` isn't a task row. This is what a press on the
+ * rendered checkbox does to the source.
+ *
+ * The swap is **length-preserving** by construction (`[ ]` and `[x]` are the
+ * same three characters wide), which is why ticking an item needs no caret
+ * arithmetic at all: every column in the note, on this line and every other,
+ * still means what it did before.
+ */
+export function toggleTaskLine(raw: string): string | null {
+  const ul = UL_RE.exec(raw);
+  if (!ul) return null;
+  const task = TASK_RE.exec(ul[4]!);
+  if (!task) return null;
+  // The state character sits one past the `[`, which opens right after the
+  // bullet and its gap.
+  const at = ul[1]!.length + ul[2]!.length + ul[3]!.length + 1;
+  const flipped = task[1] === " " ? "x" : " ";
+  return raw.slice(0, at) + flipped + raw.slice(at + 1);
+}
+
+/**
+ * Whether `body` holds a **ticked** task item. A line-level scan rather than a
+ * full `classifyLines` pass for the same reason as {@link hasClosedFence}, and
+ * fence-aware so a `- [x]` inside a code block isn't counted.
+ */
+export function hasCheckedTask(body: string): boolean {
+  let inFence = false;
+  for (const raw of body.split("\n")) {
+    if (FENCE_RE.test(raw)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const ul = UL_RE.exec(raw);
+    if (!ul) continue;
+    const task = TASK_RE.exec(ul[4]!);
+    if (task && task[1] !== " ") return true;
+  }
+  return false;
+}
+
 // Second pass over the classified blocks: assign every `ul`/`ol` item a nesting
 // `depth` from its indentation, and every `ol` item a sequential `marker`. The
 // per-line classifier can't do this — the displayed number of `1.`/`1.` (→ `1.`
@@ -496,11 +552,26 @@ function classifyLine(raw: string): LineBlock {
     const indent = ul[1]!;
     const bullet = ul[2]!;
     const gap = ul[3]!;
+    const rest = ul[4]!;
+    const bulletEnd = indent.length + bullet.length + gap.length;
+    // `- [ ] milk` / `- [x] milk` — a task item. The box counts as part of the
+    // marker, so the item's text (and every inline offset in it) begins after
+    // it, exactly as it does after a bare bullet.
+    const task = TASK_RE.exec(rest);
+    if (task) {
+      return {
+        kind: "ul",
+        raw,
+        task: task[1] !== " ",
+        content: rest.slice(task[0].length),
+        contentStart: bulletEnd + task[0].length,
+      };
+    }
     return {
       kind: "ul",
       raw,
-      content: ul[4]!,
-      contentStart: indent.length + bullet.length + gap.length,
+      content: rest,
+      contentStart: bulletEnd,
     };
   }
   const ol = OL_RE.exec(raw);

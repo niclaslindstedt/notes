@@ -417,6 +417,16 @@ export function ListOrderedGlyph({ className }: IconProps) {
   );
 }
 
+// A tick inside a box — a task item's checkbox, ticked off.
+export function CheckSquareGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" />
+      <path d="m8.5 11.5 3 3 8-8.5" />
+    </Svg>
+  );
+}
+
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;

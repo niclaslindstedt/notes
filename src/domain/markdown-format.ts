@@ -208,8 +208,12 @@ function listItemAt(
   const block = blocks[index];
   if (!block) return null;
   if (block.kind === "ul" || block.kind === "ol") {
+    const prefix = block.raw.slice(0, block.contentStart);
     return {
-      prefix: block.raw.slice(0, block.contentStart),
+      // A task item's marker carries its `[ ]` box onto the next row — but
+      // always an *empty* one. Carrying the tick over would hand every fresh
+      // item a state nobody put there.
+      prefix: block.task === true ? prefix.replace(/\[[xX]\]/, "[ ]") : prefix,
       content: block.content,
       ordered: block.kind === "ol",
     };
@@ -236,6 +240,8 @@ function listItemAt(
  *   act — press Quote to unmark the row, or put the caret on a row that isn't
  *   quoted.
  * - **A bullet** carries its own `- ` / `* ` / `+ `, at its own indent.
+ * - **A task item** carries its `- [ ] ` box too, always unticked, so a
+ *   checklist is written straight through and each new row starts open.
  * - **A numbered item** carries its number bumped by one (`2. ` → `3. `), so
  *   the source reads the way it renders; the preview renumbers regardless.
  *

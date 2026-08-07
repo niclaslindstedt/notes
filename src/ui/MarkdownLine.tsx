@@ -9,9 +9,11 @@ import {
   type LineBlock,
 } from "../domain/markdown.ts";
 import { youtubeVideo } from "../domain/youtube.ts";
+import { useT } from "../i18n/index.ts";
 import { FileAttachment } from "./attachments/FileAttachment.tsx";
 import { InlineImage } from "./attachments/InlineImage.tsx";
 import { useAttachmentsContext } from "./attachments/context.ts";
+import { CheckboxGlyph } from "./form/Checkbox.tsx";
 import { lineTextClass, rawMarkClass } from "./markdown-line-class.ts";
 import { YouTubeEmbed } from "./YouTubeEmbed.tsx";
 
@@ -118,6 +120,86 @@ function bulletGlyph(depth = 0): string {
 // at the top level so the row keeps its natural margin.
 function indentStyle(depth = 0): { marginLeft: string } | undefined {
   return depth > 0 ? { marginLeft: `${depth * 1.25}em` } : undefined;
+}
+
+/**
+ * Marks the press target of a task item's checkbox. The editor catches the
+ * press by looking for this attribute on the way up from the click
+ * (`MarkdownEditor.onSurfaceClick`) rather than through a callback prop —
+ * `RenderedLine` is memoized on its block's primitive fields, so a handler
+ * threaded down per line would have to be compared too, and the line the press
+ * landed on is exactly what the editor already resolves from
+ * `[data-line-index]`.
+ */
+export const TASK_TOGGLE_ATTR = "data-task-toggle";
+
+// The marker box every list item's glyph sits in: fixed width, exactly one
+// text line tall, centred on both axes. Shared by the bullet and the task
+// checkbox so a mixed list keeps one text column.
+const MARKER_BOX =
+  "flex h-[1lh] w-[1.25em] shrink-0 items-center justify-center";
+
+/**
+ * A task item's checkbox — the app's own checkbox artwork (`CheckboxGlyph`,
+ * accent-filled when ticked) drawn in place of the bullet glyph.
+ *
+ * When `interactive` it is a press target that ticks the item off **without
+ * opening the editor**: the press is taken on `mousedown` so the caret never
+ * moves onto the line and no soft keyboard comes up, and the editor flips the
+ * `[ ]` in the source on the click that follows. Read-only surfaces (the
+ * archive's note view) render the same box as inert state instead of a control
+ * that would do nothing.
+ *
+ * A nested item draws the smaller box, mirroring how its bullet glyph and
+ * indent already read as subordinate to its parent's.
+ */
+function TaskCheckbox({
+  checked,
+  depth = 0,
+  interactive,
+}: {
+  checked: boolean;
+  depth?: number;
+  interactive: boolean;
+}) {
+  const t = useT();
+  const glyph = (
+    <CheckboxGlyph checked={checked} size={depth > 0 ? "sm" : "md"} />
+  );
+  if (!interactive) {
+    return (
+      <span
+        role="img"
+        aria-label={t(checked ? "app.task.done" : "app.task.todo")}
+        className={`${MARKER_BOX} select-none`}
+      >
+        {glyph}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      {...{ [TASK_TOGGLE_ATTR]: "" }}
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={t("app.task.toggle")}
+      // Out of the tab order for the reason the line-number gutter's buttons
+      // are: a checklist of any length would otherwise be that many tab stops
+      // between the note body and whatever follows it. The keyboard route to
+      // an item is the source itself — put the caret on the row and the line
+      // renders raw, `[x]` and all.
+      tabIndex={-1}
+      // Take the press before the browser places a caret with it, so ticking
+      // an item off never turns its line into the raw active one (and never
+      // raises the soft keyboard on a phone). The click that follows still
+      // reaches the editor, which does the actual toggle.
+      onMouseDown={(e) => e.preventDefault()}
+      className={`${MARKER_BOX} cursor-pointer select-none`}
+    >
+      {glyph}
+    </button>
+  );
 }
 
 function renderInline(
@@ -329,6 +411,7 @@ function RenderedLineImpl({
   shortenLinkChars = 0,
   highlights = NO_HIGHLIGHTS,
   edgeClass = "",
+  interactiveTasks = false,
 }: {
   block: LineBlock;
   /** Trim bare URLs to this many characters either side (0 = show in full). */
@@ -341,6 +424,12 @@ function RenderedLineImpl({
    * slab is its lines' stacked backgrounds, so its box is closed here.
    */
   edgeClass?: string;
+  /**
+   * Whether a task item's checkbox can be pressed to tick it off. Set by the
+   * editor, which owns the source; a read-only surface leaves it off and the
+   * box draws as state rather than as a control.
+   */
+  interactiveTasks?: boolean;
 }) {
   const sizeClass = lineTextClass(block);
 
@@ -372,23 +461,38 @@ function RenderedLineImpl({
     case "ul":
       return (
         <div className="flex gap-2" style={indentStyle(block.depth)}>
-          {/* A fixed-width marker box exactly one text line tall, with the
-              glyph centred in both axes: every level's text starts at the same
-              column, and the marker sits on the first text line's centre. The
-              `1lh` height must live on this span (which keeps the text's line
-              height) — `leading-none` belongs on the inner glyph only, or it
-              would collapse `1lh` to 1em and the marker would ride high. Every
-              glyph lives in the app font, so this centres identically on every
-              platform without per-glyph tuning. */}
-          <span
-            aria-hidden
-            className="flex h-[1lh] w-[1.25em] items-center justify-center text-accent select-none"
-          >
-            <span className="text-[1.15em] leading-none">
-              {bulletGlyph(block.depth)}
+          {block.task === undefined ? (
+            /* A fixed-width marker box exactly one text line tall, with the
+               glyph centred in both axes: every level's text starts at the same
+               column, and the marker sits on the first text line's centre. The
+               `1lh` height must live on this span (which keeps the text's line
+               height) — `leading-none` belongs on the inner glyph only, or it
+               would collapse `1lh` to 1em and the marker would ride high. Every
+               glyph lives in the app font, so this centres identically on every
+               platform without per-glyph tuning. */
+            <span
+              aria-hidden
+              className={`${MARKER_BOX} text-accent select-none`}
+            >
+              <span className="text-[1.15em] leading-none">
+                {bulletGlyph(block.depth)}
+              </span>
             </span>
-          </span>
-          <span className="min-w-0 flex-1">
+          ) : (
+            <TaskCheckbox
+              checked={block.task}
+              depth={block.depth}
+              interactive={interactiveTasks}
+            />
+          )}
+          <span
+            className={`min-w-0 flex-1 ${
+              // A ticked item reads as done: struck through and dimmed, the way
+              // a paper list is crossed off. Purely visual — the source keeps
+              // whatever was typed.
+              block.task === true ? "text-muted line-through" : ""
+            }`}
+          >
             {inlineContent(block, shortenLinkChars, highlights)}
           </span>
         </div>
@@ -491,8 +595,10 @@ export const RenderedLine = memo(
   (a, b) =>
     a.shortenLinkChars === b.shortenLinkChars &&
     a.edgeClass === b.edgeClass &&
+    a.interactiveTasks === b.interactiveTasks &&
     sameHighlights(a.highlights, b.highlights) &&
     a.block.kind === b.block.kind &&
+    a.block.task === b.block.task &&
     a.block.raw === b.block.raw &&
     a.block.content === b.block.content &&
     a.block.contentStart === b.block.contentStart &&

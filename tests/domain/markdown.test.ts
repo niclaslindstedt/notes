@@ -5,6 +5,7 @@ import {
   codeBlockCopyAnchors,
   codeBlockEdges,
   fencedRanges,
+  hasCheckedTask,
   hasClosedFence,
   hasEmphasis,
   hasMultiLineQuote,
@@ -13,6 +14,7 @@ import {
   parseInline,
   rawLineSegments,
   shortenUrl,
+  toggleTaskLine,
   type InlineNode,
 } from "../../src/domain/markdown.ts";
 
@@ -343,6 +345,84 @@ describe("hasNestedListItem", () => {
 
   it("ignores indented dashes inside a fenced code block", () => {
     expect(hasNestedListItem("```\n- a\n  - b\n```")).toBe(false);
+  });
+});
+
+describe("classifyLines — task items", () => {
+  it("reads the box as part of the marker, not the content", () => {
+    const [todo, done] = classifyLines("- [ ] milk\n- [x] bread");
+    expect(todo).toMatchObject({ kind: "ul", task: false, content: "milk" });
+    expect(done).toMatchObject({ kind: "ul", task: true, content: "bread" });
+    // `contentStart` points past the box, so an inline offset on a task row
+    // maps back to the same column it would on a bare bullet.
+    expect(todo!.contentStart).toBe("- [ ] ".length);
+    expect(done!.contentStart).toBe("- [x] ".length);
+  });
+
+  it("accepts an uppercase tick, either bullet, and any indent", () => {
+    expect(classifyLines("* [X] a")[0]).toMatchObject({
+      task: true,
+      content: "a",
+    });
+    expect(classifyLines("  + [ ] a")[0]).toMatchObject({
+      task: false,
+      content: "a",
+      depth: 0,
+    });
+  });
+
+  it("treats a box with nothing after it as an empty task", () => {
+    expect(classifyLines("- [ ]")[0]).toMatchObject({
+      kind: "ul",
+      task: false,
+      content: "",
+    });
+  });
+
+  it("leaves a bare bullet and a bracket that isn't a box alone", () => {
+    expect(classifyLines("- milk")[0]!.task).toBeUndefined();
+    const empty = classifyLines("- [] milk")[0]!;
+    expect(empty.task).toBeUndefined();
+    expect(empty.content).toBe("[] milk");
+    expect(classifyLines("- [todo] milk")[0]!.task).toBeUndefined();
+  });
+
+  it("keeps a nested task item's depth and inline parsing", () => {
+    const blocks = classifyLines("- [ ] a\n  - [x] **b**");
+    expect(blocks[1]).toMatchObject({ task: true, depth: 1, content: "**b**" });
+  });
+});
+
+describe("toggleTaskLine", () => {
+  it("flips the box both ways, leaving the rest of the line verbatim", () => {
+    expect(toggleTaskLine("- [ ] milk")).toBe("- [x] milk");
+    expect(toggleTaskLine("- [x] milk")).toBe("- [ ] milk");
+    expect(toggleTaskLine("  * [X] buy **milk**")).toBe("  * [ ] buy **milk**");
+  });
+
+  it("keeps the line the same length, so no column moves", () => {
+    const raw = "\t+ [ ] a [link](http://x.y)";
+    expect(toggleTaskLine(raw)).toHaveLength(raw.length);
+  });
+
+  it("answers null for a line that isn't a task row", () => {
+    expect(toggleTaskLine("- milk")).toBeNull();
+    expect(toggleTaskLine("[ ] milk")).toBeNull();
+    expect(toggleTaskLine("1. [ ] milk")).toBeNull();
+    expect(toggleTaskLine("")).toBeNull();
+  });
+});
+
+describe("hasCheckedTask", () => {
+  it("finds a ticked task item anywhere in the body", () => {
+    expect(hasCheckedTask("")).toBe(false);
+    expect(hasCheckedTask("- [ ] a\n- [ ] b")).toBe(false);
+    expect(hasCheckedTask("intro\n- [ ] a\n  - [x] b")).toBe(true);
+    expect(hasCheckedTask("* [X] a")).toBe(true);
+  });
+
+  it("ignores a ticked box inside a fenced code block", () => {
+    expect(hasCheckedTask("```\n- [x] a\n```")).toBe(false);
   });
 });
 

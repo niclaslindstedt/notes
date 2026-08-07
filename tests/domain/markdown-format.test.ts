@@ -388,6 +388,29 @@ describe("newlineFor", () => {
     expect(enterAt("- onetwo", 0, 5)).toEqual(inserts("\n- "));
   });
 
+  it("opens another task row, always with an empty box", () => {
+    expect(enterAt("- [ ] milk", 0, 10)).toEqual(inserts("\n- [ ] "));
+    // The tick never travels: a fresh item starts open, whatever the row
+    // above it ended up as.
+    expect(enterAt("- [x] milk", 0, 10)).toEqual(inserts("\n- [ ] "));
+    expect(enterAt("  * [X] milk", 0, 12)).toEqual(inserts("\n  * [ ] "));
+  });
+
+  it("clears an empty task row, so Enter twice leaves the checklist", () => {
+    expect(enterAt("- [ ] a\n- [ ] ", 1, 6)).toEqual({
+      kind: "replaceLine",
+      line: "",
+    });
+  });
+
+  it("keeps the whole box in the marker, so Enter inside it pushes the row down", () => {
+    expect(enterAt("- [ ] milk", 0, 3)).toEqual(inserts("\n"));
+  });
+
+  it("blanks the box out with the rest of the marker on Shift+Enter", () => {
+    expect(softAt("- [x] milk", 0, 10)).toEqual(inserts("\n      "));
+  });
+
   it("bumps the number on an ordered item", () => {
     expect(enterAt("1. item", 0, 7)).toEqual(inserts("\n2. "));
     expect(enterAt("9. item", 0, 7)).toEqual(inserts("\n10. "));

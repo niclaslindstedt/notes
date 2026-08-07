@@ -481,6 +481,53 @@ describe("MarkdownEditor", () => {
     });
   });
 
+  describe("task items", () => {
+    // The checkboxes of every rendered task row, in source order.
+    function boxes(): HTMLElement[] {
+      return screen.queryAllByRole("checkbox");
+    }
+
+    it("draws a checkbox per task row, ticked to match the source", () => {
+      renderEditor("- [ ] milk\n- [x] bread\n", { focusOnMount: false });
+      expect(boxes().map((b) => b.getAttribute("aria-checked"))).toEqual([
+        "false",
+        "true",
+      ]);
+      // The box is the marker: the row's text renders without it.
+      expect(screen.getByText("milk")).not.toBeNull();
+    });
+
+    it("ticks the item off in the source when its box is pressed", () => {
+      const { onChange } = renderEditor("- [ ] milk\n- [ ] bread\n", {
+        focusOnMount: false,
+      });
+      fireEvent.click(boxes()[1]!);
+      expect(onChange).toHaveBeenCalledWith("- [ ] milk\n- [x] bread\n");
+      expect(boxes().map((b) => b.getAttribute("aria-checked"))).toEqual([
+        "false",
+        "true",
+      ]);
+    });
+
+    it("unticks a ticked item on a second press", () => {
+      const { onChange } = renderEditor("- [x] milk", { focusOnMount: false });
+      fireEvent.click(boxes()[0]!);
+      expect(onChange).toHaveBeenLastCalledWith("- [ ] milk");
+    });
+
+    it("does not open the editor on the line it ticked", () => {
+      // The point of the gesture: no raw line, so no caret and no soft
+      // keyboard. The press is cancelled on mousedown, before the browser
+      // would place a caret with it.
+      renderEditor("- [ ] milk\n- [ ] bread\n", { focusOnMount: false });
+      const box = boxes()[0]!;
+      const down = fireEvent.mouseDown(box);
+      expect(down).toBe(false); // preventDefault()ed
+      fireEvent.click(box);
+      expect(rawLine()).toBeNull();
+    });
+  });
+
   describe("styling on the active line", () => {
     it("bolds a run while keeping its asterisks on screen", () => {
       renderEditor("a **b** c");
@@ -502,6 +549,18 @@ describe("MarkdownEditor", () => {
       expect(raw.textContent).toBe("## Title");
       const marker = raw.querySelector("span")!;
       expect(marker.textContent).toBe("## ");
+      expect(marker.className).toContain("opacity-60");
+    });
+
+    it("dims a task row's whole box along with its bullet", () => {
+      // The `[x]` is part of the block marker, so stepping onto a task row
+      // shows `- [x] ` as the markup it is rather than splitting the box off
+      // into content.
+      renderEditor("- [x] milk");
+      const raw = rawLine()!;
+      expect(raw.textContent).toBe("- [x] milk");
+      const marker = raw.querySelector("span")!;
+      expect(marker.textContent).toBe("- [x] ");
       expect(marker.className).toContain("opacity-60");
     });
 
