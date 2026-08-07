@@ -13,6 +13,109 @@ predate the pipeline.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-07
+
+### Added
+
+- **Files that aren't notes** — notes now spots files in your synced folder that don't belong to any note — and
+  instead of quietly deleting them on the next save, asks whether to import each
+  one as a note, delete it, or leave it be.
+- **Styling toolbar** — The formatting button at the top right of a note opens a toolbar above the text — headings, bold, italic, strikethrough, inline code, lists, quotes, code blocks, indent and outdent, links, images and dividers, every one a toggle.
+- **Cut button** — A scissors button beside the copy button (and Ctrl/Cmd+K) cuts to the clipboard: the selection, the whole line the cursor is on, or just the text after a mid-line cursor.
+- **Browser back and forward** — Moving between notes now leaves a step in your browser's history, so Back
+  returns you to the note you were reading before (and Forward takes you on
+  again) — the Android back button included.
+- **Every note has a link** — The note you have open now has its own address, so you can copy it — out of
+  the address bar, or with the new "Copy link" entry in a note's right-click
+  menu — and reopen that exact note later from a bookmark or a message to
+  yourself.
+- **Line numbers** — The editor can number every line down its left edge, code-editor style, where pressing a number selects that whole line — switch it on under Settings → Editor → Markdown.
+- **Find in note** — The magnifier in a note's header opens a search bar under the top bar that
+  highlights every verbatim, case-insensitive match in the note you have open and
+  steps between them with previous / next arrows and a match counter.
+- **Quotes continue on Enter** — Pressing Enter inside a quote opens another quote row, so a long passage is
+  typed straight through — the quote keeps going until you press Quote to unmark
+  the row or move the caret to a row that isn't quoted.
+- **Copy a code block** — Every closed code block now carries a copy button in its top-right corner that
+  puts the code — and nothing else — on your clipboard in one tap, without
+  placing the cursor in the note; blocks gained rounded corners and a little
+  breathing room at their top and bottom to hold it.
+- **Tickable checkboxes** — A list row written `- [ ] milk` now renders as a real checkbox you can press to
+  tick the item off — writing `- [x]` straight into the Markdown, without opening
+  the editor or raising the keyboard.
+- **Desktop app for Windows, macOS, and Linux** — Every release now ships downloadable desktop builds — Windows, Linux, and macOS
+  for both Intel and Apple Silicon — that run the same app in its own window
+  instead of a browser tab.
+- **YouTube links play in the note** — A YouTube link on its own line now renders as a video player — every link shape
+  works and the tracking parameters are trimmed, nothing loads from YouTube until
+  you press play, and a button lifts the player into widescreen over a blurred
+  note without losing your place in the video.
+- **Lists continue on Enter and nest on Tab** — Pressing Enter on a bullet or numbered row opens the next one (numbers counting
+  up), Tab and Shift+Tab nest and unnest a row, Enter on an empty item steps back
+  out of the list, and Shift+Enter adds another line to the item you are already
+  on.
+- **Emphasis achievement** — Marking a word up as bold, italic, struck through, or code now unlocks a trophy.
+- **Checklist block style** — The formatting toolbar's block menu now offers **Checklist** beside Bullet list
+  and Numbered list, so a `- [ ]` row can be written without typing the brackets
+  on a phone keyboard.
+
+### Changed
+
+- **Archived notes get their own folder** — On a folder or cloud backend, archived notes now sync into an `archived/`
+  subfolder instead of sitting beside your active notes, so the folder on disk
+  matches the list in the app.
+- **Sync log newest first** — The sync log in the cloud-sync modal now lists the most recent entry at the
+  top, so what just happened is visible without scrolling.
+- **Tidier code blocks** — A finished ``` code block now hides its fence lines and renders as a shaded
+  block, bringing the delimiters back whenever the caret moves inside it.
+- **The styling toolbar shows what the cursor is in** — Bold, italic, strikethrough and inline code now light up whenever the cursor
+  sits inside such a phrase — with no selection needed — and pressing a lit
+  button takes that formatting off the whole run.
+- **Aimable taps in the editor** — Tapping the note body now lands the caret at the end of the word your finger
+  hit — and at the end of the line for a horizontal rule, which previously could
+  not be erased on a phone at all — while a mouse click keeps its exact position.
+- **Cloud glyph moved to the side menu** — The cloud sync glyph has moved out of every screen's top bar into the side
+  menu's button island, right of the search button, so it is one control in one
+  place instead of one per screen.
+- **Clear button is now a circled cross** — The button that empties the search field is drawn as a cross inside a circle so
+  it no longer reads as a second copy of the modal's close button sitting right
+  next to it.
+- **Formatting stays on the line you're editing** — The row the cursor is on now keeps its Markdown formatting instead of dropping to plain text — a bold word stays bold, with its `**` shown faintly beside it so you can see them and delete them.
+
+### Fixed
+
+- **Snug side-menu footer** — The side-menu footer and its collapse rail now sit flush against the foot of the drawer — collapsed, the rail rests snug against the bottom, and the footer carries an extra 10px of thumb clearance below Settings instead of a dead safe-area strip.
+- **Edge-to-edge iOS PWA** — The installed iOS app now paints all the way under the home indicator instead of leaving a dead black band below the shell, so the side menu reaches the bottom of the screen.
+- **Settings footer thumb reach** — The settings dialog's Reset / Cancel / Save row now keeps its breathing room above the iOS home indicator instead of sitting flush against the screen edge after the edge-to-edge change.
+- **Sidebar top alignment** — The side menu's first row now lines up with the controls in the main content's header, instead of sitting a notch too high on devices with a status-bar safe-area inset.
+- **Editor tab order** — Tab now moves from a note's title straight into its body, and on from the body
+  to the copy and sync buttons, instead of walking the header first.
+- **Typing a backtick no longer blanks the editor** — Typing a character composed by a dead key — a backtick or an accent on the Nordic keyboard layouts — no longer crashes the note editor to a black screen, and neither does an IME composition on an empty line.
+- **⌘/Ctrl+Z works again while you're typing in a note** — The undo and redo shortcuts had stopped answering while the caret sat in the
+  editor, so they only worked after clicking the side menu's Undo button had
+  moved focus out of it.
+- **Erasing a whole note no longer blanks the app** — Erasing everything in a note — whether by iOS's "Select All" from the text-selection callout, or by backspacing down to the empty "start writing" prompt and pressing it once more — no longer crashes the app to a black screen that only a cold restart clears, and any crash that does slip through now offers a reload button instead of a blank page.
+- **Readable, copyable crash screen** — The crash screen now fits the screen properly on phones — safe-area insets on
+  all four edges, its own scrolling so long error details stay reachable — and a
+  **Copy report** button puts the error, the component stack, and the recent log
+  on the clipboard.
+- **Typing that went nowhere** — A keystroke the editor couldn't place — and the non-editable attachments block
+  parked at the end of the note, which the browser could rewrite out from under
+  the editor — no longer leave the note refusing input or the app on the crash
+  screen.
+- **Tapping into a long line lands where you tapped** — Placing the caret in a sentence that wraps across several screens now scrolls to
+  the caret instead of jumping to the same spot no matter where you tapped.
+- **Toolbar menus drop down** — The styling toolbar's menus no longer flip above the toolbar when the soft
+  keyboard shortens the screen, where their first rows were drawn off the top
+  edge and out of reach.
+- **Enter always leaves an empty list item** — Pressing Enter on an empty bullet, numbered or checklist row now always ends the
+  list, instead of sometimes leaving the empty row behind and indenting the cursor
+  under it on phone keyboards.
+
+### Removed
+
+- **Folder picker in the editor header** — The folder button beside the note title is gone — file a note by dragging it onto a folder in the side menu.
+
 ## [1.4.0] - 2026-07-18
 
 ### Added
