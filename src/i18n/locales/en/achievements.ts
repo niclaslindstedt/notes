@@ -57,6 +57,12 @@ const achievements = {
       learnMore:
         "A note's title is its own field at the top; everything below it is the body. Notes render Markdown as you write.",
     },
+    emphasis: {
+      name: "Emphasis",
+      condition: "Mark a word up as bold, italic, struck through, or code.",
+      learnMore:
+        "Wrap a word in `**` for bold, `*` for italic, `~~` to strike it through, or backticks for code, and the editor formats it as you type. The line you're actually on keeps that formatting too — the markers simply come into view beside it, dimmed, so you can see what's holding the word up and take it off again.",
+    },
     headliner: {
       name: "Headliner",
       condition: "Give a note a title.",

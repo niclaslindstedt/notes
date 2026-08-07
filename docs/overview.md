@@ -209,7 +209,9 @@ while a sibling `<span>` draws the tick off the `:checked` state.
 editor, built on **one `contenteditable` surface** (not a stack of per-line
 inputs). Every line except the one the caret is on renders as formatted Markdown
 (`RenderedLine`); the caret's line renders as raw source (the `data-raw`
-`ActiveLine`) so it can be edited verbatim. Because the whole note is a single
+`ActiveLine`) so it can be edited verbatim — though it is
+[styled while raw](#styled-raw-line), so the markup comes into view without the
+formatting going out of it. Because the whole note is a single
 editable element, the browser owns caret movement — **arrow keys glide across a
 wrapped line's visual rows natively** — whole-document selection (**Ctrl/Cmd+A**),
 and **touch selection across lines on mobile**; the older per-line `<textarea>`
@@ -485,6 +487,49 @@ backspace into it — the raw `[text](url)` source then shows in the active line
 like any other text. Links are rendered `draggable={false}` so dragging across
 one starts a text selection instead of a native link drag.
 
+### Styled raw line
+
+`RawLine` (`src/ui/MarkdownLine.tsx`) — the other half of the live preview: the
+**active** line, shown as verbatim source so it can be edited, but wearing its
+Markdown while it is. Stepping the caret onto `a **bold** word` no longer drops
+the whole line back to flat grey text — the word stays bold and the `**` simply
+come into view beside it, dimmed, ready to be typed over or deleted. The block
+marker gets the same treatment: `## `, `- `, `> ` and `1. ` are dimmed while the
+heading keeps its size and weight, so the line reads as what it will become
+rather than as what it is made of. A fenced block's interior is the exception —
+inside a fence nothing is Markdown, so those lines stay untouched.
+
+The split of work follows the usual seam. `rawLineSegments`
+(`src/domain/markdown.ts`) is the pure half: it walks the line's inline nodes,
+paints a mark (`strong`, `em`, `strikethrough`, `code`, `link`, `markup`) over
+each one's **source** span — delimiters included, which is what the `InlineSpan`
+on every marked-up node is for — and returns the line tiled into runs of equal
+marks. `rawMarkClass` (`src/ui/markdown-line-class.ts`) turns one run's marks
+into classes, and `RawLine` emits a `<span>` per marked run (an unmarked run
+stays a bare text node).
+
+Two rules keep this from breaking the editor underneath it:
+
+- **The rendered text is the source, exactly.** Nothing is added, elided, or
+  reordered; the segments tile `[0, raw.length)` with no gaps. The editor reads
+  a DOM offset into this element as a source column *directly* (see
+  [selection mapping](#selection-mapping) and `contenteditable-caret.ts`), so
+  one invented character would misplace every edit after it on the line.
+- **No mark may move text.** Only weight, slant, decoration, colour and a
+  background are honoured — never a size or padding change. The run sits in the
+  line the caret is walking through, and a wider glyph mid-line would shift
+  every column after it as the caret crosses in and out of the run. (A heading's
+  size change is fine because it applies to the whole line via `lineTextClass`,
+  which the rendered line uses too — which is exactly why landing on a heading
+  causes no reflow.)
+
+Markup dims by `opacity` rather than by taking a colour of its own, so a `**`
+inside bold text keeps that text's colour and only steps back — visible enough
+to aim a caret at, which is the whole point of showing it. Where two marks would
+both set a colour (a link inside bold), `rawMarkClass` picks the winner
+explicitly: two `text-*` utilities on one element are resolved by stylesheet
+order, not by the order they are listed.
+
 ### Markdown parser
 
 `src/domain/markdown.ts` — a dependency-free, pragmatic Markdown subset.
@@ -504,8 +549,11 @@ The four marked-up constructs — `strong`, `em`, `strikethrough`, `code` — al
 carry an `InlineSpan`: the source columns of the *whole* run, delimiters
 included. That is what lets a caret column be asked which runs it sits inside,
 which the [styling toolbar](#styling-toolbar) lights its buttons from and its
-presses unwrap by. A `***x***` is one run wearing two marks, so its `strong` and
-its `em` share one span and each is taken off by its own delimiter's width.
+presses unwrap by, and which `rawLineSegments` paints the [active
+line](#styled-raw-line)'s styling over. A `***x***` is one run wearing two
+marks, so its `strong` and its `em` share one span and each is taken off by its
+own delimiter's width — which is why `rawLineSegments` measures a delimiter run
+off the source rather than trusting either mark's width alone.
 
 A ` ``` ` line toggles the fenced state, so the lines between a pair of them
 classify as `code` and are never reparsed as Markdown; `fencedRanges` /
@@ -525,7 +573,8 @@ single `-` (as well as `---`/`***`/`___`) classifies as an `hr`, a quick divider
 without counting out three dashes. An unordered item whose text opens with a
 `[ ]` / `[x]` box is a [task item](#task-items) and carries a `task` flag; the
 box is folded into the block marker, so `contentStart` — and every inline
-offset past it — behaves exactly as on a bare bullet.
+offset past it — behaves exactly as on a bare bullet (and on the [styled raw
+line](#styled-raw-line) the whole `- [x] ` dims as the markup it is).
 
 It is pure (no DOM/IO) and fast enough to run on every
 keystroke, which is why it lives in `domain/`.
@@ -974,6 +1023,11 @@ touch-reveal a press armed is dropped too, since there is no line to scroll to.
 Read-only surfaces (the archive's [note view](#archive-view)) leave
 `RenderedLine`'s `interactiveTasks` off, and the box renders as inert state —
 labelled "Done" / "Not done" — rather than as a control that would do nothing.
+
+The row the caret is *on* shows its source instead, so there is no checkbox to
+press there — the `[x]` is right in front of you to type over. Because the box
+is part of the block marker, the [styled raw line](#styled-raw-line) dims the
+whole `- [x] ` as one markup run, exactly as it dims a `- ` or a `## `.
 
 Enter on a task row opens the next one with an **empty** box: `listItemAt`
 (`src/domain/markdown-format.ts`) unticks the marker it carries over, so a

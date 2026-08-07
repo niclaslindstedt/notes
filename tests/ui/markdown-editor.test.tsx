@@ -41,12 +41,28 @@ function rawLine(): HTMLElement | null {
   return surface().querySelector("[data-raw]");
 }
 
-// Point the collapsed caret at `offset` inside a line element's first text node.
+// Point the collapsed caret at column `offset` of a line element's text.
+//
+// The active line is a run of styled spans over its raw source (`RawLine`), so
+// a column doesn't necessarily land in the first child — this walks the text
+// nodes to find the one holding it, the same way the editor's own `placeCaret`
+// does.
 function caretIn(lineEl: HTMLElement, offset: number) {
-  const node = lineEl.firstChild ?? lineEl;
+  const walker = document.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT);
+  let node: Node = lineEl;
+  let remaining = offset;
+  let text = walker.nextNode() as Text | null;
+  while (text) {
+    if (remaining <= text.data.length) {
+      node = text;
+      break;
+    }
+    remaining -= text.data.length;
+    text = walker.nextNode() as Text | null;
+  }
   const sel = window.getSelection()!;
   const range = document.createRange();
-  range.setStart(node, offset);
+  range.setStart(node, remaining);
   range.collapse(true);
   sel.removeAllRanges();
   sel.addRange(range);
@@ -509,6 +525,60 @@ describe("MarkdownEditor", () => {
       expect(down).toBe(false); // preventDefault()ed
       fireEvent.click(box);
       expect(rawLine()).toBeNull();
+    });
+  });
+
+  describe("styling on the active line", () => {
+    it("bolds a run while keeping its asterisks on screen", () => {
+      renderEditor("a **b** c");
+      const raw = rawLine()!;
+      // Verbatim first: the source is what the caret is measured against.
+      expect(raw.textContent).toBe("a **b** c");
+      const bold = [...raw.querySelectorAll("span")].filter((el) =>
+        el.className.includes("font-bold"),
+      );
+      expect(bold.map((el) => el.textContent)).toEqual(["**", "b", "**"]);
+      // The delimiters stay legible — they're what you aim at to remove them.
+      expect(bold[0]!.className).toContain("opacity-60");
+      expect(bold[1]!.className).not.toContain("opacity-60");
+    });
+
+    it("dims a block marker without moving the content after it", () => {
+      renderEditor("## Title");
+      const raw = rawLine()!;
+      expect(raw.textContent).toBe("## Title");
+      const marker = raw.querySelector("span")!;
+      expect(marker.textContent).toBe("## ");
+      expect(marker.className).toContain("opacity-60");
+    });
+
+    it("dims a task row's whole box along with its bullet", () => {
+      // The `[x]` is part of the block marker, so stepping onto a task row
+      // shows `- [x] ` as the markup it is rather than splitting the box off
+      // into content.
+      renderEditor("- [x] milk");
+      const raw = rawLine()!;
+      expect(raw.textContent).toBe("- [x] milk");
+      const marker = raw.querySelector("span")!;
+      expect(marker.textContent).toBe("- [x] ");
+      expect(marker.className).toContain("opacity-60");
+    });
+
+    it("leaves an unmarked line as one bare text node", () => {
+      renderEditor("just prose");
+      const line = rawLine()!;
+      expect(line.textContent).toBe("just prose");
+      expect(line.querySelector("span")).toBeNull();
+    });
+
+    it("still splits at the caret's column through the styled runs", () => {
+      // The spans must not shift what a DOM offset means in source columns.
+      const { onChange } = renderEditor("a **b** c");
+      // Column 5 is the end of the `b` run — a different text node from the
+      // line's first, which is the whole point.
+      caretIn(rawLine()!, 5);
+      beforeInput("insertParagraph");
+      expect(onChange).toHaveBeenLastCalledWith("a **b\n** c");
     });
   });
 

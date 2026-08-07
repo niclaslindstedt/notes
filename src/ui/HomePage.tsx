@@ -77,19 +77,22 @@ export function HomePage() {
             <li>
               Write, edit, and organise plain-text notes — each with its own
               editable title (heading the page beside a back button) and a
-              Markdown body that formats as you type. New notes can be named
-              automatically by date and time or with a running number, and each
-              note is tidied as it's saved — trailing spaces trimmed and a
-              closing newline added, both optional in Settings. Long pasted
-              links can be shortened in the preview so they don't sprawl across
-              the note — the full link is still saved and still opens. Tapping
-              the text puts the cursor at the end of the word under your finger,
-              which is something a fingertip can actually aim at, while a mouse
-              click lands exactly where you point. Line numbers can be switched
-              on down the editor's left edge, code-editor style, where pressing
-              a number selects that whole line. While the app is open, hopping
-              between notes drops you back at the exact spot and cursor position
-              you left each one at.
+              Markdown body that formats as you type. The row the cursor is on
+              keeps its formatting like every other one — a bold word stays bold
+              while you edit it, with the markers that made it bold shown
+              faintly beside it so you can see them and take them off. New notes
+              can be named automatically by date and time or with a running
+              number, and each note is tidied as it's saved — trailing spaces
+              trimmed and a closing newline added, both optional in Settings.
+              Long pasted links can be shortened in the preview so they don't
+              sprawl across the note — the full link is still saved and still
+              opens. Tapping the text puts the cursor at the end of the word
+              under your finger, which is something a fingertip can actually aim
+              at, while a mouse click lands exactly where you point. Line
+              numbers can be switched on down the editor's left edge,
+              code-editor style, where pressing a number selects that whole
+              line. While the app is open, hopping between notes drops you back
+              at the exact spot and cursor position you left each one at.
             </li>
             <li>
               Reach for the formatting button at the top right of a note to open

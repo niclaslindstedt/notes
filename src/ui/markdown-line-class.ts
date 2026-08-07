@@ -1,4 +1,4 @@
-import type { CodeBlockEdges, LineBlock } from "../domain/markdown.ts";
+import type { CodeBlockEdges, LineBlock, RawMark } from "../domain/markdown.ts";
 
 // Font size / weight for a Markdown line's text, keyed off its block kind.
 // Shared between the rendered line (`MarkdownLine.tsx`) and the live editor's
@@ -29,6 +29,39 @@ export function lineTextClass(block: LineBlock): string {
     return "bg-surface-2 px-2 text-sm";
   }
   return "";
+}
+
+// The classes one run of the active line's **raw source** wears
+// (`rawLineSegments`), so `**bold**` reads bold with its asterisks still on
+// screen. Only the marks that don't move text are honoured — weight, slant,
+// decoration, colour — because the run sits in the line the caret is in, and a
+// size or padding change would shift every column after it as the caret walks
+// through.
+export function rawMarkClass(marks: readonly RawMark[]): string {
+  if (marks.length === 0) return "";
+  const has = (m: RawMark) => marks.includes(m);
+  const classes: string[] = [];
+  if (has("strong")) classes.push("font-bold");
+  if (has("em")) classes.push("italic");
+  if (has("strikethrough")) classes.push("line-through");
+  if (has("code")) classes.push("rounded bg-surface-2");
+  if (has("link")) classes.push("underline underline-offset-2");
+  // Exactly one colour: two `text-*` utilities on one element are resolved by
+  // stylesheet order, not by the order they're listed here, so which one won
+  // would be arbitrary. Pick the winner explicitly.
+  const colour = has("link")
+    ? "text-link"
+    : has("code") || has("strong")
+      ? "text-fg-bright"
+      : has("strikethrough")
+        ? "text-muted"
+        : "";
+  if (colour !== "") classes.push(colour);
+  // Markup steps back by fading rather than by taking a colour of its own, so
+  // it keeps the run's own colour (a dimmed `**` on bold text still reads as
+  // that text's markup) and stays legible enough to aim a caret at.
+  if (has("markup")) classes.push("opacity-60");
+  return classes.join(" ");
 }
 
 // The rounded corners and vertical padding a code block's outermost drawn

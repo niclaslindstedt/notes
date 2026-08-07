@@ -289,6 +289,38 @@ export function hasMultiLineQuote(body: string): boolean {
 }
 
 /**
+ * Whether `body` holds a **closed** inline emphasis run — `**bold**`,
+ * `*italic*`, `~~struck~~` or `` `code` ``. Fence-aware, so markup inside a
+ * code block doesn't count (nothing in there is Markdown).
+ *
+ * Unlike {@link hasClosedFence} this can't be decided by a line-shape test, so
+ * it parses — but only after a one-character gate rules out the overwhelming
+ * majority of notes, since the achievement watcher runs this over every note on
+ * every edit.
+ */
+export function hasEmphasis(body: string): boolean {
+  if (!/[*_~`]/.test(body)) return false;
+  let inFence = false;
+  for (const raw of body.split("\n")) {
+    if (FENCE_RE.test(raw)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    // A nested run implies a top-level one, so the shallow check is enough.
+    const marked = parseInline(raw).some(
+      (n) =>
+        n.type === "strong" ||
+        n.type === "em" ||
+        n.type === "strikethrough" ||
+        n.type === "code",
+    );
+    if (marked) return true;
+  }
+  return false;
+}
+
+/**
  * Whether `body` holds a list item nested under another one — an indented
  * bullet or numbered row with a shallower list row above it, which is what Tab
  * in the editor (and the toolbar's indent button) writes. A line-level scan for
@@ -777,6 +809,169 @@ export function shortenUrl(url: string, chars: number): string {
   }
   return `${head}${URL_ELLIPSIS}${tail}`;
 }
+
+// ---------------------------------------------------------------------------
+// Raw (active) line
+// ---------------------------------------------------------------------------
+
+/**
+ * A mark a run of **raw source** carries in the live-preview editor's active
+ * line — the one line shown verbatim so it can be edited. `markup` is a
+ * delimiter or block marker (`**`, `` ` ``, `[`, `](…)`, `## `, `- `): it stays
+ * on screen so it can be typed over or removed, but reads as the markup it is
+ * rather than as content.
+ */
+export type RawMark =
+  "strong" | "em" | "strikethrough" | "code" | "link" | "markup";
+
+/** A run of raw source columns `[from, to)` sharing one set of marks. */
+export type RawSegment = { from: number; to: number; marks: RawMark[] };
+
+const M_STRONG = 1;
+const M_EM = 2;
+const M_STRIKE = 4;
+const M_CODE = 8;
+const M_LINK = 16;
+const M_MARKUP = 32;
+
+const MARK_BITS: readonly [number, RawMark][] = [
+  [M_STRONG, "strong"],
+  [M_EM, "em"],
+  [M_STRIKE, "strikethrough"],
+  [M_CODE, "code"],
+  [M_LINK, "link"],
+  [M_MARKUP, "markup"],
+];
+
+/**
+ * Split a line's **verbatim source** into styled runs, so the editor's active
+ * line can wear its Markdown while still showing every delimiter — `**bold**`
+ * renders bold with the asterisks in place, ready to be deleted.
+ *
+ * The segments tile `[0, raw.length)` with no gaps and no overlaps, and their
+ * text concatenates back to `block.raw` exactly. That is load-bearing: the
+ * active line's DOM text *is* the source, which is what lets a caret offset
+ * into it be read as a source column directly (see `contenteditable-caret.ts`).
+ *
+ * A fenced block's lines are left as one unmarked run — inside a fence nothing
+ * is Markdown, and the slab already says so.
+ */
+export function rawLineSegments(block: LineBlock): RawSegment[] {
+  const raw = block.raw;
+  if (raw.length === 0) return [];
+  if (block.kind === "code") return [{ from: 0, to: raw.length, marks: [] }];
+  if (block.kind === "fence" || block.kind === "hr") {
+    return [{ from: 0, to: raw.length, marks: ["markup"] }];
+  }
+
+  const masks = new Uint8Array(raw.length);
+  const add = (from: number, to: number, bits: number) => {
+    for (let i = Math.max(0, from); i < Math.min(raw.length, to); i += 1) {
+      masks[i] = masks[i]! | bits;
+    }
+  };
+  add(0, block.contentStart, M_MARKUP);
+  for (const node of parseInline(block.content, block.contentStart)) {
+    markNode(node, raw, add);
+  }
+
+  const segments: RawSegment[] = [];
+  let start = 0;
+  for (let i = 1; i <= raw.length; i += 1) {
+    if (i < raw.length && masks[i] === masks[start]) continue;
+    segments.push({ from: start, to: i, marks: marksOf(masks[start]!) });
+    start = i;
+  }
+  return segments;
+}
+
+type AddMarks = (from: number, to: number, bits: number) => void;
+
+function markNode(node: InlineNode, raw: string, add: AddMarks): void {
+  switch (node.type) {
+    case "text":
+      return;
+    case "code":
+      add(node.span.from, node.span.to, M_CODE);
+      add(node.span.from, node.offset, M_MARKUP);
+      add(node.offset + node.text.length, node.span.to, M_MARKUP);
+      return;
+    case "link": {
+      if (node.bare) {
+        // A bare URL is all content — there is no syntax around it to dim.
+        add(node.offset, node.offset + node.text.length, M_LINK);
+        return;
+      }
+      // `node.offset` points just past the `[`, so the brackets and the whole
+      // `](href)` tail either side of the label are the markup.
+      const open = node.offset - 1;
+      const labelEnd = node.offset + node.text.length;
+      const end = labelEnd + "](".length + node.href.length + ")".length;
+      add(open, end, M_LINK);
+      add(open, node.offset, M_MARKUP);
+      add(labelEnd, end, M_MARKUP);
+      return;
+    }
+    case "image": {
+      const altStart = node.offset + "![".length;
+      const altEnd = altStart + node.alt.length;
+      const end = altEnd + "](".length + node.href.length + ")".length;
+      add(node.offset, altStart, M_MARKUP);
+      add(altEnd, end, M_MARKUP);
+      return;
+    }
+    case "strong":
+    case "em":
+    case "strikethrough": {
+      const bit =
+        node.type === "strong"
+          ? M_STRONG
+          : node.type === "em"
+            ? M_EM
+            : M_STRIKE;
+      add(node.span.from, node.span.to, bit);
+      // The delimiter width is measured off the source rather than inferred
+      // from the mark: `***x***` is one run wearing both marks, and each mark
+      // knows only its own delimiter's width, so neither alone accounts for all
+      // three asterisks.
+      add(
+        node.span.from,
+        node.span.from + delimRun(raw, node.span.from, 1),
+        M_MARKUP,
+      );
+      add(
+        node.span.to - delimRun(raw, node.span.to - 1, -1),
+        node.span.to,
+        M_MARKUP,
+      );
+      for (const child of node.children) markNode(child, raw, add);
+      return;
+    }
+  }
+}
+
+// How many copies of the delimiter character at `at` run in `step`'s direction,
+// capped at three (`***` is the longest marker there is).
+function delimRun(raw: string, at: number, step: 1 | -1): number {
+  const ch = raw.charAt(at);
+  if (ch === "") return 0;
+  let n = 0;
+  let i = at;
+  while (n < 3 && raw.charAt(i) === ch) {
+    n += 1;
+    i += step;
+  }
+  return n;
+}
+
+function marksOf(mask: number): RawMark[] {
+  if (mask === 0) return [];
+  return MARK_BITS.filter(([bit]) => (mask & bit) !== 0).map(
+    ([, mark]) => mark,
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 function matchEmphasis(
   text: string,

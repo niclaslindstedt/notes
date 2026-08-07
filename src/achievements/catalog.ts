@@ -9,6 +9,7 @@ import { isImageAttachment } from "../domain/attachment.ts";
 import {
   hasCheckedTask,
   hasClosedFence,
+  hasEmphasis,
   hasMultiLineQuote,
   hasNestedListItem,
 } from "../domain/markdown.ts";
@@ -20,6 +21,7 @@ import {
   BookmarkGlyph,
   BoxesGlyph,
   BroadcastGlyph,
+  BoldGlyph,
   BroomGlyph,
   CardsGlyph,
   CheckSquareGlyph,
@@ -93,6 +95,11 @@ const hasTitledNote = (snap: Snapshot) =>
 const hasCodeBlock = (snap: Snapshot) =>
   snap.notes.some((n) => hasClosedFence(n.body ?? ""));
 
+// A note holding an inline emphasis run — the trophy for marking a word up,
+// which the editor now keeps painted even on the line being typed.
+const hasMarkedUpNote = (snap: Snapshot) =>
+  snap.notes.some((n) => hasEmphasis(n.body ?? ""));
+
 // A quote running over two or more rows — what pressing Enter inside a quote
 // writes, so this is the trophy for discovering that a quote keeps going.
 const hasLongQuote = (snap: Snapshot) =>
@@ -157,6 +164,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       slices: (s) => [s.snapshot],
       predicate: (prev, next) =>
         !hasMultiLineNote(prev.snapshot) && hasMultiLineNote(next.snapshot),
+    },
+  },
+  {
+    id: "emphasis",
+    tier: "beginner",
+    glyph: BoldGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasMarkedUpNote(prev.snapshot) && hasMarkedUpNote(next.snapshot),
     },
   },
   {

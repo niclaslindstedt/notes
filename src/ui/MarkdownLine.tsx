@@ -1,8 +1,9 @@
-import { memo, type ReactNode } from "react";
+import { Fragment, memo, type ReactNode } from "react";
 
 import { attachmentFilenameFromHref } from "../domain/attachment.ts";
 import {
   parseInline,
+  rawLineSegments,
   shortenUrl,
   type InlineNode,
   type LineBlock,
@@ -13,7 +14,7 @@ import { FileAttachment } from "./attachments/FileAttachment.tsx";
 import { InlineImage } from "./attachments/InlineImage.tsx";
 import { useAttachmentsContext } from "./attachments/context.ts";
 import { CheckboxGlyph } from "./form/Checkbox.tsx";
-import { lineTextClass } from "./markdown-line-class.ts";
+import { lineTextClass, rawMarkClass } from "./markdown-line-class.ts";
 import { YouTubeEmbed } from "./YouTubeEmbed.tsx";
 
 // Presentational rendering for the live-preview editor: turns a parsed
@@ -21,6 +22,9 @@ import { YouTubeEmbed } from "./YouTubeEmbed.tsx";
 // *not* on. Leaf inline nodes carry their source-column `offset` through to a
 // `data-src` attribute so the editor can map a click on rendered text back to
 // a caret position in the raw source (see `MarkdownEditor.tsx`).
+//
+// `RawLine` at the foot is the other half: the *active* line, shown verbatim
+// but styled in place.
 //
 // A line can also be handed the find bar's hits for it, which are painted as
 // `<mark>` runs over the rendered text — see `markSource`.
@@ -546,6 +550,43 @@ function sameHighlights(
   return a.every(
     (h, i) =>
       h.from === b[i]!.from && h.to === b[i]!.to && h.active === b[i]!.active,
+  );
+}
+
+/**
+ * The **active** line's content: its source verbatim, styled in place — so
+ * `**bold**` is bold with the asterisks still there to be deleted, and the
+ * block marker (`## `, `- `, `> `) reads as the marker it is.
+ *
+ * The one hard rule is that the text rendered here concatenates back to
+ * `block.raw` exactly, with nothing added and nothing hidden. The editor reads
+ * a caret offset into this element as a source column directly (see
+ * `contenteditable-caret.ts`), so a single inserted or elided character would
+ * misplace every edit after it on the line. `rawLineSegments` guarantees the
+ * tiling; all this adds is the class on each run.
+ *
+ * An empty line falls back to a lone `<br>` so it keeps a full line-box and
+ * stays focusable.
+ */
+export function RawLine({ block }: { block: LineBlock }) {
+  if (block.raw === "") return <br />;
+  return (
+    <>
+      {rawLineSegments(block).map((seg) => {
+        const text = block.raw.slice(seg.from, seg.to);
+        const cls = rawMarkClass(seg.marks);
+        // An unmarked run stays a bare text node rather than an empty span:
+        // plain prose is the common case, and the caret walkers have that much
+        // less DOM to step through.
+        return cls === "" ? (
+          <Fragment key={seg.from}>{text}</Fragment>
+        ) : (
+          <span key={seg.from} className={cls}>
+            {text}
+          </span>
+        );
+      })}
+    </>
   );
 }
 
