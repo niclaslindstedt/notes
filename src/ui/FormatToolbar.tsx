@@ -466,6 +466,12 @@ function FormatMenu({
         onClose={() => setOpen(false)}
         triggerRef={triggerRef}
         placement={MENU_PLACEMENT}
+        // The toolbar is pinned directly under the editor header, so there is
+        // structurally nothing useful above it — and with the soft keyboard up
+        // the viewport is short enough that the default would flip the menu
+        // there and draw its first rows off the top of the screen. Down, and
+        // scrolling inside its own box if it must (see `FloatingPanel`).
+        drop="down"
         className="py-1"
       >
         <div ref={menuRef} role="menu" aria-label={group.label}>

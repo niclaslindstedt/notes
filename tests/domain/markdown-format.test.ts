@@ -461,6 +461,28 @@ describe("newlineFor", () => {
     expect(softAt("- [x] milk", 0, 10)).toEqual(inserts("\n      "));
   });
 
+  it("ends the list from an empty item even with Shift held", () => {
+    // Shift+Enter opens a row *inside* the item you are on — but an empty item
+    // has nothing for that row to hang under, so leaving the list wins. This
+    // is also the way out on a phone, where iOS auto-capitalisation leaves the
+    // keyboard's shift engaged at the start of a blank row and its Return
+    // reports a Shift nobody pressed.
+    const cleared = { kind: "replaceLine", line: "" };
+    expect(softAt("- [ ] a\n- [ ] ", 1, 6)).toEqual(cleared);
+    expect(softAt("- a\n- ", 1, 2)).toEqual(cleared);
+    expect(softAt("1. a\n2. ", 1, 3)).toEqual(cleared);
+    // ...and a nested one still steps out a level first, as plain Enter does.
+    expect(softAt("- [ ] a\n  - [ ] ", 1, 8)).toEqual({
+      kind: "replaceLine",
+      line: "- [ ] ",
+    });
+  });
+
+  it("still opens a continuation row from an item that has content", () => {
+    expect(softAt("- [ ] milk", 0, 10)).toEqual(inserts("\n      "));
+    expect(softAt("- milk", 0, 6)).toEqual(inserts("\n  "));
+  });
+
   it("bumps the number on an ordered item", () => {
     expect(enterAt("1. item", 0, 7)).toEqual(inserts("\n2. "));
     expect(enterAt("9. item", 0, 7)).toEqual(inserts("\n10. "));

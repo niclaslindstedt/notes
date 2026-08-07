@@ -911,7 +911,11 @@ Lists, unlike quotes, are **not sticky** — an endless column of empty bullets
 is nobody's intent. Enter on an **empty item** ends the list instead of opening
 another: one press pulls a nested item back out a level (`  - ` → `- `), the
 next clears the row to a blank line, so repeated Enter walks out of the list
-the same way Tab walked into it. That is the one case `newlineFor` answers with
+the same way Tab walked into it. This is decided **before** the Shift+Enter
+branch below, so an empty item ends the list whether or not Shift is held —
+there is no content for a continuation row to hang under, and on a phone this
+is the one row where the modifier is least trustworthy (see the soft-break
+note below) and the way out matters most. That is the one case `newlineFor` answers with
 a `replaceLine` rather than an `insert` — it rewrites the caret's row instead of
 splicing at the caret — and it is a bare-caret answer only; with a range to
 delete, Enter splits like any other press.
@@ -938,8 +942,17 @@ Which of the two a press was is read from the `keydown` that precedes the
 `inputType`. `insertLineBreak` vs `insertParagraph` is meant to say exactly
 this, but the two aren't reliably split that way across browsers in a
 `plaintext-only` host, and getting it wrong would stop plain Enter continuing a
-list. A soft keyboard, which sends no such keydown, has no Shift+Enter to
-report anyway.
+list.
+
+The flag is read through `takeSoftBreak`, which **consumes** it. Only a keydown
+ever sets it, so an edit that arrives without one — a soft keyboard, an
+autocorrect commit, a dictated line break — would otherwise inherit whatever
+the *last* physical press said, a Shift+Enter minutes ago silently turning a
+later plain Enter into a soft break. A soft keyboard's Shift is not reliable
+even when it does send a keydown: iOS auto-capitalises at the start of a line,
+which leaves the on-screen shift engaged and reports `shiftKey` on the Return
+that follows. That is why the empty-item exit above is decided ahead of this
+branch rather than behind it.
 
 **Tab** on a list row indents it; **Shift+Tab** pulls it back out. `indentList`
 (`src/ui/MarkdownEditor.tsx`) routes straight to the toolbar's own
@@ -2307,6 +2320,25 @@ above the trigger when there isn't room below), the Escape/outside-click
 dismissal (`useEscapeKey`, `DismissBackdrop`), and the `document.body` portal
 mount. Portalling keeps the menu out of the settings modal's `overflow-y-auto`
 body, so a picker on a control near the bottom of the modal isn't clipped.
+
+`src/ui/FloatingPanel.tsx` is a **wrapper** over the framework's component
+rather than a bare re-export, for one prop: `drop`. The framework flips a panel
+above its trigger when less than ~180px of viewport is left below it — right for
+a control in the middle of a page, wrong for one pinned near the top, because
+that branch has no viewport clamp (the below-branch clamps its `top` twice; the
+above-branch's height is `max(120, spaceAbove)`). A panel taller than the room
+above is therefore drawn straight off the top edge, and being `position: fixed`
+it cannot be scrolled back. The [styling toolbar](#styling-toolbar)'s menus hit
+exactly that on a phone: the toolbar sits directly under the header, the soft
+keyboard shortens the viewport past the flip threshold, and the menu's first
+rows disappear behind the status bar. Those menus pass `drop="down"`, which pins
+the panel below the trigger and clamps its height to what is left, so it scrolls
+inside its own box instead. Every other call site keeps the default `"auto"`,
+which delegates straight to the framework unchanged — the sidebar footer's
+[About dropdown](#folders-in-the-side-menu) in particular *wants* the flip, since
+it sits at the bottom of the screen. Only the vertical axis is the app's: the
+width and horizontal clamping still come from the framework's
+`computeFloatingRect`.
 
 ## Sync and storage status
 

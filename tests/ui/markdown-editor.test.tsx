@@ -168,6 +168,24 @@ describe("MarkdownEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith("- one\n  ");
   });
 
+  it("does not carry a Shift+Enter over to a later plain Enter", () => {
+    // Only a keydown sets the soft-break flag, so an edit arriving without one
+    // — a soft keyboard, an autocorrect commit, a dictated break — would
+    // otherwise inherit the last physical press's Shift.
+    const { onChange } = renderEditor("- one");
+    caretIn(rawLine()!, 5);
+    fireEvent.keyDown(surface(), { key: "Enter", shiftKey: true });
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("- one\n  ");
+
+    // Put the caret back on the bullet itself, then break with no keydown at
+    // all: a new bullet, not another continuation row.
+    caretIn(screen.getByText("one").firstChild as unknown as HTMLElement, 3);
+    act(() => document.dispatchEvent(new Event("selectionchange")));
+    beforeInput("insertParagraph");
+    expect(onChange).toHaveBeenLastCalledWith("- one\n- \n  ");
+  });
+
   it("does not quote the next row from an unquoted one", () => {
     const { onChange } = renderEditor("> quoted\nplain");
     caretIn(rawLine()!, 5);

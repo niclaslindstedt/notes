@@ -269,7 +269,9 @@ function listItemAt(
  * a plain line padded out to the item's text column, so it hangs under the
  * words above it (and `classifyLines` reads it as a continuation, keeping the
  * list's numbering and nesting going). In a quote it still carries the `> ` —
- * a quote row without the marker isn't in the quote at all.
+ * a quote row without the marker isn't in the quote at all. On an **empty**
+ * item it does nothing of the sort: there is no content for a continuation row
+ * to hang under, so leaving the list wins over the modifier.
  *
  * A caret still inside the marker isn't *in* the construct — Enter there pushes
  * the whole row down, exactly as on any other line.
@@ -291,22 +293,31 @@ export function newlineFor(
   }
   const item = listItemAt(blocks, index);
   if (!item) return plain;
+  // An **empty item ends the list, Shift or not.** Shift+Enter's job is to open
+  // another row *inside* the item you are on — but an empty item has no content
+  // for that row to hang under, so the gesture has nothing to mean there, while
+  // "let me out of this list" is exactly what a second Enter on a blank row is
+  // asking for. Deciding this ahead of `soft` also makes the way out immune to
+  // a Shift the user never pressed: iOS auto-capitalises at the start of a line,
+  // which leaves the on-screen keyboard's shift engaged, and its Return reports
+  // `shiftKey` — so on a phone the empty row is *always* the case where the
+  // modifier is least trustworthy and the way out matters most.
+  if (item.content === "") {
+    const outdented = outdentLine(item.prefix);
+    return {
+      kind: "replaceLine",
+      line: outdented === item.prefix ? "" : outdented,
+    };
+  }
   // The marker blanked out to spaces, leaving the line's own indent verbatim —
   // so a tab-indented item's continuation row is tab-indented too.
   if (soft) {
     return { kind: "insert", text: `\n${item.prefix.replace(/\S/g, " ")}` };
   }
-  if (item.content !== "") {
-    const marker = item.ordered
-      ? item.prefix.replace(/\d+/, (n) => String(Number.parseInt(n, 10) + 1))
-      : item.prefix;
-    return { kind: "insert", text: `\n${marker}` };
-  }
-  const outdented = outdentLine(item.prefix);
-  return {
-    kind: "replaceLine",
-    line: outdented === item.prefix ? "" : outdented,
-  };
+  const marker = item.ordered
+    ? item.prefix.replace(/\d+/, (n) => String(Number.parseInt(n, 10) + 1))
+    : item.prefix;
+  return { kind: "insert", text: `\n${marker}` };
 }
 
 /**
