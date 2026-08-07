@@ -36,6 +36,7 @@ import {
   codeBlockCopyAnchors,
   codeBlockEdges,
   hiddenFenceLines,
+  type LineBlock,
 } from "../domain/markdown.ts";
 import {
   applyFormat,
@@ -69,7 +70,7 @@ import {
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { codeBlockEdgeClass, lineTextClass } from "./markdown-line-class.ts";
 import { CodeCopyButton } from "./CodeCopyButton.tsx";
-import { RenderedLine, type LineHighlight } from "./MarkdownLine.tsx";
+import { RawLine, RenderedLine, type LineHighlight } from "./MarkdownLine.tsx";
 import {
   extractSourceRange,
   snapStartToLineEdge,
@@ -1453,7 +1454,7 @@ export function MarkdownEditor({
           className={`relative ${lineNumbers ? "pr-4 pl-14" : "px-4"} pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
           style={widthStyle}
         >
-          {lines.map((line, index) => {
+          {blocks.map((block, index) => {
             const edgeClass = codeBlockEdgeClass(codeEdges, index);
             if (index === clampedIndex) {
               return (
@@ -1468,11 +1469,11 @@ export function MarkdownEditor({
                   <ActiveLine
                     key={`active-${active.key}`}
                     index={index}
-                    text={line}
+                    block={block}
                     setRef={(el) => {
                       activeElRef.current = el;
                     }}
-                    className={`cursor-text ${wrapClass} ${lineTextClass(blocks[index]!)} ${edgeClass}`}
+                    className={`cursor-text ${wrapClass} ${lineTextClass(block)} ${edgeClass}`}
                   />
                 </LineRow>
               );
@@ -1498,7 +1499,7 @@ export function MarkdownEditor({
                   className={`cursor-text ${wrapClass} ${code === undefined ? "" : "relative"}`}
                 >
                   <RenderedLine
-                    block={blocks[index]!}
+                    block={block}
                     shortenLinkChars={shortenLinkChars}
                     highlights={highlightsByLine.get(index)}
                     edgeClass={edgeClass}
@@ -1598,16 +1599,22 @@ function LineRow({
 // caret is re-placed — so the browser never mutates it behind React's back
 // (which, left to its own devices, corrupts a contenteditable's structure). The
 // keyed remount on activation gives a clean node when the caret rolls to a new
-// line; within a line it just updates the text. A lone `<br>` keeps an empty
-// line tall and focusable.
+// line; within a line it just updates the text.
+//
+// Verbatim is not the same as unstyled: `RawLine` wears the line's Markdown
+// over the source, delimiters and all, so stepping the caret onto a bolded word
+// keeps it bold instead of dropping it back to plain text — the `**` simply
+// come into view alongside it. Its text still concatenates to `block.raw`
+// exactly, which is what keeps a DOM offset into this element readable as a
+// source column.
 function ActiveLine({
   index,
-  text,
+  block,
   className,
   setRef,
 }: {
   index: number;
-  text: string;
+  block: LineBlock;
   className: string;
   setRef: (el: HTMLDivElement | null) => void;
 }) {
@@ -1619,7 +1626,7 @@ function ActiveLine({
       suppressContentEditableWarning
       className={className}
     >
-      {text === "" ? <br /> : text}
+      <RawLine block={block} />
     </div>
   );
 }

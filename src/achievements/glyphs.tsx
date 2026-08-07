@@ -110,6 +110,17 @@ export function TypeGlyph({ className }: IconProps) {
   );
 }
 
+// A bold "B" — the emphasis marks the editor keeps painted on the line being
+// typed, delimiters and all.
+export function BoldGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M7 5h6a3.5 3.5 0 0 1 0 7H7z" />
+      <path d="M7 12h7a3.5 3.5 0 0 1 0 7H7z" />
+    </Svg>
+  );
+}
+
 export function ScaleTextGlyph({ className }: IconProps) {
   return (
     <Svg className={className}>
