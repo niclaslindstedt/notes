@@ -12,6 +12,7 @@
 // `notes.json` envelope in the app folder rather than markdown.
 
 import { createLogger } from "../../dev/logger.ts";
+import { GOOGLE_CLIENT_ID } from "../cloud-configured.ts";
 import type { StorageAdapter } from "../adapter.ts";
 import type { AttachmentEntry, AttachmentStore } from "../attachment-store.ts";
 import {
@@ -56,11 +57,8 @@ const log = createLogger("gdrive");
 // Public OAuth client id, read from a build-time env var so a fork can plug
 // in its own Google Cloud project. Unset means the Google Drive backend is
 // disabled in the picker.
-export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
-export function isGdriveConfigured(): boolean {
-  return GOOGLE_CLIENT_ID.length > 0;
-}
+export { GOOGLE_CLIENT_ID, isGdriveConfigured } from "../cloud-configured.ts";
 
 // `drive.file` lets the app see and manage only files it created. Files stay
 // visible to the user in Drive's UI.

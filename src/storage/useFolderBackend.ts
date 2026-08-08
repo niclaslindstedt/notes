@@ -21,7 +21,6 @@ import { createLogger } from "../dev/logger.ts";
 import type { StorageAdapter } from "./adapter.ts";
 import type { BackendId } from "./backend-preference.ts";
 import type { DirectoryCrypto } from "./directory-adapter.ts";
-import { createFolderAdapter } from "./folder/index.ts";
 import {
   clearDirectoryHandle,
   ensurePermission,
@@ -160,6 +159,10 @@ export function useFolderBackend(deps: FolderBackendDeps): FolderBackend {
       log.error("folder picker failed", err);
       return;
     }
+    // Fetched on the pick, not at boot: the folder adapter travels with the
+    // other remote backends (see `remote-backends.ts`), and this runs after
+    // the user has already been through the OS directory picker.
+    const { createFolderAdapter } = await import("./folder/index.ts");
     const folder = createFolderAdapter({
       directoryHandle: handle,
       namespace: active.activeNamespace,
@@ -204,6 +207,10 @@ export function useFolderBackend(deps: FolderBackendDeps): FolderBackend {
     const active = activeRef.current;
     if (folderHandle && active) {
       try {
+        // Fetched on the pick, not at boot: the folder adapter travels with the
+        // other remote backends (see `remote-backends.ts`), and this runs after
+        // the user has already been through the OS directory picker.
+        const { createFolderAdapter } = await import("./folder/index.ts");
         const folder = createFolderAdapter({
           directoryHandle: folderHandle,
           namespace: active.activeNamespace,

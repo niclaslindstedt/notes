@@ -17,13 +17,10 @@ import { useCallback, useMemo } from "react";
 import { createPinnedFetch } from "../platform/native-bridge.ts";
 import type { StorageAdapter } from "./adapter.ts";
 import type { BackendId, NotesdConfig } from "./backend-preference.ts";
-import { localCacheKey, withLocalCache } from "./cache/index.ts";
 import type { DirectoryCrypto } from "./directory-adapter.ts";
-import { type DropboxAuth, createDropboxAdapter } from "./dropbox/index.ts";
-import { createGdriveAdapter } from "./gdrive/index.ts";
-import { createFolderAdapter } from "./folder/index.ts";
+import type { DropboxAuth } from "./dropbox/index.ts";
 import { BrowserLocalStorageAdapter } from "./local/index.ts";
-import { createNotesdAdapter } from "./notesd/index.ts";
+import type { RemoteBackends } from "./remote-backends.ts";
 
 // The resolved active backend, computed once per change so the document
 // adapter and the root settings / namespace stores are built from the same
@@ -38,6 +35,13 @@ export type BackendSelection =
 export interface BackendSelectionDeps {
   /** The per-device backend preference. */
   backend: BackendId;
+  /**
+   * The lazily-loaded remote-backend family, or null while it is still in
+   * flight. Every non-browser arm below requires it, so a null keeps the
+   * selection on the browser store — the same fall-through an unresolved
+   * token or folder grant already takes. See `useRemoteBackends`.
+   */
+  remote: RemoteBackends | null;
   /** The cloud tokens, null until each backend is connected. */
   dropboxToken: string | null;
   dropboxRefresh: string | null;
@@ -75,6 +79,7 @@ export function useBackendSelection(
 ): BackendSelectionResult {
   const {
     backend,
+    remote,
     dropboxToken,
     dropboxRefresh,
     gdriveToken,
@@ -91,6 +96,10 @@ export function useBackendSelection(
   // Resolve the active backend once. Both builders below switch on this
   // single selection rather than re-deriving the `backend && token` chain.
   const selection = useMemo<BackendSelection>(() => {
+    // `remote` gates every arm below: until the family has loaded there is no
+    // factory to build the adapter with, so the selection stays on the browser
+    // store exactly as it does while a token or grant is still resolving.
+    if (!remote) return { kind: "browser" };
     if (backend === "dropbox" && dropboxToken) {
       return {
         kind: "dropbox",
@@ -116,6 +125,7 @@ export function useBackendSelection(
     return { kind: "browser" };
   }, [
     backend,
+    remote,
     dropboxToken,
     dropboxRefresh,
     gdriveToken,
@@ -127,14 +137,22 @@ export function useBackendSelection(
 
   const makeInner = useCallback(
     (namespace: string): StorageAdapter => {
+      // Unreachable without `remote` — `selection` can only leave "browser"
+      // once it has loaded — but narrow it for the type checker all the same.
+      if (!remote || selection.kind === "browser") {
+        return new BrowserLocalStorageAdapter(
+          globalThis.localStorage,
+          namespace,
+        );
+      }
       switch (selection.kind) {
         // Cloud backends mirror their bytes into a local cache so the document
         // can be unlocked, read, and edited offline (the cache holds the
         // encrypted envelope when encryption is on). Folder / browser are
         // already on-device, so they need no mirror.
         case "dropbox":
-          return withLocalCache(
-            createDropboxAdapter(
+          return remote.withLocalCache(
+            remote.createDropboxAdapter(
               selection.auth,
               fetch,
               namespace,
@@ -142,14 +160,14 @@ export function useBackendSelection(
             ),
             {
               storage: globalThis.localStorage,
-              key: localCacheKey("dropbox", namespace),
+              key: remote.localCacheKey("dropbox", namespace),
               seal,
               unseal,
             },
           );
         case "gdrive":
-          return withLocalCache(
-            createGdriveAdapter(
+          return remote.withLocalCache(
+            remote.createGdriveAdapter(
               selection.token,
               fetch,
               namespace,
@@ -157,13 +175,13 @@ export function useBackendSelection(
             ),
             {
               storage: globalThis.localStorage,
-              key: localCacheKey("gdrive", namespace),
+              key: remote.localCacheKey("gdrive", namespace),
               seal,
               unseal,
             },
           );
         case "folder":
-          return createFolderAdapter({
+          return remote.createFolderAdapter({
             directoryHandle: selection.handle,
             namespace,
             onPermissionLost: markFolderPermissionLost,
@@ -176,20 +194,22 @@ export function useBackendSelection(
         // like the folder backend (which, being on-device, likewise needs no
         // offline-cache mirror).
         case "notesd":
-          return createNotesdAdapter(
+          return remote.createNotesdAdapter(
             selection.config,
             createPinnedFetch(selection.config.spkiPin),
             namespace,
             directoryCrypto,
           );
-        case "browser":
-          return new BrowserLocalStorageAdapter(
-            globalThis.localStorage,
-            namespace,
-          );
       }
     },
-    [selection, markFolderPermissionLost, directoryCrypto, seal, unseal],
+    [
+      selection,
+      remote,
+      markFolderPermissionLost,
+      directoryCrypto,
+      seal,
+      unseal,
+    ],
   );
 
   return { selection, makeInner };

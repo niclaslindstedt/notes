@@ -15,16 +15,10 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { createLogger } from "../dev/logger.ts";
-import {
-  type DropboxAuth,
-  createDropboxConfigPlaneStore,
-} from "./dropbox/index.ts";
-import { createGdriveConfigPlaneStore } from "./gdrive/index.ts";
-import {
-  type ConfigPlaneStore,
-  type PublishedDaemon,
-  publishDaemon as publishToStore,
-  readPublishedDaemons,
+import type { DropboxAuth } from "./dropbox/index.ts";
+import type {
+  ConfigPlaneStore,
+  PublishedDaemon,
 } from "./notesd/config-plane.ts";
 
 const log = createLogger("notesd");
@@ -49,18 +43,36 @@ export interface NotesdDiscovery {
   publishDaemon: (daemon: PublishedDaemon) => Promise<void>;
 }
 
-function resolveStore(
+// Which cloud discovery would read from — answerable from the tokens alone, so
+// the render path can label the source without loading a backend.
+function resolveSource(
   opts: UseNotesdDiscoveryOptions,
-): { store: ConfigPlaneStore; source: "Dropbox" | "Google Drive" } | null {
+): "Dropbox" | "Google Drive" | null {
+  if (opts.dropboxToken) return "Dropbox";
+  if (opts.gdriveToken) return "Google Drive";
+  return null;
+}
+
+// The store itself needs the connected cloud's config-plane code, which is
+// fetched on demand with the rest of the remote backends (see
+// `remote-backends.ts`) rather than shipped to every user who never connects
+// one. Both callers already run inside an effect or an async verb.
+async function resolveStore(opts: UseNotesdDiscoveryOptions): Promise<{
+  store: ConfigPlaneStore;
+  source: "Dropbox" | "Google Drive";
+} | null> {
   if (opts.dropboxToken) {
     const auth: DropboxAuth = {
       accessToken: opts.dropboxToken,
       refreshToken: opts.dropboxRefresh,
       onAccessTokenRefreshed: opts.rememberDropboxAccessToken,
     };
+    const { createDropboxConfigPlaneStore } =
+      await import("./dropbox/index.ts");
     return { store: createDropboxConfigPlaneStore(auth), source: "Dropbox" };
   }
   if (opts.gdriveToken) {
+    const { createGdriveConfigPlaneStore } = await import("./gdrive/index.ts");
     return {
       store: createGdriveConfigPlaneStore(opts.gdriveToken),
       source: "Google Drive",
@@ -76,8 +88,7 @@ export function useNotesdDiscovery(
   const [discoveredDaemons, setDiscovered] = useState<PublishedDaemon[]>([]);
   const [nonce, setNonce] = useState(0);
 
-  const resolved = enabled ? resolveStore(opts) : null;
-  const source = resolved?.source ?? null;
+  const source = enabled ? resolveSource(opts) : null;
 
   const refreshDiscovery = useCallback(() => setNonce((n) => n + 1), []);
 
@@ -88,13 +99,14 @@ export function useNotesdDiscovery(
       setDiscovered([]);
       return;
     }
-    const built = resolveStore(opts);
-    if (!built) {
-      setDiscovered([]);
-      return;
-    }
     let cancelled = false;
-    void readPublishedDaemons(built.store)
+    void resolveStore(opts)
+      .then(async (built) => {
+        if (!built) return [];
+        const { readPublishedDaemons } =
+          await import("./notesd/config-plane.ts");
+        return readPublishedDaemons(built.store);
+      })
       .then((list) => {
         if (!cancelled) setDiscovered(list);
       })
@@ -110,9 +122,11 @@ export function useNotesdDiscovery(
 
   const publishDaemon = useCallback(
     async (daemon: PublishedDaemon) => {
-      const built = resolveStore(opts);
+      const built = await resolveStore(opts);
       if (!built) return; // no cloud connected — nothing to publish to
       try {
+        const { publishDaemon: publishToStore } =
+          await import("./notesd/config-plane.ts");
         await publishToStore(built.store, daemon);
         refreshDiscovery();
         log.info(`published ${daemon.name} to ${built.source}`);

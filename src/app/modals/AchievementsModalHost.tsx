@@ -1,6 +1,14 @@
 import { useAppearance } from "../../theme/useTheme.ts";
-import { AchievementsModal } from "../../ui/achievements/AchievementsModal.tsx";
 import { useModalState } from "../../ui/modal-bus.ts";
+import { lazyModal } from "./lazy-modal.tsx";
+
+// The four-tier catalogue tour, its glyph set, and its copy — opened from the
+// trophy button. Split off; see `lazy-modal.tsx`.
+const AchievementsModal = lazyModal(() =>
+  import("../../ui/achievements/AchievementsModal.tsx").then(
+    (m) => m.AchievementsModal,
+  ),
+);
 
 // Owns the achievements tour's open state; opens on an "achievements" command
 // from the modal bus (the quiet trophy button). This is the

@@ -61,15 +61,7 @@ const defaultSleep = (ms: number): Promise<void> =>
 // device while offline, before anything has ever been pulled down. Distinct
 // so the UI can say "you're offline" instead of the misleading "wrong
 // passphrase" a generic failure would map to at the unlock gate.
-export class OfflineUnavailableError extends Error {
-  constructor(
-    message = "Backend is unreachable and nothing is cached yet",
-    options?: ErrorOptions,
-  ) {
-    super(message, options);
-    this.name = "OfflineUnavailableError";
-  }
-}
+export { OfflineUnavailableError } from "./offline-error.ts";
 
 export type LocalCacheOptions = {
   /** Where to persist the mirror — `localStorage` in the app, a stub in tests. */

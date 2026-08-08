@@ -29,7 +29,7 @@ import {
   getEncryption,
   setEncryption as persistEncryption,
 } from "./backend-preference.ts";
-import { OfflineUnavailableError } from "./cache/index.ts";
+import { OfflineUnavailableError } from "./cache/offline-error.ts";
 import { decryptEnvelope, encryptText, isEncryptedEnvelope } from "./crypto.ts";
 import type {
   DecryptNoteReporter,

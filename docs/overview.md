@@ -3556,6 +3556,67 @@ do on the web. See [Capabilities](#capabilities), `electron/README.md`, and
 AGENTS.md's "The wrappers are thin" for the rule about what may live in that
 directory (in short: nothing that could live in `src/`).
 
+### Code splitting
+
+What the browser downloads before it can show a note, and what it fetches only
+if you ask for it. Three seams decide that.
+
+**The route decides first.** `src/app/main.tsx` reads `location.pathname` and
+then dynamically imports one of three things: `PrivacyPage`, `HomePage`, or
+`mount-app.tsx` — the module that pulls in `App`, the storage layer, the i18n
+runtime, and every modal host. Because the app hangs off that one dynamic edge,
+the two [public pages](#the-public-pages) load a page instead of a whole
+application: `/home` and `/privacy` fetch about 17 kB of JavaScript where they
+used to fetch the entire 184 kB app. They are the crawlable, log-in-free
+surfaces, so their first paint is the one a search engine measures.
+
+**A modal that opens on demand loads on demand.** `lazyModal`
+(`src/app/modals/lazy-modal.tsx`) wraps a modal so its host stops mounting it
+while closed and Preact fetches its chunk on the first open. Settings, "What's
+new", the achievements tour and its unlock sibling, namespaces, and the
+[sync details](#sync-details-modal) dialog all go through it. The changelog is the
+biggest single beneficiary — `CHANGELOG.md` is inlined as a raw string and
+parsed at build time, so "What's new" is ~28 kB gzipped that used to sit in
+every first paint and is now read at most once per release. There is one
+deliberate exception: the [search modal](#search) opens inside a `flushSync`
+from the tap that requested it, precisely so iOS ties the focus to that gesture
+and raises the keyboard, and an `await` in the middle of that loses it. Search
+stays statically imported; so should anything else that must render within the
+tap.
+
+**The backends you never connect never load.** `remote-backends.ts` is a single
+`import()` boundary in front of Dropbox, Google Drive, the picked folder and
+notesd, together with the directory adapter and offline-cache mirror they
+share. The app opens on the browser backend and stays there unless someone
+deliberately connects something, so for most people that is code downloaded and
+parsed to be skipped. The render path reaches it through `useRemoteBackends`,
+which returns `null` until the module lands; every non-browser arm of
+[`useBackendSelection`](#storage-backend-hook) requires it, so the selection stays
+on the browser store meanwhile — the *same* fall-through it already takes while
+a Dropbox token is being read or a folder grant probed, which is why nothing
+downstream needed a new not-ready state. Verbs that run on a gesture — connect,
+remove a namespace, publish a daemon — use a local `await import()` instead.
+Three things have to answer at boot and were split into their own small modules
+so they can: `cache/offline-error.ts` (the `instanceof` check in
+[`UnlockGate`](#unlock-gate)), `dropbox/pending.ts` (is an OAuth redirect
+waiting?), and `cloud-configured.ts` (was this build given a client id?).
+
+**Dev-only code is imported where it is used.** The [seed
+dataset](#fake-data) loads behind `import.meta.env.VITE_SEED`, which
+folds to `false` in an ordinary build and drops the module entirely, and the
+fake-data adapter is imported when the toggle flips rather than at mount —
+safe because the toggle is off at mount and the adapter is only ever swapped in
+mid-session.
+
+**The wrappers get none of this.** `vite.config.ts` turns on
+`inlineDynamicImports` for the embedded builds, so `native/` and `electron/`
+emit exactly one chunk, the shape they have always shipped. Splitting is a
+network optimisation and a wrapper has no network — it loads the bundle off the
+device — while the native WebView serves the page from a `file://` origin,
+where dynamic `import()` is not dependably permitted. The trade is that the
+Swedish catalogue, which the web fetches only when the language is switched,
+rides along in the wrapper bundle.
+
 ### The renderer (Preact)
 
 The app renders with **Preact**, not React — a swap made purely for the

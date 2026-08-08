@@ -8,7 +8,7 @@ import {
   type SaveFormatting,
 } from "../domain/note.ts";
 import { isStandaloneMobile } from "../pwa/standalone.ts";
-import { createDevSeedAdapter } from "../storage/dev-seed/index.ts";
+import type { StorageAdapter } from "../storage/adapter.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
 import {
   getActiveNote,
@@ -104,11 +104,33 @@ export function App() {
   // starts from a pristine sample), so fake data can be previewed without
   // touching the notes on the device. The flag is in-memory only, so a reload
   // drops straight back to the real adapter.
+  //
+  // The sample dataset and its adapter are fetched on the flip, not shipped in
+  // the bundle: this is a diagnostic behind Developer settings, itself behind
+  // dev mode, so nearly every user downloads it and never runs it. Deferring
+  // is free here because the toggle is off at mount and the adapter is only
+  // ever swapped in mid-session (see the "DELIBERATELY NO `loadSync`" note in
+  // `storage/dev-seed`) — until the chunk lands, `seedAdapter` is null and the
+  // real backend stays put below, which is exactly where the toggle started.
   const { active: fakeData } = useDevSeed();
-  const seedAdapter = useMemo(
-    () => (fakeData ? createDevSeedAdapter() : null),
-    [fakeData],
-  );
+  const [seedAdapter, setSeedAdapter] = useState<StorageAdapter | null>(null);
+  useEffect(() => {
+    if (!fakeData) {
+      setSeedAdapter(null);
+      return;
+    }
+    let cancelled = false;
+    void import("../storage/dev-seed/index.ts").then(
+      // A fresh adapter per enable, so every flip starts from a pristine
+      // sample — the `useMemo` this replaces gave the same guarantee.
+      ({ createDevSeedAdapter }) => {
+        if (!cancelled) setSeedAdapter(createDevSeedAdapter());
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [fakeData]);
   // Format-on-save settings handed to the persistence engine: tidy each note's
   // body (trim trailing spaces, end with a newline) as it's written.
   const formatting = useMemo<SaveFormatting>(

@@ -23,10 +23,7 @@ import { unlock as unlockAchievement } from "../achievements/index.ts";
 import { createLogger } from "../dev/logger.ts";
 import { createPinnedFetch } from "../platform/native-bridge.ts";
 import type { BackendId, NotesdConfig } from "./backend-preference.ts";
-import { deleteDropboxNamespace } from "./dropbox/index.ts";
-import { deleteGdriveNamespace } from "./gdrive/index.ts";
 import { deleteLocalNamespace } from "./local/index.ts";
-import { deleteNotesdNamespace } from "./notesd/index.ts";
 import type { NamespaceRegistryStore } from "./namespace-store.ts";
 import {
   type Namespace,
@@ -218,11 +215,18 @@ export function useNamespaceRegistry(
             .removeEntry(slug, { recursive: true })
             .catch(() => {});
         } else if (backend === "dropbox" && dropboxToken) {
-          await deleteDropboxNamespace(dropboxToken, slug);
+          // Fetched here rather than imported: this runs on a delete, long
+          // after boot, and the remote backends stay out of the first paint
+          // (see `remote-backends.ts`). Already resolved in practice — you
+          // cannot be on one of these backends without it having loaded.
+          const remote = await import("./remote-backends.ts");
+          await remote.deleteDropboxNamespace(dropboxToken, slug);
         } else if (backend === "gdrive" && gdriveToken) {
-          await deleteGdriveNamespace(gdriveToken, slug);
+          const remote = await import("./remote-backends.ts");
+          await remote.deleteGdriveNamespace(gdriveToken, slug);
         } else if (backend === "notesd" && notesdConfig) {
-          await deleteNotesdNamespace(
+          const remote = await import("./remote-backends.ts");
+          await remote.deleteNotesdNamespace(
             notesdConfig,
             createPinnedFetch(notesdConfig.spkiPin),
             slug,

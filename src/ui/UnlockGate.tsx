@@ -1,7 +1,7 @@
 import { UnlockGate as FrameworkUnlockGate } from "@niclaslindstedt/oss-framework/components";
 
 import { useT } from "../i18n/index.ts";
-import { OfflineUnavailableError } from "../storage/cache/index.ts";
+import { OfflineUnavailableError } from "../storage/cache/offline-error.ts";
 import type {
   EncryptionProgress,
   UseStorageBackend,

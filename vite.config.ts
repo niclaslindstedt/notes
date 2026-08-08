@@ -299,6 +299,23 @@ export default defineConfig({
           emitHomeAlias(),
         ]),
   ],
+  build: {
+    // Code-splitting is a web-only win, and a wrapper-only hazard.
+    //
+    // `main.tsx` reaches every route through a dynamic `import()`, and the
+    // modal hosts do the same, so the browser downloads a fraction of the app
+    // on first paint. An embedded build has nothing to gain from that — the
+    // whole bundle is already on the device, loaded off local files with no
+    // network in front of it — and something to lose: the native WebView
+    // serves the page from a `file://` origin, where dynamic `import()` is not
+    // dependably permitted. A failure there is a blank app, on the platform
+    // this project treats as primary.
+    //
+    // So the wrappers get everything folded back into one chunk, exactly the
+    // shape they ship today, and the splitting applies to the web build that
+    // benefits from it.
+    rollupOptions: isEmbedded ? { output: { inlineDynamicImports: true } } : {},
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_LABEL__: JSON.stringify(BUILD_LABEL),

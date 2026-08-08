@@ -51,8 +51,12 @@ const hasPendingDropboxAuth = vi.fn(() => false);
 const completeDropboxAuth = vi.fn();
 vi.mock("../../src/storage/dropbox/index.ts", () => ({
   startDropboxAuth: () => startDropboxAuth(),
-  hasPendingDropboxAuth: () => hasPendingDropboxAuth(),
   completeDropboxAuth: (code: string) => completeDropboxAuth(code),
+}));
+// `hasPendingDropboxAuth` lives in its own module so the boot probe can answer
+// without pulling the adapter into the first paint — mock it there.
+vi.mock("../../src/storage/dropbox/pending.ts", () => ({
+  hasPendingDropboxAuth: () => hasPendingDropboxAuth(),
 }));
 
 const startGdriveAuth = vi.fn();
@@ -90,11 +94,14 @@ describe("useCloudBackend", () => {
     expect(result.current.gdriveToken).toBe("gd-tok");
   });
 
-  it("connectDropbox kicks off the OAuth redirect and switches nothing yet", () => {
+  it("connectDropbox kicks off the OAuth redirect and switches nothing yet", async () => {
     const selectBackend = vi.fn();
     const { result } = renderHook(() => useCloudBackend({ selectBackend }));
     act(() => result.current.connectDropbox());
-    expect(startDropboxAuth).toHaveBeenCalledTimes(1);
+    // The Dropbox backend is fetched on the connect rather than at boot, so
+    // the redirect starts a microtask later. Harmless here — it is a full-page
+    // redirect, not a popup that a blocker could tie to the click.
+    await waitFor(() => expect(startDropboxAuth).toHaveBeenCalledTimes(1));
     // Completion only lands in the boot effect after the redirect returns.
     expect(selectBackend).not.toHaveBeenCalled();
   });

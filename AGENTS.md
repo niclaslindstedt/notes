@@ -308,6 +308,47 @@ change out by labelling the PR `no-changelog`.
 
 ## Architecture summary
 
+### What loads when: the code-splitting seams
+
+The first paint carries the note-taking app and nothing else. Three seams keep
+it that way, and a new feature has to be dropped through the right one or it
+lands back in everyone's first download:
+
+- **`src/app/main.tsx` routes before it loads.** The entry resolves the path,
+  then dynamically imports exactly one of `ui/PrivacyPage`, `ui/HomePage`, or
+  `app/mount-app.tsx` (the whole app shell). The two public pages are the
+  crawlable surfaces — keep them off the app's static import graph, and keep
+  the app off theirs.
+- **`src/app/modals/lazy-modal.tsx` defers a modal until it opens.** Wrap an
+  on-demand modal in `lazyModal` and the host stops mounting it while closed,
+  so its code arrives with the first open. Settings, the changelog, both
+  achievements modals, namespaces, and the sync-details dialog all go through
+  it. **Not for anything that must render inside the tap that asked for it** —
+  the search modal opens in a `flushSync` so iOS raises the keyboard, and an
+  await there breaks it. That one stays static, deliberately.
+- **`src/storage/remote-backends.ts` holds every backend that isn't
+  `localStorage`.** Dropbox, Drive, the picked folder and notesd — plus the
+  directory adapter and offline-cache mirror they share — are behind one
+  `import()`, because the app opens on the browser backend and stays there
+  unless someone connects something. The render path reaches them through
+  `useRemoteBackends`; verbs that run on a gesture (connect, delete a
+  namespace, publish a daemon) use a local `await import()`. **Never import
+  `remote-backends.ts` statically** — one static edge folds the whole family
+  back into the first paint. The things that must answer at boot were split
+  into their own small modules for exactly this reason:
+  `cache/offline-error.ts`, `dropbox/pending.ts`, `cloud-configured.ts`.
+- **Dev-only code is imported at the point of use.** The seed dataset loads
+  behind `import.meta.env.VITE_SEED` (which folds to `false` and drops the
+  module in an ordinary build), and the fake-data adapter is imported when the
+  toggle flips, not at mount.
+
+**The wrappers opt out of all of it.** `vite.config.ts` sets
+`inlineDynamicImports` for the embedded builds: `native/` and `electron/` ship
+the bundle on the device with no network in front of it, so splitting buys them
+nothing, and the native WebView serves the page from a `file://` origin where
+dynamic `import()` is not dependably permitted. One chunk there, split on the
+web.
+
 ### The renderer is Preact, but the imports still say `react`
 
 The app renders with **Preact** via `preact/compat`. Nothing imports `preact`
