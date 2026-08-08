@@ -442,7 +442,7 @@ function ColorSwatchInput({
       <input
         type="color"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.currentTarget.value)}
         aria-label={label}
         className="h-7 w-full cursor-pointer rounded border border-line bg-transparent p-0"
       />

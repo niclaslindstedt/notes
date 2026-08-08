@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { renderHook } from "@testing-library/react";
+import { renderHook } from "@testing-library/preact";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DirectoryCrypto } from "../../src/storage/directory-adapter.ts";

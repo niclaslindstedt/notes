@@ -30,8 +30,8 @@ export function InlineImage({ attachment, srcOffset, onOpen }: Props) {
       data-src={srcOffset}
       // Stop the editor's line-level mousedown from rolling the caret here, so
       // a click opens the image instead of just repositioning the cursor.
-      onMouseDown={(e: ReactMouseEvent) => e.stopPropagation()}
-      onClick={(e: ReactMouseEvent) => {
+      onMouseDown={(e: ReactMouseEvent<HTMLElement>) => e.stopPropagation()}
+      onClick={(e: ReactMouseEvent<HTMLElement>) => {
         e.stopPropagation();
         onOpen(attachment);
       }}

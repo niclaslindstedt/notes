@@ -61,7 +61,7 @@ export function FolderPlusIcon({ className }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      focusable={false}
+      focusable="false"
       className={className}
     >
       <path d="M4 5h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
@@ -81,7 +81,7 @@ export function ImportIcon({ className }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      focusable={false}
+      focusable="false"
       className={className}
     >
       <path d="M14 3v4a1 1 0 0 0 1 1h4" />
@@ -108,7 +108,7 @@ export function ClearFieldIcon({ className }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      focusable={false}
+      focusable="false"
       className={className}
     >
       <circle cx="12" cy="12" r="9" />
@@ -136,7 +136,7 @@ export function CutIcon({ className }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      focusable={false}
+      focusable="false"
       className={className}
     >
       <circle cx="6" cy="6" r="3" />
@@ -159,7 +159,7 @@ export function PlayIcon({ className }: IconProps) {
       viewBox="0 0 24 24"
       fill="currentColor"
       aria-hidden
-      focusable={false}
+      focusable="false"
       className={className}
     >
       <path d="M8 5.5v13a1 1 0 0 0 1.53.85l10-6.5a1 1 0 0 0 0-1.7l-10-6.5A1 1 0 0 0 8 5.5Z" />
@@ -178,7 +178,7 @@ export function WidescreenIcon({ className }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      focusable={false}
+      focusable="false"
       className={className}
     >
       <path d="M8 3H5a2 2 0 0 0-2 2v3" />
@@ -200,7 +200,7 @@ export function MinimizeIcon({ className }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      focusable={false}
+      focusable="false"
       className={className}
     >
       <path d="M8 3v3a2 2 0 0 1-2 2H3" />
@@ -222,7 +222,7 @@ export function NotesMarkIcon({ className }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      focusable={false}
+      focusable="false"
       className={className}
     >
       <path d="M20 16 H38 L46 24 V48 H20 Z" />

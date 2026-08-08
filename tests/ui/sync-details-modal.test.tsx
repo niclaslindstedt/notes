@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/preact";
 import { describe, expect, it, vi } from "vitest";
 
 import { SyncDetailsModal } from "../../src/ui/SyncDetailsModal.tsx";

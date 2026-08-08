@@ -48,7 +48,7 @@ the `TrophyButton`; the sync glyph `SyncStatus` lives in the side menu's
 
 ### Entry point / path switch
 
-`src/app/main.tsx` — the React entry point. It mounts the global stylesheet and
+`src/app/main.tsx` — the Preact entry point. It mounts the global stylesheet and
 the bundled webfont for offline first paint, then does a trivial
 `window.location.pathname` switch: a path ending in `/privacy` renders
 `PrivacyPage`, `/home` renders `HomePage`, anything else renders the main
@@ -60,7 +60,7 @@ in `ErrorBoundary` (inside `LanguageRoot`, so the fallback is translated) — se
 ### Crash screen
 
 `ErrorBoundary` (`src/ui/ErrorBoundary.tsx`) — the app's last line of defence,
-wrapped around the shell in `main.tsx`. React unmounts the entire root when a
+wrapped around the shell in `main.tsx`. Preact unmounts the entire root when a
 render throws and nothing catches it, which on a PWA leaves a blank page whose
 only cure is force-quitting the app and launching it cold. The boundary turns
 that into a titled message and a **Reload the app** button. Nothing is lost by
@@ -70,7 +70,7 @@ the active backend.
 The caught error goes to the [in-app logger](#logger) under the `crash` scope
 rather than the console — on the phone where a blank screen hurts most,
 devtools aren't reachable, and the entry survives the reload so it can be read
-back from Settings → Logs and reported. The stack and the React **component
+back from Settings → Logs and reported. The stack and the Preact **component
 stack** (which names the surface that threw) are also shown inline behind a
 collapsed "Error details" disclosure, and a **Copy report** button puts both,
 plus the tail of the in-app log, on the clipboard. Settings → Logs lives inside
@@ -88,7 +88,7 @@ modal is.
 
 This is a safety net, not a licence: a caught error is still a defect. The
 crash it was built for was the [live-preview editor](#markdown-editor) letting
-the browser mutate the DOM React owns (see [selection
+the browser mutate the DOM Preact owns (see [selection
 mapping](#selection-mapping)), which is fixed at the source too.
 
 ### Note list / overview
@@ -219,7 +219,7 @@ model could do none of these (each textarea was its own selection island). It
 reads parsed blocks from `classifyLines` (`src/domain/markdown.ts`) and honours
 the `EditorSettings` (word-wrap, spell-check, autocorrect, margin width).
 
-**The source string stays the single source of truth.** React fully owns the
+**The source string stays the single source of truth.** Preact fully owns the
 DOM: every edit the browser proposes arrives as a native `beforeinput`, is
 `preventDefault`ed, and is applied to the source through the pure `replaceRange`
 engine (`src/domain/line-edit.ts`) — typing, autocorrect, Backspace/Delete
@@ -236,7 +236,7 @@ natively on the active line and is reconciled on `compositionend`.
 `preventDefault` fires *before* the source points are resolved and regardless of
 whether they resolve, in the `beforeinput` handler and in `onPaste` alike. An
 unmappable edit that reaches the browser has it rewrite the surface behind
-React's back, and the next render — reconciling against nodes that are no longer
+Preact's back, and the next render — reconciling against nodes that are no longer
 there — throws and takes the whole app down (the same `removeChild`
 `NotFoundError` the composition remount avoids). Refusing such an edit is the
 strictly safer failure: the mapping itself is what should cover the case, and
@@ -254,9 +254,9 @@ is refused outright. Either way the drop is reported to the
 otherwise completely silent.
 
 **A composition always remounts the line it touched.** Because the browser wrote
-into the line itself, React's record of that line's children is stale by the time
+into the line itself, Preact's record of that line's children is stale by the time
 `readBackComposition` runs, so it bumps the active-line key rather than letting
-React reconcile in place — even when the composed text turns out to match what
+Preact reconcile in place — even when the composed text turns out to match what
 was already in the source (a cancelled composition still moved DOM around, and it
 reports no edit through `onChange`, so a keystroke that changed nothing never
 bumps the note's `updatedAt`). Reconciling in place instead would try to tear down
@@ -285,7 +285,7 @@ lands exactly where the first character will (the host's `aria-label` already
 announces it, so the overlay is `aria-hidden`). It used to be a
 `contentEditable={false}` span *inside* the host, which put a node the browser
 feels entitled to normalise around at the very start of the document — right
-where a Backspace on an already-empty note aims — and left React having to
+where a Backspace on an already-empty note aims — and left Preact having to
 remove that node again on the first keystroke. Either way round, a browser that
 had moved or eaten it in the meantime turned the next render into a
 `removeChild` `NotFoundError` and unmounted the app. Out of the host, the
@@ -294,7 +294,7 @@ editing surface holds nothing but its lines.
 The [collected attachments block](#attachments) is out of the host for the same
 reason. It was the last child of the editing surface — a second
 `contentEditable={false}` island, this one sitting exactly where a caret on the
-final line forward-deletes into, and one React rebuilds whenever the placement
+final line forward-deletes into, and one Preact rebuilds whenever the placement
 setting or the note's attachments change. It now renders as a sibling after the
 host, mirroring its horizontal padding and width and carrying the bottom
 safe-area inset; it hides itself entirely (`empty:hidden`) under the default
@@ -307,7 +307,7 @@ opened state. Without it the last line the caret sat on would keep showing its r
 markdown (a trailing `-` staying a literal dash instead of becoming a rule) until
 the user tapped back in. The clear is deferred to a microtask and gated on
 `document.activeElement` still being outside the root, so the transient blur a
-cross-line edit fires (React remounts the active line and the caret effect
+cross-line edit fires (Preact remounts the active line and the caret effect
 refocuses the root in the same commit) is ignored — only a real departure clears.
 
 **A touch tap scrolls the tapped line clear of the soft keyboard.** On mobile
@@ -454,7 +454,7 @@ such manners: iOS Safari's native "Select All" (the text-selection callout —
 how a note gets erased on a phone) runs its range from `(surface, 0)` to
 `(surface, childCount)`. While those endpoints resolved to `null` the editor
 couldn't express the delete as a source splice, so it declined to intercept it,
-and WebKit applied the delete itself — tearing out the line elements React
+and WebKit applied the delete itself — tearing out the line elements Preact
 believes it owns and blanking the app on the next render (see [crash
 screen](#crash-screen)).
 
@@ -467,7 +467,7 @@ pure/DOM-only helpers the editor uses in its `copy` / `cut` handlers.
 ### Rendered line
 
 `RenderedLine` (`src/ui/MarkdownLine.tsx`) — renders one parsed `LineBlock` as
-formatted React (headings, quotes, lists, inline code/links/bold/em/strike).
+formatted markup (headings, quotes, lists, inline code/links/bold/em/strike).
 Every leaf carries a `data-src` offset so a click maps back to a caret position
 in the raw source (and a [selection](#selection-mapping) back to a source
 column); a shortened bare URL also carries `data-len` (its full source length).
@@ -1572,7 +1572,7 @@ trimmed). The UI side is `useFileDrop` → `useNotes().importFiles`. See
 ### Notes store
 
 `useNotes` (`src/app/use-notes.ts`) returns `NotesStore` — the mutation API
-between React and persistence. It translates create/edit/retitle/remove/
+between Preact and persistence. It translates create/edit/retitle/remove/
 archive/restore/importFiles into whole-`Snapshot` swaps, records each onto the
 undo timeline (coalescing keystroke edits per note), and hands `sync` state back
 up for the header. It exposes `notes` (visible), `allNotes` (incl. blank), and
@@ -1714,7 +1714,7 @@ of the list. The shortcut stands down inside plain `<input>` / `<textarea>`
 fields (the note title, settings, modal inputs) so their native character-level
 undo wins, but it **does** answer the shortcut inside the live-preview editor's
 `contenteditable` — that surface deliberately swallows the browser's native
-contenteditable undo (React owns its DOM), so without this the shortcut would be
+contenteditable undo (Preact owns its DOM), so without this the shortcut would be
 dead while the caret sits in a note — answering only once the Undo button had
 moved focus out of the editor. There it reverts one sentence of the open note's
 editing burst, exactly as the side menu's Undo button does. That carve-out is
@@ -3555,6 +3555,41 @@ Safari. Their OAuth flows redirect to a registered `https://` URL, which
 do on the web. See [Capabilities](#capabilities), `electron/README.md`, and
 AGENTS.md's "The wrappers are thin" for the rule about what may live in that
 directory (in short: nothing that could live in `src/`).
+
+### The renderer (Preact)
+
+The app renders with **Preact**, not React — a swap made purely for the
+download: it takes roughly 190 KB (52 KB compressed) off the main bundle, which
+is the app's whole first paint on a phone. Nothing imports `preact` by name.
+`@preact/preset-vite` (`vite.config.ts`) aliases `react`, `react-dom`, and
+`react/jsx-runtime` onto `preact/compat` for every importer — app source and
+[the framework package](#the-shared-framework) alike — and `tsconfig.json`'s
+`paths` mirrors those aliases so `tsc` checks against the modules Vite actually
+bundles. **Keep writing `import … from "react"`.** React itself remains in
+`node_modules` only to satisfy the framework's and Testing Library's peer
+ranges; no build ever resolves it, and `tests/app/preact-alias.test.ts` fails
+loudly if that stops being true. Vitest is the one place the alias needs help:
+it externalises `node_modules` by default, so the framework is listed in
+`test.server.deps.inline` to put its own `react` imports back through Vite's
+resolver.
+
+`preact/compat` is close to React but not identical, and four of the gaps are
+load-bearing here. **`ref` belongs to the renderer**, not to props: Preact
+lifts it off before a function component sees it (React 19 hands it through),
+so a component exposing an imperative handle takes it as **`handleRef`** —
+`MarkdownEditor` and `PlainEditor` both do. **`onSelect` is the DOM's**, firing
+only when a *range* is selected, where React synthesised it from mouse and key
+activity; the [plain editor](#the-editor) therefore tracks a collapsed caret
+through `onMouseUp` / `onKeyUp` as well, so the [styling
+toolbar](#styling-toolbar) still lights up when a click or an arrow key lands
+inside a formatted run. **`onChange` / `onBlur` / `onFocus` are remapped by
+compat** onto `input` / `focusout` / `focusin` — React's semantics, so real
+usage is unchanged, but a test has to simulate the event the DOM delivers
+(`fireEvent.input`, a real `el.blur()`) rather than the synthetic one. And
+**nullable DOM fields are visible again**: `DragEvent.dataTransfer` and
+`ClipboardEvent.clipboardData` are typed `| null` where React's synthetic
+events hid it, so the drag and paste handlers degrade instead of assuming.
+AGENTS.md's "The renderer is Preact" section carries the full list.
 
 ### The shared framework
 

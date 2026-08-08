@@ -147,9 +147,9 @@ export function FolderRow({
   onRename: () => void;
   onDelete: () => void;
   onAddNote: () => void;
-  onDragOver: (e: ReactDragEvent) => void;
-  onDragLeave: (e: ReactDragEvent) => void;
-  onDrop: (e: ReactDragEvent) => void;
+  onDragOver: (e: ReactDragEvent<HTMLElement>) => void;
+  onDragLeave: (e: ReactDragEvent<HTMLElement>) => void;
+  onDrop: (e: ReactDragEvent<HTMLElement>) => void;
 }) {
   const t = useT();
   const isDesktop = useMediaQuery("(hover: hover) and (pointer: fine)");
@@ -346,7 +346,7 @@ export function FolderEditRow({
         value={value}
         placeholder={placeholder}
         aria-label={placeholder}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => setValue(e.currentTarget.value)}
         onBlur={finish}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
@@ -399,9 +399,9 @@ export function NavItem({
   // to make a namespace row or the Archive row accept a dragged note.
   dropId?: string;
   isDropTarget?: boolean;
-  onDragOver?: (e: ReactDragEvent) => void;
-  onDragLeave?: (e: ReactDragEvent) => void;
-  onDrop?: (e: ReactDragEvent) => void;
+  onDragOver?: (e: ReactDragEvent<HTMLElement>) => void;
+  onDragLeave?: (e: ReactDragEvent<HTMLElement>) => void;
+  onDrop?: (e: ReactDragEvent<HTMLElement>) => void;
 }) {
   return (
     <button

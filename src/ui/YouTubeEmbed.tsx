@@ -45,7 +45,7 @@ export function YouTubeEmbed({ video, srcOffset, srcLength }: Props) {
   // Every press inside the card must stop the editor's line-level mousedown, or
   // the caret rolls onto this line and the whole player is replaced by its raw
   // source mid-click.
-  const keepCaretAway = (e: ReactMouseEvent) => {
+  const keepCaretAway = (e: ReactMouseEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();
   };

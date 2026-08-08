@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
 
 import { type Attachment } from "../../src/domain/attachment.ts";
 import { ImageViewer } from "../../src/ui/attachments/ImageViewer.tsx";

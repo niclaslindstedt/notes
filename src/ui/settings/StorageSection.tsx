@@ -412,7 +412,7 @@ function PairNotesdForm({
       </p>
       <textarea
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => setValue(e.currentTarget.value)}
         placeholder={
           known
             ? t("settings.storage.notesdTokenPlaceholder")
@@ -600,7 +600,7 @@ function EncryptionSection({
           <input
             type="password"
             value={pass}
-            onChange={(e) => setPass(e.target.value)}
+            onChange={(e) => setPass(e.currentTarget.value)}
             onFocus={(e) => scrollFocusedIntoView(e.currentTarget)}
             placeholder={t("settings.storage.passphrase")}
             aria-label={t("settings.storage.passphrase")}
@@ -610,7 +610,7 @@ function EncryptionSection({
           <input
             type="password"
             value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
+            onChange={(e) => setConfirm(e.currentTarget.value)}
             onFocus={(e) => scrollFocusedIntoView(e.currentTarget)}
             placeholder={t("settings.storage.passphraseConfirm")}
             aria-label={t("settings.storage.passphraseConfirm")}

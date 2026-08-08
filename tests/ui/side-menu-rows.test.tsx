@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
 
 import {
   FolderEditRow,
@@ -107,7 +107,9 @@ describe("NavItem", () => {
       name: "Undo",
     }) as HTMLButtonElement;
     expect(row.disabled).toBe(true);
-    fireEvent.click(row);
+    // `.click()` honours `disabled` the way a browser does; `fireEvent.click`
+    // dispatches straight at the node and would reach a disabled button.
+    row.click();
     expect(onClick).not.toHaveBeenCalled();
   });
 
@@ -146,7 +148,7 @@ describe("FolderEditRow", () => {
       />,
     );
     const input = screen.getByRole("textbox", { name: "Folder name" });
-    fireEvent.change(input, { target: { value: "  Recipes  " } });
+    fireEvent.input(input, { target: { value: "  Recipes  " } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onCommit).toHaveBeenCalledWith("Recipes");
     expect(onCancel).not.toHaveBeenCalled();
@@ -162,7 +164,12 @@ describe("FolderEditRow", () => {
         onCancel={onCancel}
       />,
     );
-    fireEvent.blur(screen.getByRole("textbox", { name: "Folder name" }));
+    // The row focuses itself on mount; blur it for real rather than
+    // dispatching a synthetic `blur`, since Preact maps `onBlur` onto the
+    // bubbling `focusout` (React's semantics) that only `blur()` emits.
+    (
+      screen.getByRole("textbox", { name: "Folder name" }) as HTMLInputElement
+    ).blur();
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onCommit).not.toHaveBeenCalled();
   });

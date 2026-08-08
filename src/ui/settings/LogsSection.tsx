@@ -87,7 +87,7 @@ export function LogsSection() {
           <select
             id={filterId}
             value={filter}
-            onChange={(e) => setFilter(e.target.value as LogFilter)}
+            onChange={(e) => setFilter(e.currentTarget.value as LogFilter)}
             aria-label={t("settings.logs.filterLabel")}
             className="cursor-pointer rounded border border-line bg-surface-2 px-2.5 py-1 text-sm text-fg hover:border-accent focus:border-accent focus:outline-none"
           >

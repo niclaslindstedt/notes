@@ -2,7 +2,7 @@
 
 `notes` is a TypeScript Progressive Web App that runs entirely in the browser
 and is served as static files. There is **no backend**. It is built with Vite,
-React, and Tailwind, and uses `vite-plugin-pwa` for the service worker and web
+Preact, and Tailwind, and uses `vite-plugin-pwa` for the service worker and web
 app manifest.
 
 ## Layering
@@ -53,7 +53,7 @@ native closure, diverged parser/sync/search surfaces).
 
 ## State and persistence
 
-`use-notes.ts` holds the note list in React state and persists every change to
+`use-notes.ts` holds the note list in Preact state and persists every change to
 `localStorage` via the storage layer. The list view shows non-blank notes
 newest-first; the full list (including a freshly created blank note) is exposed
 so the editor can resolve a note that isn't in the visible list yet. A note

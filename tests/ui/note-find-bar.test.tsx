@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
 
 import { Editor } from "../../src/ui/NoteEditor.tsx";
 import type { Note } from "../../src/domain/note.ts";
@@ -69,7 +69,7 @@ describe("find in note", () => {
     renderEditor();
     const field = openFind();
 
-    fireEvent.change(field, { target: { value: "alpha" } });
+    fireEvent.input(field, { target: { value: "alpha" } });
     expect(screen.getByText("1 of 2")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Next match" }));
@@ -86,7 +86,7 @@ describe("find in note", () => {
   it("steps from the field's own Enter / Shift+Enter", () => {
     renderEditor();
     const field = openFind();
-    fireEvent.change(field, { target: { value: "alpha" } });
+    fireEvent.input(field, { target: { value: "alpha" } });
 
     fireEvent.keyDown(field, { key: "Enter" });
     expect(screen.getByText("2 of 2")).toBeTruthy();
@@ -98,7 +98,7 @@ describe("find in note", () => {
   it("says so when nothing matches, and disables the arrows", () => {
     renderEditor();
     const field = openFind();
-    fireEvent.change(field, { target: { value: "nothing here" } });
+    fireEvent.input(field, { target: { value: "nothing here" } });
 
     expect(screen.getByText("No matches")).toBeTruthy();
     expect(
@@ -114,7 +114,7 @@ describe("find in note", () => {
       "Start writing…",
     ) as HTMLTextAreaElement;
 
-    fireEvent.change(field, { target: { value: "alpha" } });
+    fireEvent.input(field, { target: { value: "alpha" } });
     expect(body.selectionStart).toBe(0);
     expect(body.selectionEnd).toBe(5);
 

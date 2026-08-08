@@ -334,7 +334,7 @@ export function Editor({
           </div>
         ) : editor.renderMarkdown ? (
           <MarkdownEditor
-            ref={markdownEditorRef}
+            handleRef={markdownEditorRef}
             body={note.body ?? ""}
             onChange={onChange}
             undoScrollSeq={undoScrollSeq}
@@ -361,7 +361,7 @@ export function Editor({
           />
         ) : (
           <PlainEditor
-            ref={plainEditorRef}
+            handleRef={plainEditorRef}
             body={note.body ?? ""}
             onChange={onChange}
             onTabOut={onBodyTab}
@@ -405,7 +405,7 @@ function TitleField({
   disableAutocorrect,
 }: {
   /** Held by the editor, which hands focus back here on Shift+Tab in the body. */
-  fieldRef: RefObject<HTMLTextAreaElement | null>;
+  fieldRef: RefObject<HTMLTextAreaElement>;
   value: string;
   onChange: (title: string) => void;
   onSettle: () => void;
@@ -512,11 +512,11 @@ function TitleField({
       ref={ref}
       rows={1}
       value={draft}
-      spellCheck={!disableSpellcheck}
+      spellcheck={!disableSpellcheck}
       autoCorrect={disableAutocorrect ? "off" : "on"}
       autoCapitalize={disableAutocorrect ? "off" : "sentences"}
       placeholder={t("app.titlePlaceholder")}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => setDraft(e.currentTarget.value)}
       onBlur={settle}
       onMouseDown={(e) => {
         if (document.activeElement !== e.currentTarget)
@@ -560,7 +560,7 @@ function PlainEditor({
   onLineFormat,
   matches = NO_MATCHES,
   activeMatch = -1,
-  ref,
+  handleRef,
 }: {
   body: string;
   onChange: (body: string) => void;
@@ -583,8 +583,13 @@ function PlainEditor({
   matches?: readonly NoteMatch[];
   /** Index into `matches` of the hit the bar is parked on, or -1 for none. */
   activeMatch?: number;
-  /** Imperative handle so the toolbar can apply an action here. */
-  ref?: Ref<PlainEditorHandle>;
+  /**
+   * Imperative handle so the toolbar can apply an action here. Named
+   * `handleRef`, not `ref`: Preact reserves `ref` for the renderer (it is
+   * lifted off props before the component sees it) and only replays it as a
+   * prop through `forwardRef`, so a handle passed as `ref` would never arrive.
+   */
+  handleRef?: Ref<PlainEditorHandle>;
 }) {
   const t = useT();
   const [value, setValue] = useState(body);
@@ -751,7 +756,7 @@ function PlainEditor({
     lastOffset.current = caret;
   }
 
-  useImperativeHandle(ref, () => ({
+  useImperativeHandle(handleRef ?? null, () => ({
     format: (action: FormatAction) => {
       const el = textareaRef.current;
       if (!el) return;
@@ -820,19 +825,24 @@ function PlainEditor({
       ref={textareaRef}
       value={value}
       wrap={wordWrap ? "soft" : "off"}
-      spellCheck={!disableSpellcheck}
+      spellcheck={!disableSpellcheck}
       autoCorrect={disableAutocorrect ? "off" : "on"}
       autoCapitalize={disableAutocorrect ? "off" : "sentences"}
       onChange={(e) => {
-        setValue(e.target.value);
-        onChange(e.target.value);
-        trackCaret(e.target);
-      }}
-      onSelect={(e) => {
-        // Track the caret so switching away and back restores it (and so the
-        // styling toolbar knows which line's buttons to light).
+        setValue(e.currentTarget.value);
+        onChange(e.currentTarget.value);
         trackCaret(e.currentTarget);
       }}
+      // Track the caret so switching away and back restores it (and so the
+      // styling toolbar knows which line's buttons to light). `select` alone
+      // isn't enough: browsers emit it when a *range* is selected, not when a
+      // click or an arrow key merely moves a collapsed caret. React papered
+      // over that by synthesising `onSelect` from mouse/key activity; Preact
+      // hands through the DOM event as-is, so the two gestures that move a
+      // caret without selecting anything are listened for directly.
+      onSelect={(e) => trackCaret(e.currentTarget)}
+      onMouseUp={(e) => trackCaret(e.currentTarget)}
+      onKeyUp={(e) => trackCaret(e.currentTarget)}
       onKeyDown={(e) => {
         // Ctrl/Cmd+K cuts at the caret — the keyboard twin of the header's
         // cut button, taken from the browser (which aims it at the address

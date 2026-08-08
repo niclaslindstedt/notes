@@ -96,7 +96,7 @@ export function useNoteDragAbort(): number {
 
 export type TouchDragHandlers = Partial<{
   onPointerDown: (e: ReactPointerEvent<HTMLElement>) => void;
-  onClickCapture: (e: ReactMouseEvent) => void;
+  onClickCapture: (e: ReactMouseEvent<HTMLElement>) => void;
 }>;
 
 // Pointer (touch/pen) long-press drag for one item (a note or a folder).
@@ -282,7 +282,7 @@ export function useTouchNoteDrag(
 
   // Swallow the click that trails a drag so releasing over a folder files the
   // note instead of also opening it.
-  const onClickCapture = useCallback((e: ReactMouseEvent) => {
+  const onClickCapture = useCallback((e: ReactMouseEvent<HTMLElement>) => {
     if (justDragged.current) {
       e.preventDefault();
       e.stopPropagation();

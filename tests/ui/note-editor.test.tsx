@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
 
 import { Editor } from "../../src/ui/NoteEditor.tsx";
 import type { Note } from "../../src/domain/note.ts";
@@ -66,13 +66,17 @@ describe("Editor", () => {
 
   it("buffers title edits and commits the trimmed title on blur, then settles", () => {
     const { onTitleChange, onTitleSettle } = renderEditor();
-    const title = screen.getByDisplayValue("My note");
+    const title = screen.getByDisplayValue("My note") as HTMLTextAreaElement;
+    title.focus();
 
-    fireEvent.change(title, { target: { value: "  Renamed  " } });
+    fireEvent.input(title, { target: { value: "  Renamed  " } });
     // Buffered locally — nothing pushed up yet.
     expect(onTitleChange).not.toHaveBeenCalled();
 
-    fireEvent.blur(title);
+    // Blur for real rather than dispatching a synthetic `blur`: Preact maps
+    // `onBlur` onto the bubbling `focusout` (React's semantics), and only the
+    // DOM's own `blur()` emits that pair the way a browser does.
+    title.blur();
     expect(onTitleChange).toHaveBeenCalledWith("Renamed");
     expect(onTitleSettle).toHaveBeenCalled();
   });
@@ -81,7 +85,7 @@ describe("Editor", () => {
     const { onChange } = renderEditor();
     const body = screen.getByDisplayValue("the body");
 
-    fireEvent.change(body, { target: { value: "the body!" } });
+    fireEvent.input(body, { target: { value: "the body!" } });
     expect(onChange).toHaveBeenCalledWith("the body!");
   });
 
@@ -105,9 +109,13 @@ describe("Editor", () => {
     title.focus();
 
     fireEvent.keyDown(title, { key: "a", ctrlKey: true });
-    // The fallback must not yank focus (or the selection) into the body.
+    // The fallback must not yank focus (or the selection) into the body. The
+    // body holds a caret, never a range — a select-all would have spread it
+    // across the whole value. (Asserting a specific offset would instead pin
+    // down where a freshly mounted textarea parks its caret, which is the
+    // renderer's business, not this shortcut's.)
     expect(document.activeElement).toBe(title);
-    expect(body.selectionEnd).toBe(0);
+    expect(body.selectionStart).toBe(body.selectionEnd);
   });
 
   it("shows the decrypting placeholder and withholds the editor while loading", () => {

@@ -1,8 +1,8 @@
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import preact from "@preact/preset-vite";
 import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig, type Plugin } from "vitest/config";
 
@@ -211,7 +211,16 @@ function emitHomeAlias(): Plugin {
 export default defineConfig({
   base,
   plugins: [
-    react(),
+    // Preact, not React. The preset aliases `react` / `react-dom` /
+    // `react/jsx-runtime` onto `preact/compat` for *every* importer — the app
+    // source and `@niclaslindstedt/oss-framework` alike — so nothing in the
+    // bundle is React. React itself stays in `node_modules` only to satisfy
+    // the framework's and Testing Library's peer ranges; it is never
+    // resolved by a build. `tsconfig.json`'s `paths` mirrors these aliases so
+    // `tsc` typechecks against the same modules Vite bundles, and
+    // `tests/app/preact-alias.test.ts` fails loudly if the mapping ever
+    // regresses and React sneaks back in.
+    preact(),
     tailwindcss(),
     VitePWA({
       // The wrapper builds embed the bundle locally, so the service worker
@@ -304,5 +313,17 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["tests/**/*.test.{ts,tsx}"],
+    server: {
+      deps: {
+        // Vitest externalises `node_modules` by default, which means Node —
+        // not Vite — resolves the framework's own `import … from "react"`,
+        // and the `react` → `preact/compat` alias never gets a say. The
+        // framework's components would then run on real React inside a Preact
+        // tree and blow up on a null dispatcher. Inlining it puts those
+        // imports back through Vite's resolver, where the alias applies. The
+        // production build has no such split — Rollup resolves everything.
+        inline: [/@niclaslindstedt\/oss-framework/],
+      },
+    },
   },
 });

@@ -163,7 +163,7 @@ export function ImageViewer({
   // Swallow the click that trails a drag so a swipe-to-dismiss doesn't also
   // register as a backdrop click (which would itself close, harmlessly, but a
   // snap-back swipe must not close).
-  const onClickCapture = (e: React.MouseEvent) => {
+  const onClickCapture = (e: React.MouseEvent<HTMLElement>) => {
     if (dragged.current) {
       e.preventDefault();
       e.stopPropagation();

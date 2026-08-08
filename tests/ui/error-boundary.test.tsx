@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { act } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+
+import { act, fireEvent, render, screen } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearLogs, createLogger, getLogs } from "../../src/dev/logger.ts";
@@ -131,7 +131,9 @@ describe("ErrorBoundary", () => {
     const report = writeText.mock.calls[0]![0];
     expect(report).toContain("kaboom");
     expect(report).toContain("[dropbox] INFO load start");
-    expect(screen.getByRole("button", { name: /Copied/ })).toBeTruthy();
+    // The label flips once the clipboard write resolves, a microtask after the
+    // click — so wait for it rather than reading straight after `act`.
+    expect(await screen.findByRole("button", { name: /Copied/ })).toBeTruthy();
   });
 
   it("says so when the clipboard refuses", async () => {

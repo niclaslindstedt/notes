@@ -145,10 +145,10 @@ export function SearchModal({ open, onClose, snapshot, onOpen }: Props) {
           inputMode="search"
           autoComplete="off"
           autoCorrect="off"
-          spellCheck={false}
+          spellcheck={false}
           enterKeyHint="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => setQuery(e.currentTarget.value)}
           placeholder={t("search.placeholder")}
           aria-label={t("search.title")}
           className="min-w-0 flex-1 border-0 bg-transparent py-1 text-base text-fg-bright outline-none placeholder:text-muted/70 [appearance:none] [&::-webkit-search-cancel-button]:hidden"

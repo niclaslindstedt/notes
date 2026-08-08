@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { renderHook } from "@testing-library/preact";
 
 import { useUndoRedoShortcuts } from "../../src/ui/hooks/useUndoRedoShortcuts.ts";
 

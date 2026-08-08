@@ -308,6 +308,44 @@ change out by labelling the PR `no-changelog`.
 
 ## Architecture summary
 
+### The renderer is Preact, but the imports still say `react`
+
+The app renders with **Preact** via `preact/compat`. Nothing imports `preact`
+directly: `@preact/preset-vite` aliases `react`, `react-dom`, and
+`react/jsx-runtime` onto `preact/compat` for every importer — the app source
+and `@niclaslindstedt/oss-framework` alike — and `tsconfig.json`'s `paths`
+mirrors those aliases so `tsc` checks against the same modules Vite bundles.
+So **keep writing `import { useState } from "react"`**; it resolves to Preact
+either way, and switching a file to a bare `preact` import only splits the
+vocabulary. React stays in `node_modules` purely to satisfy the framework's
+peer range — it is never resolved by a build, and
+`tests/app/preact-alias.test.ts` fails loudly if that stops being true.
+
+Preact is not a drop-in for every React behaviour. The differences that bite,
+all of them already load-bearing somewhere in `src/`:
+
+- **`ref` is the renderer's, not a prop.** React 19 hands a function component
+  its `ref` as an ordinary prop; Preact lifts `ref` off props before the
+  component sees it, and only replays it through `forwardRef`. A component
+  exposing an imperative handle therefore takes it as **`handleRef`**
+  (`MarkdownEditor`, `PlainEditor`) — a plain prop no renderer intercepts.
+- **`onSelect` is the DOM's.** React synthesised it from mouse/key activity so
+  it fired on a bare caret move; Preact passes the native `select` event
+  through, which browsers only emit for a *range*. Track a collapsed caret via
+  `onMouseUp` / `onKeyUp` too (see `PlainEditor`).
+- **`onChange` / `onBlur` / `onFocus` are remapped by compat** onto `input` /
+  `focusout` / `focusin`, matching React's semantics. Real usage is unaffected;
+  tests must simulate the event the DOM actually delivers (`fireEvent.input`,
+  a real `el.blur()`), not the synthetic one.
+- **Nullable DOM fields are visible again.** `DragEvent.dataTransfer` and
+  `ClipboardEvent.clipboardData` are typed `| null` (React's synthetic events
+  hid that); handlers degrade rather than assume.
+- **`useSyncExternalStore` takes two arguments** — no server-snapshot.
+- **JSX attribute spelling is the DOM's**: `spellcheck`, not `spellCheck`; no
+  `suppressContentEditableWarning` (Preact never warns).
+- **Element-typed events need their type argument** — `DragEvent<HTMLElement>`,
+  not bare `DragEvent`.
+
 ### The shared framework
 
 The app consumes
@@ -362,7 +400,7 @@ product decision):
 - **The undo/redo shortcuts** (`src/ui/hooks/useUndoRedoShortcuts.ts`) —
   the framework's hook stands down on every `isContentEditable` target so
   the browser's native undo wins. notes' live-preview editor deliberately
-  swallows native contenteditable undo (React owns its DOM), so that guard
+  swallows native contenteditable undo (Preact owns its DOM), so that guard
   leaves ⌘/Ctrl+Z dead while the caret sits in a note. The app-owned hook
   keeps the `<input>` / `<textarea>` / `<select>` carve-out and answers the
   shortcut inside the editor.
@@ -422,7 +460,7 @@ The source tree under `src/` is organized by concern, not by file type:
   typed `t()` runtime (`index.ts`) over per-language catalog modules under
   `locales/<lang>/` (English `en/` is bundled + is the `Catalog`/`MessageKey`
   type source; every other language is code-split and loaded on demand). The
-  active language rides a React context provided by `LanguageRoot` (mounted
+  active language rides a Preact context provided by `LanguageRoot` (mounted
   around the app shell in `main.tsx`), backed by a plaintext localStorage
   mirror (`language-preference.ts`) so first paint renders in the right
   language; `locale.ts` is a framework-free code/`bcp47`/detection helper.
@@ -536,7 +574,9 @@ each its own component in `src/ui/` mounted by the path switch in
 ## Bringing features over from checklist
 
 This app is modelled on [`checklist`](https://github.com/niclaslindstedt/checklist),
-which shares the same stack (Vite + React + Tailwind + vite-plugin-pwa) and
+which shares the same conventions and a near-identical stack (Vite + Tailwind +
+vite-plugin-pwa; checklist still renders with React where notes has moved to
+Preact) and
 the same `OSS_SPEC.md` conventions. Most features, looks, modals, and buttons
 will be ported from there over time. **Use the `copy-feature` agent skill**
 (`.agent/skills/copy-feature/`) to do this — it clones checklist, studies the

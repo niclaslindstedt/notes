@@ -54,8 +54,8 @@ type Props = {
    */
   drop?: "auto" | "down";
 } & (
-  | { triggerRef: RefObject<HTMLElement | null>; anchorPoint?: undefined }
-  | { anchorPoint: FloatingPoint; triggerRef?: RefObject<HTMLElement | null> }
+  | { triggerRef: RefObject<HTMLElement>; anchorPoint?: undefined }
+  | { anchorPoint: FloatingPoint; triggerRef?: RefObject<HTMLElement> }
 );
 
 export function FloatingPanel({ drop = "auto", ...props }: Props) {

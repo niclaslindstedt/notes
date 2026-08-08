@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/preact";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useFileDrop } from "../../src/ui/hooks/useFileDrop.ts";
