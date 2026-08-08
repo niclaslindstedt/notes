@@ -5,8 +5,14 @@ import { noteTitle, type Note } from "../domain/note.ts";
 import type { UseStorageBackend } from "../storage/useStorageBackend.ts";
 import type { NotesSync } from "../app/use-notes-sync.ts";
 import type { EncryptionConversionState } from "./settings/EncryptionLogModal.tsx";
-import { SyncDetailsModal } from "./SyncDetailsModal.tsx";
+import { lazyModal } from "../app/modals/lazy-modal.tsx";
 import { SyncStatus } from "./SyncStatus.tsx";
+
+// The command-centre dialog behind the glyph — a deliberate tap, and one
+// only cloud/folder users ever make. Split off; see `lazy-modal.tsx`.
+const SyncDetailsModal = lazyModal(() =>
+  import("./SyncDetailsModal.tsx").then((m) => m.SyncDetailsModal),
+);
 
 // Header cloud-sync affordance for the non-browser backends, ported from
 // checklist's header cloud glyph + sync-details modal. Owns the modal's open

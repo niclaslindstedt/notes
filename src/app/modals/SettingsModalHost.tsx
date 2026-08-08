@@ -1,7 +1,14 @@
 import type { UseStorageBackend } from "../../storage/useStorageBackend.ts";
-import { SettingsModal } from "../../ui/settings/SettingsModal.tsx";
 import { useModalState } from "../../ui/modal-bus.ts";
 import type { EncryptionConversionState } from "../use-encryption-migration.ts";
+import { lazyModal } from "./lazy-modal.tsx";
+
+// The largest surface in the app (five sections, the theme editor, the storage
+// controls) behind the most deliberate gesture there is — the last entry in
+// the drawer footer. Split off; see `lazy-modal.tsx`.
+const SettingsModal = lazyModal(() =>
+  import("../../ui/settings/SettingsModal.tsx").then((m) => m.SettingsModal),
+);
 
 // Owns the settings dialog's open state. A "settings" command from the modal
 // bus opens it; closing dispatches the bus's `close`. The storage controls
