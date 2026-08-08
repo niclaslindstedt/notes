@@ -28,21 +28,8 @@ import {
   getBackend,
   setBackend as persistBackend,
 } from "./backend-preference.ts";
-import {
-  createDropboxNamespaceStore,
-  createDropboxSettingsStore,
-  isDropboxConfigured,
-} from "./dropbox/index.ts";
+import { isDropboxConfigured, isGdriveConfigured } from "./cloud-configured.ts";
 import { withEncryption } from "./encrypting/index.ts";
-import {
-  createGdriveNamespaceStore,
-  createGdriveSettingsStore,
-  isGdriveConfigured,
-} from "./gdrive/index.ts";
-import {
-  createFolderNamespaceStore,
-  createFolderSettingsStore,
-} from "./folder/index.ts";
 import type { NamespaceRegistryStore } from "./namespace-store.ts";
 import type { Namespace, NamespaceAppearance } from "./namespaces.ts";
 import {
@@ -63,12 +50,9 @@ import { useNotesdBackend } from "./useNotesdBackend.ts";
 import { useNotesdDiscovery } from "./useNotesdDiscovery.ts";
 import { useNamespaceMigration } from "./useNamespaceMigration.ts";
 import { useBackendSelection } from "./useBackendSelection.ts";
+import { useRemoteBackends } from "./useRemoteBackends.ts";
 import { createPinnedFetch } from "../platform/native-bridge.ts";
 import { capabilities } from "../platform/capabilities.ts";
-import {
-  createNotesdNamespaceStore,
-  createNotesdSettingsStore,
-} from "./notesd/index.ts";
 import type { NotesdConnectRequest } from "./notesd/pairing.ts";
 import type { PublishedDaemon } from "./notesd/config-plane.ts";
 
@@ -281,6 +265,10 @@ function lockedAdapter(id: BackendId): StorageAdapter {
 
 export function useStorageBackend(): UseStorageBackend {
   const [backend, setBackendState] = useState<BackendId>(getBackend);
+  // Dropbox / Drive / folder / notesd are fetched on demand — see
+  // `useRemoteBackends`. Null until then, which every consumer below reads
+  // as "this backend isn't resolved yet" and answers with the browser store.
+  const remote = useRemoteBackends(backend);
   // The active document adapter, exposed to the encryption verbs through a ref
   // they read at call time. Assigned right after `inner` is built below; null
   // only during the first render pass, before any verb can fire. This breaks
@@ -402,6 +390,7 @@ export function useStorageBackend(): UseStorageBackend {
   // active-document adapter switch on this single selection.
   const { selection, makeInner } = useBackendSelection({
     backend,
+    remote,
     dropboxToken,
     dropboxRefresh,
     gdriveToken,
@@ -424,13 +413,16 @@ export function useStorageBackend(): UseStorageBackend {
   // backend (localStorage is its only home) and while a folder grant is
   // unresolved.
   const namespaceStore = useMemo<NamespaceRegistryStore | null>(() => {
+    // No remote family loaded means `selection` is still "browser", which has
+    // no separate store anyway — so this is the browser answer, early.
+    if (!remote) return null;
     switch (selection.kind) {
       case "dropbox":
-        return createDropboxNamespaceStore(selection.auth);
+        return remote.createDropboxNamespaceStore(selection.auth);
       case "gdrive":
-        return createGdriveNamespaceStore(selection.token);
+        return remote.createGdriveNamespaceStore(selection.token);
       case "folder":
-        return createFolderNamespaceStore(
+        return remote.createFolderNamespaceStore(
           selection.handle,
           markFolderPermissionLost,
         );
@@ -438,7 +430,7 @@ export function useStorageBackend(): UseStorageBackend {
       // over the SPKI-pinned fetch, so the namespace list travels with the
       // daemon and lands on every paired device.
       case "notesd":
-        return createNotesdNamespaceStore(
+        return remote.createNotesdNamespaceStore(
           selection.config,
           createPinnedFetch(selection.config.spkiPin),
         );
@@ -447,7 +439,7 @@ export function useStorageBackend(): UseStorageBackend {
       case "browser":
         return null;
     }
-  }, [selection, markFolderPermissionLost]);
+  }, [selection, remote, markFolderPermissionLost]);
 
   // The device's namespace list + active cursor, its reconciliation against the
   // backend's `namespaces.json`, and the create / rename / appearance / remove /
@@ -484,20 +476,21 @@ export function useStorageBackend(): UseStorageBackend {
   // but independent of encryption (settings are app-wide plaintext). Null for
   // the browser backend (localStorage is its canonical settings home).
   const settingsStore = useMemo<SettingsStore | null>(() => {
+    if (!remote) return null;
     switch (selection.kind) {
       case "dropbox":
-        return createDropboxSettingsStore(selection.auth);
+        return remote.createDropboxSettingsStore(selection.auth);
       case "gdrive":
-        return createGdriveSettingsStore(selection.token);
+        return remote.createGdriveSettingsStore(selection.token);
       case "folder":
-        return createFolderSettingsStore(
+        return remote.createFolderSettingsStore(
           selection.handle,
           markFolderPermissionLost,
         );
       // notesd serves `settings.json` from the daemon (`/v1/settings/...`) over
       // the SPKI-pinned fetch, so appearance settings sync across paired devices.
       case "notesd":
-        return createNotesdSettingsStore(
+        return remote.createNotesdSettingsStore(
           selection.config,
           createPinnedFetch(selection.config.spkiPin),
         );
@@ -506,7 +499,7 @@ export function useStorageBackend(): UseStorageBackend {
       case "browser":
         return null;
     }
-  }, [selection, markFolderPermissionLost]);
+  }, [selection, remote, markFolderPermissionLost]);
 
   // The adapter handed to the app. While locked, a no-op placeholder. The
   // file/cloud backends encrypt per-file *inside* the directory adapter (via

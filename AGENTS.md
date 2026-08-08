@@ -326,6 +326,17 @@ lands back in everyone's first download:
   it. **Not for anything that must render inside the tap that asked for it** —
   the search modal opens in a `flushSync` so iOS raises the keyboard, and an
   await there breaks it. That one stays static, deliberately.
+- **`src/storage/remote-backends.ts` holds every backend that isn't
+  `localStorage`.** Dropbox, Drive, the picked folder and notesd — plus the
+  directory adapter and offline-cache mirror they share — are behind one
+  `import()`, because the app opens on the browser backend and stays there
+  unless someone connects something. The render path reaches them through
+  `useRemoteBackends`; verbs that run on a gesture (connect, delete a
+  namespace, publish a daemon) use a local `await import()`. **Never import
+  `remote-backends.ts` statically** — one static edge folds the whole family
+  back into the first paint. The things that must answer at boot were split
+  into their own small modules for exactly this reason:
+  `cache/offline-error.ts`, `dropbox/pending.ts`, `cloud-configured.ts`.
 - **Dev-only code is imported at the point of use.** The seed dataset loads
   behind `import.meta.env.VITE_SEED` (which folds to `false` and drops the
   module in an ordinary build), and the fake-data adapter is imported when the

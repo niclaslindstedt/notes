@@ -13,6 +13,8 @@
 // single `/notes.json` envelope instead of markdown.
 
 import { createLogger } from "../../dev/logger.ts";
+import { DROPBOX_APP_KEY } from "../cloud-configured.ts";
+import { PKCE_VERIFIER_KEY } from "./pkce-key.ts";
 import { AuthError, type StorageAdapter } from "../adapter.ts";
 import type { AttachmentEntry, AttachmentStore } from "../attachment-store.ts";
 import {
@@ -60,11 +62,8 @@ const log = createLogger("dropbox");
 // must include the prod and dev origins with no trailing slash — `startAuth`
 // derives the URI from `window.location.origin` + pathname and Dropbox
 // requires an exact match.
-export const DROPBOX_APP_KEY = import.meta.env.VITE_DROPBOX_APP_KEY ?? "";
 
-export function isDropboxConfigured(): boolean {
-  return DROPBOX_APP_KEY.length > 0;
-}
+export { DROPBOX_APP_KEY, isDropboxConfigured } from "../cloud-configured.ts";
 
 // Public folder name inside the user's Dropbox `Apps/` directory. This must
 // match the folder name on the Dropbox app registration's "App folder"
@@ -118,10 +117,6 @@ const DELETE_ENDPOINT = "https://api.dropboxapi.com/2/files/delete_v2";
 // every change" in feel — rapid edits within a single gesture collapse into
 // one network save.
 const SAVE_DEBOUNCE_MS = 1000;
-
-// `sessionStorage` survives the OAuth redirect round-trip but is scoped to
-// the tab, so a parallel auth flow in another tab can't race with this.
-const PKCE_VERIFIER_KEY = "notes:dropbox:pkce:verifier";
 
 export type FetchImpl = typeof fetch;
 
@@ -473,9 +468,7 @@ export function startDropboxAuth(): Promise<void> {
 // True when a Dropbox OAuth flow is mid-flight — i.e. `startDropboxAuth`
 // stashed a PKCE verifier in `sessionStorage` and the redirect back from
 // Dropbox has not yet been consumed by `completeDropboxAuth`.
-export function hasPendingDropboxAuth(): boolean {
-  return sessionStorage.getItem(PKCE_VERIFIER_KEY) !== null;
-}
+export { hasPendingDropboxAuth } from "./pending.ts";
 
 export function completeDropboxAuth(
   code: string,

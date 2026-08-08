@@ -25,12 +25,10 @@ import {
   setDropboxToken,
   setGdriveToken,
 } from "./backend-preference.ts";
-import {
-  completeDropboxAuth,
-  hasPendingDropboxAuth,
-  startDropboxAuth,
-} from "./dropbox/index.ts";
-import { startGdriveAuth } from "./gdrive/index.ts";
+// Only the pending-redirect probe is static — it runs on every boot. The auth
+// flows themselves are fetched when a connect actually happens, so the cloud
+// backends stay out of the first paint (see `remote-backends.ts`).
+import { hasPendingDropboxAuth } from "./dropbox/pending.ts";
 
 const log = createLogger("storage");
 
@@ -118,6 +116,7 @@ export function useCloudBackend({
     void (async () => {
       try {
         log.info("boot: completing Dropbox OAuth redirect");
+        const { completeDropboxAuth } = await import("./dropbox/index.ts");
         const result = await completeDropboxAuth(code);
         if (cancelled) return;
         setDropboxToken(result.accessToken);
@@ -142,7 +141,7 @@ export function useCloudBackend({
   const connectDropbox = useCallback(() => {
     // Redirects away; completion runs in the boot effect above — anything
     // queued here wouldn't survive the redirect.
-    void startDropboxAuth();
+    void import("./dropbox/index.ts").then((m) => m.startDropboxAuth());
   }, []);
 
   const disconnectDropbox = useCallback(() => {
@@ -154,6 +153,7 @@ export function useCloudBackend({
   }, [selectBackend]);
 
   const connectGdrive = useCallback(async () => {
+    const { startGdriveAuth } = await import("./gdrive/index.ts");
     const token = await startGdriveAuth();
     setGdriveToken(token);
     setGdriveTokenState(token);

@@ -3584,6 +3584,23 @@ and raises the keyboard, and an `await` in the middle of that loses it. Search
 stays statically imported; so should anything else that must render within the
 tap.
 
+**The backends you never connect never load.** `remote-backends.ts` is a single
+`import()` boundary in front of Dropbox, Google Drive, the picked folder and
+notesd, together with the directory adapter and offline-cache mirror they
+share. The app opens on the browser backend and stays there unless someone
+deliberately connects something, so for most people that is code downloaded and
+parsed to be skipped. The render path reaches it through `useRemoteBackends`,
+which returns `null` until the module lands; every non-browser arm of
+[`useBackendSelection`](#storage-backend-hook) requires it, so the selection stays
+on the browser store meanwhile — the *same* fall-through it already takes while
+a Dropbox token is being read or a folder grant probed, which is why nothing
+downstream needed a new not-ready state. Verbs that run on a gesture — connect,
+remove a namespace, publish a daemon — use a local `await import()` instead.
+Three things have to answer at boot and were split into their own small modules
+so they can: `cache/offline-error.ts` (the `instanceof` check in
+[`UnlockGate`](#unlock-gate)), `dropbox/pending.ts` (is an OAuth redirect
+waiting?), and `cloud-configured.ts` (was this build given a client id?).
+
 **Dev-only code is imported where it is used.** The [seed
 dataset](#fake-data) loads behind `import.meta.env.VITE_SEED`, which
 folds to `false` in an ordinary build and drops the module entirely, and the
