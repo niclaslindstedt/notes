@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
 
 import { SideMenuActionBar } from "../../src/ui/SideMenuActionBar.tsx";
 import { NOTE_DROP_ARCHIVE } from "../../src/ui/note-drag-context.ts";
@@ -90,8 +90,10 @@ describe("SideMenuActionBar", () => {
     const redo = screen.getByRole("menuitem", { name: "Redo" });
     expect((undo as HTMLButtonElement).disabled).toBe(true);
     expect((redo as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(undo);
-    fireEvent.click(redo);
+    // `.click()` honours `disabled` the way a browser does; `fireEvent.click`
+    // dispatches straight at the node and would reach a disabled button.
+    undo.click();
+    redo.click();
     expect(props.onUndo).not.toHaveBeenCalled();
     expect(props.onRedo).toHaveBeenCalledTimes(1);
   });

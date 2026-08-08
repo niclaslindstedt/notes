@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ReportDragActivityContext } from "../../src/ui/drag-activity.ts";
@@ -277,7 +277,9 @@ describe("note long-press drag", () => {
     act(() => void vi.advanceTimersByTime(400));
     expect(report).toHaveBeenLastCalledWith(true);
 
-    act(() => fireEvent.pointerUp(wrapper, { pointerId: 1 }));
+    act(() => {
+      fireEvent.pointerUp(wrapper, { pointerId: 1 });
+    });
     expect(report).toHaveBeenLastCalledWith(false);
   });
 });

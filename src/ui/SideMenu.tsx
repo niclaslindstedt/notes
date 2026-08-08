@@ -4,6 +4,7 @@ import {
   useState,
   type DragEvent as ReactDragEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { flushSync } from "react-dom";
 
@@ -298,14 +299,21 @@ export function SideMenu({
     });
   }
 
-  function startNoteDrag(e: ReactDragEvent, id: string) {
-    e.dataTransfer.setData(NOTE_DND_TYPE, id);
-    e.dataTransfer.effectAllowed = "move";
+  // `dataTransfer` is optional throughout: the DOM types it nullable (it is
+  // only ever absent on a synthetic `DragEvent` built without one, which is
+  // exactly what the tests construct), where React's synthetic event declared
+  // it always present. The live `dragItem` below is the authoritative source
+  // anyway — the MIME payload only exists so a drag can cross into another
+  // window — so an absent transfer degrades to it rather than dropping the
+  // gesture.
+  function startNoteDrag(e: ReactDragEvent<HTMLElement>, id: string) {
+    e.dataTransfer?.setData(NOTE_DND_TYPE, id);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
     setDragItem({ kind: "note", id });
   }
-  function startFolderDrag(e: ReactDragEvent, id: string) {
-    e.dataTransfer.setData(FOLDER_DND_TYPE, id);
-    e.dataTransfer.effectAllowed = "move";
+  function startFolderDrag(e: ReactDragEvent<HTMLElement>, id: string) {
+    e.dataTransfer?.setData(FOLDER_DND_TYPE, id);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
     setDragItem({ kind: "folder", id });
   }
   function endDrag() {
@@ -315,45 +323,49 @@ export function SideMenu({
   // `acceptFolder` marks the rare target (a namespace row) that also takes a
   // dragged folder; every other target accepts notes only, so a folder drag
   // over it is left inert.
-  function allowDropOn(e: ReactDragEvent, key: string, acceptFolder = false) {
+  function allowDropOn(
+    e: ReactDragEvent<HTMLElement>,
+    key: string,
+    acceptFolder = false,
+  ) {
     if (!dragItem) return;
     if (dragItem.kind === "folder" && !acceptFolder) return;
     e.preventDefault();
     // Folders now nest inside the ungrouped root drop zone, so stop the
     // hover from bubbling up and lighting the root highlight at the same time.
     e.stopPropagation();
-    e.dataTransfer.dropEffect = "move";
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
     if (dropTarget !== key) setDropTarget(key);
   }
-  function dropOn(e: ReactDragEvent, folderId: string | null) {
+  function dropOn(e: ReactDragEvent<HTMLElement>, folderId: string | null) {
     e.preventDefault();
     // A drop on a folder must not also bubble to the root zone (which would
     // immediately move the note back out to the top level).
     e.stopPropagation();
     const id =
-      e.dataTransfer.getData(NOTE_DND_TYPE) ||
+      e.dataTransfer?.getData(NOTE_DND_TYPE) ||
       (dragItem?.kind === "note" ? dragItem.id : "");
     endDrag();
     if (id) onMoveNote(id, folderId);
   }
-  function dropOnNamespace(e: ReactDragEvent, slug: string) {
+  function dropOnNamespace(e: ReactDragEvent<HTMLElement>, slug: string) {
     e.preventDefault();
     // A namespace row accepts either a note or a whole folder; the dataTransfer
     // MIME (or the live drag item) says which.
     const folderId =
-      e.dataTransfer.getData(FOLDER_DND_TYPE) ||
+      e.dataTransfer?.getData(FOLDER_DND_TYPE) ||
       (dragItem?.kind === "folder" ? dragItem.id : "");
     const noteId =
-      e.dataTransfer.getData(NOTE_DND_TYPE) ||
+      e.dataTransfer?.getData(NOTE_DND_TYPE) ||
       (dragItem?.kind === "note" ? dragItem.id : "");
     endDrag();
     if (folderId) onMoveFolderToNamespace(folderId, slug);
     else if (noteId) onMoveNoteToNamespace(noteId, slug);
   }
-  function dropOnArchive(e: ReactDragEvent) {
+  function dropOnArchive(e: ReactDragEvent<HTMLElement>) {
     e.preventDefault();
     const id =
-      e.dataTransfer.getData(NOTE_DND_TYPE) ||
+      e.dataTransfer?.getData(NOTE_DND_TYPE) ||
       (dragItem?.kind === "note" ? dragItem.id : "");
     endDrag();
     if (id) onArchiveNote(id);
@@ -813,7 +825,13 @@ export function SideMenu({
           />
           <nav
             id={drawerId}
-            ref={swipeClose.panelRef}
+            // The framework's public types are written against `@types/react`,
+            // where `RefObject<T>.current` is `T` and the nullability has to be
+            // spelled out — so `panelRef` is declared `RefObject<HTMLElement |
+            // null>`. Preact's `RefObject<T>.current` is already `T | null`, so
+            // the two are the same shape with the union doubled up, and TS's
+            // variance check on the alias rejects the assignment anyway.
+            ref={swipeClose.panelRef as RefObject<HTMLElement>}
             aria-label={t("nav.label")}
             style={{ transform: `translateX(${swipeClose.offset}px)` }}
             className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl select-none [touch-action:pan-y] [padding-top:max(0.375rem,calc(env(safe-area-inset-top)_-_0.375rem))] ${

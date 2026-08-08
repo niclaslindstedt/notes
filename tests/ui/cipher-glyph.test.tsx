@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render } from "@testing-library/react";
+import { act, render } from "@testing-library/preact";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CipherGlyph } from "../../src/ui/CipherGlyph.tsx";

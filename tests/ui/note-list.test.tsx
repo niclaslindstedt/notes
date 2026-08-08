@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
 
 import { NoteList } from "../../src/ui/note-list/NoteList.tsx";
 import type { Folder, Note } from "../../src/domain/note.ts";
@@ -137,7 +137,7 @@ describe("NoteList", () => {
 
     // The header swaps for the inline editor; commit a new name on Enter.
     const input = screen.getByLabelText("Folder name") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "Personal" } });
+    fireEvent.input(input, { target: { value: "Personal" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onRenameFolder).toHaveBeenCalledWith("f1", "Personal");
   });

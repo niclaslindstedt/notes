@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import { describe, expect, it, vi } from "vitest";
 
 import { UnlockGate } from "../../src/ui/UnlockGate.tsx";
@@ -30,7 +30,7 @@ describe("unlock gate status feedback", () => {
 
     render(<UnlockGate storage={storage} />);
 
-    fireEvent.change(screen.getByLabelText("Passphrase"), {
+    fireEvent.input(screen.getByLabelText("Passphrase"), {
       target: { value: "hunter2" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
@@ -56,7 +56,7 @@ describe("unlock gate status feedback", () => {
     const storage = { unlock } as unknown as UseStorageBackend;
 
     render(<UnlockGate storage={storage} />);
-    fireEvent.change(screen.getByLabelText("Passphrase"), {
+    fireEvent.input(screen.getByLabelText("Passphrase"), {
       target: { value: "hunter2" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
@@ -79,7 +79,7 @@ describe("unlock gate status feedback", () => {
     const storage = { unlock } as unknown as UseStorageBackend;
 
     render(<UnlockGate storage={storage} />);
-    fireEvent.change(screen.getByLabelText("Passphrase"), {
+    fireEvent.input(screen.getByLabelText("Passphrase"), {
       target: { value: "hunter2" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
@@ -101,7 +101,7 @@ describe("unlock gate status feedback", () => {
     const storage = { unlock } as unknown as UseStorageBackend;
 
     render(<UnlockGate storage={storage} />);
-    fireEvent.change(screen.getByLabelText("Passphrase"), {
+    fireEvent.input(screen.getByLabelText("Passphrase"), {
       target: { value: "hunter2" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Unlock" }));

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { classifyLines } from "../../src/domain/markdown.ts";
@@ -14,11 +14,11 @@ function renderLine(source: string) {
   return render(<RenderedLine block={classifyLines(source)[0]!} />);
 }
 
-function poster(container: HTMLElement): HTMLImageElement | null {
+function poster(container: Element): HTMLImageElement | null {
   return container.querySelector("img");
 }
 
-function player(container: HTMLElement): HTMLIFrameElement | null {
+function player(container: Element): HTMLIFrameElement | null {
   return container.querySelector("iframe");
 }
 

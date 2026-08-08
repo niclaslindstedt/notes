@@ -224,7 +224,7 @@ export function NoteDragItem({
   draggable?: boolean;
   /** The desktop drag state for this row, for the lift styling. */
   dragging?: boolean;
-  onDragStart?: (e: ReactDragEvent) => void;
+  onDragStart?: (e: ReactDragEvent<HTMLElement>) => void;
   onDragEnd?: () => void;
   className?: string;
   children: ReactNode;

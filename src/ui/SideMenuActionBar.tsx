@@ -80,9 +80,9 @@ export function SideMenuActionBar({
   canRedo: boolean;
   /** Whether the Archive cell should paint its drag-hover highlight. */
   archiveIsDropTarget: boolean;
-  onArchiveDragOver: (e: ReactDragEvent) => void;
-  onArchiveDragLeave: (e: ReactDragEvent) => void;
-  onArchiveDrop: (e: ReactDragEvent) => void;
+  onArchiveDragOver: (e: ReactDragEvent<HTMLElement>) => void;
+  onArchiveDragLeave: (e: ReactDragEvent<HTMLElement>) => void;
+  onArchiveDrop: (e: ReactDragEvent<HTMLElement>) => void;
 }) {
   const t = useT();
   return (
@@ -172,9 +172,9 @@ function BarButton({
   onClick: () => void;
   dropId?: string;
   isDropTarget?: boolean;
-  onDragOver?: (e: ReactDragEvent) => void;
-  onDragLeave?: (e: ReactDragEvent) => void;
-  onDrop?: (e: ReactDragEvent) => void;
+  onDragOver?: (e: ReactDragEvent<HTMLElement>) => void;
+  onDragLeave?: (e: ReactDragEvent<HTMLElement>) => void;
+  onDrop?: (e: ReactDragEvent<HTMLElement>) => void;
 }) {
   return (
     <button

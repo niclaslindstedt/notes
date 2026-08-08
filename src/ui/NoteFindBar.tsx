@@ -94,7 +94,7 @@ export function NoteFindBar({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
+            onChange={(e) => onQueryChange(e.currentTarget.value)}
             onKeyDown={onKeyDown}
             placeholder={t("app.find.placeholder")}
             aria-label={t("app.find.bar")}
@@ -103,7 +103,7 @@ export function NoteFindBar({
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
-            spellCheck={false}
+            spellcheck={false}
             className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-fg outline-none placeholder:text-muted/60"
           />
           {/* The counter says which hit you're on and how many there are, so

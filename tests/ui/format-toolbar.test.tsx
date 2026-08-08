@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
 
 import type { LineFormat } from "../../src/domain/markdown-format.ts";
 import { FormatToolbar } from "../../src/ui/FormatToolbar.tsx";

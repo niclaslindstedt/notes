@@ -108,24 +108,27 @@ export function NoteList({
       return next;
     });
   }
-  function startDrag(e: ReactDragEvent, id: string) {
-    e.dataTransfer.setData(NOTE_DND_TYPE, id);
-    e.dataTransfer.effectAllowed = "move";
+  // `dataTransfer` is optional throughout — see the same note in `SideMenu`:
+  // the DOM types it nullable, and `draggingNote` below is the authoritative
+  // source, so an absent payload degrades to it rather than losing the drag.
+  function startDrag(e: ReactDragEvent<HTMLElement>, id: string) {
+    e.dataTransfer?.setData(NOTE_DND_TYPE, id);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
     setDraggingNote(id);
   }
   function endDrag() {
     setDraggingNote(null);
     setDropTarget(null);
   }
-  function allowDropOn(e: ReactDragEvent, key: string) {
+  function allowDropOn(e: ReactDragEvent<HTMLElement>, key: string) {
     if (!draggingNote) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
     if (dropTarget !== key) setDropTarget(key);
   }
-  function dropOn(e: ReactDragEvent, folderId: string | null) {
+  function dropOn(e: ReactDragEvent<HTMLElement>, folderId: string | null) {
     e.preventDefault();
-    const id = e.dataTransfer.getData(NOTE_DND_TYPE) || draggingNote;
+    const id = e.dataTransfer?.getData(NOTE_DND_TYPE) || draggingNote;
     endDrag();
     if (id) onMoveNote(id, folderId);
   }
@@ -509,7 +512,7 @@ function FolderRenameRow({
         value={value}
         placeholder={placeholder}
         aria-label={placeholder}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => setValue(e.currentTarget.value)}
         onBlur={finish}
         onKeyDown={(e) => {
           if (e.key === "Enter") {

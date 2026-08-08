@@ -32,8 +32,8 @@ export function FileAttachment({ attachment, srcOffset }: Props) {
       // Stop the editor's line-level mousedown from rolling the caret here, so
       // a click downloads the file instead of entering edit mode (mirrors the
       // inline image and link nodes).
-      onMouseDown={(e: ReactMouseEvent) => e.stopPropagation()}
-      onClick={(e: ReactMouseEvent) => {
+      onMouseDown={(e: ReactMouseEvent<HTMLElement>) => e.stopPropagation()}
+      onClick={(e: ReactMouseEvent<HTMLElement>) => {
         e.stopPropagation();
         if (!data) e.preventDefault();
       }}

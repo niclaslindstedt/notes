@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/preact";
 
 import { FloatingPanel } from "../../src/ui/FloatingPanel.tsx";
 import type { FloatingPlacement } from "../../src/ui/hooks/useFloatingPosition.ts";

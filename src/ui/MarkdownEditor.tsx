@@ -171,8 +171,14 @@ type Props = {
   matches?: readonly NoteMatch[];
   /** Index into `matches` of the hit the bar is parked on, or -1 for none. */
   activeMatch?: number;
-  /** Imperative handle so the title field can hand focus down into the body. */
-  ref?: Ref<MarkdownEditorHandle>;
+  /**
+   * Imperative handle so the title field can hand focus down into the body.
+   * Named `handleRef`, not `ref`: Preact reserves `ref` for the renderer (it
+   * is lifted off props before the component sees it) and only replays it as
+   * a prop through `forwardRef`, so a handle passed as `ref` would never
+   * arrive.
+   */
+  handleRef?: Ref<MarkdownEditorHandle>;
 };
 
 // A stable empty hit list, so a closed find bar hands every line the identical
@@ -227,7 +233,7 @@ export function MarkdownEditor({
   onLineFormat,
   matches = NO_MATCHES,
   activeMatch = -1,
-  ref,
+  handleRef,
 }: Props) {
   const t = useT();
   // Where the caret / scroll were the last time this note was left this session
@@ -1008,7 +1014,10 @@ export function MarkdownEditor({
     // interception above is: a paste it applies itself corrupts the DOM React
     // owns. An unmappable selection drops the paste rather than risking that.
     e.preventDefault();
-    const text = e.clipboardData.getData("text/plain");
+    // `clipboardData` is typed nullable by the DOM (React's synthetic event
+    // declared it always present); a paste event without one carries nothing
+    // to insert, so an empty string is the right degradation.
+    const text = e.clipboardData?.getData("text/plain") ?? "";
     const pts = selectionPoints();
     if (!pts) return;
     replaceSelection(pts.start, pts.end, text);
@@ -1405,7 +1414,7 @@ export function MarkdownEditor({
   const cutRef = useRef(cut);
   cutRef.current = cut;
   useImperativeHandle(
-    ref,
+    handleRef ?? null,
     () => ({
       focus: () => placeCaretAtEndRef.current(),
       format: (action: FormatAction) => formatRef.current(action),
@@ -1511,8 +1520,7 @@ export function MarkdownEditor({
           // never reached twice (and never traps focus in the header).
           tabIndex={-1}
           contentEditable={editableMode}
-          suppressContentEditableWarning
-          spellCheck={!disableSpellcheck}
+          spellcheck={!disableSpellcheck}
           autoCorrect={disableAutocorrect ? "off" : "on"}
           autoCapitalize={disableAutocorrect ? "off" : "sentences"}
           onKeyDown={onKeyDown}
@@ -1726,13 +1734,7 @@ function ActiveLine({
   setRef: (el: HTMLDivElement | null) => void;
 }) {
   return (
-    <div
-      ref={setRef}
-      data-line-index={index}
-      data-raw=""
-      suppressContentEditableWarning
-      className={className}
-    >
+    <div ref={setRef} data-line-index={index} data-raw="" className={className}>
       <RawLine block={block} />
     </div>
   );
@@ -1772,7 +1774,7 @@ function setScrollTop(el: HTMLElement | null | undefined, top: number): void {
 
 // Whether a drag is carrying files (rather than dragged text) — the same
 // `"Files"` type check the global import uses.
-function carriesFiles(e: ReactDragEvent): boolean {
+function carriesFiles(e: ReactDragEvent<HTMLElement>): boolean {
   const types = e.dataTransfer?.types;
   return types ? Array.from(types).includes("Files") : false;
 }

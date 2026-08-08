@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/preact";
 
 import {
   DOC_SCOPE,
@@ -61,7 +61,9 @@ describe("useUndoRedo", () => {
     const { view, last, rec } = mount();
     rec(DOC_SCOPE, snap("a"), snap("a", "b"), "New note");
     expect(view.result.current.canUndo).toBe(true);
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(tagsOf(last().snapshot)).toEqual(["a"]);
     expect(view.result.current.canUndo).toBe(false);
     expect(view.result.current.canRedo).toBe(true);
@@ -99,8 +101,12 @@ describe("useUndoRedo", () => {
   it("redoes back to the undone snapshot", () => {
     const { view, applied, rec } = mount();
     rec(DOC_SCOPE, snap("a"), snap("a", "b"), "New note");
-    act(() => view.result.current.undo());
-    act(() => view.result.current.redo());
+    act(() => {
+      view.result.current.undo();
+    });
+    act(() => {
+      view.result.current.redo();
+    });
     expect(applied.map((a) => tagsOf(a.snapshot))).toEqual([["a"], ["a", "b"]]);
     expect(view.result.current.canRedo).toBe(false);
   });
@@ -108,7 +114,9 @@ describe("useUndoRedo", () => {
   it("drops the redo branch when a new edit is recorded after an undo", () => {
     const { view, rec } = mount();
     rec(DOC_SCOPE, snap("a"), snap("a", "b"), "New note");
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(view.result.current.canRedo).toBe(true);
     rec(DOC_SCOPE, snap("a"), snap("a", "c"), "New note");
     expect(view.result.current.canRedo).toBe(false);
@@ -117,7 +125,9 @@ describe("useUndoRedo", () => {
   it("reset drops every timeline", () => {
     const { view, rec } = mount();
     rec(DOC_SCOPE, snap("a"), snap("a", "b"), "New note");
-    act(() => view.result.current.reset());
+    act(() => {
+      view.result.current.reset();
+    });
     expect(view.result.current.canUndo).toBe(false);
     expect(view.result.current.canRedo).toBe(false);
   });
@@ -131,7 +141,9 @@ describe("useUndoRedo", () => {
     rec("a", snap("abc"), snap("abcd"), "Edited note", "edit:a:0:0");
     expect(view.result.current.canUndo).toBe(true);
     // A single undo jumps straight back past the whole editing session.
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(tagsOf(last().snapshot)).toEqual(["a"]);
     expect(view.result.current.canUndo).toBe(false);
   });
@@ -143,7 +155,9 @@ describe("useUndoRedo", () => {
     rec("b", snap("a1"), snap("b1"), "Edited note");
     // Looking at "a": undo walks a's timeline back to its seed.
     expect(view.result.current.canUndo).toBe(true);
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(last().scope).toBe("a");
     expect(tagsOf(last().snapshot)).toEqual(["a0"]);
     // a is now exhausted, but b's timeline is untouched.
@@ -151,7 +165,9 @@ describe("useUndoRedo", () => {
     // Switch to note "b": its own history is available again.
     view.rerender("b");
     expect(view.result.current.canUndo).toBe(true);
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(last().scope).toBe("b");
     expect(tagsOf(last().snapshot)).toEqual(["a1"]);
   });
@@ -175,11 +191,17 @@ describe("useUndoRedo", () => {
     type("One. Two. ", 2); // second sentence finished
     type("One. Two. Three", 2);
 
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(tagsOf(last().snapshot)).toEqual(["One. Two."]);
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(tagsOf(last().snapshot)).toEqual(["One."]);
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(tagsOf(last().snapshot)).toEqual([""]);
     expect(view.result.current.canUndo).toBe(false);
   });
@@ -204,11 +226,17 @@ describe("useUndoRedo", () => {
     for (const b of ["w", "wo", "wor", "worl", "world"]) edit(b);
 
     // Undo peels back "world", then the erase (to empty), then "hello".
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(tagsOf(last().snapshot)).toEqual([""]);
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(tagsOf(last().snapshot)).toEqual(["hello"]);
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(tagsOf(last().snapshot)).toEqual([""]);
   });
 
@@ -218,7 +246,9 @@ describe("useUndoRedo", () => {
     // Open a different, untouched note: its timeline is empty, so undo is inert.
     view.rerender("untouched");
     expect(view.result.current.canUndo).toBe(false);
-    act(() => view.result.current.undo());
+    act(() => {
+      view.result.current.undo();
+    });
     expect(view.result.current.canRedo).toBe(false);
   });
 });

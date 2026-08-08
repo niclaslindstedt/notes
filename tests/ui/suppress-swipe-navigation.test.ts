@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { renderHook } from "@testing-library/react";
+import { renderHook } from "@testing-library/preact";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { useSuppressSwipeNavigation } from "../../src/ui/hooks/useSuppressSwipeNavigation.ts";

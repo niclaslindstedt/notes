@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { act } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+
+import { act, fireEvent, render, screen } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MarkdownEditor } from "../../src/ui/MarkdownEditor.tsx";
@@ -181,7 +181,9 @@ describe("MarkdownEditor", () => {
     // Put the caret back on the bullet itself, then break with no keydown at
     // all: a new bullet, not another continuation row.
     caretIn(screen.getByText("one").firstChild as unknown as HTMLElement, 3);
-    act(() => document.dispatchEvent(new Event("selectionchange")));
+    act(() => {
+      document.dispatchEvent(new Event("selectionchange"));
+    });
     beforeInput("insertParagraph");
     expect(onChange).toHaveBeenLastCalledWith("- one\n- \n  ");
   });
@@ -305,7 +307,10 @@ describe("MarkdownEditor", () => {
       // the render that used to throw on a surface the browser had rewritten.
       expect(() => {
         act(() => {
-          fireEvent.blur(surface());
+          // A real blur, not a synthetic one: Preact maps `onBlur` onto the
+          // bubbling `focusout` (React's semantics) that only `blur()` emits.
+          surface().focus();
+          surface().blur();
         });
       }).not.toThrow();
       expect(screen.getByText("Start writing…")).toBeTruthy();
@@ -489,7 +494,9 @@ describe("MarkdownEditor", () => {
       expect(rawLine()).toBeNull();
       const plain = screen.getByText("plain");
       caretIn(plain.firstChild as unknown as HTMLElement, 2);
-      act(() => document.dispatchEvent(new Event("selectionchange")));
+      act(() => {
+        document.dispatchEvent(new Event("selectionchange"));
+      });
       // Line 1 is now the active raw line showing its source.
       const raw = rawLine();
       expect(raw?.getAttribute("data-line-index")).toBe("1");
@@ -621,7 +628,9 @@ describe("MarkdownEditor", () => {
     it("reveals the fences once the caret steps inside the block", () => {
       renderEditor("before\n```\ncode\n```\n", { focusOnMount: false });
       caretIn(screen.getByText("code"), 0);
-      act(() => document.dispatchEvent(new Event("selectionchange")));
+      act(() => {
+        document.dispatchEvent(new Event("selectionchange"));
+      });
       expect(renderedIndices()).toEqual(["0", "1", "2", "3", "4"]);
       expect(rawLine()?.getAttribute("data-line-index")).toBe("2");
       expect(surface().textContent).toContain("```");
@@ -713,15 +722,25 @@ describe("MarkdownEditor", () => {
   // reconciled the line in place and tried to tear down the `<br>` the browser
   // had already swapped out. `composeInto` stands in for that native rewrite.
   describe("IME / dead-key composition", () => {
+    // Dispatched natively rather than through `fireEvent`: Testing Library's
+    // Preact bindings route an event either at the matching `on<name>` DOM
+    // property or, failing that, through a fallback that mis-cases the type —
+    // and jsdom exposes no `oncompositionstart`, so the fallback is what a
+    // `fireEvent.compositionStart` would take.
+    function compose(kind: "compositionstart" | "compositionend", data = "") {
+      surface().dispatchEvent(
+        new CompositionEvent(kind, { bubbles: true, data }),
+      );
+    }
     function composeInto(line: HTMLElement, text: string) {
       act(() => {
-        fireEvent.compositionStart(surface());
+        compose("compositionstart");
       });
       // The browser rewrites the line's children itself — on an empty line that
-      // means dropping the lone <br> React rendered there.
+      // means dropping the lone <br> the renderer put there.
       line.textContent = text;
       act(() => {
-        fireEvent.compositionEnd(surface(), { data: text });
+        compose("compositionend", text);
       });
     }
 

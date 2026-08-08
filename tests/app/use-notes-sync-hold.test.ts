@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/preact";
 
 import { useNotesSync } from "../../src/app/use-notes-sync.ts";
 import type { Snapshot } from "../../src/domain/note.ts";

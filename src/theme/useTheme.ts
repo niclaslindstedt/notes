@@ -426,11 +426,10 @@ export function setDisableAchievements(disabled: boolean): void {
 
 /** Read the persisted appearance and re-render on change. */
 export function useAppearance(): Appearance {
-  return useSyncExternalStore(
-    subscribe,
-    () => current,
-    () => DEFAULT_APPEARANCE,
-  );
+  // No server-snapshot argument: Preact's `useSyncExternalStore` takes only
+  // (subscribe, getSnapshot). The app never renders on a server, so the
+  // fallback was dead weight either way.
+  return useSyncExternalStore(subscribe, () => current);
 }
 
 /**
@@ -438,7 +437,7 @@ export function useAppearance(): Appearance {
  * settings dialog streams a draft, otherwise the persisted document.
  */
 function useEffectiveAppearance(): Appearance {
-  return useSyncExternalStore(subscribe, effective, () => DEFAULT_APPEARANCE);
+  return useSyncExternalStore(subscribe, effective);
 }
 
 /**
