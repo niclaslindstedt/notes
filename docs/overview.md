@@ -664,6 +664,20 @@ and `tabIndex={-1}`, keeping it out of both the editable text and the tab order
 (the editor hands focus on via `onTabOut`, and one tab stop per line would trap
 a long note).
 
+**The gutter is only as wide as the note needs.** The surface reserves its left
+padding from the digit count of the note's *highest* line number — a nine-line
+note spends one digit's width on it, and the tenth line is what widens it to two
+— so a short note keeps the room a fixed gutter would have spent on numbers it
+will never show. The reservation is a `calc()` in `ch` at the surface's own
+font, times the `0.75em` the numbers are drawn at, so it tracks the digits
+across every font family and font-scale setting; `GUTTER_GAP` is the one
+constant the surface and the number both read for the space between them. The
+number itself shrink-wraps its digits and hangs off `right-full`, which
+right-aligns the column against the text with no width to compute, and spans the
+row's full height to **centre within it** — so on a heading, or a long line the
+wrap has made several rows tall, the digit sits beside the middle of the line it
+belongs to instead of clinging to its top.
+
 A press runs `selectLine`, which reuses the same machinery a multi-line block
 format does: the line stops being the active raw one, and the whole-line
 selection is queued in `pendingLineSpan` for the layout effect to draw with
@@ -672,6 +686,22 @@ no re-render to wait for, so it is drawn straight away). The result is an
 ordinary ranged selection over the formatted line, so cut / copy / type-over and
 the styling toolbar all treat it exactly as a hand-drawn one — `spanLine` keeps
 the toolbar reporting the pressed line while no single line is active.
+
+**A press works from a note that isn't being edited yet**, which on a phone is
+the common case: an existing note opens with no active line and the soft
+keyboard down, so the press has to raise the keyboard *and* land the selection,
+without the view going anywhere. `selectLineSpan` takes focus with
+`preventScroll` — the browser's own focus-time reveal reveals the editing host,
+the whole note, which throws the view to its top rather than to the line that
+was pressed — and then does the reveal itself: `scrollFocusedIntoView` in
+`ifHidden` mode waits for the soft keyboard to settle the visual viewport and
+only moves the view if the pressed line ends up behind the keyboard, leaving a
+press on an already-visible line exactly where the user was reading. `selectLine`
+also drops the reveal a touch `pointerdown` armed, the same way
+[ticking a task item](#task-items) does and for the same reason: this gesture
+leaves no active line, so the caret-placement effect that would consume the
+arming never runs, and a flag left set fires on whatever the next tap happens
+to be.
 
 Numbers are the *source* line numbers, so a line hidden from the preview — an
 [at-end attachment](#attachments-at-the-end) reference, or a

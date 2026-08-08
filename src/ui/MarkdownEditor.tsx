@@ -184,6 +184,11 @@ const NO_MATCHES: readonly NoteMatch[] = [];
 // phone, where the console is out of reach (see `dev/logger.ts`).
 const log = createLogger("editor");
 
+// The breathing room between the line-number gutter and the text it numbers.
+// One constant because two places must agree on it: the surface reserves it in
+// its left padding, and the number pushes itself back out of the text by it.
+const GUTTER_GAP = "1rem";
+
 /** What the editor exposes to its parent: a way to start editing from outside. */
 export type MarkdownEditorHandle = {
   /** Place the caret at the end of the note and start editing there. */
@@ -1296,16 +1301,32 @@ export function MarkdownEditor({
     const root = rootRef.current;
     const sel = window.getSelection();
     if (!root || !sel) return;
-    const first = root.querySelector(`[data-line-index="${from}"]`);
-    const last = root.querySelector(`[data-line-index="${to}"]`);
+    const first = root.querySelector<HTMLElement>(
+      `[data-line-index="${from}"]`,
+    );
+    const last = root.querySelector<HTMLElement>(`[data-line-index="${to}"]`);
     if (!first || !last) return;
     settingSel.current = true;
-    if (document.activeElement !== root) root.focus();
+    // Taking focus with `preventScroll`, because the browser's own focus-time
+    // reveal reveals *the host* — the whole note — not the span about to be
+    // selected in it. On a note opened with the keyboard still down (no line
+    // active yet, which is exactly the state a gutter press arrives in) that
+    // throws the view to the top of the note, nowhere near the line that was
+    // pressed. The span below is what the view should follow, so the reveal is
+    // ours to do afterwards.
+    const took = document.activeElement !== root;
+    if (took) root.focus({ preventScroll: true });
     const range = document.createRange();
     range.setStart(first, 0);
     range.setEnd(last, last.childNodes.length);
     sel.removeAllRanges();
     sel.addRange(range);
+    // Focus raises the soft keyboard, which shrinks the visual viewport *after*
+    // this returns — so a line pressed in the lower half would end up behind
+    // it. `scrollFocusedIntoView` waits for the viewport to settle and then
+    // only moves the view if the line really is covered, leaving a press on an
+    // already-visible line exactly where the user was reading.
+    if (took) scrollFocusedIntoView(first, { ifHidden: true });
     queueMicrotask(() => {
       settingSel.current = false;
     });
@@ -1328,6 +1349,12 @@ export function MarkdownEditor({
   function selectLine(index: number) {
     const len = (linesRef.current[index] ?? "").length;
     lastCaret.current = { line: index, col: len };
+    // The arming the touch press did on the way in is dropped, the same way
+    // ticking a task item drops it: this press leaves *no* line active, so the
+    // caret-placement effect that would consume the arming never runs, and a
+    // flag left set would fire the reveal on whatever the next tap happens to
+    // be. `selectLineSpan` owns the reveal for this gesture instead.
+    revealPending.current = false;
     // No single line is active, so the toolbar reads the pressed one instead
     // (see `reportIndex`) — bulleting a gutter-selected line lights the button.
     setSpanLine(index);
@@ -1395,6 +1422,21 @@ export function MarkdownEditor({
 
   const widthStyle =
     maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" };
+  // The line-number gutter reserves only as much room as the note's highest
+  // number needs, so a nine-line note hands the writing column a digit's worth
+  // more width than a ten-line one does. Measured in `ch` at the *surface's*
+  // font, times the `0.75em` the numbers are drawn at (see `LineRow`), so the
+  // reservation tracks the digits across every font family and font-scale
+  // setting — which the fixed pixel gutter this replaced did not. The numbers
+  // are right-aligned against the text, so any slack falls in the outer inset
+  // where there is nothing to clip.
+  const gutterStyle = lineNumbers
+    ? {
+        paddingLeft: `calc(1rem + ${String(blocks.length).length} * 0.75ch + ${GUTTER_GAP})`,
+      }
+    : undefined;
+  const surfaceStyle =
+    widthStyle || gutterStyle ? { ...widthStyle, ...gutterStyle } : undefined;
   const wrapClass = wordWrap
     ? "whitespace-pre-wrap break-words"
     : "whitespace-pre";
@@ -1451,8 +1493,8 @@ export function MarkdownEditor({
         {value === "" && (
           <div
             aria-hidden="true"
-            style={widthStyle}
-            className={`pointer-events-none absolute inset-x-0 top-0 ${lineNumbers ? "pr-4 pl-14" : "px-4"} pt-4 text-muted/60 select-none`}
+            style={surfaceStyle}
+            className="pointer-events-none absolute inset-x-0 top-0 px-4 pt-4 text-muted/60 select-none"
           >
             {t("app.startWriting")}
           </div>
@@ -1506,8 +1548,8 @@ export function MarkdownEditor({
             composing.current = false;
             readBackComposition();
           }}
-          className={`relative ${lineNumbers ? "pr-4 pl-14" : "px-4"} pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
-          style={widthStyle}
+          className={`relative px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
+          style={surfaceStyle}
         >
           {blocks.map((block, index) => {
             const edgeClass = codeBlockEdgeClass(codeEdges, index);
@@ -1584,8 +1626,8 @@ export function MarkdownEditor({
             padding and width so the block lines up with the text, and carries
             the bottom safe-area inset the host would otherwise have to. */}
         <div
-          style={widthStyle}
-          className={`empty:hidden ${lineNumbers ? "pr-4 pl-14" : "px-4"} pb-[max(1rem,env(safe-area-inset-bottom))]`}
+          style={surfaceStyle}
+          className="empty:hidden px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
         >
           <AttachmentsEndBlock />
         </div>
@@ -1604,6 +1646,14 @@ export function MarkdownEditor({
 // active raw line, the caret walker in `placeCaret`, the composition read-back)
 // measures that element's own text, so a digit inside it would shift every
 // column by its width and corrupt each edit.
+//
+// The number shrink-wraps its digits and hangs off `right-full` — its right
+// edge `GUTTER_GAP` clear of the line's first character — so the column is
+// right-aligned against the text without anyone having to compute a width. It
+// spans the row's full height and centres within it, so the number sits beside
+// the middle of the line it belongs to rather than clinging to its top: on a
+// heading, or a long line the wrap has made several rows tall, a top-aligned
+// digit reads as belonging to whatever is above it.
 function LineRow({
   index,
   numbered,
@@ -1638,9 +1688,10 @@ function LineRow({
           e.preventDefault();
           onSelect(index);
         }}
-        className={`absolute top-0 -left-12 w-9 cursor-pointer text-right text-xs tabular-nums select-none ${
+        className={`absolute inset-y-0 right-full flex cursor-pointer items-center text-[0.75em] tabular-nums select-none ${
           current ? "text-fg-bright" : "text-muted/50 hover:text-muted"
         }`}
+        style={{ marginRight: GUTTER_GAP }}
       >
         {index + 1}
       </button>

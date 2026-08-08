@@ -1219,6 +1219,46 @@ describe("MarkdownEditor", () => {
       expect(gutter().map((b) => b.textContent)).toEqual(["1", "2", "3"]);
     });
 
+    // How much room the surface reserves for the gutter, in `ch` — the digit
+    // term of its `calc()` left padding. Read off the coefficient rather than
+    // the whole string because jsdom folds `2 * 0.75ch` down to `1.5ch` and
+    // reorders the sum, neither of which the feature depends on.
+    function gutterCh(): number {
+      const m = /(?:([\d.]+)\s*\*\s*)?([\d.]+)ch/.exec(
+        surface().style.paddingLeft,
+      );
+      return m ? Number(m[1] ?? 1) * Number(m[2]!) : 0;
+    }
+
+    function renderLines(count: number, extra?: Record<string, unknown>) {
+      return renderEditor(
+        Array.from({ length: count }, (_, i) => `line ${i + 1}`).join("\n"),
+        { focusOnMount: false, ...extra },
+      );
+    }
+
+    it("reserves gutter room for the note's digit count, not a fixed width", () => {
+      // A nine-line note spends one digit's width on the gutter; the tenth line
+      // is what widens it to two, and nothing else ever does.
+      const two = renderLines(2, { lineNumbers: true });
+      expect(gutterCh()).toBeCloseTo(0.75);
+      two.unmount();
+      const nine = renderLines(9, { lineNumbers: true });
+      expect(gutterCh()).toBeCloseTo(0.75);
+      nine.unmount();
+      const ten = renderLines(10, { lineNumbers: true });
+      expect(gutterCh()).toBeCloseTo(1.5);
+      ten.unmount();
+      renderLines(100, { lineNumbers: true });
+      expect(gutterCh()).toBeCloseTo(2.25);
+    });
+
+    it("reserves nothing while the setting is off", () => {
+      renderLines(10);
+      // The plain `px-4` class alone — no inline override widening the column.
+      expect(surface().style.paddingLeft).toBe("");
+    });
+
     it("keeps the number out of the line's own text", () => {
       // A digit inside the line element would shift every source column by its
       // width, so the button must be a sibling of `[data-line-index]`.
@@ -1237,6 +1277,26 @@ describe("MarkdownEditor", () => {
       const sel = window.getSelection()!;
       expect(sel.isCollapsed).toBe(false);
       expect(sel.toString()).toBe("alpha");
+    });
+
+    it("takes focus for the row it selects, without the browser's own reveal", () => {
+      // The press a note opened with the keyboard down receives: focus has to
+      // land on the editing host (what raises the keyboard) *and* the pressed
+      // row has to end up selected. `preventScroll` is what keeps the two
+      // together — the focus-time reveal reveals the whole host, throwing the
+      // view to the top of the note instead of the line that was pressed.
+      renderEditor("alpha\nbeta\ngamma", {
+        focusOnMount: false,
+        lineNumbers: true,
+      });
+      expect(document.activeElement).not.toBe(surface());
+      const focus = vi.spyOn(surface(), "focus");
+      act(() => {
+        fireEvent.mouseDown(gutter()[2]!);
+      });
+      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+      expect(document.activeElement).toBe(surface());
+      expect(window.getSelection()!.toString()).toBe("gamma");
     });
 
     it("drops the active raw line so the selection covers the formatted one", () => {
