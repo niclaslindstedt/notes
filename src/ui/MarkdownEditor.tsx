@@ -309,8 +309,14 @@ export function MarkdownEditor({
   // index. Block formatting (heading, list, quote, indent) is a whole-line
   // affair, so when it spans several lines the selection is restored at line
   // granularity — which is what lets a press chain onto the last one: bullet
-  // three lines, then indent the same three into children.
-  const pendingLineSpan = useRef<{ from: number; to: number } | null>(null);
+  // three lines, then indent the same three into children. `backward` draws it
+  // from the far end so the caret lands on the span's *start* (see
+  // `selectLineSpan`) — what a gutter press asks for.
+  const pendingLineSpan = useRef<{
+    from: number;
+    to: number;
+    backward?: boolean;
+  } | null>(null);
 
   // The latest known caret (as a source point) and scroll offset, kept current
   // as the user types / moves / scrolls so the unmount handler can stash them in
@@ -1337,7 +1343,13 @@ export function MarkdownEditor({
   // Draw a selection over whole source lines `[from, to]`. The endpoints are
   // anchored *inside* the line elements (not at the contenteditable root) so
   // both map back to source — the same shape `selectAllLines` relies on.
-  function selectLineSpan(from: number, to: number) {
+  //
+  // `backward` anchors the selection at the span's end and extends it back to
+  // the start, so the selection's *focus* — where the caret sits, and what the
+  // next arrow key collapses to — is the first character of the first line.
+  // Everything that reads the selection orders its endpoints (`orderPoints`),
+  // so the direction changes nothing but where the user is left standing.
+  function selectLineSpan(from: number, to: number, backward = false) {
     const root = rootRef.current;
     const sel = window.getSelection();
     if (!root || !sel) return;
@@ -1356,11 +1368,15 @@ export function MarkdownEditor({
     // ours to do afterwards.
     const took = document.activeElement !== root;
     if (took) root.focus({ preventScroll: true });
-    const range = document.createRange();
-    range.setStart(first, 0);
-    range.setEnd(last, last.childNodes.length);
     sel.removeAllRanges();
-    sel.addRange(range);
+    if (backward) {
+      sel.setBaseAndExtent(last, last.childNodes.length, first, 0);
+    } else {
+      const range = document.createRange();
+      range.setStart(first, 0);
+      range.setEnd(last, last.childNodes.length);
+      sel.addRange(range);
+    }
     // Focus raises the soft keyboard, which shrinks the visual viewport *after*
     // this returns — so a line pressed in the lower half would end up behind
     // it. `scrollFocusedIntoView` waits for the viewport to settle and then
@@ -1376,19 +1392,25 @@ export function MarkdownEditor({
     const span = pendingLineSpan.current;
     if (!span) return;
     pendingLineSpan.current = null;
-    selectLineSpan(span.from, span.to);
+    selectLineSpan(span.from, span.to, span.backward);
   });
 
-  // A press on the line-number gutter: take the whole line. The line stops
+  // A press anywhere in the line-number gutter: take the whole line. The line stops
   // being the active raw one first — a whole-line selection reads as the
   // formatted line the rest of the note shows, and both endpoints then map back
   // to source the same way a block format's multi-line result does. Clearing
   // the active line is what re-renders it, so the selection is queued for the
   // effect above to draw afterwards; with no active line to clear there is no
   // re-render to wait for and it is drawn straight away.
+  //
+  // The line is taken from its *start*: the selection is drawn backwards (see
+  // `selectLineSpan`) and the caret we remember is column 0, so the gesture
+  // leaves the user at the beginning of the line — which is the end of it the
+  // reveal brings into view, and the only end of a long wrapped line that says
+  // anything about where you are.
   function selectLine(index: number) {
     const len = (linesRef.current[index] ?? "").length;
-    lastCaret.current = { line: index, col: len };
+    lastCaret.current = { line: index, col: 0 };
     // The arming the touch press did on the way in is dropped, the same way
     // ticking a task item drops it: this press leaves *no* line active, so the
     // caret-placement effect that would consume the arming never runs, and a
@@ -1400,12 +1422,12 @@ export function MarkdownEditor({
     setSpanLine(index);
     markCaret(index, 0, len);
     if (activeRef.current.index === null) {
-      selectLineSpan(index, index);
+      selectLineSpan(index, index, true);
       return;
     }
     pendingCaret.current = null;
     pendingRange.current = null;
-    pendingLineSpan.current = { from: index, to: index };
+    pendingLineSpan.current = { from: index, to: index, backward: true };
     setActive((a) => ({ index: null, key: a.key + 1 }));
   }
 
@@ -1688,11 +1710,27 @@ export function MarkdownEditor({
 //
 // The number shrink-wraps its digits and hangs off `right-full` — its right
 // edge `GUTTER_GAP` clear of the line's first character — so the column is
-// right-aligned against the text without anyone having to compute a width. It
-// spans the row's full height and centres within it, so the number sits beside
-// the middle of the line it belongs to rather than clinging to its top: on a
-// heading, or a long line the wrap has made several rows tall, a top-aligned
-// digit reads as belonging to whatever is above it.
+// right-aligned against the text without anyone having to compute a width.
+//
+// The digit is **top-aligned**, beside the line's *first* wrapped row. A line
+// that wraps to several rows (a paragraph on a phone is routinely taller than
+// the screen) is a box whose middle can be anywhere, so a centred number
+// drifts away from where the line starts and, on a long enough line, off the
+// screen entirely — the number of the line you are reading is the one you
+// can't see. Aligning to the first row is also what makes the column read as a
+// list: each number sits where its line begins. The digit is drawn at
+// `0.75em`, so it rides in a box exactly one *text* row tall (`h-[1lh]` at the
+// surface's own font, the same trick the task checkbox uses) and centres
+// there, rather than being flush with the row's top edge where it would sit
+// above the text it numbers.
+//
+// The press target is the whole gutter column, not the digits: the button
+// spans the row's full height and stretches from the line's first character
+// out to the surface's left inset (`GUTTER_GAP` of it as padding on the right,
+// the outer `1rem` inset as padding on the left). Two or three characters of
+// digit at three-quarter size is far below the size of a fingertip — the
+// gesture is "press to the left of the line", and the target has to be the
+// band the finger actually lands in.
 function LineRow({
   index,
   numbered,
@@ -1727,12 +1765,17 @@ function LineRow({
           e.preventDefault();
           onSelect(index);
         }}
-        className={`absolute inset-y-0 right-full flex cursor-pointer items-center text-[0.75em] tabular-nums select-none ${
+        className={`absolute inset-y-0 right-full flex cursor-pointer items-start justify-end pl-4 select-none ${
           current ? "text-fg-bright" : "text-muted/50 hover:text-muted"
         }`}
-        style={{ marginRight: GUTTER_GAP }}
+        style={{ paddingRight: GUTTER_GAP }}
       >
-        {index + 1}
+        {/* One text row tall at the surface's font — not the smaller one the
+            digit is drawn at — so the number centres against the line's first
+            row wherever that row's own text sits. */}
+        <span className="flex h-[1lh] items-center">
+          <span className="text-[0.75em] tabular-nums">{index + 1}</span>
+        </span>
       </button>
       {children}
     </div>

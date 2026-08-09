@@ -1365,6 +1365,52 @@ describe("MarkdownEditor", () => {
       expect(sel.toString()).toBe("alpha");
     });
 
+    it("leaves the caret at the start of the line it selects", () => {
+      // The selection is drawn backwards, so its *focus* — where the caret
+      // sits, what the next arrow key collapses to — is the first character of
+      // the line rather than its end. On a long wrapped line the two ends are
+      // screens apart, and only the start says where you are.
+      renderEditor("alpha\nbeta", { focusOnMount: false, lineNumbers: true });
+      act(() => {
+        fireEvent.mouseDown(gutter()[0]!);
+      });
+      const sel = window.getSelection()!;
+      const line = surface().querySelector("[data-line-index='0']")!;
+      expect(sel.toString()).toBe("alpha");
+      expect(sel.focusNode).toBe(line);
+      expect(sel.focusOffset).toBe(0);
+    });
+
+    it("remembers the start of the pressed line as the session caret", () => {
+      // Reopening the note lands where the press left the user: the head of
+      // the line, not its tail.
+      const { unmount } = renderEditor("alpha\nbeta", {
+        focusOnMount: false,
+        lineNumbers: true,
+        noteId: "gutter",
+      });
+      act(() => {
+        fireEvent.mouseDown(gutter()[1]!);
+      });
+      unmount();
+      expect(getEditorPosition("gutter")?.caret).toEqual({ line: 1, col: 0 });
+    });
+
+    it("keeps the digits a gutter gap clear of the text while the target spans the column", () => {
+      // The press target is the whole gutter column — the row's full height,
+      // out to the surface's left inset — so a fingertip aimed left of the
+      // line hits it. Its right padding is what holds the digits themselves
+      // `GUTTER_GAP` off the first character.
+      renderEditor("alpha", { focusOnMount: false, lineNumbers: true });
+      const button = gutter()[0]!;
+      expect(button.style.paddingRight).toBe("1rem");
+      expect(button.className).toContain("inset-y-0");
+      // Top-aligned: the digit rides in a one-row-tall box beside the line's
+      // *first* wrapped row, rather than centring over the whole line.
+      expect(button.className).toContain("items-start");
+      expect(button.querySelector("span")?.className).toContain("h-[1lh]");
+    });
+
     it("takes focus for the row it selects, without the browser's own reveal", () => {
       // The press a note opened with the keyboard down receives: focus has to
       // land on the editing host (what raises the keyboard) *and* the pressed
