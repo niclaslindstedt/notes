@@ -474,6 +474,23 @@ round-trips as the source it was typed as; only the columns at the very start an
 end of the selection are trimmed, interior lines are taken in full. Both are
 pure/DOM-only helpers the editor uses in its `copy` / `cut` handlers.
 
+**A selection doesn't outlive the focus that drew it — on a touch device.**
+`dropSelectionOnBlur` (`src/ui/MarkdownEditor.tsx`), run from the surface's blur
+handler once focus has genuinely landed outside it, removes any range still
+standing inside the editor. On a phone the highlight and the range come apart:
+dismissing the soft keyboard blurs the surface and takes the *painted* selection
+with it, but the DOM range survives — and the next tap on those lines hands the
+browser an existing selection to act on, so Android repaints the row and raises
+its Cut / Copy / Paste bar instead of placing the caret, and only the tap after
+that gets a caret back into a line that looked idle. It shows up most plainly
+after a [line-number](#line-numbers) press, which draws a whole-line span with no
+active line to blur out from under it, but it is the same for a hand-dragged
+selection. The toolbar's `spanLine` stand-in is cleared alongside the range it
+spoke for. Desktop pointers (`useDesktopPointer`) are left alone: the browser
+keeps painting a selection, greyed, once focus moves on, so nothing goes
+invisible there — and with no soft keyboard there is no way into the state in the
+first place.
+
 ### Rendered line
 
 `RenderedLine` (`src/ui/MarkdownLine.tsx`) — renders one parsed `LineBlock` as
@@ -763,6 +780,11 @@ native reveal is run as part of updating the rendering and can land a frame or
 two after the commit that provoked it — but only one frame when the press is
 also taking focus, since from there the keyboard-aware reveal above owns the
 view and holding the old offset would fight it.
+
+**The span ends when focus does**, on a phone: dismissing the soft keyboard
+blurs the surface, and `dropSelectionOnBlur` takes the range with the highlight
+rather than leaving an invisible selection for the next tap to trip over — see
+[selection mapping](#selection-mapping).
 
 Numbers are the *source* line numbers, so a line hidden from the preview — an
 [at-end attachment](#attachments-at-the-end) reference, or a

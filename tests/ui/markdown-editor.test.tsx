@@ -1456,5 +1456,79 @@ describe("MarkdownEditor", () => {
       beforeInput("insertText", "X");
       expect(onChange).toHaveBeenLastCalledWith("X\nbeta");
     });
+
+    // Focus leaves the surface while a selection is still standing in it — what
+    // dismissing the soft keyboard does on a phone, and the state the drop is
+    // about.
+    //
+    // Assembled by hand, because jsdom won't produce it: its `blur()` clears the
+    // selection outright, and focusing anything else collapses the selection
+    // into *that* element — neither of which a browser does. So blur for real to
+    // get `activeElement` off the surface, put the selection back where a
+    // browser would have left it, and re-deliver the `focusout` that Preact maps
+    // `onBlur` onto. Awaited because the handler defers to a microtask.
+    async function dismissKeyboard(lineIndex: number, text: string) {
+      await act(async () => {
+        surface().blur();
+      });
+      selectRange(
+        surface().querySelector<HTMLElement>(
+          `[data-line-index='${lineIndex}']`,
+        )!,
+        0,
+        text.length,
+      );
+      await act(async () => {
+        surface().dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      });
+    }
+
+    it("drops the line's selection when focus leaves the surface", async () => {
+      // Dismissing the keyboard blurs the surface and takes the highlight with
+      // it, but the DOM range used to survive: the next tap on those lines then
+      // handed the browser a selection to act on — it repainted the row and
+      // raised the Cut / Copy / Paste bar — so it took a second tap to get a
+      // caret back into a line that looked idle.
+      renderEditor("alpha\nbeta", { focusOnMount: false, lineNumbers: true });
+      act(() => {
+        fireEvent.mouseDown(gutter()[0]!);
+      });
+      expect(window.getSelection()!.toString()).toBe("alpha");
+
+      await dismissKeyboard(0, "alpha");
+
+      expect(window.getSelection()!.rangeCount).toBe(0);
+    });
+
+    it("leaves the selection standing for a desktop pointer", async () => {
+      // A mouse has no soft keyboard to dismiss, and the browser keeps painting
+      // the selection (greyed) once focus moves on — so nothing goes invisible
+      // and the platform's own behaviour stands.
+      vi.stubGlobal(
+        "matchMedia",
+        vi.fn(() => ({
+          matches: true,
+          media: "",
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          onchange: null,
+          dispatchEvent: vi.fn(),
+        })),
+      );
+      try {
+        renderEditor("alpha\nbeta", { focusOnMount: false, lineNumbers: true });
+        act(() => {
+          fireEvent.mouseDown(gutter()[0]!);
+        });
+
+        await dismissKeyboard(0, "alpha");
+
+        expect(window.getSelection()!.toString()).toBe("alpha");
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
   });
 });
