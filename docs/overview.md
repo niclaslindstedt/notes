@@ -647,8 +647,8 @@ sections.
 Off by default. With the `lineNumbers` editor setting on, the
 [live-preview editor](#markdown-editor) numbers every line in a gutter hanging
 in its left padding, the way a code editor does — the line the caret sits on lit
-brighter than the rest — and each number is a press target that **selects that
-whole line**.
+brighter than the rest — and the gutter beside each line is a press target that
+**selects that whole line**.
 
 `LineRow` (`src/ui/MarkdownEditor.tsx`) is the whole feature. With the setting
 off it renders its child — the line element — verbatim, so the default editor
@@ -673,10 +673,27 @@ font, times the `0.75em` the numbers are drawn at, so it tracks the digits
 across every font family and font-scale setting; `GUTTER_GAP` is the one
 constant the surface and the number both read for the space between them. The
 number itself shrink-wraps its digits and hangs off `right-full`, which
-right-aligns the column against the text with no width to compute, and spans the
-row's full height to **centre within it** — so on a heading, or a long line the
-wrap has made several rows tall, the digit sits beside the middle of the line it
-belongs to instead of clinging to its top.
+right-aligns the column against the text with no width to compute.
+
+**The digit sits beside its line's first wrapped row**, not the middle of the
+line. A line that wraps is a box whose centre can be anywhere, and on a phone a
+paragraph is routinely taller than the screen — so a centred number drifts away
+from where its line starts and, on a long enough line, off the screen entirely,
+leaving the line you are reading as the one line whose number you can't see.
+Aligning to the first row is also what makes the column read as a list: every
+number sits where its line begins. It isn't flush with the row's top edge
+either — the digit rides in a box exactly one *text* row tall (`h-[1lh]` at the
+surface's own font, the same box the [task checkbox](#task-items) uses) and
+centres in that, so at its `0.75em` it lines up with the text of the row rather
+than floating above it.
+
+**The press target is the whole gutter column**, not the digits: the button
+spans the row's full height — so a line wrapped to ten rows has ten rows of
+target — and stretches from the line's first character out to the surface's
+left inset, carrying `GUTTER_GAP` as its right padding and the outer `1rem`
+inset as its left. Two or three characters of digit at three-quarter size is
+far below the size of a fingertip; the gesture is "press to the left of the
+line", so the target has to be the band the finger actually lands in.
 
 A press runs `selectLine`, which reuses the same machinery a multi-line block
 format does: the line stops being the active raw one, and the whole-line
@@ -686,6 +703,17 @@ no re-render to wait for, so it is drawn straight away). The result is an
 ordinary ranged selection over the formatted line, so cut / copy / type-over and
 the styling toolbar all treat it exactly as a hand-drawn one — `spanLine` keeps
 the toolbar reporting the pressed line while no single line is active.
+
+**The line is taken from its start.** `selectLineSpan` draws the gutter's span
+`backward` — anchored at the line's end and extended back to its first
+character — so the selection's *focus*, where the caret sits and what the next
+arrow key collapses to, is the beginning of the line; `selectLine` remembers
+column 0 as the session caret to match. Everything that reads a selection orders
+its endpoints (`orderPoints`), so the direction changes nothing but where the
+user is left standing. It is also the end the reveal brings into view:
+`caretRectWithin` measures the *first* of a range's client rects, so a line
+taller than the screen is revealed at its head rather than centred on its
+middle.
 
 **A press works from a note that isn't being edited yet**, which on a phone is
 the common case: an existing note opens with no active line and the soft
