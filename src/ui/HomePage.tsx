@@ -107,6 +107,15 @@ export function HomePage() {
               button takes that formatting back off.
             </li>
             <li>
+              Tap <kbd>space</kbd> twice at the end of a word and the sentence
+              ends itself — the second space becomes a full stop, cursor left
+              ready for the next sentence. It is the shortcut your phone applies
+              in any other text field, done by the app so it works the same on a
+              computer. Two spaces after a full stop stay two spaces, code
+              blocks are left verbatim, and <em>Disable auto correct</em> in
+              Settings turns it off.
+            </li>
+            <li>
               Lists write themselves. <kbd>Enter</kbd> on a bullet or numbered
               row opens the next one — numbers count up as you go — and{" "}
               <kbd>Tab</kbd> tucks a row in under the one above it, with{" "}

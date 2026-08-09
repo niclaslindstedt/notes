@@ -47,23 +47,39 @@ function rawLine(): HTMLElement | null {
 // a column doesn't necessarily land in the first child — this walks the text
 // nodes to find the one holding it, the same way the editor's own `placeCaret`
 // does.
-function caretIn(lineEl: HTMLElement, offset: number) {
+function domPointIn(
+  lineEl: HTMLElement,
+  offset: number,
+): { node: Node; offset: number } {
   const walker = document.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT);
-  let node: Node = lineEl;
   let remaining = offset;
   let text = walker.nextNode() as Text | null;
   while (text) {
-    if (remaining <= text.data.length) {
-      node = text;
-      break;
-    }
+    if (remaining <= text.data.length) return { node: text, offset: remaining };
     remaining -= text.data.length;
     text = walker.nextNode() as Text | null;
   }
+  return { node: lineEl, offset: remaining };
+}
+
+function caretIn(lineEl: HTMLElement, offset: number) {
+  const at = domPointIn(lineEl, offset);
   const sel = window.getSelection()!;
   const range = document.createRange();
-  range.setStart(node, remaining);
+  range.setStart(at.node, at.offset);
   range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+/** Select `[from, to)` of a line element's text — the ranged sibling of `caretIn`. */
+function selectRange(lineEl: HTMLElement, from: number, to: number) {
+  const a = domPointIn(lineEl, from);
+  const b = domPointIn(lineEl, to);
+  const sel = window.getSelection()!;
+  const range = document.createRange();
+  range.setStart(a.node, a.offset);
+  range.setEnd(b.node, b.offset);
   sel.removeAllRanges();
   sel.addRange(range);
 }
@@ -346,6 +362,57 @@ describe("MarkdownEditor", () => {
     caretIn(rawLine()!, 1);
     beforeInput("insertText", "b");
     expect(onChange).toHaveBeenLastCalledWith("abc");
+  });
+
+  // Tapping space twice ends the sentence. The editor intercepts every
+  // insertion, which takes the keystroke out of reach of the platform's own
+  // version of this shortcut, so it applies the rule itself.
+  describe("double space", () => {
+    it("ends the sentence on a second space", () => {
+      const { onChange } = renderEditor("Hello ");
+      caretIn(rawLine()!, 6);
+      beforeInput("insertText", " ");
+      expect(onChange).toHaveBeenLastCalledWith("Hello. ");
+    });
+
+    it("leaves a first space alone", () => {
+      const { onChange } = renderEditor("Hello");
+      caretIn(rawLine()!, 5);
+      beforeInput("insertText", " ");
+      expect(onChange).toHaveBeenLastCalledWith("Hello ");
+    });
+
+    it("leaves a double space after a full stop alone", () => {
+      const { onChange } = renderEditor("Done. ");
+      caretIn(rawLine()!, 6);
+      beforeInput("insertText", " ");
+      expect(onChange).toHaveBeenLastCalledWith("Done.  ");
+    });
+
+    it("leaves a code block's spacing verbatim", () => {
+      // Code is the exception the platform can't make: inside a fence two
+      // spaces are two spaces.
+      const { onChange } = renderEditor("```\nlet x = 1 ");
+      caretIn(rawLine()!, 11);
+      beforeInput("insertText", " ");
+      expect(onChange).toHaveBeenLastCalledWith("```\nlet x = 1  ");
+    });
+
+    it("stands down when auto correct is turned off", () => {
+      const { onChange } = renderEditor("Hello ", { disableAutocorrect: true });
+      caretIn(rawLine()!, 6);
+      beforeInput("insertText", " ");
+      expect(onChange).toHaveBeenLastCalledWith("Hello  ");
+    });
+
+    it("types over a selection rather than ending a sentence", () => {
+      // The rule is a collapsed-caret affair: with a range selected the space
+      // replaces it, exactly as any other character would.
+      const { onChange } = renderEditor("Hello there");
+      selectRange(rawLine()!, 6, 11);
+      beforeInput("insertText", " ");
+      expect(onChange).toHaveBeenLastCalledWith("Hello  ");
+    });
   });
 
   it("adopts an out-of-band change to the body prop", () => {

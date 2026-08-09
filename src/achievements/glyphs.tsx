@@ -427,6 +427,20 @@ export function CheckSquareGlyph({ className }: IconProps) {
   );
 }
 
+// Three lines of prose, the last one stopped short by a fat dot — a sentence
+// ended. The dot is a zero-length path: a round cap paints it as a circle, so
+// it needs no fill in an otherwise stroke-only set.
+export function FullStopGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h7" />
+      <path d="M15 18h0" strokeWidth={3.5} />
+    </Svg>
+  );
+}
+
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;

@@ -1,5 +1,8 @@
-// Sentence boundaries in a body of text — the granularity the undo timeline
-// uses to break a continuous typing burst into sentence-sized steps.
+// Sentence shape in a body of text: where one ends (the granularity the undo
+// timeline breaks a continuous typing burst into) and how one is ended (the
+// double-space-to-period shortcut the editor applies as you type).
+//
+// --- Sentence boundaries ----------------------------------------------------
 //
 // A note's body is edited one keystroke at a time, so the undo timeline
 // coalesces a run of edits sharing a merge key into a single step (see
@@ -37,4 +40,44 @@ const TRAILING_NEWLINES = /\n+$/u;
 export function sentenceBoundaryCount(text: string): number {
   const matches = text.replace(TRAILING_NEWLINES, "").match(SENTENCE_BOUNDARY);
   return matches ? matches.length : 0;
+}
+
+// --- Ending a sentence with two spaces --------------------------------------
+
+// What must sit in front of the space for a second space to end a sentence: a
+// letter, a digit, or a closing quote / bracket — the tail of a word. Anything
+// else leaves the two spaces exactly as typed, which is what keeps the two
+// habits that look like this from growing a stray dot: double-spacing *after* a
+// full stop (`Done.  ` — the character before the space is `.`) and lining
+// something up with a run of spaces (the character before is another space).
+const SENTENCE_TAIL = /[\p{L}\p{N}"'”’)\]]/u;
+
+/**
+ * The rewrite a space typed at column `col` of `line` should turn into, or
+ * `null` when it is an ordinary space.
+ *
+ * Tapping space twice at the end of a word ends the sentence: the first space
+ * is replaced by `". "`, so `Hello ` + space reads `Hello. ` with the caret
+ * still at the end and the next sentence ready to type. This is the shortcut
+ * iOS and macOS apply inside any ordinary text field — the live-preview editor
+ * intercepts every insertion and applies it to the source itself
+ * (`MarkdownEditor.tsx`), which takes the keystroke out of the reach of the
+ * platform's own substitution, so the editor owns the rule instead. Doing it
+ * here rather than leaning on the OS also means it reads the same on a desktop
+ * browser and on Android, where the shortcut is a keyboard's option rather
+ * than the system's.
+ *
+ * `from` is the column the replacement starts at (the space being consumed);
+ * the caller splices `[from, col)` out for `text`.
+ */
+export function doubleSpacePeriod(
+  line: string,
+  col: number,
+): { from: number; text: string } | null {
+  // Needs a space to consume and a word character in front of it, so a space
+  // at (or one past) the start of the line is always just a space.
+  if (col < 2) return null;
+  if (line[col - 1] !== " ") return null;
+  if (!SENTENCE_TAIL.test(line[col - 2] ?? "")) return null;
+  return { from: col - 1, text: ". " };
 }

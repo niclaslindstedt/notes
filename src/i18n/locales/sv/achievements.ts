@@ -101,6 +101,12 @@ const achievements: AchievementsCatalog = {
         "Formateringsknappen uppe till höger i en anteckning fäller ut en rad ovanför texten — rubriker, fet, kursiv, genomstruken, kod i text, punktlistor och numrerade listor, citat, kodblock, indrag, länkar, bilder och avdelare, en knapp var. Den skriver vanlig Markdown, så allt du når där kan du lika gärna skriva för hand; varje knapp är en växel, så ett tryck på en tänd knapp tar bort formateringen igen.",
     },
 
+    fullStop: {
+      name: "Punkt slut",
+      condition: "Avsluta en mening genom att trycka mellanslag två gånger.",
+      learnMore:
+        'Tryck mellanslag två gånger efter ett ord så avslutar anteckningen meningen åt dig: det första mellanslaget sväljs och en punkt skrivs i dess ställe, med markören kvar efter ". " redo för nästa mening. Det är samma genväg som telefonen tillämpar i vilket annat textfält som helst — editorn skriver varje tangenttryck in i anteckningen själv, vilket sätter tryckningen utom räckhåll för tangentbordet, så den gör utbytet i stället och gör det likadant på en dator. Två mellanslag efter en punkt förblir två mellanslag, och inuti ett kodblock skrivs ingenting om. Stäng av det med "Inaktivera autokorrigering" under Inställningar → Redigerare.',
+    },
     pinpoint: {
       name: "Pricksäker",
       condition: "Hitta text inuti anteckningen du har öppen.",

@@ -1003,6 +1003,55 @@ Enter and Tab would cost the browser's own undo history.
 line-level scan behind the [Sub-point](#unlock-triggers) achievement, which
 fires the first time a note holds a list row indented under a shallower one.
 
+### Double space period
+
+Tapping **space twice** at the end of a word ends the sentence: the space
+already there is swallowed and `". "` written over it, so `Hello ` + space
+reads `Hello. ` with the caret sitting after the space, ready for the next
+sentence.
+
+This is the shortcut iOS and macOS apply inside any ordinary text field, and it
+is in this app's hands rather than the platform's for the reason everything
+else in the [live-preview editor](#markdown-editor) is: the editor intercepts
+every `beforeinput`, `preventDefault`s it, and applies the edit to the source
+itself. The keystroke never reaches the platform's own substitution, so the
+shortcut simply stopped happening in the note body once the editor moved off
+`<textarea>`s onto one `contenteditable` surface. Owning the rule also makes it
+read the same everywhere — a desktop browser, Android (where the substitution
+is a keyboard's option rather than the system's), and inside the
+[wrappers](#embedded-wrapper-builds) — instead of depending on what the device underneath
+happens to do.
+
+`doubleSpacePeriod(line, col)` (`src/domain/sentence.ts`) is the rule, and it
+is deliberately narrow: it fires only when the character being replaced is a
+space **and** the one in front of it is a word's tail — a letter, a digit, or a
+closing quote / bracket. That is what leaves the two habits that look like this
+alone: double-spacing *after* a full stop (`Done.  ` — the character in front of
+the space is `.`, not a word) and lining text up with a run of spaces (the
+character in front is another space). It returns the column the rewrite starts
+at, and the editor splices `". "` over `[from, col)` through the same
+`replaceRange` engine every other edit uses — so it is one undo step, and the
+[undo timeline](#undo--redo)'s sentence counter (also `src/domain/sentence.ts`)
+sees the finished sentence and checkpoints there.
+
+`autoPeriodAt` (`src/ui/MarkdownEditor.tsx`) decides whether to consult the
+rule at all, in the `insert` branch of the `beforeinput` handler. It stands
+down for a ranged selection (a space typed over a selection replaces it, like
+any other character), when the caret is inside a **fenced code block** — code
+is verbatim text where two spaces are two spaces, an exception no platform
+keyboard makes — and when **Disable auto correct** is on in
+[Editor settings](#editor-settings): the shortcut belongs to the same family as
+the platform's autocorrect and auto-capitalisation, so the one switch that
+turns those off turns this off too, and no new setting was added for it.
+
+The [plain `<textarea>` fallback](#editor-settings) needs none of this — it
+never intercepts a keystroke, so the platform's own shortcut still applies
+there.
+
+The first rewrite fires the **Full stop** achievement through the manual bus:
+the dot it writes is indistinguishable from one typed by hand, so there is
+nothing in the document to derive it from.
+
 ### Bullet characters
 
 An unordered list draws one of three fixed glyphs per nesting level:

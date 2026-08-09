@@ -106,6 +106,12 @@ const achievements = {
         "The formatting button at the top right of a note opens a toolbar above the text — headings, bold, italic, strikethrough, inline code, bullet and numbered lists, quotes, code blocks, indent and outdent, links, images and dividers, one button each. It writes ordinary Markdown, so anything you reach for there you can also just type; every button is a toggle, so pressing a lit one takes the formatting back off.",
     },
 
+    fullStop: {
+      name: "Full stop",
+      condition: "End a sentence by tapping space twice.",
+      learnMore:
+        'Tap space twice at the end of a word and the note ends the sentence for you: the first space is swallowed and a full stop written in its place, leaving the cursor after ". " ready for the next one. It is the same shortcut your phone applies in any other text field — the editor writes every keystroke into the note itself, which puts the keystroke out of the keyboard\'s reach, so it does the substitution instead and does it the same way on a computer. Two spaces after a full stop stay two spaces, and inside a code block nothing is rewritten at all. Turn it off with "Disable auto correct" in Settings → Editor.',
+    },
     pinpoint: {
       name: "Pinpoint",
       condition: "Find text inside the note you have open.",
