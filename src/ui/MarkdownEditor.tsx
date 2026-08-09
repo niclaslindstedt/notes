@@ -70,6 +70,7 @@ import {
   revealRect,
   scrollFocusedIntoView,
 } from "./hooks/scrollFocusedIntoView.ts";
+import { useDesktopPointer } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { codeBlockEdgeClass, lineTextClass } from "./markdown-line-class.ts";
 import { CodeCopyButton } from "./CodeCopyButton.tsx";
@@ -260,6 +261,9 @@ export function MarkdownEditor({
   // The first line of a whole-line selection a block press just drew, so the
   // toolbar still knows what it applied while no single line is active.
   const [spanLine, setSpanLine] = useState<number | null>(null);
+  // Touch or mouse — the one thing that decides whether a selection outlives
+  // the blur that ends it (see `dropSelectionOnBlur`).
+  const desktopPointer = useDesktopPointer();
   // Where the caret (or a single-line selection) sits, in source coordinates —
   // what tells the toolbar which *inline* runs it is inside. The caret's line
   // alone can't: bold is a span within a line, not a property of it. Null while
@@ -1417,6 +1421,34 @@ export function MarkdownEditor({
     selectLineSpan(span.from, span.to, span.backward, span.anchor);
   });
 
+  // Focus has genuinely left the surface: drop any selection still standing in
+  // it. A selection the user can no longer see must not still be there.
+  //
+  // On a phone the two come apart. Dismissing the soft keyboard blurs the
+  // surface, and the highlight goes with it — but the DOM range survives, so
+  // the next tap on those lines hands the browser an existing selection to act
+  // on: it repaints the row and raises the Cut / Copy / Paste bar instead of
+  // placing the caret, and only the tap *after* that gets a caret back into a
+  // line that looked idle. Most visible after a line-number press, which draws
+  // a whole-line span with no active line to blur out from under it.
+  //
+  // Desktop keeps the browser's own behaviour, where a selection that survives
+  // a click elsewhere stays painted (greyed) and is the platform convention —
+  // and where there is no soft keyboard to dismiss, so the invisible-selection
+  // state this clears can't arise in the first place.
+  function dropSelectionOnBlur(root: HTMLElement) {
+    if (desktopPointer) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    const { anchorNode, focusNode } = sel;
+    if (!anchorNode || !focusNode) return;
+    if (!root.contains(anchorNode) && !root.contains(focusNode)) return;
+    sel.removeAllRanges();
+    // The toolbar's stand-in for a whole-line span goes with the span itself —
+    // it only ever spoke for a selection that is now gone.
+    setSpanLine(null);
+  }
+
   // A press anywhere in the line-number gutter: take the whole line. The line stops
   // being the active raw one first — a whole-line selection reads as the
   // formatted line the rest of the note shows, and both endpoints then map back
@@ -1630,6 +1662,7 @@ export function MarkdownEditor({
               setActive((a) =>
                 a.index === null ? a : { index: null, key: a.key + 1 },
               );
+              dropSelectionOnBlur(root);
             });
           }}
           onCompositionStart={() => {
