@@ -35,6 +35,7 @@ import {
   FolderGlyph,
   FolderTreeGlyph,
   FormatGlyph,
+  FullStopGlyph,
   GlobeGlyph,
   HistoryGlyph,
   ImageGlyph,
@@ -580,6 +581,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     // Fired by the first press of any styling-toolbar button (`runFormat` in
     // `src/ui/NoteEditor.tsx`) — the markup it writes is indistinguishable
     // from typing it by hand, so there is nothing in the document to derive.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "fullStop",
+    tier: "beginner",
+    glyph: FullStopGlyph,
+    learnMore: true,
+    // Fired by the editor rewriting a second space as `". "` (`autoPeriodAt`
+    // in `src/ui/MarkdownEditor.tsx`) — the dot it writes is indistinguishable
+    // from one typed by hand, so there is nothing in the document to derive.
     trigger: { kind: "manual" },
   },
   {

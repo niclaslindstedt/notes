@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { sentenceBoundaryCount } from "../../src/domain/sentence.ts";
+import {
+  doubleSpacePeriod,
+  sentenceBoundaryCount,
+} from "../../src/domain/sentence.ts";
 
 describe("sentenceBoundaryCount", () => {
   it("is zero for empty or terminator-free text", () => {
@@ -49,5 +52,60 @@ describe("sentenceBoundaryCount", () => {
   it("ignores a period not followed by whitespace (paths, numbers)", () => {
     expect(sentenceBoundaryCount("see attachments/a.png here")).toBe(0);
     expect(sentenceBoundaryCount("version 3.5 shipped")).toBe(0);
+  });
+});
+
+describe("doubleSpacePeriod", () => {
+  it("ends the sentence when a space follows a word and a space", () => {
+    // "Hello " with the caret at the end, a second space arriving: the space
+    // already there is consumed and ". " written over it.
+    expect(doubleSpacePeriod("Hello ", 6)).toEqual({ from: 5, text: ". " });
+  });
+
+  it("works mid-line, not only at the end", () => {
+    expect(doubleSpacePeriod("Hello there", 6)).toEqual({
+      from: 5,
+      text: ". ",
+    });
+  });
+
+  it("leaves a space that does not follow a space alone", () => {
+    expect(doubleSpacePeriod("Hello", 5)).toBeNull();
+    expect(doubleSpacePeriod("Hello world", 11)).toBeNull();
+  });
+
+  it("leaves the typewriter double space after a full stop alone", () => {
+    // "Done. " + space: the character in front of the space is punctuation,
+    // so the habit of double-spacing between sentences never grows a second
+    // dot.
+    expect(doubleSpacePeriod("Done. ", 6)).toBeNull();
+    expect(doubleSpacePeriod("Really? ", 8)).toBeNull();
+    expect(doubleSpacePeriod("Wow! ", 5)).toBeNull();
+    expect(doubleSpacePeriod("First, ", 7)).toBeNull();
+  });
+
+  it("leaves a run of spaces alone", () => {
+    // A third space lands behind a space, not behind a word.
+    expect(doubleSpacePeriod("cols  ", 6)).toBeNull();
+    expect(doubleSpacePeriod("   ", 3)).toBeNull();
+  });
+
+  it("needs a word in front of the space", () => {
+    expect(doubleSpacePeriod(" ", 1)).toBeNull();
+    expect(doubleSpacePeriod("", 0)).toBeNull();
+    expect(doubleSpacePeriod("- ", 2)).toBeNull();
+  });
+
+  it("accepts a digit or a closing quote or bracket as the word's tail", () => {
+    expect(doubleSpacePeriod("Room 12 ", 8)).toEqual({ from: 7, text: ". " });
+    expect(doubleSpacePeriod('He said "go" ', 13)).toEqual({
+      from: 12,
+      text: ". ",
+    });
+    expect(doubleSpacePeriod("(aside) ", 8)).toEqual({ from: 7, text: ". " });
+  });
+
+  it("accepts a non-ASCII letter as the word's tail", () => {
+    expect(doubleSpacePeriod("på gång ", 8)).toEqual({ from: 7, text: ". " });
   });
 });

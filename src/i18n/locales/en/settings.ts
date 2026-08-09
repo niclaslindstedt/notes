@@ -93,7 +93,7 @@ const settings = {
       "Stop your device checking spelling as you type, hiding the red squiggles.",
     disableAutocorrect: "Disable auto correct",
     disableAutocorrectHint:
-      "Stop your device auto-correcting and auto-capitalising as you type (mostly affects mobile keyboards).",
+      "Stop your device auto-correcting and auto-capitalising as you type (mostly affects mobile keyboards), and stop a double-tapped space ending the sentence with a full stop.",
     trimTrailingSpaces: "Trim trailing spaces",
     trimTrailingSpacesHint:
       "Remove spaces left at the end of every line when a note is saved.",

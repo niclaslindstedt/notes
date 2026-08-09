@@ -88,7 +88,7 @@ const settings: SettingsCatalog = {
       "Sluta låta enheten kontrollera stavning medan du skriver, döljer de röda vågorna.",
     disableAutocorrect: "Inaktivera autokorrigering",
     disableAutocorrectHint:
-      "Sluta låta enheten autokorrigera och automatiskt göra versaler medan du skriver (påverkar mest mobiltangentbord).",
+      "Sluta låta enheten autokorrigera och automatiskt göra versaler medan du skriver (påverkar mest mobiltangentbord), och sluta avsluta meningen med punkt när mellanslag trycks två gånger.",
     trimTrailingSpaces: "Ta bort släpande blanksteg",
     trimTrailingSpacesHint:
       "Ta bort blanksteg som lämnats kvar i slutet av varje rad när en anteckning sparas.",

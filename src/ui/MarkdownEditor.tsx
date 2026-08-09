@@ -48,6 +48,7 @@ import {
 } from "../domain/markdown-format.ts";
 import type { NoteMatch } from "../domain/note-find.ts";
 import type { Note } from "../domain/note.ts";
+import { doubleSpacePeriod } from "../domain/sentence.ts";
 import { useT } from "../i18n/index.ts";
 import { writeClipboard } from "./clipboard.ts";
 import { getEditorPosition, setEditorPosition } from "./editor-position.ts";
@@ -756,11 +757,23 @@ export function MarkdownEditor({
         );
       }
     } else if (it.startsWith("insert")) {
-      replaceSelection(
-        pts.start,
-        pts.end,
-        e.data ?? e.dataTransfer?.getData("text/plain") ?? "",
-      );
+      const text = e.data ?? e.dataTransfer?.getData("text/plain") ?? "";
+      // A second space at the end of a word ends the sentence instead: the
+      // space already there is swallowed and `". "` written over it.
+      const period =
+        text === " " && pointsEqual(pts.start, pts.end)
+          ? autoPeriodAt(pts.start)
+          : null;
+      if (period) {
+        replaceSelection(
+          { line: pts.start.line, col: period.from },
+          pts.end,
+          period.text,
+        );
+        unlock("fullStop");
+      } else {
+        replaceSelection(pts.start, pts.end, text);
+      }
     } else if (it.startsWith("delete")) {
       // A ranged target (a selection, or a word/line delete the browser scoped
       // for us) deletes exactly that span. A collapsed one is a single
@@ -774,6 +787,24 @@ export function MarkdownEditor({
     }
     // Any other input type (formatting commands etc.) is simply swallowed.
   };
+
+  // Whether the space now being inserted at `at` should end the sentence
+  // instead (see `doubleSpacePeriod`), and where the rewrite starts.
+  //
+  // The shortcut belongs to the same family as the platform's autocorrect and
+  // auto-capitalisation — it *is* that shortcut, re-applied here because
+  // intercepting every insertion takes the keystroke out of the platform's
+  // reach — so the one switch that turns those off turns this off too. Code is
+  // the exception the platform can't make: a fenced block is verbatim text
+  // where two spaces are two spaces, so it is left alone whatever the setting.
+  function autoPeriodAt(
+    at: SourcePoint,
+  ): { from: number; text: string } | null {
+    if (disableAutocorrect) return null;
+    const kind = blocksRef.current[at.line]?.kind;
+    if (kind === "code" || kind === "fence") return null;
+    return doubleSpacePeriod(linesRef.current[at.line] ?? "", at.col);
+  }
 
   // The last caret we tracked, as a collapsed span clamped to the current
   // source — the landing spot for an edit whose own position the DOM couldn't
