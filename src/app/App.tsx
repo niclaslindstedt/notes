@@ -18,6 +18,7 @@ import { unlockAchievements, useApplyAppearance } from "../theme/useTheme.ts";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { OrphanFilesModal } from "../ui/OrphanFilesModal.tsx";
 import { DropOverlay } from "../ui/DropOverlay.tsx";
+import { EDGE_ZONE } from "../ui/hooks/edge-gesture.ts";
 import { useEdgeSwipeOpen } from "../ui/hooks/useEdgeSwipeOpen.ts";
 import { useFileDrop } from "../ui/hooks/useFileDrop.ts";
 import { useMediaQuery } from "../ui/hooks/useMediaQuery.ts";
@@ -306,6 +307,9 @@ export function App() {
     side: nav.position.side,
     enabled: !nav.showButton && !nav.pinned && !nav.open,
     onOpen: nav.toggle,
+    // The zone the row swipes stand down in, so the gesture that opens the
+    // drawer and the one they ignore are the same strip of screen.
+    edgeZone: EDGE_ZONE,
   });
 
   // Kill the browser's native edge-swipe history navigation (swipe in from the

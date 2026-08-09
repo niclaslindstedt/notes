@@ -1972,6 +1972,27 @@ starting ≤30px from the drawer's resting edge and travelling inward >48px open
 the drawer. Gated by the menu-activation choice, disabled while a modal is open,
 and axis-locked so vertical scrolls don't trigger it.
 
+### Edge zone / edge gesture guard
+
+`edge-gesture.ts` (`src/ui/hooks/edge-gesture.ts`) — the single definition of
+where "the edge" is (`EDGE_ZONE`, 30px from either screen border) plus
+`useEdgeGestureGuard`, which reserves that strip for the side menu. The zone is
+shared by [edge swipe to open](#edge-swipe-to-open) (passed as its `edgeZone`),
+[suppress swipe navigation](#suppress-swipe-navigation), and both row gestures.
+
+The guard exists because an inward edge swipe still lands on whatever the page
+paints there — a note card in the overview, a note row in the open drawer — and
+a row only swallows the click trailing its own gesture once that gesture has
+committed to a *horizontal* drag. An edge swipe that arcs downward as it comes
+in locks the row's axis to "vertical", so the row treats it as a scroll and the
+browser's synthesized click at the end activates it: the drawer opens and a note
+opens behind it. `useRowSwipe` and `useSwipeReveal` therefore both run their
+handlers through the guard — a **touch** gesture starting inside `EDGE_ZONE`
+never reaches the row (no slide, no archive, no reveal) and its trailing click is
+swallowed once the finger has travelled 8px or more. A stationary tap at the edge
+still opens the row it hit, and mouse gestures pass through untouched so a narrow
+window keeps no dead strip.
+
 ### Suppress swipe navigation
 
 `useSuppressSwipeNavigation` (`src/ui/hooks/useSuppressSwipeNavigation.ts`) —
@@ -1995,9 +2016,11 @@ it, with the backdrop dimming in step with the drag. Rows tagged
 
 ### Row swipe
 
-`useRowSwipe` (`src/ui/hooks/useRowSwipe.ts`) — the note-card gesture. A right
-swipe >96px archives the note; a left swipe >48px latches a trash button that
-needs a second confirming tap to delete. The foreground tracks the finger with
+`useRowSwipe` (`src/ui/hooks/useRowSwipe.ts`) — the note-card gesture (a thin
+wrapper over the framework hook that adds the
+[edge guard](#edge-zone--edge-gesture-guard)). A right swipe >96px archives the
+note; a left swipe >48px latches a trash button that needs a second confirming
+tap to delete. The foreground tracks the finger with
 `translateX` and settles via CSS transition on release. **Touch only:** on a
 hover/fine-pointer device (`useMediaQuery("(hover: hover) and (pointer:
 fine)")`) `SwipeableNoteCard` skips the swipe wiring and renders the card inside
@@ -2008,7 +2031,8 @@ a [right-click menu](#right-click-menu) instead.
 `useSwipeReveal` (`src/ui/hooks/useSwipeReveal.ts`) — the side-menu row gesture:
 a left swipe latches the row open to uncover a single trash button; tapping it
 deletes the note straight away (no confirming second tap — deletion is undoable
-from the Edit section), and tapping an open row closes it. **Touch only:** like
+from the Edit section), and tapping an open row closes it. Like the card, it
+stands down inside the [edge zone](#edge-zone--edge-gesture-guard). **Touch only:** like
 the overview card, `SwipeToRemove` swaps the swipe for a
 [right-click menu](#right-click-menu) on a hover/fine-pointer device.
 

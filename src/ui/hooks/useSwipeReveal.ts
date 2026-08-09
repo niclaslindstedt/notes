@@ -8,12 +8,21 @@
 // `onArchive` (archiving is undoable, so this one acts without a confirm).
 // Without it a right swipe is inert — the row only opens leftward.
 //
+// A gesture that starts within the screen-edge zone is the side menu's, not
+// the row's: `useEdgeGestureGuard` keeps it away from the handlers below, so
+// an inward edge swipe neither slides the row nor activates it.
+//
 // The caller spreads `handlers` onto the sliding foreground element and
 // applies `translateX(offset)`, with `animating` gating the CSS
 // transition. `actionWidth` is how far the row latches open and must match
 // the width of the action rendered behind the foreground.
 
 import { useCallback, useRef, useState, type PointerEvent } from "react";
+
+import {
+  useEdgeGestureGuard,
+  type SwipeGestureHandlers,
+} from "./edge-gesture.ts";
 
 // Movement before we commit to a horizontal vs. vertical gesture (so a
 // vertical drag still scrolls the drawer instead of arming the swipe).
@@ -28,13 +37,7 @@ export interface SwipeReveal {
   animating: boolean;
   open: boolean;
   close: () => void;
-  handlers: {
-    onPointerDown: (e: PointerEvent<HTMLElement>) => void;
-    onPointerMove: (e: PointerEvent<HTMLElement>) => void;
-    onPointerUp: (e: PointerEvent<HTMLElement>) => void;
-    onPointerCancel: (e: PointerEvent<HTMLElement>) => void;
-    onClickCapture: (e: React.MouseEvent<HTMLElement>) => void;
-  };
+  handlers: SwipeGestureHandlers;
 }
 
 export function useSwipeReveal(
@@ -136,7 +139,7 @@ export function useSwipeReveal(
   // Swallow the click that trails a drag (so a swipe never activates the
   // row), and turn a tap on an already-open row into a close.
   const onClickCapture = useCallback(
-    (e: React.MouseEvent<HTMLElement>) => {
+    (e: React.MouseEvent<Element>) => {
       if (dragged.current) {
         e.preventDefault();
         e.stopPropagation();
@@ -152,17 +155,15 @@ export function useSwipeReveal(
     [open, close],
   );
 
-  return {
-    offset,
-    animating,
-    open,
-    close,
-    handlers: {
-      onPointerDown,
-      onPointerMove,
-      onPointerUp,
-      onPointerCancel: onPointerUp,
-      onClickCapture,
-    },
-  };
+  // An inward swipe from a screen border belongs to the side menu, so the row
+  // never sees a gesture that starts there (see `edge-gesture.ts`).
+  const handlers = useEdgeGestureGuard({
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel: onPointerUp,
+    onClickCapture,
+  });
+
+  return { offset, animating, open, close, handlers };
 }
