@@ -417,6 +417,32 @@ export function SideMenu({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, close]);
 
+  // Sliding the drawer open should show you where you are. A note filed in a
+  // folder sits behind that folder's collapsed header, so the active row — the
+  // one thing the drawer is meant to orient you by — isn't on screen at all.
+  // Spring its folder open as the drawer appears (and, on the docked sidebar
+  // that is always open, as the active note changes).
+  //
+  // Keyed on the *folder*, not on the expanded set, so collapsing it by hand
+  // afterwards sticks: this only runs again when the drawer reopens or the
+  // active note moves to a different folder.
+  const activeFolderId = activeNoteId
+    ? (notes.find((n) => n.id === activeNoteId)?.folderId ?? null)
+    : null;
+  // A note pointing at a folder the registry no longer has renders ungrouped
+  // (see the split below), so there is nothing to reveal for it either.
+  const revealFolderId =
+    activeFolderId && folders.some((f) => f.id === activeFolderId)
+      ? activeFolderId
+      : null;
+  const drawerShowing = open || pinned;
+  useEffect(() => {
+    if (!drawerShowing || !revealFolderId) return;
+    setExpandedFolders((prev) =>
+      prev.has(revealFolderId) ? prev : new Set(prev).add(revealFolderId),
+    );
+  }, [drawerShowing, revealFolderId]);
+
   const onRight = position.side === "right";
 
   // A folder can only be dragged somewhere meaningful — onto another namespace
