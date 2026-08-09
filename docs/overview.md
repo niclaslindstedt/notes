@@ -334,6 +334,16 @@ the same place, with the caret often off screen. A short line's caret rect is it
 text row, so the reveal is unchanged there. Targets with no document selection to
 read (the Storage settings passphrase `<input>`) fall back to the element box.
 
+A *ranged* selection is measured at the point it **starts** — which is what a
+[gutter press](#line-numbers) leans on to reveal a long line at its head. Its
+range begins on the line *element* (`(line, 0)`) rather than inside the text, and
+a range's client rects lead with the border box of every element it swallows
+whole, so the first rect there is the line's own box, as tall as all its rows.
+`caretRectWithin` steps into the first character after such a boundary and
+measures that single character instead: one character can only occupy one row,
+and that row is the one the line begins on. A boundary with no text after it (a
+horizontal rule) keeps the old rect-list reading.
+
 **Typing keeps the caret on screen with a one-line buffer.** Because every edit
 is intercepted and the caret re-placed programmatically, the browser runs no
 native "keep the caret visible" pass — so on desktop, pressing Enter on the
@@ -711,9 +721,14 @@ arrow key collapses to, is the beginning of the line; `selectLine` remembers
 column 0 as the session caret to match. Everything that reads a selection orders
 its endpoints (`orderPoints`), so the direction changes nothing but where the
 user is left standing. It is also the end the reveal brings into view:
-`caretRectWithin` measures the *first* of a range's client rects, so a line
-taller than the screen is revealed at its head rather than centred on its
-middle.
+`caretRectWithin` measures the span at the point it *starts* — stepping into the
+line's first character, because the range begins on the line element and a
+range's rect list leads with that element's full, screens-tall box — so a line
+taller than the screen is revealed at its head rather than centred on its middle
+with its opening rows scrolled off the top. One consequence beyond where the view
+lands: the head is a single text row, so `ifHidden` can tell that an already-
+visible line needs no reveal at all, where the line's box (which runs past the
+bottom of the band by definition) always read as hidden and moved the view.
 
 **A press works from a note that isn't being edited yet**, which on a phone is
 the common case: an existing note opens with no active line and the soft
@@ -2102,9 +2117,10 @@ keyboard-settling burst goes quiet — the keyboard animates in as a series of
 intermediate heights, so centring only on the first would leave the last line
 (which can't scroll any further up) behind the keyboard. What it centres is the
 target's *reveal rect* (`revealRect`): the caret's own client rect when the
-target is an editable line holding the caret, so a sentence that soft-wraps
-across several screens reveals where the caret is rather than the middle of its
-box; the element's rect otherwise. It centres by setting
+target is an editable line holding the caret (or the head of a selection over
+it), so a sentence that soft-wraps across several screens reveals where the
+caret is rather than the middle of its box; the element's rect otherwise. It
+centres by setting
 the **nearest scrollable ancestor's `scrollTop`** (the pure `centeredScrollTop`
 clamps to the container's scroll range), *not* `Element.scrollIntoView`: the
 latter walks up every scroll container and, on iOS, nudges the visual viewport

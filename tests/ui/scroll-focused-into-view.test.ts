@@ -60,7 +60,8 @@ function scrollableLine() {
     configurable: true,
   });
   scroller.scrollTop = 0;
-  scroller.getBoundingClientRect = () => ({ top: 0, height: 400 }) as DOMRect;
+  scroller.getBoundingClientRect = () =>
+    ({ top: 0, bottom: 400, height: 400 }) as DOMRect;
   // The line sits at content offset 300; on screen it rides up as the container
   // scrolls, so re-centring converges rather than compounding (as it would in a
   // real browser).
@@ -107,6 +108,46 @@ function tallEditableLine() {
   return { scroller, line, scrollTo, putCaretAt };
 }
 
+// A single editable line the whole of which is selected — the shape a
+// line-number gutter press draws. The range starts on the *line element* at
+// offset 0 rather than inside its text, and (as the CSSOM rules require) its
+// rect list leads with the border box of the element it swallows whole: one
+// rect as tall as every row the line wraps to. jsdom implements no range
+// geometry at all, so both that list and the one-character measurement the
+// helper falls back on are stubbed by hand.
+function wholeLineSelected() {
+  const { scroller, line, scrollTo } = scrollableLine();
+  const inner = line.ownerDocument.createElement("div");
+  inner.append(line.ownerDocument.createTextNode("a very long sentence"));
+  line.append(inner);
+  Object.defineProperty(line, "isContentEditable", {
+    value: true,
+    configurable: true,
+  });
+  // Content offset 300, 1200 tall: three times the visible band.
+  const box = () =>
+    ({ top: 300 - scroller.scrollTop, height: 1200 }) as DOMRect;
+  const row = (n: number) =>
+    ({ top: 300 - scroller.scrollTop + n * 20, height: 20 }) as DOMRect;
+  line.getBoundingClientRect = box;
+
+  vi.spyOn(window, "getSelection").mockReturnValue({
+    rangeCount: 1,
+    getRangeAt: () => ({
+      startContainer: line,
+      startOffset: 0,
+      getClientRects: () => [box(), row(0), row(1)] as unknown as DOMRectList,
+    }),
+  } as unknown as Selection);
+  // Every range the helper builds itself covers one character of the line's
+  // text, which sits on its first row.
+  Object.defineProperty(Range.prototype, "getBoundingClientRect", {
+    value: () => row(0),
+    configurable: true,
+  });
+  return { scroller, line, scrollTo };
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   stubReducedMotion(false);
@@ -120,6 +161,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
   document.body.innerHTML = "";
 });
 
@@ -140,6 +182,25 @@ describe("revealRect", () => {
       getRangeAt: () => ({ startContainer: other, getClientRects: () => [] }),
     } as unknown as Selection);
 
+    expect(revealRect(line)).toEqual({ top: 300, bottom: 1500, height: 1200 });
+  });
+
+  it("measures the head of a whole-line selection, not the line's box", () => {
+    const { line } = wholeLineSelected();
+
+    // The bug: a gutter press selects the line by anchoring the range on the
+    // line *element*, whose border box leads the range's rect list — so trusting
+    // that first rect centred the view on the middle of a screens-tall line and
+    // scrolled its opening rows off the top.
+    expect(revealRect(line)).toEqual({ top: 300, bottom: 320, height: 20 });
+  });
+
+  it("falls back to the range's rects when the boundary has no text in it", () => {
+    const { line } = wholeLineSelected();
+    line.replaceChildren(line.ownerDocument.createElement("hr"));
+
+    // A horizontal rule has no character to step into; the rect list is all
+    // there is, and for a one-row line it says the same thing anyway.
     expect(revealRect(line)).toEqual({ top: 300, bottom: 1500, height: 1200 });
   });
 
@@ -356,6 +417,27 @@ describe("scrollFocusedIntoView", () => {
     // tap landed on the same offset regardless of where the caret went.
     expect(atStart).toBe(110);
     expect(atEnd).toBe(1290);
+  });
+
+  it("reveals the head of a line selected from the gutter", () => {
+    const { line, scrollTo } = wholeLineSelected();
+
+    scrollFocusedIntoView(line);
+    vv.emit("resize");
+    // The line's first row centred in the band (300 - (400 - 20) / 2), not the
+    // middle of its 1200-tall box.
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 110, behavior: "smooth" });
+  });
+
+  it("leaves the view alone when the head of a selected line is on screen", () => {
+    const { line, scrollTo } = wholeLineSelected();
+
+    // `ifHidden` is the mode a gutter press reveals in: the line's opening row
+    // sits inside the band (300..320 of 0..400), so the press must not move the
+    // view at all — even though the line itself runs far past the bottom.
+    scrollFocusedIntoView(line, { ifHidden: true });
+    vv.emit("resize");
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 
   it("snaps instantly when the user prefers reduced motion", () => {

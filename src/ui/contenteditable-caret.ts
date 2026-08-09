@@ -67,6 +67,18 @@ export function caretRectWithin(lineEl: HTMLElement): DOMRect | null {
   if (!sel || sel.rangeCount === 0) return null;
   const range = sel.getRangeAt(0);
   if (!lineEl.contains(range.startContainer)) return null;
+  // A boundary that sits on an *element* rather than inside text — which is how
+  // a whole-line span starts, at `(line, 0)` — is measured by stepping into the
+  // first character after it. The range's own rect list can't answer here: it
+  // leads with the border box of each element the range swallows whole, and a
+  // line element's box is as tall as every row it wraps to, so reading the
+  // first rect would hand back the middle of a long line rather than its head.
+  const stepped = firstCharRect(
+    lineEl,
+    range.startContainer,
+    range.startOffset,
+  );
+  if (stepped) return stepped;
   // A range that spans wrapped rows reports one rect per row, so the first is
   // the row the selection *starts* on — the end the user is anchored to. The
   // bounding rect is the fallback for engines that hand back an empty list for
@@ -76,6 +88,48 @@ export function caretRectWithin(lineEl: HTMLElement): DOMRect | null {
   const rect =
     rects && rects.length > 0 ? rects[0]! : range.getBoundingClientRect?.();
   return rect && rect.height > 0 ? rect : null;
+}
+
+/**
+ * The rect of the first character at or after an element boundary
+ * (`node`, `offset`), searching inside `root`. Null when the boundary is
+ * already in text (there is nothing to step into), when no text follows it, or
+ * when the engine reports no geometry.
+ *
+ * One character rather than a collapsed point, because a range with something
+ * in it is what every engine reports geometry for — and a single character can
+ * only occupy one row, which is the whole reason for measuring here.
+ */
+function firstCharRect(
+  root: HTMLElement,
+  node: Node,
+  offset: number,
+): DOMRect | null {
+  if (node.nodeType === Node.TEXT_NODE) return null;
+  const from = node.childNodes[offset];
+  if (!from) return null;
+  const text = firstTextFrom(root, from);
+  if (!text) return null;
+  const range = root.ownerDocument.createRange();
+  range.setStart(text, 0);
+  range.setEnd(text, 1);
+  const rect = range.getBoundingClientRect?.();
+  return rect && rect.height > 0 ? rect : null;
+}
+
+/** The first text node with characters in it at or after `from`, within `root`. */
+function firstTextFrom(root: HTMLElement, from: Node): Text | null {
+  if (from.nodeType === Node.TEXT_NODE && (from as Text).data.length > 0)
+    return from as Text;
+  const walker = root.ownerDocument.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT,
+  );
+  walker.currentNode = from;
+  let next = walker.nextNode() as Text | null;
+  while (next && next.data.length === 0)
+    next = walker.nextNode() as Text | null;
+  return next;
 }
 
 // Resolve column `col` of `lineEl`'s text to the (node, offset) the DOM speaks.
