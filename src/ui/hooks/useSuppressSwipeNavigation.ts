@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 
+import { EDGE_ZONE } from "./edge-gesture.ts";
+
 // Suppresses the browser's native edge-swipe history navigation — the
 // "swipe in from the left edge to go *back*" (and its mirror, swipe in from
 // the right edge to go *forward*) gesture phones fire on a horizontal drag
@@ -19,9 +21,6 @@ import { useEffect } from "react";
 // It only claims gestures that *begin* at the very edge, so horizontal scrolls
 // inside the page (a wide code block, a carousel) are never touched.
 
-// How close to a screen border (px) a touch must start to count as an edge
-// swipe — matches `useEdgeSwipeOpen`'s zone.
-const EDGE_ZONE = 30;
 // Horizontal travel (px) before we commit the gesture to "navigation" and
 // claim it. Small, so the native swipe is cancelled before it animates.
 const AXIS_LOCK = 10;

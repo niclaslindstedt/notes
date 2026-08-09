@@ -143,6 +143,7 @@ Honour these when naming a new file, key, or string.
 | **Side menu** / **drawer** / **nav** / **sidebar**         | `SideMenu` (`src/ui/SideMenu.tsx`); `NavContext`, `useNav` (`src/ui/nav-context.ts`). [→](overview.md#side-menu) |
 | **Floating menu button** / **drag button** / **hamburger** | `useDraggableMenuButton` (`src/ui/hooks/useDraggableMenuButton.ts`); `src/ui/sideMenuPosition.ts`; `showButton` in `nav-context.ts`. [→](overview.md#floating-menu-button) |
 | **Edge swipe to open** / **swipe in from the edge**        | `useEdgeSwipeOpen` (`src/ui/hooks/useEdgeSwipeOpen.ts`). [→](overview.md#edge-swipe-to-open)                  |
+| **Edge zone** / **the edge belongs to the sidebar** / **edge swipe opened a note** | `EDGE_ZONE`, `useEdgeGestureGuard` (`src/ui/hooks/edge-gesture.ts`); wrapped into `useRowSwipe` / `useSwipeReveal`. [→](overview.md#edge-zone--edge-gesture-guard) |
 | **Disable swipe-back** / **swipe-back navigation** / **edge-swipe back/forward** | `useSuppressSwipeNavigation` (`src/ui/hooks/useSuppressSwipeNavigation.ts`). [→](overview.md#suppress-swipe-navigation) |
 | **Swipe the drawer closed** / **drag to close**            | `useDrawerSwipeClose` (`src/ui/hooks/useDrawerSwipeClose.ts`). [→](overview.md#drawer-swipe-to-close)         |
 | **Swipe to archive** / **swipe to delete** (note card)     | `useRowSwipe` (`src/ui/hooks/useRowSwipe.ts`); desktop uses the right-click menu instead. [→](overview.md#row-swipe) |
