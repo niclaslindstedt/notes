@@ -65,6 +65,7 @@ import {
   placeRange,
 } from "./contenteditable-caret.ts";
 import {
+  anchoredScrollTop,
   bufferedScrollTop,
   revealRect,
   scrollFocusedIntoView,
@@ -312,10 +313,14 @@ export function MarkdownEditor({
   // three lines, then indent the same three into children. `backward` draws it
   // from the far end so the caret lands on the span's *start* (see
   // `selectLineSpan`) — what a gutter press asks for.
+  // `anchor` rides along when the span comes from a gutter press: the viewport
+  // y the pressed line sat at when the finger landed, which the view is pinned
+  // back to once the span is drawn (see `holdLineAnchor`).
   const pendingLineSpan = useRef<{
     from: number;
     to: number;
     backward?: boolean;
+    anchor?: number;
   } | null>(null);
 
   // The latest known caret (as a source point) and scroll offset, kept current
@@ -1349,7 +1354,12 @@ export function MarkdownEditor({
   // next arrow key collapses to — is the first character of the first line.
   // Everything that reads the selection orders its endpoints (`orderPoints`),
   // so the direction changes nothing but where the user is left standing.
-  function selectLineSpan(from: number, to: number, backward = false) {
+  function selectLineSpan(
+    from: number,
+    to: number,
+    backward = false,
+    anchor?: number,
+  ) {
     const root = rootRef.current;
     const sel = window.getSelection();
     if (!root || !sel) return;
@@ -1377,11 +1387,23 @@ export function MarkdownEditor({
       range.setEnd(last, last.childNodes.length);
       sel.addRange(range);
     }
+    // Pin the pressed line back under the finger. You can only press a number
+    // you can see, so this gesture has no reveal to do — but the commit that
+    // carries it can still slide the view (see `holdLineAnchor`), and that
+    // reads as the note jumping somewhere else and scrolling back.
+    if (anchor !== undefined)
+      holdLineAnchor(
+        root,
+        from,
+        anchor,
+        took ? ANCHOR_FRAMES_TAKING_FOCUS : ANCHOR_FRAMES_FOCUSED,
+      );
     // Focus raises the soft keyboard, which shrinks the visual viewport *after*
     // this returns — so a line pressed in the lower half would end up behind
     // it. `scrollFocusedIntoView` waits for the viewport to settle and then
     // only moves the view if the line really is covered, leaving a press on an
-    // already-visible line exactly where the user was reading.
+    // already-visible line exactly where the user was reading. It runs long
+    // after the anchor above, so the two never fight.
     if (took) scrollFocusedIntoView(first, { ifHidden: true });
     queueMicrotask(() => {
       settingSel.current = false;
@@ -1392,7 +1414,7 @@ export function MarkdownEditor({
     const span = pendingLineSpan.current;
     if (!span) return;
     pendingLineSpan.current = null;
-    selectLineSpan(span.from, span.to, span.backward);
+    selectLineSpan(span.from, span.to, span.backward, span.anchor);
   });
 
   // A press anywhere in the line-number gutter: take the whole line. The line stops
@@ -1410,6 +1432,9 @@ export function MarkdownEditor({
   // anything about where you are.
   function selectLine(index: number) {
     const len = (linesRef.current[index] ?? "").length;
+    // Where the pressed line sits *now*, before anything below re-renders it —
+    // the y the view is pinned back to once the selection is drawn.
+    const anchor = lineTop(rootRef.current, index);
     lastCaret.current = { line: index, col: 0 };
     // The arming the touch press did on the way in is dropped, the same way
     // ticking a task item drops it: this press leaves *no* line active, so the
@@ -1422,12 +1447,17 @@ export function MarkdownEditor({
     setSpanLine(index);
     markCaret(index, 0, len);
     if (activeRef.current.index === null) {
-      selectLineSpan(index, index, true);
+      selectLineSpan(index, index, true, anchor);
       return;
     }
     pendingCaret.current = null;
     pendingRange.current = null;
-    pendingLineSpan.current = { from: index, to: index, backward: true };
+    pendingLineSpan.current = {
+      from: index,
+      to: index,
+      backward: true,
+      anchor,
+    };
     setActive((a) => ({ index: null, key: a.key + 1 }));
   }
 
@@ -1837,6 +1867,72 @@ function scrollLineIntoView(root: HTMLElement | null, index: number): void {
     behavior: reduceMotion ? "auto" : "smooth",
   });
 }
+
+// Where the line at `index` currently sits in the viewport — the top of its
+// *first* wrapped row, which is the row a gutter press is aimed at. Undefined
+// when the line isn't rendered (nothing to anchor to).
+function lineTop(root: HTMLElement | null, index: number): number | undefined {
+  const line = root?.querySelector<HTMLElement>(`[data-line-index="${index}"]`);
+  return line?.getBoundingClientRect().top;
+}
+
+// Hold a pressed line exactly where the finger left it, `top` being the y it
+// was measured at on the way in.
+//
+// A gutter press has no reveal to do — you can only press a number you can see
+// — but the commit that answers it can still slide the view out from under it,
+// two ways. The line the caret *left* drops back to formatted, and its raw
+// markdown (a `#`, a `- `, a `**`) can wrap to one row more or fewer than the
+// formatted line does, which reflows everything below it. And the browser runs
+// its own reveal for the focus / selection change, which reveals the editing
+// *host* — the top of the note — and then glides back down. Either one reads as
+// the note jumping somewhere else and scrolling to the line, rather than the
+// line simply being selected where it already was.
+//
+// Re-anchoring the line's first row to the y it was pressed at cancels both,
+// and costs nothing when neither happened (the sub-pixel delta bails).
+//
+// Held for `frames` more frames rather than applied once, because a native
+// reveal is run as part of updating the rendering — it can land a frame or two
+// after the commit that provoked it, and correcting it a frame late is the
+// difference between a flicker and a scroll the user has to undo by hand. The
+// window is short enough (a handful of frames after a press that has only just
+// been released) that no real scroll gesture can be underway inside it.
+function holdLineAnchor(
+  root: HTMLElement | null,
+  index: number,
+  top: number,
+  frames: number,
+): void {
+  const apply = () => {
+    const scroller = root?.parentElement;
+    const now = lineTop(root, index);
+    if (!scroller || now === undefined) return;
+    const delta = now - top;
+    if (Math.abs(delta) < 1) return;
+    scroller.scrollTop = anchoredScrollTop(
+      scroller.scrollTop,
+      delta,
+      scroller.clientHeight,
+      scroller.scrollHeight,
+    );
+  };
+  apply();
+  let left = frames;
+  const again = () => {
+    apply();
+    if (--left > 0) requestAnimationFrame(again);
+  };
+  if (left > 0) requestAnimationFrame(again);
+}
+
+// How long the anchor above holds the view, in frames. One frame is enough when
+// the soft keyboard is about to open (`scrollFocusedIntoView` owns the reveal
+// from there, and holding the old offset would fight it); when the surface was
+// already focused nothing else is going to move the view, so the anchor holds
+// across the couple of frames a late native reveal can arrive in.
+const ANCHOR_FRAMES_FOCUSED = 8;
+const ANCHOR_FRAMES_TAKING_FOCUS = 1;
 
 // Restore a scroll container's offset when reopening a note. A plain helper
 // (rather than an inline `el.scrollTop = …` in the effect) so the value being

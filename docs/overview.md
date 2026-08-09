@@ -731,6 +731,24 @@ leaves no active line, so the caret-placement effect that would consume the
 arming never runs, and a flag left set fires on whatever the next tap happens
 to be.
 
+**And a press from a note that *is* being edited must not move the view at
+all.** You can only press a number you can see, so there is no reveal owed — but
+the commit that answers the press can still slide the note out from under the
+finger, two ways. The line the caret *left* drops back to formatted, and its raw
+markdown (a `#`, a `- `, a `**` pair) can wrap to one row more or fewer than the
+formatted line does, reflowing everything below it. And the browser runs its own
+reveal for the focus / selection change, which reveals the host — the top of the
+note — and then glides back down to the selection. Either one reads as the note
+jumping somewhere else and scrolling to the line, rather than the line being
+selected where it already was. So `selectLine` measures the pressed line's first
+row on the way in and `holdLineAnchor` pins it back to that y once the span is
+drawn (`anchoredScrollTop` is the clamped arithmetic, alongside its siblings in
+`scrollFocusedIntoView.ts`). The pin is held across a few frames, because a
+native reveal is run as part of updating the rendering and can land a frame or
+two after the commit that provoked it — but only one frame when the press is
+also taking focus, since from there the keyboard-aware reveal above owns the
+view and holding the old offset would fight it.
+
 Numbers are the *source* line numbers, so a line hidden from the preview — an
 [at-end attachment](#attachments-at-the-end) reference, or a
 [fence](#code-block) the caret is outside of — takes its number with it, leaving
@@ -3137,6 +3155,16 @@ until summoned, the way a note's do: a **left swipe** latches open an
 split in two) on touch, and a **right-click** opens the same two actions on a
 computer (`RowActionMenu`); editing swaps the row for the inline
 `FolderEditRow`.
+
+**Sliding the drawer open reveals the note you have open.** If the active note
+is filed in a folder, that folder springs open as the drawer appears, so the
+highlighted row is on screen rather than hidden behind a collapsed header —
+which is the one thing the drawer is meant to orient you by. The effect is keyed
+on the *folder*, not on the expanded set, so collapsing it by hand afterwards
+sticks: it only runs again when the drawer reopens or the active note moves to a
+different folder. The [docked sidebar](#pinned-sidebar) never opens, so there it
+runs as the active note changes instead. A note pointing at a folder the
+registry no longer has renders ungrouped, so there is nothing to reveal for it.
 
 How the folders and loose notes are ordered is two appearance preferences (see
 [appearance store](#appearance-store)). **`folderPlacement`** is `top`

@@ -117,6 +117,21 @@ export function bufferedScrollTop(
   return scrollTop;
 }
 
+// The `scrollTop` that puts an element back where it was measured, given how
+// far it has drifted since (`delta` in CSS pixels, positive when it has moved
+// down the screen). Clamped to the scroller's range, so an anchor near either
+// end settles at the edge rather than pushing the offset out of bounds. Pure so
+// the geometry is unit-testable without a layout engine (jsdom does no layout).
+export function anchoredScrollTop(
+  scrollTop: number,
+  delta: number,
+  clientHeight: number,
+  scrollHeight: number,
+): number {
+  const max = Math.max(0, scrollHeight - clientHeight);
+  return Math.max(0, Math.min(scrollTop + delta, max));
+}
+
 // The nearest ancestor that can actually scroll vertically, or null when the
 // content fits (nothing to scroll). Walks up from the element's parent.
 function nearestScrollableAncestor(el: HTMLElement): HTMLElement | null {

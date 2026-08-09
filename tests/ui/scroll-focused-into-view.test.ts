@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  anchoredScrollTop,
   bufferedScrollTop,
   centeredScrollTop,
   revealRect,
@@ -170,6 +171,30 @@ describe("centeredScrollTop", () => {
   it("clamps to the bottom so a last line rests at the band's foot", () => {
     const max = 2000 - 400;
     expect(centeredScrollTop(1990, 20, 0, 1600, 400, 2000)).toBe(max);
+  });
+});
+
+describe("anchoredScrollTop", () => {
+  it("leaves the offset alone when nothing drifted", () => {
+    expect(anchoredScrollTop(500, 0, 400, 2000)).toBe(500);
+  });
+
+  it("follows a line that reflowed downward", () => {
+    // The line the caret left grew a row, pushing the pressed line 20px down →
+    // scroll 20px further to put it back under the finger.
+    expect(anchoredScrollTop(500, 20, 400, 2000)).toBe(520);
+  });
+
+  it("follows a line the browser's own reveal flung upward", () => {
+    // A native focus reveal jumped the view to the top of the note, so the
+    // pressed line now sits 480px higher than it was pressed at.
+    expect(anchoredScrollTop(0, -480, 400, 2000)).toBe(0);
+    expect(anchoredScrollTop(500, -480, 400, 2000)).toBe(20);
+  });
+
+  it("clamps to the scroll range at both ends", () => {
+    expect(anchoredScrollTop(10, -100, 400, 2000)).toBe(0);
+    expect(anchoredScrollTop(1590, 100, 400, 2000)).toBe(1600);
   });
 });
 
