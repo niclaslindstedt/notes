@@ -884,6 +884,30 @@ appearance tab it edits the dialog's **draft**, so nothing persists until
 authored content, not a preference toggle, and are deleted one at a time from
 their own tab.
 
+Under the pattern field sits the **regex reference** — `RegexHelper`
+(`src/ui/settings/RegexHelper.tsx`), a dropdown of the constructs a rule is
+built from, each showing its snippet beside what it does in words ("`\d` — any
+digit, 0 to 9"). Pressing a row types that snippet into the pattern **at the
+caret**; a wrapping one (`(…)`, `[…]`, `(?:…)`) goes *around* the selection
+instead, so selecting `\d+` and pressing `(…)` gives `(\d+)`. The press is
+taken on `mousedown` so focus never leaves the field, and the caret is parked
+where the insert left it (between the halves of an empty wrap, past the closing
+half of a filled one) by a pending-caret effect — the field is controlled, so
+the caret can only be placed once the new value has rendered. The panel stays
+open, because building `#(\d+)` is three presses. It expands **in flow** rather
+than floating: the dialog body is a scroll container that would clip an
+absolutely-positioned menu, and on a phone a panel that pushes the fields down
+is easier to hit than one hovering over them.
+
+The token catalog is data in `src/domain/transform.ts` (`REGEX_TOKEN_GROUPS`,
+four groups: match a character, repeat, group, position) with every description
+in the `settings` i18n namespace under `settings.transform.token.<id>` — the
+same data/copy split the [achievements catalog](#achievement-catalog) uses, so a
+new token is a row plus its strings. `insertRegexToken` is the pure insertion
+(clamping and ordering the selection bounds, so a never-focused field simply
+prepends); a test asserts every token has copy in both languages and compiles in
+the position it is typed into.
+
 **Add transform** and the edit button open the same dialog,
 `TransformRuleModal` (`src/ui/settings/TransformRuleModal.tsx`), laid out in the
 order a rule is written in: the pattern, the kind, the replacement (its label
