@@ -1,10 +1,22 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/preact";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { emptyTransformRule } from "../../src/domain/transform.ts";
 import { DEFAULT_APPEARANCE } from "../../src/theme/useTheme.ts";
 import { TransformSection } from "../../src/ui/settings/TransformSection.tsx";
+
+// The pattern field reveals itself on focus (`scrollFocusedIntoView`), and the
+// regex helper focuses it to place the caret. jsdom has no layout and no
+// `scrollIntoView`, so stub it for the file rather than let the reveal throw
+// out of an event handler.
+const realScrollIntoView = HTMLElement.prototype.scrollIntoView;
+beforeAll(() => {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+});
+afterAll(() => {
+  HTMLElement.prototype.scrollIntoView = realScrollIntoView;
+});
 
 const ISSUE_RULE = {
   ...emptyTransformRule("issue"),
@@ -199,5 +211,73 @@ describe("TransformRuleModal", () => {
     expect(
       screen.getByRole("combobox", { name: "Mask" }).textContent,
     ).toContain("Keep both ends");
+  });
+});
+
+describe("the regex helper", () => {
+  function openBlankDialog() {
+    render(
+      <TransformSection appearance={DEFAULT_APPEARANCE} onUpdate={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add transform" }));
+  }
+
+  function patternField() {
+    return screen.getByRole("textbox", {
+      name: "Match",
+    }) as HTMLInputElement;
+  }
+
+  it("is collapsed until the toggle is pressed", () => {
+    openBlankDialog();
+    const toggle = screen.getByRole("button", { name: /regex reference/i });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Any digit, 0 to 9")).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Any digit, 0 to 9")).toBeTruthy();
+    // Each entry shows the snippet beside what it does.
+    expect(screen.getByRole("button", { name: /^\\d Any digit/ })).toBeTruthy();
+  });
+
+  it("types a token into the pattern at the caret", () => {
+    openBlankDialog();
+    fireEvent.click(screen.getByRole("button", { name: /regex reference/i }));
+
+    const field = patternField();
+    fireEvent.input(field, { target: { value: "#" } });
+    field.setSelectionRange(1, 1);
+    fireEvent.click(screen.getByRole("button", { name: /^\\d Any digit/ }));
+
+    expect(patternField().value).toBe("#\\d");
+  });
+
+  it("wraps the selected part of the pattern in a capture group", () => {
+    openBlankDialog();
+    fireEvent.click(screen.getByRole("button", { name: /regex reference/i }));
+
+    const field = patternField();
+    fireEvent.input(field, { target: { value: "#\\d+" } });
+    field.setSelectionRange(1, 4);
+    fireEvent.click(screen.getByRole("button", { name: /^\(…\) Capture/ }));
+
+    expect(patternField().value).toBe("#(\\d+)");
+  });
+
+  it("stays open so several tokens can be typed in a row", () => {
+    openBlankDialog();
+    fireEvent.click(screen.getByRole("button", { name: /regex reference/i }));
+
+    const digit = screen.getByRole("button", { name: /^\\d Any digit/ });
+    fireEvent.click(digit);
+    fireEvent.click(screen.getByRole("button", { name: /^\+ One or more/ }));
+
+    expect(patternField().value).toBe("\\d+");
+    expect(
+      screen
+        .getByRole("button", { name: /regex reference/i })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
   });
 });

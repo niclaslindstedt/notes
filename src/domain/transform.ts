@@ -433,6 +433,120 @@ function splitTextNode(
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// The regex helper
+// ---------------------------------------------------------------------------
+
+/**
+ * One entry in the rule dialog's **regex helper** — the dropdown that types a
+ * regex construct into the pattern field and says, in words, what it does.
+ *
+ * `label` is the snippet as the list shows it (`\d`, `(…)`); `insert` is what
+ * actually goes into the field. A token with a `close` is a **wrapping** one:
+ * with a selection it goes around it (select `\d+`, press `(…)`, get
+ * `(\d+)`), and without one the caret lands between the halves ready to type.
+ *
+ * The catalog is data only — every description lives in the `settings`
+ * i18n namespace under `settings.transform.token.<id>`, the same split the
+ * achievements catalog uses, so a new token is a row here plus its copy.
+ */
+export type RegexToken = {
+  id: string;
+  label: string;
+  insert: string;
+  close?: string;
+};
+
+export type RegexTokenGroup = { id: string; tokens: readonly RegexToken[] };
+
+export const REGEX_TOKEN_GROUPS: readonly RegexTokenGroup[] = [
+  {
+    id: "match",
+    tokens: [
+      { id: "digit", label: "\\d", insert: "\\d" },
+      { id: "word", label: "\\w", insert: "\\w" },
+      { id: "space", label: "\\s", insert: "\\s" },
+      { id: "any", label: ".", insert: "." },
+      { id: "set", label: "[…]", insert: "[", close: "]" },
+      { id: "notSet", label: "[^…]", insert: "[^", close: "]" },
+      { id: "range", label: "a-z", insert: "a-z" },
+    ],
+  },
+  {
+    id: "repeat",
+    tokens: [
+      { id: "oneOrMore", label: "+", insert: "+" },
+      { id: "zeroOrMore", label: "*", insert: "*" },
+      { id: "optional", label: "?", insert: "?" },
+      { id: "count", label: "{2,4}", insert: "{2,4}" },
+    ],
+  },
+  {
+    id: "group",
+    tokens: [
+      { id: "capture", label: "(…)", insert: "(", close: ")" },
+      { id: "nonCapture", label: "(?:…)", insert: "(?:", close: ")" },
+      { id: "alternate", label: "|", insert: "|" },
+    ],
+  },
+  {
+    id: "position",
+    tokens: [
+      { id: "lineStart", label: "^", insert: "^" },
+      { id: "lineEnd", label: "$", insert: "$" },
+      { id: "wordBoundary", label: "\\b", insert: "\\b" },
+      { id: "escape", label: "\\", insert: "\\" },
+    ],
+  },
+];
+
+/** A pattern field after a helper token was typed into it. */
+export type TokenInsertion = { value: string; caret: number };
+
+/**
+ * Type `token` into `value` at the field's selection, returning the new
+ * pattern and where the caret should land.
+ *
+ * A wrapping token with a non-empty selection goes **around** it and leaves
+ * the caret past the closing half, so the wrap can be repeated; with a
+ * collapsed caret both halves are inserted and the caret sits between them.
+ * A plain token replaces the selection and leaves the caret after itself.
+ *
+ * Out-of-range or reversed selection bounds are clamped and ordered, so a
+ * field that has never been focused (`0, 0`) simply prepends.
+ */
+export function insertRegexToken(
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  token: RegexToken,
+): TokenInsertion {
+  const lo = Math.max(
+    0,
+    Math.min(value.length, Math.min(selectionStart, selectionEnd)),
+  );
+  const hi = Math.max(
+    0,
+    Math.min(value.length, Math.max(selectionStart, selectionEnd)),
+  );
+  const before = value.slice(0, lo);
+  const selected = value.slice(lo, hi);
+  const after = value.slice(hi);
+
+  if (token.close === undefined) {
+    return {
+      value: before + token.insert + after,
+      caret: lo + token.insert.length,
+    };
+  }
+
+  const wrapped = token.insert + selected + token.close;
+  return {
+    value: before + wrapped + after,
+    caret: selected === "" ? lo + token.insert.length : lo + wrapped.length,
+  };
+}
+
 /** A run of the sample text in the rule dialog's output preview. */
 export type PreviewSegment =
   | { kind: "plain"; text: string }

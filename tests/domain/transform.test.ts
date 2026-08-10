@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { parseInline } from "../../src/domain/markdown.ts";
+import enSettings from "../../src/i18n/locales/en/settings.ts";
 import {
   applyTransforms,
   compilePattern,
   compileTransforms,
   emptyTransformRule,
   expandReplacement,
+  insertRegexToken,
   maskText,
   patternError,
   previewSegments,
+  REGEX_TOKEN_GROUPS,
   transformHits,
   type TransformRule,
 } from "../../src/domain/transform.ts";
@@ -302,5 +305,91 @@ describe("previewSegments", () => {
 
   it("is empty for an empty sample", () => {
     expect(previewSegments("", compileTransforms([ISSUE_RULE]))).toEqual([]);
+  });
+});
+
+describe("insertRegexToken", () => {
+  const digit = { id: "digit", label: "\\d", insert: "\\d" };
+  const capture = { id: "capture", label: "(…)", insert: "(", close: ")" };
+
+  it("types a plain token at the caret", () => {
+    expect(insertRegexToken("ab", 1, 1, digit)).toEqual({
+      value: "a\\db",
+      caret: 3,
+    });
+  });
+
+  it("replaces the selection with a plain token", () => {
+    expect(insertRegexToken("abc", 1, 3, digit)).toEqual({
+      value: "a\\d",
+      caret: 3,
+    });
+  });
+
+  it("wraps a selection and lands the caret past the closing half", () => {
+    expect(insertRegexToken("#\\d+", 1, 4, capture)).toEqual({
+      value: "#(\\d+)",
+      caret: 6,
+    });
+  });
+
+  it("wraps nothing and lands the caret between the halves", () => {
+    expect(insertRegexToken("#", 1, 1, capture)).toEqual({
+      value: "#()",
+      caret: 2,
+    });
+  });
+
+  it("appends at the end of the field", () => {
+    expect(insertRegexToken("\\d", 2, 2, digit)).toEqual({
+      value: "\\d\\d",
+      caret: 4,
+    });
+  });
+
+  it("clamps and orders out-of-range or reversed bounds", () => {
+    // A field that was never focused reports (0, 0) — prepend.
+    expect(insertRegexToken("ab", 0, 0, digit).value).toBe("\\dab");
+    expect(insertRegexToken("ab", 99, 99, digit).value).toBe("ab\\d");
+    expect(insertRegexToken("abc", 3, 1, capture).value).toBe("a(bc)");
+  });
+});
+
+describe("REGEX_TOKEN_GROUPS", () => {
+  const copy = enSettings.transform as unknown as {
+    token: Record<string, string>;
+    tokenGroup: Record<string, string>;
+  };
+
+  it("has unique token ids", () => {
+    const ids = REGEX_TOKEN_GROUPS.flatMap((g) => g.tokens.map((tk) => tk.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("has copy for every group and every token", () => {
+    // The renderer resolves these keys dynamically, so nothing but this test
+    // catches a token added without its description.
+    for (const group of REGEX_TOKEN_GROUPS) {
+      expect(copy.tokenGroup[group.id], `group "${group.id}"`).toBeTruthy();
+      for (const token of group.tokens) {
+        expect(copy.token[token.id], `token "${token.id}"`).toBeTruthy();
+      }
+    }
+  });
+
+  it("compiles every token's snippet in the position it is typed into", () => {
+    // A token is pressed with text around it, which is the shape that has to
+    // hold: a plain one sits between characters, a wrapping one around them.
+    // (`\\` is exactly why the trailing character matters — it escapes what
+    // the user types next, and is a syntax error on its own.)
+    for (const group of REGEX_TOKEN_GROUPS) {
+      for (const token of group.tokens) {
+        const source =
+          token.close === undefined
+            ? `a${token.insert}b`
+            : `${token.insert}a${token.close}`;
+        expect(() => new RegExp(source), `token "${token.id}"`).not.toThrow();
+      }
+    }
   });
 });

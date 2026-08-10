@@ -1,13 +1,15 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
   compileTransforms,
   emptyTransformRule,
+  insertRegexToken,
   MASK_STYLES,
   patternError,
   previewSegments,
   TRANSFORM_KINDS,
   type MaskStyle,
+  type RegexToken,
   type TransformKind,
   type TransformRule,
 } from "../../domain/transform.ts";
@@ -18,6 +20,7 @@ import { SelectPicker } from "../form/SelectPicker.tsx";
 import { scrollFocusedIntoView } from "../hooks/scrollFocusedIntoView.ts";
 import { CloseIcon, WandIcon } from "../icons.tsx";
 import { Modal } from "../Modal.tsx";
+import { RegexHelper } from "./RegexHelper.tsx";
 import { Field, SegmentedRow } from "./shared.tsx";
 
 // The add / edit dialog for one **Transform** rule, opened from the Transform
@@ -55,12 +58,38 @@ export function TransformRuleModal({
   const [draft, setDraft] = useState<TransformRule>(
     () => rule ?? emptyTransformRule("draft"),
   );
+  // The pattern field, and where the caret should go after the regex helper
+  // types into it. The value is controlled, so the caret can only be placed
+  // once the new text has actually been rendered — hence the pending slot
+  // rather than a `setSelectionRange` in the click handler.
+  const patternRef = useRef<HTMLInputElement>(null);
+  const [pendingCaret, setPendingCaret] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (pendingCaret === null) return;
+    const el = patternRef.current;
+    setPendingCaret(null);
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(pendingCaret, pendingCaret);
+  }, [pendingCaret]);
 
   // Re-seed from the rule the tab handed over each time the dialog opens, so
   // editing a second rule never shows the first one's half-typed state.
   useEffect(() => {
     if (open && rule) setDraft(rule);
   }, [open, rule]);
+
+  // Type a helper token into the pattern at the caret (wrapping the selection
+  // when there is one), then park the caret where the insert left it.
+  function insertToken(token: RegexToken): void {
+    const el = patternRef.current;
+    const start = el?.selectionStart ?? draft.pattern.length;
+    const end = el?.selectionEnd ?? draft.pattern.length;
+    const next = insertRegexToken(draft.pattern, start, end, token);
+    update("pattern", next.value);
+    setPendingCaret(next.caret);
+  }
 
   function update<K extends keyof TransformRule>(
     key: K,
@@ -153,6 +182,7 @@ export function TransformRuleModal({
 
         <Field label={t("settings.transform.pattern")}>
           <input
+            ref={patternRef}
             type="text"
             value={draft.pattern}
             onChange={(e) => update("pattern", e.currentTarget.value)}
@@ -177,6 +207,7 @@ export function TransformRuleModal({
               {t("settings.transform.patternInvalid", { error })}
             </p>
           )}
+          <RegexHelper onInsert={insertToken} />
           <div className="flex items-center gap-2">
             <Checkbox
               checked={draft.ignoreCase}
