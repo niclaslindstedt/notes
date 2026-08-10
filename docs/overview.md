@@ -894,10 +894,19 @@ taken on `mousedown` so focus never leaves the field, and the caret is parked
 where the insert left it (between the halves of an empty wrap, past the closing
 half of a filled one) by a pending-caret effect — the field is controlled, so
 the caret can only be placed once the new value has rendered. The panel stays
-open, because building `#(\d+)` is three presses. It expands **in flow** rather
-than floating: the dialog body is a scroll container that would clip an
-absolutely-positioned menu, and on a phone a panel that pushes the fields down
-is easier to hit than one hovering over them.
+open, because building `#(\d+)` is three presses.
+
+It is the app's own dropdown, not a control of its own: the trigger is
+full-width and cut to the same size, border and type as a
+[`SelectPicker`](#custom-dropdown) trigger — the mask picker further down the
+same dialog *is* one, and the two must not read as different kinds of control —
+and the rows hang in a portalled [`FloatingPanel`](#custom-dropdown) with the row
+metrics every other menu in the app uses (`role="menu"`, one `role="group"` per
+token group). The trigger takes its press on `mousedown` too, so merely opening
+the reference doesn't cost the caret either. Being portalled, the panel escapes
+the dialog body's scroll container rather than being clipped by it; the cost is
+the panel's dismiss backdrop, so a tap on the pattern field while the reference
+is open closes it, the way it does for every other dropdown.
 
 The token catalog is data in `src/domain/transform.ts` (`REGEX_TOKEN_GROUPS`,
 four groups: match a character, repeat, group, position) with every description
@@ -2751,6 +2760,13 @@ which delegates straight to the framework unchanged — the sidebar footer's
 it sits at the bottom of the screen. Only the vertical axis is the app's: the
 width and horizontal clamping still come from the framework's
 `computeFloatingRect`.
+
+The trigger and the row metrics are the app's dropdown *vocabulary*, not just
+`SelectPicker`'s: a control that opens a list of commands rather than picking a
+value — the [regex reference](#transform-settings) — reuses the same full-width
+bordered trigger and the same `FloatingPanel`, switching only the ARIA from
+listbox/option to menu/menuitem. A new dropdown belongs on one of those two
+shapes; hand-rolling a third is what makes a dialog look assembled from parts.
 
 ## Sync and storage status
 
