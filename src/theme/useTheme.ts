@@ -311,6 +311,10 @@ function coerce(raw: unknown): Appearance {
       lineNumbers: editor.lineNumbers === true,
       disableSpellcheck: editor.disableSpellcheck === true,
       disableAutocorrect: editor.disableAutocorrect === true,
+      capitaliseSentences:
+        typeof editor.capitaliseSentences === "boolean"
+          ? editor.capitaliseSentences
+          : DEFAULT_EDITOR_SETTINGS.capitaliseSentences,
       trimTrailingSpaces:
         typeof editor.trimTrailingSpaces === "boolean"
           ? editor.trimTrailingSpaces

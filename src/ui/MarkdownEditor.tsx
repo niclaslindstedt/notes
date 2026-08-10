@@ -48,7 +48,7 @@ import {
 } from "../domain/markdown-format.ts";
 import type { NoteMatch } from "../domain/note-find.ts";
 import type { Note } from "../domain/note.ts";
-import { doubleSpacePeriod } from "../domain/sentence.ts";
+import { doubleSpacePeriod, sentenceCapital } from "../domain/sentence.ts";
 import type { CompiledTransform } from "../domain/transform.ts";
 import { useT } from "../i18n/index.ts";
 import { writeClipboard } from "./clipboard.ts";
@@ -134,6 +134,9 @@ type Props = {
   disableSpellcheck: boolean;
   /** Turn off mobile autocorrect and auto-capitalisation. */
   disableAutocorrect: boolean;
+  /** Write the capital that starts a sentence (see `sentenceCapital`). Ignored
+   *  while `disableAutocorrect` is on — that switch turns the family off. */
+  capitaliseSentences?: boolean;
   /** Max width of the writing column (`"none"` for full-bleed) + classes. */
   maxWidth: string;
   /** Place the caret in the body on mount (false when the title takes focus). */
@@ -233,6 +236,7 @@ export function MarkdownEditor({
   wordWrap,
   disableSpellcheck,
   disableAutocorrect,
+  capitaliseSentences = true,
   maxWidth,
   focusOnMount = true,
   note = null,
@@ -799,7 +803,12 @@ export function MarkdownEditor({
         );
         unlock("fullStop");
       } else {
-        replaceSelection(pts.start, pts.end, text);
+        // The first letter of a sentence goes in capitalised. Unlike the full
+        // stop above this also applies over a selection — what sits *after* the
+        // caret has no say in whether a sentence starts there.
+        const capital = autoCapitalAt(pts.start, text);
+        replaceSelection(pts.start, pts.end, capital ?? text);
+        if (capital) unlock("capitalIdea");
       }
     } else if (it.startsWith("delete")) {
       // A ranged target (a selection, or a word/line delete the browser scoped
@@ -831,6 +840,20 @@ export function MarkdownEditor({
     const kind = blocksRef.current[at.line]?.kind;
     if (kind === "code" || kind === "fence") return null;
     return doubleSpacePeriod(linesRef.current[at.line] ?? "", at.col);
+  }
+
+  // The capitalised form of the letter now being inserted at `at`, when it
+  // starts a sentence (see `sentenceCapital`), or null to insert it as typed.
+  //
+  // Same family, same exceptions as the full stop above: **Disable auto
+  // correct** turns it off along with the platform behaviour it stands in for,
+  // and a fenced code block is verbatim text — `const x` must not become
+  // `Const x` — so it is left alone whatever the settings say.
+  function autoCapitalAt(at: SourcePoint, typed: string): string | null {
+    if (disableAutocorrect || !capitaliseSentences) return null;
+    const kind = blocksRef.current[at.line]?.kind;
+    if (kind === "code" || kind === "fence") return null;
+    return sentenceCapital(linesRef.current[at.line] ?? "", at.col, typed);
   }
 
   // The last caret we tracked, as a collapsed span clamped to the current
@@ -1649,7 +1672,13 @@ export function MarkdownEditor({
           contentEditable={editableMode}
           spellcheck={!disableSpellcheck}
           autoCorrect={disableAutocorrect ? "off" : "on"}
-          autoCapitalize={disableAutocorrect ? "off" : "sentences"}
+          // The editor writes the sentence capital itself (`autoCapitalAt`),
+          // but the hint still goes out: a keyboard that acts on it shows the
+          // Shift key already up, and the two agree on the answer. Turning the
+          // setting off has to turn the platform's copy off with it.
+          autoCapitalize={
+            disableAutocorrect || !capitaliseSentences ? "off" : "sentences"
+          }
           onKeyDown={onKeyDown}
           onClick={onSurfaceClick}
           onPaste={onPaste}

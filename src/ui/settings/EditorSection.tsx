@@ -143,6 +143,12 @@ export function EditorSection({
 
       <Section title={t("settings.editor.typingTitle")}>
         <ToggleRow
+          label={t("settings.editor.capitaliseSentences")}
+          hint={t("settings.editor.capitaliseSentencesHint")}
+          checked={editor.capitaliseSentences}
+          onChange={(v) => update("capitaliseSentences", v)}
+        />
+        <ToggleRow
           label={t("settings.editor.disableSpellcheck")}
           hint={t("settings.editor.disableSpellcheckHint")}
           checked={editor.disableSpellcheck}

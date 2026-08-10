@@ -1,6 +1,7 @@
 // Sentence shape in a body of text: where one ends (the granularity the undo
-// timeline breaks a continuous typing burst into) and how one is ended (the
-// double-space-to-period shortcut the editor applies as you type).
+// timeline breaks a continuous typing burst into), how one is ended (the
+// double-space-to-period shortcut the editor applies as you type), and how one
+// starts (the capital the editor writes for the first letter of a sentence).
 //
 // --- Sentence boundaries ----------------------------------------------------
 //
@@ -80,4 +81,55 @@ export function doubleSpacePeriod(
   if (line[col - 1] !== " ") return null;
   if (!SENTENCE_TAIL.test(line[col - 2] ?? "")) return null;
   return { from: col - 1, text: ". " };
+}
+
+// --- Starting a sentence with a capital -------------------------------------
+
+// What may sit in front of the caret for it to still count as the *start* of a
+// line: indentation, quote and heading markers, a bullet or numbered list
+// marker, and a checkbox — the markup that opens a row rather than text written
+// on it. So `- ` and `> ## ` and `1. [ ] ` are all sentence starts, while a
+// half-typed `*` (an emphasis run, not a bullet — it has no space after it) is
+// not. Written as a flat sequence rather than a repeated alternation so it
+// matches in one pass.
+const LINE_LEAD = /^[\s>#]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:\[[ xX]\][ \t]+)?$/u;
+
+// What may sit in front of the caret for it to count as the start of the *next*
+// sentence on a line already being written: a run of sentence-ending
+// punctuation (the same terminators `SENTENCE_BOUNDARY` counts), any closing
+// quotes or brackets, and then the space that moved past it. Requiring that
+// trailing space is what keeps a decimal (`3.5`) and a filename (`a.png`) —
+// where the letter follows the dot immediately — from being read as a new
+// sentence. An abbreviation (`e.g. `) is read as one; that is the same
+// harmless over-reach every platform keyboard makes.
+const SENTENCE_GAP = /[.!?…]+["'”’)\]]*[ \t]+$/u;
+
+/**
+ * The capitalised form of `typed` when inserting it at column `col` of `line`
+ * starts a sentence, or `null` when the character should go in as typed.
+ *
+ * This is the capital iOS, macOS and most Android keyboards write for you at
+ * the start of a sentence. The live-preview editor intercepts every insertion
+ * and applies it to the source itself (`MarkdownEditor.tsx`), which puts the
+ * keystroke out of reach of the platform's own substitution — so the capital
+ * "falls away" mid-note unless the editor writes it, exactly as it owns the
+ * double-space full stop above. Owning it also means it reads the same on a
+ * desktop browser, where no platform offers it at all.
+ *
+ * Only a single lowercase letter is ever rewritten: a paste, an autocorrect
+ * replacement, or a digit goes in untouched. A letter whose uppercase form is
+ * more than one character (`ß` → `SS`) is left alone too — growing the text
+ * would shift the caret out from under the typist.
+ */
+export function sentenceCapital(
+  line: string,
+  col: number,
+  typed: string,
+): string | null {
+  if (!/^\p{Ll}$/u.test(typed)) return null;
+  const upper = typed.toUpperCase();
+  if (upper === typed || upper.length !== typed.length) return null;
+  const before = line.slice(0, Math.max(col, 0));
+  if (!LINE_LEAD.test(before) && !SENTENCE_GAP.test(before)) return null;
+  return upper;
 }

@@ -289,6 +289,7 @@ export function Editor({
           onMultilineChange={setTitleMultiline}
           disableSpellcheck={editor.disableSpellcheck}
           disableAutocorrect={editor.disableAutocorrect}
+          capitaliseSentences={editor.capitaliseSentences}
         />
         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions --
             the handler only redirects Shift+Tab back into the body; the actions
@@ -354,6 +355,7 @@ export function Editor({
             wordWrap={editor.wordWrap}
             disableSpellcheck={editor.disableSpellcheck}
             disableAutocorrect={editor.disableAutocorrect}
+            capitaliseSentences={editor.capitaliseSentences}
             maxWidth={maxWidth}
             focusOnMount={false}
             note={note}
@@ -384,6 +386,7 @@ export function Editor({
             wordWrap={editor.wordWrap}
             disableSpellcheck={editor.disableSpellcheck}
             disableAutocorrect={editor.disableAutocorrect}
+            capitaliseSentences={editor.capitaliseSentences}
             maxWidth={maxWidth}
             focusOnMount={false}
             noteId={note.id}
@@ -417,6 +420,7 @@ function TitleField({
   onMultilineChange,
   disableSpellcheck,
   disableAutocorrect,
+  capitaliseSentences,
 }: {
   /** Held by the editor, which hands focus back here on Shift+Tab in the body. */
   fieldRef: RefObject<HTMLTextAreaElement>;
@@ -429,6 +433,7 @@ function TitleField({
   onMultilineChange: (multiline: boolean) => void;
   disableSpellcheck: boolean;
   disableAutocorrect: boolean;
+  capitaliseSentences: boolean;
 }) {
   const t = useT();
   const ref = fieldRef;
@@ -528,7 +533,9 @@ function TitleField({
       value={draft}
       spellcheck={!disableSpellcheck}
       autoCorrect={disableAutocorrect ? "off" : "on"}
-      autoCapitalize={disableAutocorrect ? "off" : "sentences"}
+      autoCapitalize={
+        disableAutocorrect || !capitaliseSentences ? "off" : "sentences"
+      }
       placeholder={t("app.titlePlaceholder")}
       onChange={(e) => setDraft(e.currentTarget.value)}
       onBlur={settle}
@@ -567,6 +574,7 @@ function PlainEditor({
   wordWrap,
   disableSpellcheck,
   disableAutocorrect,
+  capitaliseSentences,
   maxWidth,
   focusOnMount = true,
   noteId,
@@ -583,6 +591,10 @@ function PlainEditor({
   wordWrap: boolean;
   disableSpellcheck: boolean;
   disableAutocorrect: boolean;
+  /** Ask the keyboard for a capital at the start of a sentence. A textarea is
+   *  never intercepted, so here the platform's own shortcut still does the
+   *  work — the setting only decides whether to ask for it. */
+  capitaliseSentences: boolean;
   maxWidth: string;
   focusOnMount?: boolean;
   /** Keys this note's session-remembered caret / scroll (see `editor-position.ts`). */
@@ -841,7 +853,9 @@ function PlainEditor({
       wrap={wordWrap ? "soft" : "off"}
       spellcheck={!disableSpellcheck}
       autoCorrect={disableAutocorrect ? "off" : "on"}
-      autoCapitalize={disableAutocorrect ? "off" : "sentences"}
+      autoCapitalize={
+        disableAutocorrect || !capitaliseSentences ? "off" : "sentences"
+      }
       onChange={(e) => {
         setValue(e.currentTarget.value);
         onChange(e.currentTarget.value);

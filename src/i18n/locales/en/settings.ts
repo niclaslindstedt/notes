@@ -90,12 +90,15 @@ const settings = {
     filesAtEnd: "Files at the end",
     filesAtEndHint:
       "Collect attached files (anything that isn't an image) in a block at the foot of the note instead of inline.",
+    capitaliseSentences: "Capitalise sentences",
+    capitaliseSentencesHint:
+      "Start every sentence with a capital as you type — after a full stop, question mark or exclamation mark, and at the start of a line. Code blocks are left alone, and the capital is an ordinary edit, so Backspace or Undo takes it straight back off.",
     disableSpellcheck: "Disable spell check",
     disableSpellcheckHint:
       "Stop your device checking spelling as you type, hiding the red squiggles.",
     disableAutocorrect: "Disable auto correct",
     disableAutocorrectHint:
-      "Stop your device auto-correcting and auto-capitalising as you type (mostly affects mobile keyboards), and stop a double-tapped space ending the sentence with a full stop.",
+      "Stop your device auto-correcting and auto-capitalising as you type (mostly affects mobile keyboards), and stop a double-tapped space ending the sentence with a full stop. Overrides Capitalise sentences.",
     trimTrailingSpaces: "Trim trailing spaces",
     trimTrailingSpacesHint:
       "Remove spaces left at the end of every line when a note is saved.",

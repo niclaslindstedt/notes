@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   doubleSpacePeriod,
   sentenceBoundaryCount,
+  sentenceCapital,
 } from "../../src/domain/sentence.ts";
 
 describe("sentenceBoundaryCount", () => {
@@ -107,5 +108,78 @@ describe("doubleSpacePeriod", () => {
 
   it("accepts a non-ASCII letter as the word's tail", () => {
     expect(doubleSpacePeriod("på gång ", 8)).toEqual({ from: 7, text: ". " });
+  });
+});
+
+describe("sentenceCapital", () => {
+  it("capitalises the first letter of a line", () => {
+    expect(sentenceCapital("", 0, "h")).toBe("H");
+    expect(sentenceCapital("ello", 0, "h")).toBe("H");
+    expect(sentenceCapital("  ", 2, "h")).toBe("H");
+  });
+
+  it("capitalises after a terminator and a space", () => {
+    expect(sentenceCapital("Done. ", 6, "n")).toBe("N");
+    expect(sentenceCapital("Really? ", 8, "y")).toBe("Y");
+    expect(sentenceCapital("Wow! ", 5, "t")).toBe("T");
+    expect(sentenceCapital("Wait… ", 6, "s")).toBe("S");
+    expect(sentenceCapital("Hold on... ", 11, "o")).toBe("O");
+  });
+
+  it("capitalises after closing quotes and brackets", () => {
+    expect(sentenceCapital('He said "go." ', 14, "t")).toBe("T");
+    expect(sentenceCapital("(done.) ", 8, "n")).toBe("N");
+  });
+
+  it("capitalises after the markup that opens a row", () => {
+    expect(sentenceCapital("- ", 2, "m")).toBe("M");
+    expect(sentenceCapital("* ", 2, "m")).toBe("M");
+    expect(sentenceCapital("1. ", 3, "m")).toBe("M");
+    expect(sentenceCapital("2) ", 3, "m")).toBe("M");
+    expect(sentenceCapital("- [ ] ", 6, "m")).toBe("M");
+    expect(sentenceCapital("> ", 2, "q")).toBe("Q");
+    expect(sentenceCapital("## ", 3, "t")).toBe("T");
+    expect(sentenceCapital("  - ", 4, "n")).toBe("N");
+  });
+
+  it("leaves a letter mid-sentence alone", () => {
+    expect(sentenceCapital("hello", 5, "s")).toBeNull();
+    expect(sentenceCapital("hello ", 6, "w")).toBeNull();
+    expect(sentenceCapital("- a bullet ", 11, "w")).toBeNull();
+  });
+
+  it("leaves a period with no space after it alone", () => {
+    // A filename or a decimal: the letter follows the dot immediately, so
+    // nothing there starts a sentence.
+    expect(sentenceCapital("see attachments/a.", 18, "p")).toBeNull();
+    expect(sentenceCapital("version 3.", 10, "x")).toBeNull();
+    expect(sentenceCapital("e.g", 2, "g")).toBeNull();
+  });
+
+  it("leaves an emphasis marker alone (it is not a bullet)", () => {
+    // `*word*` opens a run of emphasis, not a list row — a bullet needs the
+    // space after its marker.
+    expect(sentenceCapital("*", 1, "i")).toBeNull();
+    expect(sentenceCapital("**", 2, "b")).toBeNull();
+  });
+
+  it("only rewrites a single lowercase letter", () => {
+    expect(sentenceCapital("", 0, "H")).toBeNull();
+    expect(sentenceCapital("", 0, "1")).toBeNull();
+    expect(sentenceCapital("", 0, " ")).toBeNull();
+    expect(sentenceCapital("", 0, "")).toBeNull();
+    // A paste or an autocorrect replacement arrives whole; leave it as it came.
+    expect(sentenceCapital("", 0, "hello")).toBeNull();
+  });
+
+  it("leaves a letter that grows when uppercased alone", () => {
+    // `ß`.toUpperCase() is "SS" — two characters, which would shove the caret
+    // one place further than the typist put it.
+    expect(sentenceCapital("", 0, "ß")).toBeNull();
+  });
+
+  it("capitalises a non-ASCII letter", () => {
+    expect(sentenceCapital("", 0, "å")).toBe("Å");
+    expect(sentenceCapital("Klart. ", 7, "ö")).toBe("Ö");
   });
 });

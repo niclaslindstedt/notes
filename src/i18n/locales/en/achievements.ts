@@ -112,6 +112,12 @@ const achievements = {
       learnMore:
         'Tap space twice at the end of a word and the note ends the sentence for you: the first space is swallowed and a full stop written in its place, leaving the cursor after ". " ready for the next one. It is the same shortcut your phone applies in any other text field — the editor writes every keystroke into the note itself, which puts the keystroke out of the keyboard\'s reach, so it does the substitution instead and does it the same way on a computer. Two spaces after a full stop stay two spaces, and inside a code block nothing is rewritten at all. Turn it off with "Disable auto correct" in Settings → Editor.',
     },
+    capitalIdea: {
+      name: "Capital idea",
+      condition: "Let the note capitalise the start of a sentence for you.",
+      learnMore:
+        'Start a sentence and the note writes the capital for you \u2014 the first letter of a line, and the first letter after a full stop, question mark or exclamation mark. It is the capital your phone puts in for you anywhere else, done by the app because the editor writes every keystroke into the note itself, which puts the keystroke out of the keyboard\'s reach; that is also why it works the same on a computer, where nothing offers it at all. A file name or a decimal keeps its lower case, code blocks are left exactly as typed, and because the capital is an ordinary edit, Backspace or Undo takes it back off. Turn it off with "Capitalise sentences" in Settings \u2192 Editor.',
+    },
     pinpoint: {
       name: "Pinpoint",
       condition: "Find text inside the note you have open.",

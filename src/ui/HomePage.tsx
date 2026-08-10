@@ -116,6 +116,15 @@ export function HomePage() {
               Settings turns it off.
             </li>
             <li>
+              Sentences start with a capital. The note writes it for you — the
+              first letter of a line, and the first letter after a full stop,
+              question mark or exclamation mark — so the capital your phone puts
+              in everywhere else is there in the editor too, and on a computer
+              where nothing offers it at all. File names and decimals keep their
+              lower case, code blocks are left exactly as typed, and{" "}
+              <em>Capitalise sentences</em> in Settings turns it off.
+            </li>
+            <li>
               Lists write themselves. <kbd>Enter</kbd> on a bullet or numbered
               row opens the next one — numbers count up as you go — and{" "}
               <kbd>Tab</kbd> tucks a row in under the one above it, with{" "}

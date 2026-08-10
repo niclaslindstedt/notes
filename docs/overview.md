@@ -658,7 +658,9 @@ header.
 `EditorSettings` (`src/theme/themes.ts`) — margin (writing-column max width via
 `editorMarginMaxWidth`), `wordWrap`, `renderMarkdown`, `lineNumbers` (see
 [Line numbers](#line-numbers)), `disableSpellcheck`,
-`disableAutocorrect`, `shortenLinkChars` (see [Shorten links](#shorten-links)),
+`disableAutocorrect`, `capitaliseSentences` (see
+[Sentence capitals](#sentence-capitals)),
+`shortenLinkChars` (see [Shorten links](#shorten-links)),
 the `defaultTitle` scheme, and the `copyScope` (see
 [Copy row](#copy-scope)). They live in the
 [appearance store](#appearance-store) (so they sync with the folder/cloud) and
@@ -666,7 +668,8 @@ are edited in the Editor tab of the settings modal, `EditorSection`
 (`src/ui/settings/EditorSection.tsx`), which groups them into focused bordered
 sections (mirroring the General tab) — **New notes** (the default-title scheme),
 **Writing column** (margins, word wrap), **Markdown** (live render, line
-numbers, link shortening), **Typing aids** (spell-check / auto-correct),
+numbers, link shortening), **Typing aids** (sentence capitals, spell-check /
+auto-correct),
 **Formatting on save** (see [Format on save](#format-on-save)), and **Copying**
 (the copy scope) — see [Storage settings](#storage-settings) and its sibling
 sections.
@@ -1286,6 +1289,61 @@ there.
 The first rewrite fires the **Full stop** achievement through the manual bus:
 the dot it writes is indistinguishable from one typed by hand, so there is
 nothing in the document to derive it from.
+
+### Sentence capitals
+
+The other half of the same story, and the same reason for existing: the note
+writes the **capital that opens a sentence** as you type — the first letter of
+a line, and the first letter after a full stop, question mark or exclamation
+mark. A phone puts that capital in for you in any ordinary text field, and it
+"falls away" the moment the caret is inside the
+[live-preview editor](#markdown-editor), which `preventDefault`s every
+`beforeinput` and writes the character into the source itself; the keystroke
+never reaches the platform's substitution, so nothing capitalises it. On a
+desktop browser nothing offered it in the first place. Owning the rule fixes
+both at once, and makes them agree.
+
+`sentenceCapital(line, col, typed)` (`src/domain/sentence.ts`) is the rule. It
+answers with the capitalised letter, or `null` to insert what was typed, and it
+is narrow in three ways:
+
+- **Only a single lowercase letter is ever rewritten.** A paste, an autocorrect
+  replacement (`insertReplacementText`), a digit, or an already-capital letter
+  goes in untouched. A letter whose uppercase form is *longer* than the letter
+  (`ß` → `SS`) is left alone too — growing the text would shove the caret one
+  place past where the typist put it.
+- **A sentence starts either at the head of a row or after a terminator and a
+  space.** `LINE_LEAD` allows the markup that *opens* a row to sit in front of
+  the caret — indentation, `>` and `#`, a bullet or numbered marker, a checkbox
+  — so `- `, `1. `, `> ## ` and `- [ ] ` are all sentence starts. `SENTENCE_GAP`
+  matches the terminators [the boundary rule](#undo--redo) counts (`.!?…`, plus
+  any closing quotes or brackets) **followed by a space**. Requiring that space
+  is what keeps `a.png` and `3.5` in lower case; an abbreviation (`e.g. `) is
+  read as a sentence start, the same harmless over-reach every platform
+  keyboard makes.
+- **A half-typed emphasis marker is not a bullet.** `*` on its own opens
+  `*italic*`; a list marker needs the space after it.
+
+`autoCapitalAt` (`src/ui/MarkdownEditor.tsx`) decides whether to consult the
+rule, in the `insert` branch of the `beforeinput` handler, and the capital goes
+in through the same `replaceRange` engine as every other edit — so Backspace or
+Undo takes it straight back off. Unlike the [full stop](#double-space-period)
+it *does* apply over a ranged selection: what sits after the caret has no say in
+whether a sentence starts there. It stands down inside a **fenced code block**
+(`const x` must not become `Const x`), when **Capitalise sentences** is off in
+[Editor settings](#editor-settings), and when **Disable auto correct** is on —
+that switch turns the whole family off, this included.
+
+The **Capitalise sentences** setting (`capitaliseSentences`, default on) also
+drives the `autocapitalize` attribute on the [live-preview](#markdown-editor)
+surface, on the [plain `<textarea>` fallback](#editor-settings) and on the
+[title field](#title-field): a textarea is never intercepted, so there the
+platform's own capitalisation still does the work and the setting only decides
+whether to ask for it.
+
+The first capital the editor writes fires the **Capital idea** achievement
+through the manual bus — like the full stop's dot, the letter is
+indistinguishable from one typed with Shift held.
 
 ### Bullet characters
 
