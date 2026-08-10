@@ -238,7 +238,22 @@ describe("the regex helper", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByText("Any digit, 0 to 9")).toBeTruthy();
     // Each entry shows the snippet beside what it does.
-    expect(screen.getByRole("button", { name: /^\\d Any digit/ })).toBeTruthy();
+    expect(
+      screen.getByRole("menuitem", { name: /^\\d Any digit/ }),
+    ).toBeTruthy();
+  });
+
+  it("opens the app's dropdown rather than a control of its own", () => {
+    openBlankDialog();
+    const toggle = screen.getByRole("button", { name: /regex reference/i });
+    expect(toggle.getAttribute("aria-haspopup")).toBe("menu");
+
+    fireEvent.click(toggle);
+    // The panel is portalled out of the dialog body, so the rows live in a
+    // menu of their own rather than in flow under the field.
+    const menu = screen.getByRole("menu", { name: /regex reference/i });
+    expect(menu.contains(toggle)).toBe(false);
+    expect(toggle.getAttribute("aria-controls")).toBe(menu.id);
   });
 
   it("types a token into the pattern at the caret", () => {
@@ -248,7 +263,7 @@ describe("the regex helper", () => {
     const field = patternField();
     fireEvent.input(field, { target: { value: "#" } });
     field.setSelectionRange(1, 1);
-    fireEvent.click(screen.getByRole("button", { name: /^\\d Any digit/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /^\\d Any digit/ }));
 
     expect(patternField().value).toBe("#\\d");
   });
@@ -260,7 +275,7 @@ describe("the regex helper", () => {
     const field = patternField();
     fireEvent.input(field, { target: { value: "#\\d+" } });
     field.setSelectionRange(1, 4);
-    fireEvent.click(screen.getByRole("button", { name: /^\(…\) Capture/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /^\(…\) Capture/ }));
 
     expect(patternField().value).toBe("#(\\d+)");
   });
@@ -269,9 +284,9 @@ describe("the regex helper", () => {
     openBlankDialog();
     fireEvent.click(screen.getByRole("button", { name: /regex reference/i }));
 
-    const digit = screen.getByRole("button", { name: /^\\d Any digit/ });
+    const digit = screen.getByRole("menuitem", { name: /^\\d Any digit/ });
     fireEvent.click(digit);
-    fireEvent.click(screen.getByRole("button", { name: /^\+ One or more/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /^\+ One or more/ }));
 
     expect(patternField().value).toBe("\\d+");
     expect(
