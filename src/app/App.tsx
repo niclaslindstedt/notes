@@ -7,6 +7,7 @@ import {
   type Note,
   type SaveFormatting,
 } from "../domain/note.ts";
+import { compileTransforms } from "../domain/transform.ts";
 import { isStandaloneMobile } from "../pwa/standalone.ts";
 import type { StorageAdapter } from "../storage/adapter.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
@@ -95,6 +96,13 @@ export function App() {
   useViewportHeight();
   const appearance = useApplyAppearance();
   const { editor } = appearance;
+  // The user's Transform rules, compiled once per edit of the rule list rather
+  // than per line per keystroke — the note surfaces below hand the same array
+  // to every rendered line, whose memo then settles on identity.
+  const transforms = useMemo(
+    () => compileTransforms(appearance.transforms),
+    [appearance.transforms],
+  );
   // The active storage backend (this device / a local folder / a cloud) and
   // its sync engine. Appearance settings reconcile against the same backend
   // so they travel with a synced folder too.
@@ -701,6 +709,7 @@ export function App() {
                       key={editing.id}
                       note={editing}
                       editor={editor}
+                      transforms={transforms}
                       onBack={showAll}
                       onChange={(body) => update(editing.id, body)}
                       onTitleChange={(title) => retitle(editing.id, title)}
@@ -718,6 +727,7 @@ export function App() {
                       key={reading.id}
                       note={reading}
                       editor={editor}
+                      transforms={transforms}
                       onBack={() => backTo(ARCHIVE_ROUTE)}
                       onRestore={() => restoreAndEdit(reading.id)}
                       onDelete={() => removeNote(reading.id)}

@@ -24,6 +24,7 @@ import {
 } from "../domain/markdown-format.ts";
 import { findMatches, type NoteMatch } from "../domain/note-find.ts";
 import { isBlank, type Note } from "../domain/note.ts";
+import type { CompiledTransform } from "../domain/transform.ts";
 import { useT } from "../i18n/index.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { CipherGlyph } from "./CipherGlyph.tsx";
@@ -66,6 +67,10 @@ function readToolbarOpen(): boolean {
 // seeing the identical reference and their per-line memos bail out.
 const NO_MATCHES: readonly NoteMatch[] = [];
 
+// The same for a user with no Transform rules: one shared empty list keeps the
+// per-line memos bailing out.
+const NO_TRANSFORMS: readonly CompiledTransform[] = [];
+
 /** What the plain-textarea fallback exposes, mirroring the live-preview one. */
 type PlainEditorHandle = {
   format: (action: FormatAction) => void;
@@ -75,6 +80,7 @@ type PlainEditorHandle = {
 export function Editor({
   note,
   editor,
+  transforms = NO_TRANSFORMS,
   onBack,
   onChange,
   onTitleChange,
@@ -87,6 +93,9 @@ export function Editor({
 }: {
   note: Note;
   editor: EditorSettings;
+  /** The user's compiled **Transform** rules, applied to the preview for
+   *  display only (`domain/transform.ts`). */
+  transforms?: readonly CompiledTransform[];
   /** Leave the editor and return to the overview (the header back button). */
   onBack: () => void;
   onChange: (body: string) => void;
@@ -353,6 +362,7 @@ export function Editor({
               filesAtEnd: editor.filesAtEnd,
             }}
             shortenLinkChars={editor.shortenLinkChars}
+            transforms={transforms}
             lineNumbers={editor.lineNumbers}
             onTabOut={onBodyTab}
             onLineFormat={toolbarOpen ? setLineFormat : undefined}

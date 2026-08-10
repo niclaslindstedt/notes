@@ -403,6 +403,21 @@ export function TextSearchGlyph({ className }: IconProps) {
   );
 }
 
+// One box turning into another across an arrow — a Transform rule, which
+// takes the text it matches and shows something else in its place.
+export function ReplaceGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="3" y="4" width="7" height="6" rx="1" />
+      <rect x="14" y="14" width="7" height="6" rx="1" />
+      <path d="M6.5 10v5a2 2 0 0 0 2 2h2" />
+      <path d="m8.5 15 2 2-2 2" />
+      <path d="M17.5 14V9a2 2 0 0 0-2-2h-2" />
+      <path d="m15.5 9-2-2 2-2" />
+    </Svg>
+  );
+}
+
 // Numbered rules down a left margin — the editor's line-number gutter.
 export function ListOrderedGlyph({ className }: IconProps) {
   return (

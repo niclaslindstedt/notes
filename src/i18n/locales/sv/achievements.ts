@@ -298,6 +298,12 @@ const achievements: AchievementsCatalog = {
     },
 
     // ── Proffs ────────────────────────────────────────────────────────
+    shapeshifter: {
+      name: "Formskiftaren",
+      condition: "Lägg till en omvandlingsregel.",
+      learnMore:
+        "Inställningar → Omvandling matchar en del av en anteckning med ett reguljärt uttryck och visar något annat i dess ställe: ett ärendenummer som en länk till ärendet, en bokningskod som orden den står för, ett telefonnummer med mitten maskad. Själva anteckningen ändras aldrig — sätt markören på raden för att se exakt vad du skrev, och kopiering kopierar alltid originalet.",
+    },
     localVault: {
       name: "Lokalt valv",
       condition: "Anslut en mapp på din enhet.",
