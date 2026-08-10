@@ -8,6 +8,10 @@ import {
   type InlineNode,
   type LineBlock,
 } from "../domain/markdown.ts";
+import {
+  applyTransforms,
+  type CompiledTransform,
+} from "../domain/transform.ts";
 import { youtubeVideo } from "../domain/youtube.ts";
 import { useT } from "../i18n/index.ts";
 import { FileAttachment } from "./attachments/FileAttachment.tsx";
@@ -39,6 +43,10 @@ export type LineHighlight = { from: number; to: number; active: boolean };
 // A stable empty list, so a line with no hits keeps handing `RenderedLine` the
 // identical reference and its memo bails out (see the comparator at the foot).
 const NO_HIGHLIGHTS: readonly LineHighlight[] = [];
+
+// The same trick for the Transform rules: a note with none configured hands
+// every line this one reference, so the memo comparator settles on identity.
+const NO_TRANSFORMS: readonly CompiledTransform[] = [];
 
 const MARK_CLASS = "rounded-[2px] bg-link/35 text-fg-bright";
 const MARK_ACTIVE_CLASS = "rounded-[2px] bg-accent text-page-bg";
@@ -256,6 +264,26 @@ function renderInline(
             offset={node.offset}
           />
         );
+      case "transform":
+        return (
+          <TransformNode
+            key={i}
+            kind={node.kind}
+            text={node.text}
+            href={node.href}
+            source={node.source}
+            offset={node.offset}
+            // Like a shortened link, a transformed run's rendered text has its
+            // own length, so a hit inside it is painted as a tint over the
+            // whole run rather than split into `<mark>`s that would map back
+            // to the wrong columns.
+            hit={overlaps(
+              highlights,
+              node.offset,
+              node.offset + node.source.length,
+            )}
+          />
+        );
       case "strong":
         return (
           <strong key={i} className="font-bold text-fg-bright">
@@ -388,18 +416,98 @@ function LinkNode({
   );
 }
 
+// A run a **Transform** rule rewrote (`domain/transform.ts`): an issue number
+// shown as the link it names, a code shown as different text, a phone number
+// shown masked. The source is untouched — this is display only — so every kind
+// carries `data-len` (the *source* length) beside its `data-src`, and a
+// selection across it copies the characters that were typed rather than the
+// ones on screen (see `markdown-selection.ts`). The caret's own line renders
+// raw, so the real text is always one press away.
+//
+// A `link` behaves like an ordinary anchor, including the mousedown/click
+// dance that opens one from inside the contenteditable surface, and wears a
+// dotted underline so it reads as derived rather than typed. A `sensitive` run
+// deliberately carries no tooltip: revealing on hover what it masks on screen
+// would undo the point of masking it.
+function TransformNode({
+  kind,
+  text,
+  href,
+  source,
+  offset,
+  hit = null,
+}: {
+  kind: "link" | "text" | "sensitive";
+  text: string;
+  href: string | null;
+  source: string;
+  offset: number;
+  hit?: LineHighlight | null;
+}) {
+  const hitClass = hit ? (hit.active ? MARK_ACTIVE_CLASS : MARK_CLASS) : "";
+
+  if (kind === "link" && href) {
+    return (
+      <a
+        data-src={offset}
+        data-len={source.length}
+        href={href}
+        title={source}
+        target="_blank"
+        rel="noreferrer noopener"
+        draggable={false}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          const sel = window.getSelection();
+          if (sel && !sel.isCollapsed) return; // a drag-select ending here
+          e.preventDefault();
+          window.open(href, "_blank", "noreferrer,noopener");
+        }}
+        className={`text-link underline decoration-dotted underline-offset-2 ${hitClass}`}
+      >
+        {text}
+      </a>
+    );
+  }
+
+  if (kind === "sensitive") {
+    return (
+      <span
+        data-src={offset}
+        data-len={source.length}
+        className={`text-muted ${hitClass}`}
+      >
+        {text}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      data-src={offset}
+      data-len={source.length}
+      title={source}
+      className={hitClass}
+    >
+      {text}
+    </span>
+  );
+}
+
 // Inline content, falling back to a non-breaking space so an empty line keeps
 // a full line-box (and stays clickable to place the caret there).
 function inlineContent(
   block: LineBlock,
   shortenLinkChars: number,
   highlights: readonly LineHighlight[],
+  transforms: readonly CompiledTransform[],
 ): ReactNode {
   if (block.content.length === 0) {
     return <span data-src={block.contentStart}>{" "}</span>;
   }
   return renderInline(
-    parseInline(block.content, block.contentStart),
+    applyTransforms(parseInline(block.content, block.contentStart), transforms),
     shortenLinkChars,
     highlights,
   );
@@ -410,6 +518,7 @@ function RenderedLineImpl({
   block,
   shortenLinkChars = 0,
   highlights = NO_HIGHLIGHTS,
+  transforms = NO_TRANSFORMS,
   edgeClass = "",
   interactiveTasks = false,
 }: {
@@ -418,6 +527,12 @@ function RenderedLineImpl({
   shortenLinkChars?: number;
   /** Find-bar hits on this line, in its own source columns (see `markSource`). */
   highlights?: readonly LineHighlight[];
+  /**
+   * The user's compiled **Transform** rules, applied to this line's text runs
+   * for display only (`domain/transform.ts`). Empty (the default) when none
+   * are configured, which is the common case and costs nothing.
+   */
+  transforms?: readonly CompiledTransform[];
   /**
    * The rounded corners / padding this line carries as a code block's top or
    * bottom edge (`codeBlockEdgeClass`), or "" for every other line. The block's
@@ -447,14 +562,14 @@ function RenderedLineImpl({
     case "heading":
       return (
         <div className={sizeClass}>
-          {inlineContent(block, shortenLinkChars, highlights)}
+          {inlineContent(block, shortenLinkChars, highlights, transforms)}
         </div>
       );
 
     case "quote":
       return (
         <div className="border-l-2 border-line pl-3 text-muted italic">
-          {inlineContent(block, shortenLinkChars, highlights)}
+          {inlineContent(block, shortenLinkChars, highlights, transforms)}
         </div>
       );
 
@@ -493,7 +608,7 @@ function RenderedLineImpl({
               block.task === true ? "text-muted line-through" : ""
             }`}
           >
-            {inlineContent(block, shortenLinkChars, highlights)}
+            {inlineContent(block, shortenLinkChars, highlights, transforms)}
           </span>
         </div>
       );
@@ -505,7 +620,7 @@ function RenderedLineImpl({
             {block.marker ?? block.ordinal}
           </span>
           <span className="min-w-0 flex-1">
-            {inlineContent(block, shortenLinkChars, highlights)}
+            {inlineContent(block, shortenLinkChars, highlights, transforms)}
           </span>
         </div>
       );
@@ -526,7 +641,11 @@ function RenderedLineImpl({
       );
 
     case "paragraph":
-      return <div>{inlineContent(block, shortenLinkChars, highlights)}</div>;
+      return (
+        <div>
+          {inlineContent(block, shortenLinkChars, highlights, transforms)}
+        </div>
+      );
   }
 }
 
@@ -596,6 +715,9 @@ export const RenderedLine = memo(
     a.shortenLinkChars === b.shortenLinkChars &&
     a.edgeClass === b.edgeClass &&
     a.interactiveTasks === b.interactiveTasks &&
+    // The rule list is compiled once per note (see `NoteEditor`), so identity
+    // holds until the user actually edits their Transform settings.
+    a.transforms === b.transforms &&
     sameHighlights(a.highlights, b.highlights) &&
     a.block.kind === b.block.kind &&
     a.block.task === b.block.task &&

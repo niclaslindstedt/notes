@@ -10,6 +10,7 @@ const settings: SettingsCatalog = {
     general: "Allmänt",
     appearance: "Utseende",
     editor: "Redigerare",
+    transform: "Omvandling",
     storage: "Lagring",
     developer: "Utvecklare",
     logs: "Loggar",
@@ -101,6 +102,58 @@ const settings: SettingsCatalog = {
     copyBody: "Brödtext",
     copyTitleBody: "Titel & brödtext",
     copyFrontMatter: "Frontmatter",
+  },
+
+  transform: {
+    rulesTitle: "Omvandlingsregler",
+    blurb:
+      "Ändra vad en anteckning visar utan att ändra vad den sparar. En regel matchar en del av en anteckning med ett reguljärt uttryck och visar något annat i dess ställe — ett ärendenummer som en länk till ärendet, ett telefonnummer med mitten maskad. Anteckningen behåller exakt det du skrev: sätt markören på raden för att se det, och kopiering kopierar alltid originalet.",
+    empty: "Inga omvandlingar ännu.",
+    add: "Lägg till omvandling",
+    orderHint:
+      "Reglerna körs uppifrån och ner, och den första som tar en textbit vinner.",
+    toggleAria: "Aktivera {name}",
+    editAria: "Redigera {name}",
+    deleteAria: "Ta bort {name}",
+
+    ruleTitle: "Omvandling",
+    name: "Namn",
+    namePlaceholder: "Ärendelänkar",
+    pattern: "Matcha",
+    patternPlaceholder: "#(\\d+)",
+    patternHint:
+      "Ett reguljärt uttryck. Omslut en del med parenteser för att fånga den, och använd sedan $1, $2 … i ersättningen ($& är hela träffen).",
+    patternInvalid: "Inte ett giltigt reguljärt uttryck: {error}",
+    ignoreCase: "Ignorera skiftläge",
+    kind: "Ersätt med",
+    kindLink: "Länk",
+    kindText: "Text",
+    kindSensitive: "Känsligt",
+    kindHint:
+      "Länk behåller den matchade texten och gör den till en länk; Text visar något helt annat; Känsligt döljer träffen bakom en mask.",
+    replacementLink: "Länkadress",
+    replacementLinkHint:
+      "Vart träffen pekar. Den matchade texten står kvar på skärmen; bara dess destination byggs av det här.",
+    replacementLinkPlaceholder: "https://github.com/acme/repo/issues/$1",
+    replacementText: "Ersättning",
+    replacementTextHint: "Vad som ska visas i stället för träffen.",
+    replacementTextPlaceholder: "$1",
+    replacementSensitive: "Maska detta (valfritt)",
+    replacementSensitiveHint:
+      "Lämna tomt för att maska hela träffen. Fyll i för att i stället maska något som byggs av träffen.",
+    mask: "Mask",
+    maskAll: "Dölj allt",
+    maskFixed: "Fast längd",
+    maskEnds: "Behåll båda ändarna",
+    maskLast: "Behåll slutet",
+    maskFirst: "Behåll början",
+    maskHint:
+      "Hur mycket av träffen som fortfarande syns. Fast längd ritar alltid lika många stjärnor, så längden döljs också.",
+    sample: "Exempeltext",
+    samplePlaceholder: "Fixat i #134",
+    output: "Resultat",
+    outputEmpty: "Skriv lite exempeltext för att se vad regeln gör.",
+    outputHint: "Hur exemplet ovan läses när regeln har tillämpats.",
   },
 
   appearance: {

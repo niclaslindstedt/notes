@@ -27,6 +27,7 @@ function flatten(nodes: InlineNode[]): string {
         case "text":
         case "code":
         case "link":
+        case "transform":
           return n.text;
         case "image":
           return n.alt;

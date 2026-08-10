@@ -1,6 +1,7 @@
 import { hiddenAttachmentLines } from "../domain/attachment.ts";
 import { classifyLines } from "../domain/markdown.ts";
 import { type Note } from "../domain/note.ts";
+import type { CompiledTransform } from "../domain/transform.ts";
 import { useT } from "../i18n/index.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { AttachmentsEndBlock } from "./attachments/AttachmentsEndBlock.tsx";
@@ -89,12 +90,16 @@ export function ArchiveList({
 export function ReadOnlyNote({
   note,
   editor,
+  transforms,
   onBack,
   onRestore,
   onDelete,
 }: {
   note: Note;
   editor: EditorSettings;
+  /** The user's compiled **Transform** rules, so an archived note reads the
+   *  same way it does in the editor — a masked number stays masked here. */
+  transforms?: readonly CompiledTransform[];
   onBack: () => void;
   onRestore: () => void;
   onDelete: () => void;
@@ -153,7 +158,7 @@ export function ReadOnlyNote({
                     key={i}
                     className="text-fg break-words whitespace-pre-wrap"
                   >
-                    <RenderedLine block={block} />
+                    <RenderedLine block={block} transforms={transforms} />
                   </div>
                 ),
               )}

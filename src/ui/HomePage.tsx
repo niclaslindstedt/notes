@@ -189,6 +189,22 @@ export function HomePage() {
               and files in a block at the end of the note instead of inline.
             </li>
             <li>
+              Set up your own <em>transform rules</em> in Settings and the app
+              rewrites what a note shows without touching what it stores. A rule
+              matches part of a note with a regular expression and displays
+              something else in its place: an issue number like{" "}
+              <code className="text-fg-bright">#134</code> as a link straight to
+              that issue, a shorthand as the words it stands for, or a phone
+              number as <code className="text-fg-bright">076****123</code> so it
+              isn&apos;t readable over your shoulder. The note itself never
+              changes — put the cursor on the line to see exactly what you
+              typed, and copying always copies the original. Everything happens
+              on your device; a rule is a pattern you wrote, and no text is sent
+              anywhere to match it. Each rule is built in a dialog where you
+              type sample text and watch the result underneath, so you can see
+              what it does before you keep it.
+            </li>
+            <li>
               Paste a <em>YouTube link</em> into a note and it becomes a video
               player right where you pasted it — every link shape works (the
               mobile site, <code className="text-fg-bright">youtu.be</code>,

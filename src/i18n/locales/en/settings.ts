@@ -15,6 +15,7 @@ const settings = {
     general: "General",
     appearance: "Appearance",
     editor: "Editor",
+    transform: "Transform",
     storage: "Storage",
     developer: "Developer",
     logs: "Logs",
@@ -106,6 +107,58 @@ const settings = {
     copyBody: "Body",
     copyTitleBody: "Title & body",
     copyFrontMatter: "Front matter",
+  },
+
+  transform: {
+    rulesTitle: "Transform rules",
+    blurb:
+      "Rewrite what a note shows without changing what it stores. A rule matches part of a note with a regular expression and shows something else in its place — an issue number as a link to the issue, a phone number with its middle masked. The note keeps exactly what you typed: put the caret on the line to see it, and copying always copies the original.",
+    empty: "No transforms yet.",
+    add: "Add transform",
+    orderHint:
+      "Rules run top to bottom, and the first one to claim a piece of text wins.",
+    toggleAria: "Enable {name}",
+    editAria: "Edit {name}",
+    deleteAria: "Delete {name}",
+
+    ruleTitle: "Transform",
+    name: "Name",
+    namePlaceholder: "Issue links",
+    pattern: "Match",
+    patternPlaceholder: "#(\\d+)",
+    patternHint:
+      "A regular expression. Wrap a part in parentheses to capture it, then use $1, $2 … in the replacement ($& is the whole match).",
+    patternInvalid: "Not a valid regular expression: {error}",
+    ignoreCase: "Ignore case",
+    kind: "Replace with",
+    kindLink: "Link",
+    kindText: "Text",
+    kindSensitive: "Sensitive",
+    kindHint:
+      "Link keeps the matched text and turns it into a link; Text shows something else entirely; Sensitive hides the match behind a mask.",
+    replacementLink: "Link address",
+    replacementLinkHint:
+      "Where the match points. The matched text stays on screen; only its destination is built from this.",
+    replacementLinkPlaceholder: "https://github.com/acme/repo/issues/$1",
+    replacementText: "Replacement",
+    replacementTextHint: "What to show in place of the match.",
+    replacementTextPlaceholder: "$1",
+    replacementSensitive: "Mask this (optional)",
+    replacementSensitiveHint:
+      "Leave empty to mask the whole match. Fill it in to mask something built from the match instead.",
+    mask: "Mask",
+    maskAll: "Hide everything",
+    maskFixed: "Fixed length",
+    maskEnds: "Keep both ends",
+    maskLast: "Keep the end",
+    maskFirst: "Keep the start",
+    maskHint:
+      "How much of the match still shows. Fixed length always draws the same number of stars, so the length is hidden too.",
+    sample: "Sample text",
+    samplePlaceholder: "Fixed in #134",
+    output: "Result",
+    outputEmpty: "Type some sample text to see what this rule does.",
+    outputHint: "How the sample above reads once this rule is applied.",
   },
 
   appearance: {

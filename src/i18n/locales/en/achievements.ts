@@ -301,6 +301,12 @@ const achievements = {
     },
 
     // ── Pro ───────────────────────────────────────────────────────────
+    shapeshifter: {
+      name: "Shapeshifter",
+      condition: "Add a transform rule.",
+      learnMore:
+        "Settings → Transform matches part of a note with a regular expression and shows something else in its place: an issue number as a link to the issue, a booking code as the words it stands for, a phone number with its middle masked out. The note itself never changes — put the caret on the line to see exactly what you typed, and copying always copies the original.",
+    },
     localVault: {
       name: "Local vault",
       condition: "Connect a folder on your device.",
