@@ -303,6 +303,33 @@ export {
   isNoteSortKey,
 } from "../domain/note.ts";
 
+// The PDF-export settings live in `domain/pdf.ts` next to the pure renderer
+// that consumes them (`domain/` may not import the theme layer), and are
+// re-exported here so the appearance store and the settings UI read them from
+// the same place as every other preference.
+export {
+  type PdfSettings,
+  type PdfPageSize,
+  type PdfOrientation,
+  type PdfBodyFont,
+  type PdfCodeFont,
+  type PdfBullet,
+  DEFAULT_PDF_SETTINGS,
+  PDF_PAGE_SIZES,
+  PDF_ORIENTATIONS,
+  PDF_MARGINS_MM,
+  PDF_BODY_FONTS,
+  PDF_FONT_SIZES_PT,
+  PDF_LINE_HEIGHTS,
+  PDF_HEADING_SCALES,
+  PDF_CODE_FONTS,
+  PDF_CODE_SCALES,
+  PDF_CODE_BACKGROUNDS,
+  PDF_CODE_BACKGROUND_NONE,
+  PDF_BULLETS,
+  coercePdfSettings,
+} from "../domain/pdf.ts";
+
 export type RadiusPreset = "none" | "sm" | "md" | "lg";
 export type DensityPreset = "compact" | "comfortable" | "spacious";
 

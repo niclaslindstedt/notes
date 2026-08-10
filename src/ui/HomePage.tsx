@@ -225,10 +225,20 @@ export function HomePage() {
               only the note in front of you, and never leaves your device.
             </li>
             <li>
-              <em>Copy</em> a note to your clipboard with the button in its
-              header — by default just the body, or, if you choose so in
-              Settings, the title and body or the whole Markdown file with its
-              frontmatter. It stays on your device; the clipboard is written
+              <em>Export a note</em> from the up arrow in its header — as a{" "}
+              <em>PDF</em>, as a plain{" "}
+              <code className="text-fg-bright">.md</code> file, or straight to
+              your clipboard. The PDF is typeset by your own device&apos;s print
+              engine (the export opens your usual print dialog, where &quot;Save
+              as PDF&quot; writes the file), and Settings → Export decides how
+              the page looks: paper size and margins, fonts and their sizes, the
+              monospaced family and the background behind code, and the bullet
+              character. The Markdown export is the same file the app stores
+              your notes as, so it opens anywhere and comes back unchanged. The
+              clipboard option takes, by default, just the body — or, if you
+              choose so in Settings, the title and body or the whole Markdown
+              file with its frontmatter. Every export happens on your device:
+              nothing is uploaded to convert it, and the clipboard is written
               locally.
             </li>
             <li>

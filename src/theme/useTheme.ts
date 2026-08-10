@@ -38,8 +38,10 @@ import { loadFontFamily } from "./fonts.ts";
 import {
   COLOR_KEYS,
   COLOR_KEY_TO_CSS_VAR,
+  coercePdfSettings,
   DEFAULT_CUSTOM_THEME,
   DEFAULT_EDITOR_SETTINGS,
+  DEFAULT_PDF_SETTINGS,
   DEFAULT_FOLDER_PLACEMENT,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SCALE,
@@ -60,6 +62,7 @@ import {
   type FontFamilyId,
   type ListLayout,
   type NoteSortKey,
+  type PdfSettings,
   type RadiusPreset,
   type ThemePreset,
 } from "./themes.ts";
@@ -71,6 +74,7 @@ export type {
   FolderPlacement,
   ListLayout,
   NoteSortKey,
+  PdfSettings,
   ThemePreset,
 } from "./themes.ts";
 
@@ -102,6 +106,9 @@ export type Appearance = {
   // the stored note keeps what was typed. Order is significant (the first
   // rule to claim a run of text wins), so this is a list, not a map.
   transforms: TransformRule[];
+  // How the export function lays a note out on paper — page size, margins,
+  // fonts, code styling, bullet glyph. Read only by the PDF renderer.
+  pdf: PdfSettings;
   // Earned achievements: a map of achievement `id` → unlock timestamp (ms
   // epoch). Idempotent — an id already present keeps its first timestamp.
   achievements: Record<string, number>;
@@ -126,6 +133,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   noteSortKey: DEFAULT_NOTE_SORT_KEY,
   editor: DEFAULT_EDITOR_SETTINGS,
   transforms: [],
+  pdf: DEFAULT_PDF_SETTINGS,
   achievements: {},
   unseenAchievements: [],
   disableAchievements: false,
@@ -313,6 +321,7 @@ function coerce(raw: unknown): Appearance {
         : DEFAULT_EDITOR_SETTINGS.copyScope,
     },
     transforms: validTransforms(raw.transforms),
+    pdf: coercePdfSettings(raw.pdf),
     achievements,
     unseenAchievements: validUnseen(raw.unseenAchievements, achievements),
     disableAchievements: raw.disableAchievements === true,

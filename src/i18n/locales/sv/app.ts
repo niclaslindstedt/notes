@@ -19,8 +19,13 @@ const app: AppCatalog = {
   delete: "Ta bort",
   noteActions: "Anteckningsåtgärder",
   copy: {
-    label: "Kopiera anteckning",
     copied: "Kopierat",
+  },
+  export: {
+    label: "Exportera",
+    pdf: "Exportera till PDF",
+    markdown: "Exportera till MD",
+    clipboard: "Kopiera till urklipp",
   },
   copyCode: "Kopiera kod",
   copyLink: "Kopiera länk",

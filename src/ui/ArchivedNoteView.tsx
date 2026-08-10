@@ -6,7 +6,7 @@ import { useT } from "../i18n/index.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { AttachmentsEndBlock } from "./attachments/AttachmentsEndBlock.tsx";
 import { AttachmentsProvider } from "./attachments/AttachmentsProvider.tsx";
-import { CopyNoteButton } from "./CopyNoteButton.tsx";
+import { ExportButton } from "./export/ExportButton.tsx";
 import { ArrowLeftIcon, RestoreIcon, TrashIcon } from "./icons.tsx";
 import { RenderedLine } from "./MarkdownLine.tsx";
 import { SwipeableNoteCard } from "./note-list/NoteCard.tsx";
@@ -137,7 +137,11 @@ export function ReadOnlyNote({
           <ArrowLeftIcon className="h-[18px] w-[18px]" />
         </button>
         <div className="flex items-center gap-2">
-          <CopyNoteButton note={note} copyScope={editor.copyScope} />
+          <ExportButton
+            note={note}
+            copyScope={editor.copyScope}
+            transforms={transforms}
+          />
         </div>
       </header>
 

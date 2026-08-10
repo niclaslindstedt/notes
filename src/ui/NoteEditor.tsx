@@ -29,7 +29,6 @@ import { useT } from "../i18n/index.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { CipherGlyph } from "./CipherGlyph.tsx";
 import { writeClipboard } from "./clipboard.ts";
-import { CopyNoteButton } from "./CopyNoteButton.tsx";
 import { CutButton } from "./CutButton.tsx";
 import {
   getEditorPosition,
@@ -37,6 +36,7 @@ import {
   pointToOffset,
   setEditorPosition,
 } from "./editor-position.ts";
+import { ExportButton } from "./export/ExportButton.tsx";
 import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { ArrowLeftIcon, SpinnerIcon } from "./icons.tsx";
@@ -301,7 +301,11 @@ export function Editor({
           <NoteFindButton open={findOpen} onToggle={toggleFind} />
           <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
           {!loading && <CutButton onCut={runCut} />}
-          <CopyNoteButton note={note} copyScope={editor.copyScope} />
+          <ExportButton
+            note={note}
+            copyScope={editor.copyScope}
+            transforms={transforms}
+          />
         </div>
       </header>
 

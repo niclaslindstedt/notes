@@ -660,7 +660,7 @@ header.
 [Line numbers](#line-numbers)), `disableSpellcheck`,
 `disableAutocorrect`, `shortenLinkChars` (see [Shorten links](#shorten-links)),
 the `defaultTitle` scheme, and the `copyScope` (see
-[Copy button](#copy-button)). They live in the
+[Copy row](#copy-scope)). They live in the
 [appearance store](#appearance-store) (so they sync with the folder/cloud) and
 are edited in the Editor tab of the settings modal, `EditorSection`
 (`src/ui/settings/EditorSection.tsx`), which groups them into focused bordered
@@ -1457,24 +1457,124 @@ caret onto a hidden line in the editor reveals its raw source (it becomes the
 active line), so the reference stays editable. Turning either toggle on unlocks
 the **Appendix** achievement.
 
-### Copy button
+### Export
 
-`CopyNoteButton` (`src/ui/CopyNoteButton.tsx`) — the last button in the editor's
-and the read-only archived-note view's header action cluster. One tap copies the open note to the clipboard; what it copies is the saved
-`copyScope` [editor setting](#editor-settings), chosen from the dropdown in the
-Editor tab of the settings modal (`EditorSection`). The three scopes are a
-`CopyScope` (`src/domain/note.ts`): `body` (the body verbatim — the default,
-never the title), `titleBody` (the title prepended as a `# ` heading), and
-`frontMatter` (the whole `.md` file the way the file backends store it).
-`buildCopyText` (`src/ui/copy-note.ts`) assembles the text — the `frontMatter`
-case reuses the [markdown codec](#markdown-codec)'s `noteToMarkdown` so a copied
-note is byte-identical to its on-disk file. Copying is the **Copycat**
-achievement (fired via `unlock("copycat")`).
+`ExportButton` (`src/ui/export/ExportButton.tsx`) — the **up arrow** at the end
+of the editor's (and the read-only archived-note view's) header action cluster.
+It opens a menu of the three ways a note leaves the app:
+
+- **Export to PDF** renders the note for paper and raises the print dialog,
+  where "Save as PDF" writes the file. See [PDF settings](#pdf-settings) for how
+  that page is laid out. Unlocks the **Printing press** achievement.
+- **Export to MD** downloads the note as a plain `.md` file. The bytes are the
+  ones the file / cloud backends store (`noteToMarkdown` — see the
+  [markdown codec](#markdown-codec)), YAML front matter and all, so an exported
+  note opens in any Markdown app and round-trips back into notes unchanged. The
+  filename is `exportFileStem` — a slug of the title, deliberately *without* the
+  id suffix `noteFileStem` adds, since that noise has no place in a file you are
+  about to send someone. Unlocks the **Takeaway** achievement.
+- **Copy to clipboard** puts the note on the clipboard, as much of it as the
+  `copyScope` [editor setting](#editor-settings) says — see
+  [copy scope](#copy-scope). This is the only way to copy a note: the menu is
+  where someone looks for "get this note out of the app", and a separate header
+  button doing one of its three jobs was one too many in a row that already
+  holds four. Unlocks the **Copycat** achievement.
+
+**On a narrow screen the menu rows are glyphs alone; from `sm:` up each glyph is
+followed by its label.** That is a `useMediaQuery` decision rather than a CSS
+`hidden sm:inline`, because the [floating panel](#custom-dropdown) is measured
+and positioned in JS — it has to know it is a strip of icons, or it would be
+sized for text that isn't drawn.
+
+The work is loaded **on the press**, not at mount (`await import()` from the
+handlers): the Markdown codec, the print renderer and its stylesheet are
+kilobytes nobody who never exports should download. See
+[code splitting](#code-splitting).
+
+There is no PDF library and no backend to render on. Every surface the app runs
+on — browser, the native WebView, Electron — already carries a production-grade
+PDF writer behind `print()`, so the export builds the page and lets that engine
+typeset it. `printHtmlDocument` (`src/ui/export/print-document.ts`) owns that
+handoff: it prints from an **off-screen iframe** rather than the app's own
+window (which would print the chrome, not the note), waits for the document's
+fonts and images to settle so the first page lays out completely, and tears the
+frame down on `afterprint` with a long timer behind it — removing it early
+cancels an in-flight print.
+
+### PDF settings
+
+`PdfSettings` (`src/domain/pdf.ts`) — what an exported note looks like on paper:
+page size and orientation, margins, the body font / size / line height /
+heading scale, the monospaced family, size and background fill behind code, the
+bullet glyph, and whether the note's title heads the page. It lives in the
+domain (next to the pure renderer that reads it, since `domain/` may not import
+the theme layer) and is re-exported from `src/theme/themes.ts`; the values ride
+on the [appearance store](#appearance-store) as `Appearance.pdf`, so they travel
+with `settings.json` like every other preference, and `coercePdfSettings`
+validates a stored document slot by slot on read.
+
+Only offered values survive that read, and `codeBackground` is narrowed to
+`transparent` or a hex colour — the value is interpolated straight into the
+print stylesheet, so the allowlist is what stops a hostile `settings.json` from
+smuggling a declaration into the document.
+
+`renderPrintDocument` (`src/domain/pdf-render.ts`) is the renderer: a note in, a
+complete self-contained `<!doctype html>` document out — one inline `<style>`,
+no external requests, images as `data:` URLs. Pure, so it is unit-testable
+without a browser. It reads through the same [Markdown parser](#markdown-parser)
+the live preview does, so a PDF says what the editor showed: consecutive prose
+lines keep the newlines the writer typed as hard breaks, lists nest by the
+`depth` the parser assigned and ordered lists carry its computed
+numeric → alpha → roman markers, task rows print as boxes showing their state,
+and a fence that was never closed still prints as a code block.
+
+The document deliberately shares nothing with the app's screen theme: it is
+black on white in a print-safe family, because a note exported to PDF should
+read as a document rather than a screenshot of a dark editor. (The app's bundled
+webfonts aren't loaded in the print document, which is why the font choices are
+generic families.) Note text is escaped and link/image URLs are allowlisted by
+scheme throughout — a note can arrive from a synced folder someone else wrote
+to, so it is treated as untrusted.
+
+**The PDF honours the [Transform](#transforms) rules; the other two exports
+don't.** This is the one place the three deliberately part company — the PDF is
+what you *see*, the Markdown file and the clipboard are what you *stored*. The
+latter two are byte-exact copies of the note by design, and transforms are
+display-only; but a `sensitive` rule masking a phone number exists precisely so
+the original doesn't leave the screen, and a document made to be handed out is
+where it must not reappear. `renderInline` splices the compiled rules into each
+parsed line exactly as the live preview does, and a transformed `link` still
+resolves to an anchor when its target is an inert scheme.
+
+Image attachments are resolved to `data:` URLs before rendering
+(`resolveImages` in `src/ui/export/export-note.ts`, through the
+[on-demand fetcher](#attachments)) — a note from a file/cloud backend carries
+its attachments' metadata but not their bytes, and the print document is
+standalone. An attachment the backend can't produce degrades to its alt text
+rather than to a broken-image box.
+
+### Copy scope
+
+**Copy to clipboard** is the third row of the [export menu](#export) — there is
+no separate copy button in the header (the export menu is where someone looks
+for "get this note out of the app", and a second button doing one of its three
+jobs was one too many in a row that already holds four).
+
+What it copies is the saved `copyScope` [editor setting](#editor-settings),
+chosen from the dropdown in the Editor tab of the settings modal
+(`EditorSection`). The three scopes are a `CopyScope` (`src/domain/note.ts`):
+`body` (the body verbatim — the default, never the title), `titleBody` (the
+title prepended as a `# ` heading), and `frontMatter` (the whole `.md` file the
+way the file backends store it). `buildCopyText` (`src/ui/copy-note.ts`)
+assembles the text — the `frontMatter` case reuses the
+[markdown codec](#markdown-codec)'s `noteToMarkdown` so a copied note is
+byte-identical to its on-disk file. Copying is the **Copycat** achievement
+(fired via `unlock("copycat")`).
 
 ### Cut button
 
 `CutButton` (`src/ui/CutButton.tsx`) — the scissors glyph immediately left of
-the [copy button](#copy-button) in the editor header. It cuts at the caret: what it
+the [export button](#export) in the editor header. It cuts at the caret: what it
 takes leaves the note *and* lands on the clipboard, because clearing a line by
 hand is otherwise a select-and-erase or a held Backspace, and text you pulled
 out is text you often want to put somewhere else. `Ctrl/Cmd+K` is the same edit
@@ -1504,7 +1604,7 @@ so both surfaces agree:
 A whole line is cut *with* its trailing newline, so pasting it back re-creates a
 line rather than splicing it into the one the caret is on; a selection is cut
 verbatim. The text goes out through `writeClipboard` (`src/ui/clipboard.ts`,
-shared with the [copy button](#copy-button)) and the write is deliberately
+shared with the [copy row](#copy-scope)) and the write is deliberately
 fire-and-forget — a refused or unavailable clipboard must not hold up the edit,
 and [undo](#undo--redo) is right there.
 
@@ -1529,7 +1629,7 @@ does nothing rather than guess at a line. Cutting something unlocks the
 one button per Markdown construct the app renders, brought up by the
 `FormatToolbarButton` sitting top-right in the editor header (after the
 [find bar](#find-in-note)'s magnifier, before the
-[cut](#cut-button) and [copy](#copy-button) buttons). Pressing that button opens the toolbar; pressing it
+[cut](#cut-button) and [export](#export) buttons). Pressing that button opens the toolbar; pressing it
 again takes it away, and the choice is remembered across notes and reloads under
 the `notes/format-toolbar` localStorage key.
 
@@ -2075,7 +2175,7 @@ route (an archived note gets its read-only address, matching where opening it
 lands) and writes `routeUrl(route)` — the deploy slot's base plus the hash, not
 whatever path this tab happens to sit on — through
 `writeClipboard` (`src/ui/clipboard.ts`, shared with the editor's
-[copy button](#copy-button)).
+[copy row](#copy-scope)).
 
 `App` passes an `onPop` that runs the same side effects an in-app tap does for
 any move the app didn't initiate — a Back / Forward step, or a hash pasted into
@@ -2520,8 +2620,20 @@ edit individual [colour slots](#custom-theme).
 
 `EditorSection` (`src/ui/settings/EditorSection.tsx`) — margin (writing-column
 width), word-wrap, render-markdown, spell-check / autocorrect toggles, the
-default-title scheme, and the [copy](#copy-button) scope. The values are the
+default-title scheme, and the [copy](#copy-scope) scope. The values are the
 [Editor settings](#editor-settings) on the appearance store.
+
+### Export settings
+
+`ExportSection` (`src/ui/settings/ExportSection.tsx`) — the Export tab: every
+control over the [PDF renderer](#pdf-settings), grouped by what it affects (the
+sheet, the body text, code, lists, and what the page carries beyond the body).
+The code background is a swatch row plus a native colour input, the way the
+custom-theme editor picks a colour. Only the PDF path reads any of it — the
+Markdown export is a file the storage layer already writes and the clipboard
+export is plain text, so neither has anything to style. Like the other
+appearance tabs, each control edits the dialog's `draft` and takes effect on
+Save.
 
 ### Storage settings
 
@@ -2608,7 +2720,7 @@ ToggleRow, SegmentedRow) every settings tab composes from.
 ### Custom dropdown
 
 `SelectPicker` (`src/ui/form/SelectPicker.tsx`) — the app's `<select>`
-replacement, used for the [copy button](#copy-button) scope picker in the Editor
+replacement, used for the [copy row](#copy-scope) scope picker in the Editor
 tab (`EditorSection`). The trigger is a bordered field wearing a `ChevronDownIcon`
 caret; the open menu is a `role="listbox"` of `role="option"` buttons with the
 current value ticked and full keyboard nav (Arrow/Home/End to move, Enter/Space
