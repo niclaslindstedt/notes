@@ -39,6 +39,15 @@ const app = {
     label: "Copy note",
     copied: "Copied",
   },
+  // The export button (the up arrow) in the note header and the three rows of
+  // its menu. On a narrow screen the rows show only their glyph, so each label
+  // is also the row's tooltip and accessible name.
+  export: {
+    label: "Export",
+    pdf: "Export to PDF",
+    markdown: "Export to MD",
+    clipboard: "Copy to clipboard",
+  },
   // The copy button in a fenced code block's top-right corner. It confirms
   // with the same "Copied" as the header's copy button above.
   copyCode: "Copy code",

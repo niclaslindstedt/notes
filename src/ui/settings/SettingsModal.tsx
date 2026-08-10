@@ -25,6 +25,7 @@ import {
   CodeIcon,
   CogIcon,
   DatabaseIcon,
+  ExportIcon,
   MenuIcon,
   PaletteIcon,
   PencilIcon,
@@ -35,6 +36,7 @@ import { Modal } from "../Modal.tsx";
 import { AppearanceSection } from "./AppearanceSection.tsx";
 import { DeveloperSection } from "./DeveloperSection.tsx";
 import { EditorSection } from "./EditorSection.tsx";
+import { ExportSection } from "./ExportSection.tsx";
 import { GeneralSection } from "./GeneralSection.tsx";
 import { LogsSection } from "./LogsSection.tsx";
 import { StorageSection } from "./StorageSection.tsx";
@@ -60,7 +62,13 @@ import { StorageSection } from "./StorageSection.tsx";
 // capture off, so the Logs tab can never outlive its data).
 
 type TabId =
-  "general" | "appearance" | "editor" | "storage" | "developer" | "logs";
+  | "general"
+  | "appearance"
+  | "editor"
+  | "export"
+  | "storage"
+  | "developer"
+  | "logs";
 
 type IconComponent = ComponentType<{ className?: string }>;
 
@@ -70,6 +78,7 @@ const BASE_TABS: readonly TabDef[] = [
   { id: "general", labelKey: "settings.tab.general", Icon: SlidersIcon },
   { id: "appearance", labelKey: "settings.tab.appearance", Icon: PaletteIcon },
   { id: "editor", labelKey: "settings.tab.editor", Icon: PencilIcon },
+  { id: "export", labelKey: "settings.tab.export", Icon: ExportIcon },
   { id: "storage", labelKey: "settings.tab.storage", Icon: DatabaseIcon },
 ];
 
@@ -191,6 +200,9 @@ export function SettingsModal({ open, onClose, storage, conversion }: Props) {
             )}
             {activeTab === "editor" && (
               <EditorSection appearance={draft} onUpdate={update} />
+            )}
+            {activeTab === "export" && (
+              <ExportSection appearance={draft} onUpdate={update} />
             )}
             {activeTab === "storage" && (
               <StorageSection storage={storage} conversion={conversion} />

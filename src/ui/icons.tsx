@@ -93,6 +93,101 @@ export function ImportIcon({ className }: IconProps) {
 }
 
 /**
+ * An arrow leaving a tray upward — the editor's export button. Deliberately the
+ * mirror of `ImportIcon`'s direction: notes come *down* into the app and go
+ * *up* out of it, so the pair reads as one axis. Not in the framework set.
+ */
+export function ExportIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <path d="M12 16V4" />
+      <path d="m7 9 5-5 5 5" />
+      <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+    </svg>
+  );
+}
+
+/**
+ * A **file-format badge**: a rounded outline holding the format's letters. The
+ * shared frame behind `FilePdfIcon` and `FileMarkdownIcon`, so the two export
+ * rows read as one family of format marks rather than as two unrelated
+ * pictures.
+ *
+ * Three decisions here are all about legibility at the ~20px these render at:
+ *
+ *   * **The letters get the whole glyph.** A page-with-a-corner-fold plus tiny
+ *     lettering under it was the obvious first draft and the wrong one — the
+ *     letters were unreadable, and an unreadable "PDF" is just a generic page
+ *     icon sitting next to a generic file icon.
+ *   * **The frame is a hairline**, not the set's usual 2px. A 2px border on a
+ *     24-unit box eats the interior, and the lettering ends up wedged against
+ *     it. The box is also drawn nearly edge to edge for the same reason.
+ *   * **The lettering is filled text**, not stroked paths, which turn to mush
+ *     at this size. `fontSize` is per-badge because two letters can be set
+ *     larger than three in the same width.
+ *
+ * Not in the framework set.
+ */
+function FormatBadge({
+  className,
+  letters,
+  fontSize,
+}: IconProps & { letters: string; fontSize: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <rect x="1" y="4.25" width="22" height="15.5" rx="3" />
+      <text
+        x="12"
+        y="15.4"
+        textAnchor="middle"
+        stroke="none"
+        fill="currentColor"
+        fontSize={fontSize}
+        fontWeight="700"
+        fontFamily="ui-sans-serif, system-ui, sans-serif"
+      >
+        {letters}
+      </text>
+    </svg>
+  );
+}
+
+/** The `PDF` format badge — the export menu's PDF row. */
+export function FilePdfIcon({ className }: IconProps) {
+  return <FormatBadge className={className} letters="PDF" fontSize={9} />;
+}
+
+/**
+ * The `MD` format badge — the export menu's Markdown row. Spelled out rather
+ * than drawn as Markdown's own `M▾` mark: the row it labels says "Export to
+ * MD", and a glyph that repeats the row's own word is read instantly, where the
+ * downward chevron of the official mark reads as "download" beside it.
+ */
+export function FileMarkdownIcon({ className }: IconProps) {
+  return <FormatBadge className={className} letters="MD" fontSize={11} />;
+}
+
+/**
  * A cross inside a circle — the "empty this field" affordance. Deliberately
  * *not* the bare `CloseIcon`: a clear button usually sits a few pixels from a
  * dialog's close button, and two identical crosses side by side read as one

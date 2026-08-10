@@ -36,6 +36,7 @@ import {
   pointToOffset,
   setEditorPosition,
 } from "./editor-position.ts";
+import { ExportButton } from "./export/ExportButton.tsx";
 import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { ArrowLeftIcon, SpinnerIcon } from "./icons.tsx";
@@ -293,6 +294,7 @@ export function Editor({
           <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
           {!loading && <CutButton onCut={runCut} />}
           <CopyNoteButton note={note} copyScope={editor.copyScope} />
+          <ExportButton note={note} copyScope={editor.copyScope} />
         </div>
       </header>
 

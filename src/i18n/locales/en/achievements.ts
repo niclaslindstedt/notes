@@ -268,6 +268,18 @@ const achievements = {
       learnMore:
         "The copy button in a note's header puts the open note on your clipboard. Settings → Editor chooses how much it takes — just the body, the title and body, or the whole .md file with its YAML frontmatter.",
     },
+    printPress: {
+      name: "Printing press",
+      condition: "Export a note to PDF.",
+      learnMore:
+        "The up arrow in a note's header exports it. \u201cExport to PDF\u201d lays the note out as a document \u2014 headings, lists, quotes and code blocks and all \u2014 and hands it to your device's print dialog, where \u201cSave as PDF\u201d writes the file. Settings \u2192 Export controls how that page looks: paper size and margins, the fonts and their sizes, the monospaced family and background behind code, and the bullet glyph.",
+    },
+    takeaway: {
+      name: "Takeaway",
+      condition: "Export a note as a Markdown file.",
+      learnMore:
+        "\u201cExport to MD\u201d in the same menu downloads the note as a plain .md file \u2014 byte for byte the file the folder and cloud backends store, YAML front matter and all \u2014 so it opens in any Markdown app and comes back into notes unchanged.",
+    },
     snippetSnatcher: {
       name: "Snippet snatcher",
       condition: "Copy a code block with its copy button.",

@@ -264,6 +264,18 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Kopieringsknappen i en antecknings sidhuvud lägger den öppna anteckningen på urklipp. Inställningar → Redigerare väljer hur mycket som tas med — bara brödtexten, titel och brödtext, eller hela .md-filen med dess YAML-frontmatter.",
     },
+    printPress: {
+      name: "Tryckpress",
+      condition: "Exportera en anteckning till PDF.",
+      learnMore:
+        "Uppåtpilen i en antecknings sidhuvud exporterar den. \u201dExportera till PDF\u201d s\u00e4tter anteckningen som ett dokument \u2014 rubriker, listor, citat och kodblock \u2014 och l\u00e4mnar den till enhetens utskriftsdialog, d\u00e4r \u201dSpara som PDF\u201d skriver filen. Inst\u00e4llningar \u2192 Export styr hur sidan ser ut: pappersstorlek och marginaler, typsnitten och deras storlekar, den fasta breddsteg-familjen och bakgrunden bakom kod, samt punkttecknet.",
+    },
+    takeaway: {
+      name: "Avh\u00e4mtning",
+      condition: "Exportera en anteckning som en Markdown-fil.",
+      learnMore:
+        "\u201dExportera till MD\u201d i samma meny laddar ner anteckningen som en vanlig .md-fil \u2014 byte f\u00f6r byte samma fil som mapp- och molnlagringen skriver, med YAML-frontmatter \u2014 s\u00e5 den \u00f6ppnas i vilken Markdown-app som helst och kommer tillbaka till notes of\u00f6r\u00e4ndrad.",
+    },
     snippetSnatcher: {
       name: "Kodsnattare",
       condition: "Kopiera ett kodblock med dess kopieringsknapp.",

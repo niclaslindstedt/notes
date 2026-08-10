@@ -1346,6 +1346,90 @@ caret onto a hidden line in the editor reveals its raw source (it becomes the
 active line), so the reference stays editable. Turning either toggle on unlocks
 the **Appendix** achievement.
 
+### Export
+
+`ExportButton` (`src/ui/export/ExportButton.tsx`) — the **up arrow** at the end
+of the editor's (and the read-only archived-note view's) header action cluster.
+It opens a menu of the three ways a note leaves the app:
+
+- **Export to PDF** renders the note for paper and raises the print dialog,
+  where "Save as PDF" writes the file. See [PDF settings](#pdf-settings) for how
+  that page is laid out. Unlocks the **Printing press** achievement.
+- **Export to MD** downloads the note as a plain `.md` file. The bytes are the
+  ones the file / cloud backends store (`noteToMarkdown` — see the
+  [markdown codec](#markdown-codec)), YAML front matter and all, so an exported
+  note opens in any Markdown app and round-trips back into notes unchanged. The
+  filename is `exportFileStem` — a slug of the title, deliberately *without* the
+  id suffix `noteFileStem` adds, since that noise has no place in a file you are
+  about to send someone. Unlocks the **Takeaway** achievement.
+- **Copy to clipboard** is the same write the [copy button](#copy-button) does,
+  honouring the same `copyScope` [editor setting](#editor-settings) — kept here
+  because the menu is where someone looks for "get this note out of the app",
+  and the answer shouldn't depend on knowing which header button is which.
+
+**On a narrow screen the menu rows are glyphs alone; from `sm:` up each glyph is
+followed by its label.** That is a `useMediaQuery` decision rather than a CSS
+`hidden sm:inline`, because the [floating panel](#custom-dropdown) is measured
+and positioned in JS — it has to know it is a strip of icons, or it would be
+sized for text that isn't drawn.
+
+The work is loaded **on the press**, not at mount (`await import()` from the
+handlers): the Markdown codec, the print renderer and its stylesheet are
+kilobytes nobody who never exports should download. See
+[code splitting](#code-splitting).
+
+There is no PDF library and no backend to render on. Every surface the app runs
+on — browser, the native WebView, Electron — already carries a production-grade
+PDF writer behind `print()`, so the export builds the page and lets that engine
+typeset it. `printHtmlDocument` (`src/ui/export/print-document.ts`) owns that
+handoff: it prints from an **off-screen iframe** rather than the app's own
+window (which would print the chrome, not the note), waits for the document's
+fonts and images to settle so the first page lays out completely, and tears the
+frame down on `afterprint` with a long timer behind it — removing it early
+cancels an in-flight print.
+
+### PDF settings
+
+`PdfSettings` (`src/domain/pdf.ts`) — what an exported note looks like on paper:
+page size and orientation, margins, the body font / size / line height /
+heading scale, the monospaced family, size and background fill behind code, the
+bullet glyph, and whether the note's title heads the page. It lives in the
+domain (next to the pure renderer that reads it, since `domain/` may not import
+the theme layer) and is re-exported from `src/theme/themes.ts`; the values ride
+on the [appearance store](#appearance-store) as `Appearance.pdf`, so they travel
+with `settings.json` like every other preference, and `coercePdfSettings`
+validates a stored document slot by slot on read.
+
+Only offered values survive that read, and `codeBackground` is narrowed to
+`transparent` or a hex colour — the value is interpolated straight into the
+print stylesheet, so the allowlist is what stops a hostile `settings.json` from
+smuggling a declaration into the document.
+
+`renderPrintDocument` (`src/domain/pdf-render.ts`) is the renderer: a note in, a
+complete self-contained `<!doctype html>` document out — one inline `<style>`,
+no external requests, images as `data:` URLs. Pure, so it is unit-testable
+without a browser. It reads through the same [Markdown parser](#markdown-parser)
+the live preview does, so a PDF says what the editor showed: consecutive prose
+lines keep the newlines the writer typed as hard breaks, lists nest by the
+`depth` the parser assigned and ordered lists carry its computed
+numeric → alpha → roman markers, task rows print as boxes showing their state,
+and a fence that was never closed still prints as a code block.
+
+The document deliberately shares nothing with the app's screen theme: it is
+black on white in a print-safe family, because a note exported to PDF should
+read as a document rather than a screenshot of a dark editor. (The app's bundled
+webfonts aren't loaded in the print document, which is why the font choices are
+generic families.) Note text is escaped and link/image URLs are allowlisted by
+scheme throughout — a note can arrive from a synced folder someone else wrote
+to, so it is treated as untrusted.
+
+Image attachments are resolved to `data:` URLs before rendering
+(`resolveImages` in `src/ui/export/export-note.ts`, through the
+[on-demand fetcher](#attachments)) — a note from a file/cloud backend carries
+its attachments' metadata but not their bytes, and the print document is
+standalone. An attachment the backend can't produce degrades to its alt text
+rather than to a broken-image box.
+
 ### Copy button
 
 `CopyNoteButton` (`src/ui/CopyNoteButton.tsx`) — the last button in the editor's
@@ -2409,6 +2493,18 @@ edit individual [colour slots](#custom-theme).
 width), word-wrap, render-markdown, spell-check / autocorrect toggles, the
 default-title scheme, and the [copy](#copy-button) scope. The values are the
 [Editor settings](#editor-settings) on the appearance store.
+
+### Export settings
+
+`ExportSection` (`src/ui/settings/ExportSection.tsx`) — the Export tab: every
+control over the [PDF renderer](#pdf-settings), grouped by what it affects (the
+sheet, the body text, code, lists, and what the page carries beyond the body).
+The code background is a swatch row plus a native colour input, the way the
+custom-theme editor picks a colour. Only the PDF path reads any of it — the
+Markdown export is a file the storage layer already writes and the clipboard
+export is plain text, so neither has anything to style. Like the other
+appearance tabs, each control edits the dialog's `draft` and takes effect on
+Save.
 
 ### Storage settings
 

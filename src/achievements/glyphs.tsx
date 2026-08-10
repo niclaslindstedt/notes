@@ -22,6 +22,8 @@ import {
   CodeIcon,
   CopyIcon,
   CutIcon,
+  ExportIcon,
+  FilePdfIcon,
   ImportIcon,
   PaletteIcon,
   PlusIcon,
@@ -458,3 +460,5 @@ export const LinkGlyph: Glyph = LinkFormatIcon;
 export const QuoteGlyph: Glyph = QuoteFormatIcon;
 export const IndentGlyph: Glyph = IndentFormatIcon;
 export const CutGlyph: Glyph = CutIcon;
+export const ExportGlyph: Glyph = ExportIcon;
+export const PdfGlyph: Glyph = FilePdfIcon;

@@ -216,6 +216,20 @@ export function HomePage() {
               locally.
             </li>
             <li>
+              <em>Export a note</em> from the up arrow in its header — as a{" "}
+              <em>PDF</em>, as a plain{" "}
+              <code className="text-fg-bright">.md</code> file, or straight to
+              your clipboard. The PDF is typeset by your own device&apos;s print
+              engine (the export opens your usual print dialog, where &quot;Save
+              as PDF&quot; writes the file), and Settings → Export decides how
+              the page looks: paper size and margins, fonts and their sizes, the
+              monospaced family and the background behind code, and the bullet
+              character. The Markdown export is the same file the app stores
+              your notes as, so it opens anywhere and comes back unchanged.
+              Every export happens on your device — nothing is uploaded to
+              convert it.
+            </li>
+            <li>
               Lift a <em>code block</em> out of a note in one tap — every block
               fenced in <code>```</code> carries a small copy button in its
               top-right corner that puts the code (and only the code) on your
