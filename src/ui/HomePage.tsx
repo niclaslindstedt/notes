@@ -202,7 +202,9 @@ export function HomePage() {
               on your device; a rule is a pattern you wrote, and no text is sent
               anywhere to match it. Each rule is built in a dialog where you
               type sample text and watch the result underneath, so you can see
-              what it does before you keep it.
+              what it does before you keep it. A rule belongs to one namespace
+              (see below), so the rewrites you want at work leave your notes at
+              home alone — or you can set a rule to apply in all of them.
             </li>
             <li>
               Paste a <em>YouTube link</em> into a note and it becomes a video

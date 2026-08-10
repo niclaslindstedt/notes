@@ -14,6 +14,7 @@ import {
 function rule(over: Partial<TransformRule>): TransformRule {
   return {
     id: "r1",
+    namespace: null,
     name: "",
     pattern: "",
     ignoreCase: false,

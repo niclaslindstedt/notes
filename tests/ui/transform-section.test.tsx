@@ -3,7 +3,11 @@ import { fireEvent, render, screen } from "@testing-library/preact";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { emptyTransformRule } from "../../src/domain/transform.ts";
-import { DEFAULT_APPEARANCE } from "../../src/theme/useTheme.ts";
+import type { Namespace } from "../../src/storage/namespaces.ts";
+import {
+  DEFAULT_APPEARANCE,
+  type Appearance,
+} from "../../src/theme/useTheme.ts";
 import { TransformSection } from "../../src/ui/settings/TransformSection.tsx";
 
 // The pattern field reveals itself on focus (`scrollFocusedIntoView`), and the
@@ -31,44 +35,51 @@ function withRules(rules: (typeof ISSUE_RULE)[]) {
   return { ...DEFAULT_APPEARANCE, transforms: rules };
 }
 
+// One namespace is the quiet case the scope UI stays out of; the tests that
+// care about scoping pass `NAMESPACES` instead.
+const SOLO: Namespace[] = [{ slug: "default", name: "Default" }];
+const NAMESPACES: Namespace[] = [
+  { slug: "default", name: "Default" },
+  { slug: "work", name: "Work" },
+];
+
+function renderSection(
+  appearance: Appearance,
+  onUpdate: <K extends keyof Appearance>(key: K, value: Appearance[K]) => void,
+  namespaces: Namespace[] = SOLO,
+  activeNamespace = "default",
+) {
+  return render(
+    <TransformSection
+      appearance={appearance}
+      onUpdate={onUpdate}
+      namespaces={namespaces}
+      activeNamespace={activeNamespace}
+    />,
+  );
+}
+
 describe("TransformSection", () => {
   it("shows the empty state when no rules are configured", () => {
-    render(
-      <TransformSection appearance={DEFAULT_APPEARANCE} onUpdate={vi.fn()} />,
-    );
+    renderSection(DEFAULT_APPEARANCE, vi.fn());
     expect(screen.getByText("No transforms yet.")).toBeTruthy();
   });
 
   it("lists a rule by its name, kind and pattern", () => {
-    render(
-      <TransformSection
-        appearance={withRules([ISSUE_RULE])}
-        onUpdate={vi.fn()}
-      />,
-    );
+    renderSection(withRules([ISSUE_RULE]), vi.fn());
     expect(screen.getByText("Issue links")).toBeTruthy();
     expect(screen.getByText("Link")).toBeTruthy();
     expect(screen.getByText("#(\\d+)")).toBeTruthy();
   });
 
   it("falls back to the pattern for an unnamed rule", () => {
-    render(
-      <TransformSection
-        appearance={withRules([{ ...ISSUE_RULE, name: "" }])}
-        onUpdate={vi.fn()}
-      />,
-    );
+    renderSection(withRules([{ ...ISSUE_RULE, name: "" }]), vi.fn());
     expect(screen.getByRole("button", { name: "Edit #(\\d+)" })).toBeTruthy();
   });
 
   it("parks a rule without deleting it", () => {
     const onUpdate = vi.fn();
-    render(
-      <TransformSection
-        appearance={withRules([ISSUE_RULE])}
-        onUpdate={onUpdate}
-      />,
-    );
+    renderSection(withRules([ISSUE_RULE]), onUpdate);
     fireEvent.click(
       screen.getByRole("checkbox", { name: "Enable Issue links" }),
     );
@@ -79,24 +90,14 @@ describe("TransformSection", () => {
 
   it("deletes a rule", () => {
     const onUpdate = vi.fn();
-    render(
-      <TransformSection
-        appearance={withRules([ISSUE_RULE])}
-        onUpdate={onUpdate}
-      />,
-    );
+    renderSection(withRules([ISSUE_RULE]), onUpdate);
     fireEvent.click(screen.getByRole("button", { name: "Delete Issue links" }));
     expect(onUpdate).toHaveBeenCalledWith("transforms", []);
   });
 
   it("opens the dialog on Add and appends the saved rule", () => {
     const onUpdate = vi.fn();
-    render(
-      <TransformSection
-        appearance={withRules([ISSUE_RULE])}
-        onUpdate={onUpdate}
-      />,
-    );
+    renderSection(withRules([ISSUE_RULE]), onUpdate);
     fireEvent.click(screen.getByRole("button", { name: "Add transform" }));
 
     fireEvent.input(screen.getByRole("textbox", { name: "Match" }), {
@@ -115,12 +116,7 @@ describe("TransformSection", () => {
 
   it("edits an existing rule in place rather than appending it", () => {
     const onUpdate = vi.fn();
-    render(
-      <TransformSection
-        appearance={withRules([ISSUE_RULE])}
-        onUpdate={onUpdate}
-      />,
-    );
+    renderSection(withRules([ISSUE_RULE]), onUpdate);
     fireEvent.click(screen.getByRole("button", { name: "Edit Issue links" }));
     fireEvent.input(screen.getByRole("textbox", { name: "Name" }), {
       target: { value: "Tickets" },
@@ -133,11 +129,73 @@ describe("TransformSection", () => {
   });
 });
 
+describe("namespace scoping", () => {
+  const WORK_RULE = {
+    ...ISSUE_RULE,
+    id: "work",
+    name: "Work links",
+    namespace: "work",
+  };
+
+  it("says nothing about scope while the device has one namespace", () => {
+    renderSection(withRules([ISSUE_RULE]), vi.fn());
+    expect(screen.queryByText("All namespaces")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add transform" }));
+    expect(screen.queryByRole("combobox", { name: "Applies to" })).toBeNull();
+  });
+
+  it("names the namespace each rule runs in", () => {
+    renderSection(withRules([ISSUE_RULE, WORK_RULE]), vi.fn(), NAMESPACES);
+    // The rule with no scope is global; the other wears its namespace's name.
+    expect(screen.getByText("All namespaces")).toBeTruthy();
+    expect(screen.getByText("Work")).toBeTruthy();
+  });
+
+  it("still lists the rules of the namespaces you aren't in", () => {
+    renderSection(withRules([WORK_RULE]), vi.fn(), NAMESPACES, "default");
+    expect(screen.getByText("Work links")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Edit Work links" }),
+    ).toBeTruthy();
+  });
+
+  it("starts a new rule in the namespace you're in", () => {
+    const onUpdate = vi.fn();
+    renderSection(DEFAULT_APPEARANCE, onUpdate, NAMESPACES, "work");
+    fireEvent.click(screen.getByRole("button", { name: "Add transform" }));
+    expect(
+      screen.getByRole("combobox", { name: "Applies to" }).textContent,
+    ).toContain("Work");
+
+    fireEvent.input(screen.getByRole("textbox", { name: "Match" }), {
+      target: { value: "#(\\d+)" },
+    });
+    fireEvent.input(screen.getByRole("textbox", { name: "Link address" }), {
+      target: { value: "https://example.test/issues/$1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    const [, value] = onUpdate.mock.calls.at(-1)!;
+    expect(value[0]).toMatchObject({ namespace: "work" });
+  });
+
+  it("widens a rule back to every namespace", () => {
+    const onUpdate = vi.fn();
+    renderSection(withRules([WORK_RULE]), onUpdate, NAMESPACES, "work");
+    fireEvent.click(screen.getByRole("button", { name: "Edit Work links" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Applies to" }));
+    fireEvent.click(screen.getByRole("option", { name: "All namespaces" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onUpdate).toHaveBeenCalledWith("transforms", [
+      { ...WORK_RULE, namespace: null },
+    ]);
+  });
+});
+
 describe("TransformRuleModal", () => {
   function openBlankDialog() {
-    render(
-      <TransformSection appearance={DEFAULT_APPEARANCE} onUpdate={vi.fn()} />,
-    );
+    renderSection(DEFAULT_APPEARANCE, vi.fn());
     fireEvent.click(screen.getByRole("button", { name: "Add transform" }));
   }
 
@@ -216,9 +274,7 @@ describe("TransformRuleModal", () => {
 
 describe("the regex helper", () => {
   function openBlankDialog() {
-    render(
-      <TransformSection appearance={DEFAULT_APPEARANCE} onUpdate={vi.fn()} />,
-    );
+    renderSection(DEFAULT_APPEARANCE, vi.fn());
     fireEvent.click(screen.getByRole("button", { name: "Add transform" }));
   }
 

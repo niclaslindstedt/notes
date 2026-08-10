@@ -14,6 +14,7 @@ import {
   type TransformRule,
 } from "../../domain/transform.ts";
 import { useT } from "../../i18n/index.ts";
+import type { Namespace } from "../../storage/namespaces.ts";
 import { Button } from "../form/Button.tsx";
 import { Checkbox } from "../form/Checkbox.tsx";
 import { SelectPicker } from "../form/SelectPicker.tsx";
@@ -41,15 +42,26 @@ import { Field, SegmentedRow } from "./shared.tsx";
 const INPUT_CLASS =
   "w-full rounded-[var(--radius)] border border-line bg-surface-2 px-2 py-1.5 text-sm text-fg outline-none focus:border-accent";
 
+// The scope picker's value for "every namespace". A namespace slug is never
+// empty (see `slugify`), so the empty string is free to mean "not one of them".
+const ALL_NAMESPACES = "";
+
 export function TransformRuleModal({
   open,
   rule,
+  namespaces,
   onSave,
   onClose,
 }: {
   open: boolean;
   /** The rule being edited, or null when the dialog is closed. */
   rule: TransformRule | null;
+  /**
+   * Namespaces the rule can be scoped to. Empty when the device has only one
+   * namespace, which hides the scope field: there is nothing to choose
+   * between, and a rule made then applies everywhere.
+   */
+  namespaces: Namespace[];
   onSave: (rule: TransformRule) => void;
   onClose: () => void;
 }) {
@@ -113,6 +125,22 @@ export function TransformRuleModal({
       ),
     [draft],
   );
+
+  // All namespaces, plus — when the rule points at one this device no longer
+  // knows (its namespace was deleted, or it came from another device that has
+  // it) — that slug itself, so opening the rule doesn't silently re-scope it
+  // to whatever the picker happened to land on.
+  const scopeOptions = useMemo(() => {
+    const options = [
+      { value: ALL_NAMESPACES, label: t("settings.transform.scopeAll") },
+      ...namespaces.map((ns) => ({ value: ns.slug, label: ns.name })),
+    ];
+    const scope = draft.namespace;
+    if (scope !== null && !options.some((o) => o.value === scope)) {
+      options.push({ value: scope, label: scope });
+    }
+    return options;
+  }, [namespaces, draft.namespace, t]);
 
   const kindLabel: Record<TransformKind, string> = {
     link: t("settings.transform.kindLink"),
@@ -179,6 +207,22 @@ export function TransformRuleModal({
             className={INPUT_CLASS}
           />
         </Field>
+
+        {namespaces.length > 0 && (
+          <Field label={t("settings.transform.scope")}>
+            <SelectPicker<string>
+              value={draft.namespace ?? ALL_NAMESPACES}
+              options={scopeOptions}
+              onChange={(v) =>
+                update("namespace", v === ALL_NAMESPACES ? null : v)
+              }
+              ariaLabel={t("settings.transform.scope")}
+            />
+            <p className="text-xs text-muted">
+              {t("settings.transform.scopeHint")}
+            </p>
+          </Field>
+        )}
 
         <Field label={t("settings.transform.pattern")}>
           <input

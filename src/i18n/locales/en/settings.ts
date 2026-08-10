@@ -114,6 +114,8 @@ const settings = {
     rulesTitle: "Transform rules",
     blurb:
       "Rewrite what a note shows without changing what it stores. A rule matches part of a note with a regular expression and shows something else in its place — an issue number as a link to the issue, a phone number with its middle masked. The note keeps exactly what you typed: put the caret on the line to see it, and copying always copies the original.",
+    scopeBlurb:
+      "Each rule belongs to a namespace, so work and home can rewrite different things. Rules from your other namespaces are listed here too, greyed out — they don't run over the notes you have open.",
     empty: "No transforms yet.",
     add: "Add transform",
     orderHint:
@@ -125,6 +127,10 @@ const settings = {
     ruleTitle: "Transform",
     name: "Name",
     namePlaceholder: "Issue links",
+    scope: "Applies to",
+    scopeAll: "All namespaces",
+    scopeHint:
+      "Which notes this rule rewrites. A new rule starts in the namespace you're in; pick All namespaces to run it everywhere.",
     pattern: "Match",
     patternPlaceholder: "#(\\d+)",
     patternHint:

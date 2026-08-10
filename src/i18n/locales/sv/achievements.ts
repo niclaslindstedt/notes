@@ -316,6 +316,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Inställningar → Omvandling matchar en del av en anteckning med ett reguljärt uttryck och visar något annat i dess ställe: ett ärendenummer som en länk till ärendet, en bokningskod som orden den står för, ett telefonnummer med mitten maskad. Själva anteckningen ändras aldrig — sätt markören på raden för att se exakt vad du skrev, och kopiering kopierar alltid originalet.",
     },
+    localDialect: {
+      name: "Lokal dialekt",
+      condition: "Ha omvandlingsregler i två olika namnrymder.",
+      learnMore:
+        "En omvandlingsregel hör till en namnrymd, så att ärendelänkarna du vill ha på jobbet aldrig skriver om inköpslistan hemma. Inställningar → Omvandling listar fortfarande alla dina regler — de som hör till dina andra namnrymder är nedtonade — och regelns ”Gäller för” vidgar tillbaka en regel till alla namnrymder när den verkligen gäller allt.",
+    },
     localVault: {
       name: "Lokalt valv",
       condition: "Anslut en mapp på din enhet.",

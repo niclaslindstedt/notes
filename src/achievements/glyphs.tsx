@@ -170,6 +170,16 @@ export function MoveGlyph({ className }: IconProps) {
   );
 }
 
+// A funnel — the "Local dialect" trophy for narrowing a transform rule down
+// to a single namespace.
+export function FunnelGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 4h18l-7 8v7l-4 2v-9z" />
+    </Svg>
+  );
+}
+
 export function BoxesGlyph({ className }: IconProps) {
   return (
     <Svg className={className}>
