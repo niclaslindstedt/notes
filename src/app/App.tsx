@@ -96,17 +96,19 @@ export function App() {
   useViewportHeight();
   const appearance = useApplyAppearance();
   const { editor } = appearance;
-  // The user's Transform rules, compiled once per edit of the rule list rather
-  // than per line per keystroke — the note surfaces below hand the same array
-  // to every rendered line, whose memo then settles on identity.
-  const transforms = useMemo(
-    () => compileTransforms(appearance.transforms),
-    [appearance.transforms],
-  );
   // The active storage backend (this device / a local folder / a cloud) and
   // its sync engine. Appearance settings reconcile against the same backend
   // so they travel with a synced folder too.
   const storage = useStorageBackend();
+  // The user's Transform rules, compiled once per edit of the rule list (or
+  // per namespace switch) rather than per line per keystroke — the note
+  // surfaces below hand the same array to every rendered line, whose memo then
+  // settles on identity. Rules scoped to another namespace are left out here,
+  // so the work rewrites never reach the home notes.
+  const transforms = useMemo(
+    () => compileTransforms(appearance.transforms, storage.activeNamespace),
+    [appearance.transforms, storage.activeNamespace],
+  );
   useSettingsSync(storage.settingsStore);
   // Developer "Fake data" toggle: while active, a fresh ephemeral in-memory
   // seed adapter overrides the real backend for the session (each enable

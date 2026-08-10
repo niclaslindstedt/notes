@@ -8,6 +8,7 @@ import {
   emptySnapshot,
   type Snapshot,
 } from "../../src/domain/note.ts";
+import { emptyTransformRule } from "../../src/domain/transform.ts";
 import {
   DEFAULT_APPEARANCE,
   type Appearance,
@@ -106,6 +107,43 @@ describe("deriveUnlocks", () => {
       nextMap,
     );
     expect(fresh).toContain("completionist");
+  });
+
+  it("unlocks localDialect only once two namespaces have rules of their own", () => {
+    const withScopes = (scopes: (string | null)[]): Appearance => ({
+      ...DEFAULT_APPEARANCE,
+      transforms: scopes.map((namespace, i) => ({
+        ...emptyTransformRule(`r${i}`, namespace),
+        pattern: "#(\\d+)",
+      })),
+    });
+
+    // A first rule scoped to the namespace you're in is the default, not an
+    // accomplishment.
+    expect(
+      deriveUnlocks(
+        state(emptySnapshot(), withScopes([])),
+        state(emptySnapshot(), withScopes(["work"])),
+        {},
+      ),
+    ).not.toContain("localDialect");
+
+    // Nor is a second rule in the same namespace, or a global one beside it.
+    expect(
+      deriveUnlocks(
+        state(emptySnapshot(), withScopes(["work"])),
+        state(emptySnapshot(), withScopes(["work", "work", null])),
+        {},
+      ),
+    ).not.toContain("localDialect");
+
+    expect(
+      deriveUnlocks(
+        state(emptySnapshot(), withScopes(["work"])),
+        state(emptySnapshot(), withScopes(["work", "home"])),
+        {},
+      ),
+    ).toContain("localDialect");
   });
 
   it("ignores manual-trigger achievements", () => {

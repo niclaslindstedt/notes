@@ -55,6 +55,16 @@ const MASK_EDGE = 3;
 export type TransformRule = {
   /** Stable id, used as the list key and by the edit dialog. */
   id: string;
+  /**
+   * Which **namespace** the rule runs in: a namespace slug, or `null` for
+   * every namespace. Work and home want different rewrites — an issue-number
+   * link belongs in the work notes and nowhere else — so a rule is scoped to
+   * one namespace unless it is deliberately made global.
+   *
+   * Missing on a rule written before scoping existed, which reads back as
+   * `null`: what those rules did was apply everywhere, and they keep doing it.
+   */
+  namespace: string | null;
   /** Optional human label. Falls back to the pattern in the list. */
   name: string;
   /** The regex source, as typed — no delimiters, no flags. */
@@ -104,12 +114,17 @@ export function newTransformId(): string {
   return crypto.randomUUID();
 }
 
-/** A blank rule for the "add" dialog to start from. */
+/**
+ * A blank rule for the "add" dialog to start from, scoped to `namespace`
+ * (`null` — the default — being every namespace).
+ */
 export function emptyTransformRule(
   id: string = newTransformId(),
+  namespace: string | null = null,
 ): TransformRule {
   return {
     id,
+    namespace,
     name: "",
     pattern: "",
     ignoreCase: false,
@@ -168,16 +183,33 @@ export function patternError(
 }
 
 /**
+ * Whether `rule` runs in the namespace `slug`. A rule scoped to `null` is
+ * global and runs everywhere; every other rule runs in its own namespace only.
+ */
+export function transformAppliesTo(rule: TransformRule, slug: string): boolean {
+  return rule.namespace === null || rule.namespace === slug;
+}
+
+/**
  * Compile the enabled rules, in order, dropping the ones whose pattern the
  * regex engine rejects. Order is significant: an earlier rule claims its match
  * and a later one can't overlap it.
+ *
+ * `namespace` is the active namespace's slug: rules scoped to another one are
+ * left out, so the work rules don't rewrite the home notes. Omit it to compile
+ * every rule regardless of scope — what the rule dialog's preview does, where
+ * the question is "does this rule do what I meant", not "does it run here".
  */
 export function compileTransforms(
   rules: readonly TransformRule[],
+  namespace?: string,
 ): CompiledTransform[] {
   const compiled: CompiledTransform[] = [];
   for (const rule of rules) {
     if (!rule.enabled) continue;
+    if (namespace !== undefined && !transformAppliesTo(rule, namespace)) {
+      continue;
+    }
     const re = compilePattern(rule.pattern, rule.ignoreCase);
     if (re) compiled.push({ rule, re });
   }

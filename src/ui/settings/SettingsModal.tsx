@@ -210,7 +210,12 @@ export function SettingsModal({ open, onClose, storage, conversion }: Props) {
               <EditorSection appearance={draft} onUpdate={update} />
             )}
             {activeTab === "transform" && (
-              <TransformSection appearance={draft} onUpdate={update} />
+              <TransformSection
+                appearance={draft}
+                onUpdate={update}
+                namespaces={storage.namespaces}
+                activeNamespace={storage.activeNamespace}
+              />
             )}
             {activeTab === "export" && (
               <ExportSection appearance={draft} onUpdate={update} />

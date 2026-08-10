@@ -14,6 +14,7 @@ import {
   hasNestedListItem,
 } from "../domain/markdown.ts";
 import type { Snapshot } from "../domain/note.ts";
+import type { TransformRule } from "../domain/transform.ts";
 import { hasYouTubeLink } from "../domain/youtube.ts";
 import {
   AccessibilityGlyph,
@@ -37,6 +38,7 @@ import {
   FolderTreeGlyph,
   FormatGlyph,
   FullStopGlyph,
+  FunnelGlyph,
   GlobeGlyph,
   HistoryGlyph,
   ImageGlyph,
@@ -141,6 +143,16 @@ const hasFileAttachment = (snap: Snapshot) =>
   snap.notes.some((n) =>
     (n.attachments ?? []).some((a) => !isImageAttachment(a)),
   );
+
+// Transform rules living in two different namespaces — the point where the
+// rewrites have genuinely parted ways, work from home. Deliberately not "a
+// rule with a namespace": a new rule is scoped to the namespace you're in
+// anyway, so that would unlock itself the first time anyone wrote one.
+const hasTwoScopedTransforms = (rules: readonly TransformRule[]) => {
+  const scopes = new Set<string>();
+  for (const r of rules) if (r.namespace !== null) scopes.add(r.namespace);
+  return scopes.size >= 2;
+};
 
 export const ACHIEVEMENTS: readonly Achievement[] = [
   // ──────────────────────────────────────────────────────────────
@@ -635,6 +647,21 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       predicate: (prev, next) =>
         prev.appearance.transforms.length === 0 &&
         next.appearance.transforms.length > 0,
+    },
+  },
+  {
+    id: "localDialect",
+    tier: "pro",
+    glyph: FunnelGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      // Compared by identity, not by length: re-scoping a rule edits one in
+      // place rather than adding one.
+      slices: (s) => [s.appearance.transforms],
+      predicate: (prev, next) =>
+        !hasTwoScopedTransforms(prev.appearance.transforms) &&
+        hasTwoScopedTransforms(next.appearance.transforms),
     },
   },
   {

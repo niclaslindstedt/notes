@@ -105,6 +105,11 @@ export type Appearance = {
   // an issue number into a link, a phone number into a mask. Display-only;
   // the stored note keeps what was typed. Order is significant (the first
   // rule to claim a run of text wins), so this is a list, not a map.
+  //
+  // Every rule carries the namespace it runs in (or `null` for all of them),
+  // and the list holds the rules of every namespace: this document is the one
+  // `settings.json` at the app-folder root, shared by every namespace, so a
+  // work rule travels with the folder even while the home notes are open.
   transforms: TransformRule[];
   // How the export function lays a note out on paper — page size, margins,
   // fonts, code styling, bullet glyph. Read only by the PDF renderer.
@@ -218,6 +223,14 @@ function validTransforms(v: unknown): TransformRule[] {
     out.push({
       id,
       pattern,
+      // A rule written before scoping existed carries no `namespace`, and a
+      // rule from an older build that dropped the field reads back the same
+      // way: null, meaning it runs in every namespace — which is exactly what
+      // it did before.
+      namespace:
+        typeof raw.namespace === "string" && raw.namespace !== ""
+          ? raw.namespace
+          : null,
       name: typeof raw.name === "string" ? raw.name : "",
       ignoreCase: raw.ignoreCase === true,
       kind: isTransformKind(raw.kind) ? raw.kind : DEFAULT_TRANSFORM_KIND,

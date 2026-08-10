@@ -319,6 +319,12 @@ const achievements = {
       learnMore:
         "Settings → Transform matches part of a note with a regular expression and shows something else in its place: an issue number as a link to the issue, a booking code as the words it stands for, a phone number with its middle masked out. The note itself never changes — put the caret on the line to see exactly what you typed, and copying always copies the original.",
     },
+    localDialect: {
+      name: "Local dialect",
+      condition: "Have transform rules in two different namespaces.",
+      learnMore:
+        "A transform rule belongs to one namespace, so the issue links you want at work never rewrite the shopping list at home. Settings → Transform still lists every rule you have — the ones belonging to your other namespaces are greyed out — and the rule's “Applies to” picker widens one back to all namespaces when it really is for everything.",
+    },
     localVault: {
       name: "Local vault",
       condition: "Connect a folder on your device.",

@@ -832,6 +832,19 @@ mapping](#selection-mapping)). That is what makes the `sensitive` kind
 honest: it hides a phone number from someone reading over your shoulder, it
 does **not** redact the note.
 
+**A rule belongs to a namespace.** Work and home want different rewrites — the
+issue links that make the work notes readable have no business rewriting a
+shopping list — so every rule carries a `namespace` slug, or `null` for all of
+them. `App` compiles the list against the [active namespace](#namespaces)
+(`compileTransforms(rules, slug)`, filtered by `transformAppliesTo`), so a rule
+scoped elsewhere is simply not in the compiled array the renderers get. The
+whole list still lives in the one appearance document — `settings.json` sits at
+the app-folder root and is shared by every namespace — so a work rule travels
+with the folder and is still there when you switch back. A rule written before
+scoping existed (and one an older build round-trips through, dropping the
+field) reads back as `null`, which is exactly what it did before: run
+everywhere.
+
 A rule has a **pattern** (the regex, with an optional ignore-case flag), a
 **kind**, a **replacement**, and — for `sensitive` — a **mask style**. The
 replacement expands `$1`…`$99`, `$&`, `$<name>` and `$$` against the match
@@ -870,7 +883,11 @@ Markdown-off [plain textarea](#markdown-editor) has no rendering layer and
 shows the source, as it does for every other display-only feature.
 
 See [Transform settings](#transform-settings) for the UI, and the
-[Shapeshifter](#unlock-triggers) achievement, which fires on the first rule.
+[Shapeshifter](#unlock-triggers) achievement, which fires on the first rule —
+[Local dialect](#unlock-triggers) once rules exist in two different namespaces,
+which is the point at which the rewrites have genuinely parted ways (a rule
+carrying *a* namespace wouldn't do: a new rule is scoped to the namespace you're
+in anyway).
 
 ### Transform settings
 
@@ -883,6 +900,17 @@ appearance tab it edits the dialog's **draft**, so nothing persists until
 **Save**. **Reset to defaults** deliberately *keeps* the rules: they are
 authored content, not a preference toggle, and are deleted one at a time from
 their own tab.
+
+The tab lists **every** rule, not just the ones that run here: a rule hidden
+because you switched namespace is a rule you can't find, so the ones belonging
+elsewhere stay in the list, greyed out, wearing a chip with the name of the
+namespace they do run in (a rule left behind by a *deleted* namespace shows its
+bare slug — deleting a namespace never deletes authored rules — and the dialog
+re-scopes it). New rules start in the namespace you are in, and the dialog's
+**Applies to** picker widens one back to *All namespaces*. None of that is
+drawn while the device has a single namespace: there is nothing to scope to, so
+the chip, the picker and the explanatory line stay away and a rule made then is
+global — which keeps it working if a second namespace appears later.
 
 Under the pattern field sits the **regex reference** — `RegexHelper`
 (`src/ui/settings/RegexHelper.tsx`), a dropdown of the constructs a rule is
@@ -919,13 +947,17 @@ the position it is typed into.
 
 **Add transform** and the edit button open the same dialog,
 `TransformRuleModal` (`src/ui/settings/TransformRuleModal.tsx`), laid out in the
-order a rule is written in: the pattern, the kind, the replacement (its label
-and hint follow the kind, and the mask picker appears only for `sensitive`),
-then a **sample text** field and the **result** pane beneath it. That pane is
-the point of the dialog — a regex is easy to get subtly wrong, and the only
-convincing check is watching your own text go through it — so it re-runs
-`previewSegments` on every keystroke, drawing links, replacements and masks the
-way the note will. The sample is saved with the rule, so re-opening it shows
+order a rule is written in: the name, the **Applies to** scope (a
+[`SelectPicker`](#custom-dropdown) of *All namespaces* plus every namespace,
+shown only when there is more than one), the pattern, the kind, the replacement
+(its label and hint follow the kind, and the mask picker appears only for
+`sensitive`), then a **sample text** field and the **result** pane beneath it.
+That pane is the point of the dialog — a regex is easy to get subtly wrong, and
+the only convincing check is watching your own text go through it — so it
+re-runs `previewSegments` on every keystroke, drawing links, replacements and
+masks the way the note will. It compiles the draft **without** a namespace: the
+question there is whether the rule does what you meant, not whether it runs
+where you're standing. The sample is saved with the rule, so re-opening it shows
 the example that proved it. Save is refused while the pattern is empty or the
 regex engine rejects it (the error is shown verbatim), and while a `link` rule
 has nowhere to point.

@@ -13,6 +13,7 @@ import {
   patternError,
   previewSegments,
   REGEX_TOKEN_GROUPS,
+  transformAppliesTo,
   transformHits,
   type TransformRule,
 } from "../../src/domain/transform.ts";
@@ -78,6 +79,50 @@ describe("compileTransforms", () => {
       PHONE_RULE,
     ]);
     expect(compiled.map((c) => c.rule.id)).toEqual(["issue", "phone"]);
+  });
+
+  it("leaves out the rules of other namespaces", () => {
+    const rules = [
+      rule({ id: "global", pattern: "a" }),
+      rule({ id: "work", pattern: "b", namespace: "work" }),
+      rule({ id: "home", pattern: "c", namespace: "home" }),
+    ];
+    expect(compileTransforms(rules, "work").map((c) => c.rule.id)).toEqual([
+      "global",
+      "work",
+    ]);
+    expect(compileTransforms(rules, "home").map((c) => c.rule.id)).toEqual([
+      "global",
+      "home",
+    ]);
+  });
+
+  it("compiles every rule when no namespace is given", () => {
+    const rules = [
+      rule({ id: "work", pattern: "b", namespace: "work" }),
+      rule({ id: "home", pattern: "c", namespace: "home" }),
+    ];
+    // What the rule dialog's preview does: the question there is whether the
+    // rule works at all, not whether it runs where you're standing.
+    expect(compileTransforms(rules).map((c) => c.rule.id)).toEqual([
+      "work",
+      "home",
+    ]);
+  });
+});
+
+describe("transformAppliesTo", () => {
+  it("runs an unscoped rule everywhere", () => {
+    const global = rule({ pattern: "a" });
+    expect(global.namespace).toBeNull();
+    expect(transformAppliesTo(global, "default")).toBe(true);
+    expect(transformAppliesTo(global, "work")).toBe(true);
+  });
+
+  it("runs a scoped rule only in its own namespace", () => {
+    const scoped = rule({ pattern: "a", namespace: "work" });
+    expect(transformAppliesTo(scoped, "work")).toBe(true);
+    expect(transformAppliesTo(scoped, "default")).toBe(false);
   });
 });
 

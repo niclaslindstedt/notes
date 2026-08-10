@@ -109,6 +109,8 @@ const settings: SettingsCatalog = {
     rulesTitle: "Omvandlingsregler",
     blurb:
       "Ändra vad en anteckning visar utan att ändra vad den sparar. En regel matchar en del av en anteckning med ett reguljärt uttryck och visar något annat i dess ställe — ett ärendenummer som en länk till ärendet, ett telefonnummer med mitten maskad. Anteckningen behåller exakt det du skrev: sätt markören på raden för att se det, och kopiering kopierar alltid originalet.",
+    scopeBlurb:
+      "Varje regel hör till en namnrymd, så att jobb och hem kan skriva om olika saker. Regler från dina andra namnrymder listas också här, nedtonade — de körs inte över anteckningarna du har öppna.",
     empty: "Inga omvandlingar ännu.",
     add: "Lägg till omvandling",
     orderHint:
@@ -120,6 +122,10 @@ const settings: SettingsCatalog = {
     ruleTitle: "Omvandling",
     name: "Namn",
     namePlaceholder: "Ärendelänkar",
+    scope: "Gäller för",
+    scopeAll: "Alla namnrymder",
+    scopeHint:
+      "Vilka anteckningar regeln skriver om. En ny regel börjar i namnrymden du är i; välj Alla namnrymder för att köra den överallt.",
     pattern: "Matcha",
     patternPlaceholder: "#(\\d+)",
     patternHint:
