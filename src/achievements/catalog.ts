@@ -58,6 +58,7 @@ import {
   PlusGlyph,
   QuoteGlyph,
   RefreshGlyph,
+  ReplaceGlyph,
   ScaleTextGlyph,
   SearchGlyph,
   ServerGlyph,
@@ -623,6 +624,19 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   // ──────────────────────────────────────────────────────────────
   // Pro — "Make it sync, take it everywhere."
   // ──────────────────────────────────────────────────────────────
+  {
+    id: "shapeshifter",
+    tier: "pro",
+    glyph: ReplaceGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.appearance.transforms.length],
+      predicate: (prev, next) =>
+        prev.appearance.transforms.length === 0 &&
+        next.appearance.transforms.length > 0,
+    },
+  },
   {
     id: "localVault",
     tier: "pro",

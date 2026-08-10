@@ -17,6 +17,7 @@ import {
 } from "../../domain/attachment.ts";
 import { renderPrintDocument } from "../../domain/pdf-render.ts";
 import type { PdfSettings } from "../../domain/pdf.ts";
+import type { CompiledTransform } from "../../domain/transform.ts";
 import type { Note } from "../../domain/note.ts";
 import { noteToMarkdown } from "../../storage/markdown/codec.ts";
 import type { AttachmentFetcher } from "../attachments/fetch-context.ts";
@@ -75,17 +76,22 @@ export function downloadMarkdown(note: Note): void {
  * `fetchAttachment` is the on-demand fetcher from the attachment context; a
  * missing one (or an attachment the backend can't produce) degrades to the
  * image's alt text rather than failing the export.
+ *
+ * `transforms` are the active display rules — the PDF shows what the screen
+ * shows, so a masked run stays masked on paper. See `PrintDocument`.
  */
 export async function exportPdf(
   note: Note,
   settings: PdfSettings,
   fetchAttachment?: AttachmentFetcher | null,
+  transforms?: readonly CompiledTransform[],
 ): Promise<boolean> {
   const images = await resolveImages(note, fetchAttachment);
   const html = renderPrintDocument({
     title: note.title,
     body: note.body ?? "",
     settings,
+    transforms,
     resolveImage: (href) => {
       const filename = attachmentFilenameFromHref(href);
       return filename ? images.get(filename) : undefined;

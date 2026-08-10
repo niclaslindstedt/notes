@@ -27,6 +27,13 @@
 import { useEffect, useSyncExternalStore } from "react";
 
 import { isCopyScope, isDefaultTitleScheme } from "../domain/note.ts";
+import {
+  DEFAULT_MASK_STYLE,
+  DEFAULT_TRANSFORM_KIND,
+  isMaskStyle,
+  isTransformKind,
+  type TransformRule,
+} from "../domain/transform.ts";
 import { loadFontFamily } from "./fonts.ts";
 import {
   COLOR_KEYS,
@@ -94,6 +101,11 @@ export type Appearance = {
   noteSortKey: NoteSortKey;
   // Note-writing surface preferences (margins, wrap, live Markdown).
   editor: EditorSettings;
+  // The **Transform** rules: regexes that rewrite what a note body shows —
+  // an issue number into a link, a phone number into a mask. Display-only;
+  // the stored note keeps what was typed. Order is significant (the first
+  // rule to claim a run of text wins), so this is a list, not a map.
+  transforms: TransformRule[];
   // How the export function lays a note out on paper — page size, margins,
   // fonts, code styling, bullet glyph. Read only by the PDF renderer.
   pdf: PdfSettings;
@@ -120,6 +132,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   folderPlacement: DEFAULT_FOLDER_PLACEMENT,
   noteSortKey: DEFAULT_NOTE_SORT_KEY,
   editor: DEFAULT_EDITOR_SETTINGS,
+  transforms: [],
   pdf: DEFAULT_PDF_SETTINGS,
   achievements: {},
   unseenAchievements: [],
@@ -188,6 +201,33 @@ function validUnseen(v: unknown, unlocked: Record<string, number>): string[] {
   return v.filter(
     (id): id is string => typeof id === "string" && unlocked[id] !== undefined,
   );
+}
+
+// Coerce a stored value into the Transform rule list: an array of records,
+// each of which must at least carry an id and a pattern (a rule with neither
+// can never match anything, so it's dropped rather than repaired). Every other
+// field falls back to the blank rule's default, slot by slot.
+function validTransforms(v: unknown): TransformRule[] {
+  if (!Array.isArray(v)) return [];
+  const out: TransformRule[] = [];
+  for (const raw of v) {
+    if (!isRecord(raw)) continue;
+    const { id, pattern } = raw;
+    if (typeof id !== "string" || id === "") continue;
+    if (typeof pattern !== "string" || pattern === "") continue;
+    out.push({
+      id,
+      pattern,
+      name: typeof raw.name === "string" ? raw.name : "",
+      ignoreCase: raw.ignoreCase === true,
+      kind: isTransformKind(raw.kind) ? raw.kind : DEFAULT_TRANSFORM_KIND,
+      replacement: typeof raw.replacement === "string" ? raw.replacement : "",
+      mask: isMaskStyle(raw.mask) ? raw.mask : DEFAULT_MASK_STYLE,
+      sample: typeof raw.sample === "string" ? raw.sample : "",
+      enabled: raw.enabled !== false,
+    });
+  }
+  return out;
 }
 
 // Coerce arbitrary stored JSON into a valid `Appearance`, falling back to
@@ -280,6 +320,7 @@ function coerce(raw: unknown): Appearance {
         ? editor.copyScope
         : DEFAULT_EDITOR_SETTINGS.copyScope,
     },
+    transforms: validTransforms(raw.transforms),
     pdf: coercePdfSettings(raw.pdf),
     achievements,
     unseenAchievements: validUnseen(raw.unseenAchievements, achievements),

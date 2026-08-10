@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { unlock } from "../../achievements/index.ts";
 import type { CopyScope, Note } from "../../domain/note.ts";
+import type { CompiledTransform } from "../../domain/transform.ts";
 import { useT } from "../../i18n/index.ts";
 import { haptics } from "../../platform/native-bridge.ts";
 import { useAppearance } from "../../theme/useTheme.ts";
@@ -28,10 +29,11 @@ import {
 //     dialog, where "Save as PDF" writes the file.
 //   * **Export to MD** downloads the `.md` file the file backends would store,
 //     front matter and all.
-//   * **Copy to clipboard** is the same write the header's copy button does,
-//     honouring the same copy-scope setting — kept here too because the menu is
-//     where someone goes looking for "get this note out of the app", and the
-//     answer shouldn't depend on knowing which button is which.
+//   * **Copy to clipboard** puts the note on the clipboard, as much of it as
+//     the copy-scope setting says. This is the *only* way to copy a note —
+//     the menu is where someone looks for "get this note out of the app", and
+//     a second header button doing one of its three jobs was one button too
+//     many in a row that already holds four.
 //
 // **On a narrow screen the rows are glyphs alone**; from `sm:` up each glyph is
 // followed by its label. That is a deliberate media-query decision rather than
@@ -61,10 +63,16 @@ type Busy = "pdf" | "md" | "copy" | null;
 export function ExportButton({
   note,
   copyScope,
+  transforms,
 }: {
   note: Note;
   /** How much of the note the "Copy to clipboard" row takes — see `CopyScope`. */
   copyScope: CopyScope;
+  /**
+   * The active display rules. Only the PDF honours them — see `PrintDocument`
+   * in `domain/pdf-render.ts` for why the other two rows export the source.
+   */
+  transforms?: readonly CompiledTransform[];
 }) {
   const t = useT();
   const { pdf } = useAppearance();
@@ -82,7 +90,7 @@ export function ExportButton({
     setBusy("pdf");
     try {
       const mod = await import("./export-note.ts");
-      const ok = await mod.exportPdf(note, pdf, fetchAttachment);
+      const ok = await mod.exportPdf(note, pdf, fetchAttachment, transforms);
       if (ok) unlock("printPress");
     } finally {
       setBusy(null);

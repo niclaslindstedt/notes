@@ -31,6 +31,7 @@ import {
   PencilIcon,
   ScrollTextIcon,
   SlidersIcon,
+  WandIcon,
 } from "../icons.tsx";
 import { Modal } from "../Modal.tsx";
 import { AppearanceSection } from "./AppearanceSection.tsx";
@@ -40,6 +41,7 @@ import { ExportSection } from "./ExportSection.tsx";
 import { GeneralSection } from "./GeneralSection.tsx";
 import { LogsSection } from "./LogsSection.tsx";
 import { StorageSection } from "./StorageSection.tsx";
+import { TransformSection } from "./TransformSection.tsx";
 
 // Settings dialog. Lands on the General tab, with Appearance and Storage as
 // their own tabs alongside it. Modelled on checklist's tabbed SettingsModal —
@@ -65,6 +67,7 @@ type TabId =
   | "general"
   | "appearance"
   | "editor"
+  | "transform"
   | "export"
   | "storage"
   | "developer"
@@ -78,6 +81,7 @@ const BASE_TABS: readonly TabDef[] = [
   { id: "general", labelKey: "settings.tab.general", Icon: SlidersIcon },
   { id: "appearance", labelKey: "settings.tab.appearance", Icon: PaletteIcon },
   { id: "editor", labelKey: "settings.tab.editor", Icon: PencilIcon },
+  { id: "transform", labelKey: "settings.tab.transform", Icon: WandIcon },
   { id: "export", labelKey: "settings.tab.export", Icon: ExportIcon },
   { id: "storage", labelKey: "settings.tab.storage", Icon: DatabaseIcon },
 ];
@@ -161,10 +165,14 @@ export function SettingsModal({ open, onClose, storage, conversion }: Props) {
   }, [draft, onClose]);
 
   // Reset only the owned appearance fields; keep the earned achievements and
-  // the unseen queue the dialog can't edit from here.
+  // the unseen queue the dialog can't edit from here — and keep the Transform
+  // rules, which are authored content rather than a preference: a stray press
+  // of "Reset to defaults" must not silently delete regexes someone wrote.
+  // They are deleted one at a time, from their own tab.
   const handleReset = useCallback(() => {
     setDraft((prev) => ({
       ...DEFAULT_APPEARANCE,
+      transforms: prev.transforms,
       achievements: prev.achievements,
       unseenAchievements: prev.unseenAchievements,
     }));
@@ -200,6 +208,9 @@ export function SettingsModal({ open, onClose, storage, conversion }: Props) {
             )}
             {activeTab === "editor" && (
               <EditorSection appearance={draft} onUpdate={update} />
+            )}
+            {activeTab === "transform" && (
+              <TransformSection appearance={draft} onUpdate={update} />
             )}
             {activeTab === "export" && (
               <ExportSection appearance={draft} onUpdate={update} />

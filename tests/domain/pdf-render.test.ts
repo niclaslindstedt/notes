@@ -5,6 +5,26 @@ import {
   DEFAULT_PDF_SETTINGS,
   type PdfSettings,
 } from "../../src/domain/pdf.ts";
+import {
+  compileTransforms,
+  type TransformRule,
+} from "../../src/domain/transform.ts";
+
+// A Transform rule, spelled out once so each test only names what it changes.
+function rule(over: Partial<TransformRule>): TransformRule {
+  return {
+    id: "r1",
+    name: "",
+    pattern: "",
+    ignoreCase: false,
+    kind: "text",
+    replacement: "",
+    mask: "ends",
+    sample: "",
+    enabled: true,
+    ...over,
+  };
+}
 
 function render(body: string, settings: Partial<PdfSettings> = {}): string {
   return renderPrintDocument({
@@ -149,6 +169,63 @@ describe("renderPrintDocument", () => {
     expect(html).toContain("line-height:1.8");
     expect(html).toContain("background:#eef2f7");
     expect(html).toContain('li[data-bullet="0"]>.marker::before{content:"▪"}');
+  });
+
+  it("prints what a Transform rule displays, not its source", () => {
+    // The PDF is the one export that honours display rules: a `sensitive` rule
+    // exists so the original never leaves the screen, and a document made to be
+    // handed out is exactly where it must not reappear.
+    const html = renderPrintDocument({
+      title: "Note",
+      body: "Call 0761234123 today",
+      settings: DEFAULT_PDF_SETTINGS,
+      transforms: compileTransforms([
+        rule({ pattern: "\\d{10}", kind: "sensitive", mask: "ends" }),
+      ]),
+    });
+    expect(html).not.toContain("0761234123");
+    expect(html).toContain("076****123");
+  });
+
+  it("keeps a transformed link clickable and refuses a hostile target", () => {
+    const linked = renderPrintDocument({
+      title: "Note",
+      body: "See #134",
+      settings: DEFAULT_PDF_SETTINGS,
+      transforms: compileTransforms([
+        rule({
+          pattern: "#(\\d+)",
+          kind: "link",
+          replacement: "https://example.com/issues/$1",
+        }),
+      ]),
+    });
+    expect(linked).toContain('<a href="https://example.com/issues/134">');
+
+    const hostile = renderPrintDocument({
+      title: "Note",
+      body: "See #134",
+      settings: DEFAULT_PDF_SETTINGS,
+      transforms: compileTransforms([
+        rule({
+          pattern: "#(\\d+)",
+          kind: "link",
+          replacement: "javascript:alert($1)",
+        }),
+      ]),
+    });
+    expect(hostile).not.toContain("javascript:");
+    expect(hostile).toContain("#134");
+  });
+
+  it("leaves the note alone when no rules are active", () => {
+    const html = renderPrintDocument({
+      title: "Note",
+      body: "Call 0761234123 today",
+      settings: DEFAULT_PDF_SETTINGS,
+      transforms: [],
+    });
+    expect(html).toContain("0761234123");
   });
 
   it("drops the code fill entirely when the background is none", () => {

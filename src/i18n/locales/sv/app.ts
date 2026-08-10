@@ -19,7 +19,6 @@ const app: AppCatalog = {
   delete: "Ta bort",
   noteActions: "Anteckningsåtgärder",
   copy: {
-    label: "Kopiera anteckning",
     copied: "Kopierat",
   },
   export: {

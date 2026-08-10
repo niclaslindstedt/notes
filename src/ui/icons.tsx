@@ -306,6 +306,31 @@ export function MinimizeIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * A wand throwing sparks — the **Transform** rules, which turn one piece of
+ * text into another. Not in the framework set.
+ */
+export function WandIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <path d="m14 6 4 4L7 21l-4-4L14 6Z" />
+      <path d="m16 4 1-2 1 2 2 1-2 1-1 2-1-2-2-1 2-1Z" />
+      <path d="M6 4v3M4.5 5.5h3" />
+      <path d="M19 16v3M17.5 17.5h3" />
+    </svg>
+  );
+}
+
 /** The app's wordmark glyph — a dog-eared note sheet. App-specific. */
 export function NotesMarkIcon({ className }: IconProps) {
   return (

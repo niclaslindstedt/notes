@@ -608,6 +608,22 @@ export type InlineNode =
   | { type: "code"; text: string; offset: number; span: InlineSpan }
   | { type: "link"; text: string; href: string; offset: number; bare?: true }
   | { type: "image"; alt: string; href: string; offset: number }
+  /**
+   * A run a **Transform** rule rewrote for display (`domain/transform.ts`).
+   * The parser never emits one: `applyTransforms` splices them into an
+   * already-parsed tree, so only the renderer meets them. `text` is what to
+   * show, `source` the characters it stands in for — the two differ in
+   * length, so the renderer stamps `data-len` and a selection still copies
+   * the source.
+   */
+  | {
+      type: "transform";
+      kind: "link" | "text" | "sensitive";
+      text: string;
+      href: string | null;
+      source: string;
+      offset: number;
+    }
   | { type: "strong"; children: InlineNode[]; span: InlineSpan }
   | { type: "em"; children: InlineNode[]; span: InlineSpan }
   | { type: "strikethrough"; children: InlineNode[]; span: InlineSpan };
@@ -890,6 +906,11 @@ type AddMarks = (from: number, to: number, bits: number) => void;
 function markNode(node: InlineNode, raw: string, add: AddMarks): void {
   switch (node.type) {
     case "text":
+      return;
+    // A transform node has no markup of its own to dim, and it never reaches
+    // here anyway: the raw line is tiled from the parser's own output, which
+    // is the tree before any rule rewrote it.
+    case "transform":
       return;
     case "code":
       add(node.span.from, node.span.to, M_CODE);

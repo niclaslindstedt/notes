@@ -31,6 +31,7 @@ import {
   PDF_CODE_BACKGROUND_NONE,
   type PdfSettings,
 } from "./pdf.ts";
+import { applyTransforms, type CompiledTransform } from "./transform.ts";
 
 export type PrintDocument = {
   /** The note's title, printed as the page heading when `includeTitle` is on. */
@@ -38,6 +39,18 @@ export type PrintDocument = {
   /** The note's Markdown body. */
   body: string;
   settings: PdfSettings;
+  /**
+   * The active [Transform](./transform.ts) rules, compiled. Passing them makes
+   * the PDF show what the *screen* shows — which is the safe default, because
+   * a `sensitive` rule masking a phone number would otherwise print the number
+   * in full into a document made to be handed out.
+   *
+   * This is the one place the three exports deliberately part company: **the
+   * PDF is what you see, the Markdown file and the clipboard are what you
+   * stored.** The latter two are byte-exact copies of the note by design, and
+   * transforms are display-only.
+   */
+  transforms?: readonly CompiledTransform[];
   /**
    * Resolve a body image reference — an `attachments/<file>` ref, typically —
    * to something the print document can actually draw (a `data:` URL). An
@@ -289,7 +302,16 @@ function renderItem(
 // ---------------------------------------------------------------------------
 
 function renderInline(text: string, doc: PrintDocument): string {
-  return renderNodes(parseInline(text), doc);
+  // Source offsets are bookkeeping for the editor's caret mapping and mean
+  // nothing on paper, so the line is parsed from zero.
+  const parsed = parseInline(text);
+  // Transform rules are spliced into the parsed tree, exactly as the
+  // live-preview renderer does it — see `transforms` on `PrintDocument` for why
+  // the PDF honours them where the other two exports don't.
+  return renderNodes(
+    doc.transforms?.length ? applyTransforms(parsed, doc.transforms) : parsed,
+    doc,
+  );
 }
 
 function renderNodes(nodes: readonly InlineNode[], doc: PrintDocument): string {
@@ -308,6 +330,17 @@ function renderNode(node: InlineNode, doc: PrintDocument): string {
       return `<em>${renderNodes(node.children, doc)}</em>`;
     case "strikethrough":
       return `<del>${renderNodes(node.children, doc)}</del>`;
+    case "transform": {
+      // A rewritten run prints as what it displays, never as its source: a
+      // `sensitive` rule exists precisely so the original doesn't leave the
+      // screen. The `link` kind still resolves to an anchor when its target is
+      // an inert scheme, so a transformed issue number stays clickable in the
+      // PDF the way it is in the editor.
+      const label = escapeHtml(node.text);
+      if (node.kind !== "link" || !node.href) return label;
+      const href = safeHref(node.href);
+      return href ? `<a href="${escapeAttr(href)}">${label}</a>` : label;
+    }
     case "link": {
       const href = safeHref(node.href);
       const label = escapeHtml(node.text);

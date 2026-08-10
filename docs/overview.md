@@ -563,7 +563,9 @@ order, not by the order they are listed.
 `classifyLines` splits the body into `LineBlock[]` (one per line, tracking
 fenced-code state); `parseInline` tokenizes a line into `InlineNode`s (strong,
 em, code, link, image, strikethrough), each leaf carrying a source-column
-`offset` for click-to-caret mapping. Both an explicit `[text](url)` link and a
+`offset` for click-to-caret mapping. (A seventh variant, `transform`, is
+declared here but never emitted by the parser: [Transforms](#transforms)
+splices it into an already-parsed tree.) Both an explicit `[text](url)` link and a
 **bare URL** (`http://…`, `https://…`, or `www.…`, via `matchAutolink`) become
 a `link` node, so a pasted or typed URL renders and clicks through without the
 `[…](…)` ceremony (`www.` gets an `https://` href; trailing sentence
@@ -658,7 +660,7 @@ header.
 [Line numbers](#line-numbers)), `disableSpellcheck`,
 `disableAutocorrect`, `shortenLinkChars` (see [Shorten links](#shorten-links)),
 the `defaultTitle` scheme, and the `copyScope` (see
-[Copy button](#copy-button)). They live in the
+[Copy row](#copy-scope)). They live in the
 [appearance store](#appearance-store) (so they sync with the folder/cloud) and
 are edited in the Editor tab of the settings modal, `EditorSection`
 (`src/ui/settings/EditorSection.tsx`), which groups them into focused bordered
@@ -809,6 +811,91 @@ short URL (where head + marker + tail would meet or overlap) is shown in full.
 `LinkNode` (`src/ui/MarkdownLine.tsx`) applies it; the
 [Short and sweet](#unlock-triggers) achievement fires the first time it's
 switched on.
+
+### Transforms
+
+**Transform rules** rewrite what a note *shows* without changing what it
+stores. A rule matches part of a note body with a regular expression and
+renders something else in its place: `#134` as a link to that issue, a booking
+code as the words it stands for, `0761234123` as `076****123`. The pure engine
+is `src/domain/transform.ts`; the rules live in the
+[appearance store](#appearance-store) as `transforms`, so they travel with a
+synced folder or cloud the way every other preference does.
+
+**The note is never rewritten.** This is the property everything else hangs
+off: the saved bytes are exactly what was typed, the
+[active line](#styled-raw-line) renders raw so the real text is one press away, and a
+copied selection carries the source rather than the substitution (every
+transformed run stamps `data-len` beside its `data-src`, the same mechanism a
+[shortened link](#shorten-links) uses — see [selection
+mapping](#selection-mapping)). That is what makes the `sensitive` kind
+honest: it hides a phone number from someone reading over your shoulder, it
+does **not** redact the note.
+
+A rule has a **pattern** (the regex, with an optional ignore-case flag), a
+**kind**, a **replacement**, and — for `sensitive` — a **mask style**. The
+replacement expands `$1`…`$99`, `$&`, `$<name>` and `$$` against the match
+(`expandReplacement`), so several capture groups can be combined into one
+substitution. The three kinds:
+
+- **`link`** (the default) — the matched text stays on screen and becomes an
+  anchor to the expanded replacement, wearing a dotted underline so it reads as
+  derived rather than typed.
+- **`text`** — the expanded replacement is shown in place of the match.
+- **`sensitive`** — the match (or the expansion, when one is given) is masked
+  by one of `MASK_STYLES`: `all` (every character starred, length still
+  readable), `fixed` (always eight stars, so the length is hidden too), `ends`
+  (`076****123`), `last`, `first`. A run shorter than the characters a style
+  would keep in the clear is masked entirely rather than leaked.
+
+The pipeline is three exports. `compileTransforms` builds the `RegExp`s once
+per edit of the rule list — silently dropping the ones the engine rejects, so a
+half-typed pattern can't throw on every keystroke — `transformHits` finds one
+line's non-overlapping matches, and `applyTransforms` splices them into the
+parsed inline tree as `transform` nodes (`src/domain/markdown.ts`), which
+`TransformNode` (`src/ui/MarkdownLine.tsx`) draws. Rules run **in list order**
+and the first to claim a run of text wins, so a broad rule below a narrow one
+never swallows it. Only plain text runs are considered: a rule never fires
+inside inline code, a link's label, an image reference, or a
+[fenced code block](#code-block) — all markup the writer meant literally — but
+it does walk into emphasis, so it still matches inside **bold**. Matches per
+line are capped (`MAX_HITS_PER_LINE`) and zero-width matches are skipped, so a
+pathological pattern can't hang the render.
+
+`App` compiles the list once and hands the same array to the
+[live-preview editor](#markdown-editor) and the
+[read-only archived note](#archive-view), so a masked number reads the same in both;
+each rendered line's memo compares that array by identity and bails out. The
+Markdown-off [plain textarea](#markdown-editor) has no rendering layer and
+shows the source, as it does for every other display-only feature.
+
+See [Transform settings](#transform-settings) for the UI, and the
+[Shapeshifter](#unlock-triggers) achievement, which fires on the first rule.
+
+### Transform settings
+
+The **Transform** tab of the [settings modal](#settings-modal) —
+`TransformSection` (`src/ui/settings/TransformSection.tsx`) — lists the rules in
+the order they run. Each row shows the rule's name (falling back to its
+pattern), its kind, and the pattern itself, with a checkbox that parks the rule
+without deleting it and buttons to edit or delete it. Like every other
+appearance tab it edits the dialog's **draft**, so nothing persists until
+**Save**. **Reset to defaults** deliberately *keeps* the rules: they are
+authored content, not a preference toggle, and are deleted one at a time from
+their own tab.
+
+**Add transform** and the edit button open the same dialog,
+`TransformRuleModal` (`src/ui/settings/TransformRuleModal.tsx`), laid out in the
+order a rule is written in: the pattern, the kind, the replacement (its label
+and hint follow the kind, and the mask picker appears only for `sensitive`),
+then a **sample text** field and the **result** pane beneath it. That pane is
+the point of the dialog — a regex is easy to get subtly wrong, and the only
+convincing check is watching your own text go through it — so it re-runs
+`previewSegments` on every keystroke, drawing links, replacements and masks the
+way the note will. The sample is saved with the rule, so re-opening it shows
+the example that proved it. Save is refused while the pattern is empty or the
+regex engine rejects it (the error is shown verbatim), and while a `link` rule
+has nowhere to point.
 
 ### YouTube player
 
@@ -1362,10 +1449,12 @@ It opens a menu of the three ways a note leaves the app:
   filename is `exportFileStem` — a slug of the title, deliberately *without* the
   id suffix `noteFileStem` adds, since that noise has no place in a file you are
   about to send someone. Unlocks the **Takeaway** achievement.
-- **Copy to clipboard** is the same write the [copy button](#copy-button) does,
-  honouring the same `copyScope` [editor setting](#editor-settings) — kept here
-  because the menu is where someone looks for "get this note out of the app",
-  and the answer shouldn't depend on knowing which header button is which.
+- **Copy to clipboard** puts the note on the clipboard, as much of it as the
+  `copyScope` [editor setting](#editor-settings) says — see
+  [copy scope](#copy-scope). This is the only way to copy a note: the menu is
+  where someone looks for "get this note out of the app", and a separate header
+  button doing one of its three jobs was one too many in a row that already
+  holds four. Unlocks the **Copycat** achievement.
 
 **On a narrow screen the menu rows are glyphs alone; from `sm:` up each glyph is
 followed by its label.** That is a `useMediaQuery` decision rather than a CSS
@@ -1423,6 +1512,16 @@ generic families.) Note text is escaped and link/image URLs are allowlisted by
 scheme throughout — a note can arrive from a synced folder someone else wrote
 to, so it is treated as untrusted.
 
+**The PDF honours the [Transform](#transforms) rules; the other two exports
+don't.** This is the one place the three deliberately part company — the PDF is
+what you *see*, the Markdown file and the clipboard are what you *stored*. The
+latter two are byte-exact copies of the note by design, and transforms are
+display-only; but a `sensitive` rule masking a phone number exists precisely so
+the original doesn't leave the screen, and a document made to be handed out is
+where it must not reappear. `renderInline` splices the compiled rules into each
+parsed line exactly as the live preview does, and a transformed `link` still
+resolves to an anchor when its target is an inert scheme.
+
 Image attachments are resolved to `data:` URLs before rendering
 (`resolveImages` in `src/ui/export/export-note.ts`, through the
 [on-demand fetcher](#attachments)) — a note from a file/cloud backend carries
@@ -1430,24 +1529,28 @@ its attachments' metadata but not their bytes, and the print document is
 standalone. An attachment the backend can't produce degrades to its alt text
 rather than to a broken-image box.
 
-### Copy button
+### Copy scope
 
-`CopyNoteButton` (`src/ui/CopyNoteButton.tsx`) — the last button in the editor's
-and the read-only archived-note view's header action cluster. One tap copies the open note to the clipboard; what it copies is the saved
-`copyScope` [editor setting](#editor-settings), chosen from the dropdown in the
-Editor tab of the settings modal (`EditorSection`). The three scopes are a
-`CopyScope` (`src/domain/note.ts`): `body` (the body verbatim — the default,
-never the title), `titleBody` (the title prepended as a `# ` heading), and
-`frontMatter` (the whole `.md` file the way the file backends store it).
-`buildCopyText` (`src/ui/copy-note.ts`) assembles the text — the `frontMatter`
-case reuses the [markdown codec](#markdown-codec)'s `noteToMarkdown` so a copied
-note is byte-identical to its on-disk file. Copying is the **Copycat**
-achievement (fired via `unlock("copycat")`).
+**Copy to clipboard** is the third row of the [export menu](#export) — there is
+no separate copy button in the header (the export menu is where someone looks
+for "get this note out of the app", and a second button doing one of its three
+jobs was one too many in a row that already holds four).
+
+What it copies is the saved `copyScope` [editor setting](#editor-settings),
+chosen from the dropdown in the Editor tab of the settings modal
+(`EditorSection`). The three scopes are a `CopyScope` (`src/domain/note.ts`):
+`body` (the body verbatim — the default, never the title), `titleBody` (the
+title prepended as a `# ` heading), and `frontMatter` (the whole `.md` file the
+way the file backends store it). `buildCopyText` (`src/ui/copy-note.ts`)
+assembles the text — the `frontMatter` case reuses the
+[markdown codec](#markdown-codec)'s `noteToMarkdown` so a copied note is
+byte-identical to its on-disk file. Copying is the **Copycat** achievement
+(fired via `unlock("copycat")`).
 
 ### Cut button
 
 `CutButton` (`src/ui/CutButton.tsx`) — the scissors glyph immediately left of
-the [copy button](#copy-button) in the editor header. It cuts at the caret: what it
+the [export button](#export) in the editor header. It cuts at the caret: what it
 takes leaves the note *and* lands on the clipboard, because clearing a line by
 hand is otherwise a select-and-erase or a held Backspace, and text you pulled
 out is text you often want to put somewhere else. `Ctrl/Cmd+K` is the same edit
@@ -1477,7 +1580,7 @@ so both surfaces agree:
 A whole line is cut *with* its trailing newline, so pasting it back re-creates a
 line rather than splicing it into the one the caret is on; a selection is cut
 verbatim. The text goes out through `writeClipboard` (`src/ui/clipboard.ts`,
-shared with the [copy button](#copy-button)) and the write is deliberately
+shared with the [copy row](#copy-scope)) and the write is deliberately
 fire-and-forget — a refused or unavailable clipboard must not hold up the edit,
 and [undo](#undo--redo) is right there.
 
@@ -1502,7 +1605,7 @@ does nothing rather than guess at a line. Cutting something unlocks the
 one button per Markdown construct the app renders, brought up by the
 `FormatToolbarButton` sitting top-right in the editor header (after the
 [find bar](#find-in-note)'s magnifier, before the
-[cut](#cut-button) and [copy](#copy-button) buttons). Pressing that button opens the toolbar; pressing it
+[cut](#cut-button) and [export](#export) buttons). Pressing that button opens the toolbar; pressing it
 again takes it away, and the choice is remembered across notes and reloads under
 the `notes/format-toolbar` localStorage key.
 
@@ -2048,7 +2151,7 @@ route (an archived note gets its read-only address, matching where opening it
 lands) and writes `routeUrl(route)` — the deploy slot's base plus the hash, not
 whatever path this tab happens to sit on — through
 `writeClipboard` (`src/ui/clipboard.ts`, shared with the editor's
-[copy button](#copy-button)).
+[copy row](#copy-scope)).
 
 `App` passes an `onPop` that runs the same side effects an in-app tap does for
 any move the app didn't initiate — a Back / Forward step, or a hash pasted into
@@ -2269,8 +2372,8 @@ needs (storage, appearance, sync, the document). All are mounted once at the
 ### Settings modal
 
 `SettingsModal` (`src/ui/settings/SettingsModal.tsx`) — a tabbed dialog
-(General, Appearance, Editor, Storage; Developer and Logs appear only when dev
-mode / log capture are on), with a footer pinned below the content: **Reset to
+(General, Appearance, Editor, Transform, Storage; Developer and Logs appear only
+when dev mode / log capture are on), with a footer pinned below the content: **Reset to
 defaults** on the left, **Cancel** + **Save** on the right (mirroring
 checklist). The appearance settings it owns — theme, font, the Editor controls,
 the achievements switch — are edited against a local **draft** and only persist
@@ -2278,7 +2381,9 @@ on **Save**: while the dialog is open the draft streams to the theme engine via
 `setAppearancePreview` so the look previews live, **Cancel** (and Escape /
 backdrop / the X) drops the draft so the persisted look snaps back, and **Save**
 flushes it through `commitAppearance` (which preserves the earned achievements
-the dialog can't edit). The device-local controls (language, the
+the dialog can't edit). **Reset to defaults** likewise keeps the
+[Transform rules](#transform-settings), which are authored content rather than a
+preference. The device-local controls (language, the
 menu-activation toggle, developer mode) and the storage connections apply
 immediately — they don't live in the persisted appearance document the draft
 snapshots. Tabs reset to General on reopen.
@@ -2491,7 +2596,7 @@ edit individual [colour slots](#custom-theme).
 
 `EditorSection` (`src/ui/settings/EditorSection.tsx`) — margin (writing-column
 width), word-wrap, render-markdown, spell-check / autocorrect toggles, the
-default-title scheme, and the [copy](#copy-button) scope. The values are the
+default-title scheme, and the [copy](#copy-scope) scope. The values are the
 [Editor settings](#editor-settings) on the appearance store.
 
 ### Export settings
@@ -2591,7 +2696,7 @@ ToggleRow, SegmentedRow) every settings tab composes from.
 ### Custom dropdown
 
 `SelectPicker` (`src/ui/form/SelectPicker.tsx`) — the app's `<select>`
-replacement, used for the [copy button](#copy-button) scope picker in the Editor
+replacement, used for the [copy row](#copy-scope) scope picker in the Editor
 tab (`EditorSection`). The trigger is a bordered field wearing a `ChevronDownIcon`
 caret; the open menu is a `role="listbox"` of `role="option"` buttons with the
 current value ticked and full keyboard nav (Arrow/Home/End to move, Enter/Space
@@ -3539,7 +3644,8 @@ directory may linger harmlessly until the backend prunes it.
 `customTheme`, `listLayout`, `folderPlacement` and `noteSortKey` (the side-menu
 layout preferences — see
 [folders in the side menu](#folders-in-the-side-menu)), `editor`
-([Editor settings](#editor-settings)), and the achievements map + unseen queue.
+([Editor settings](#editor-settings)), `transforms` ([Transforms](#transforms)),
+and the achievements map + unseen queue.
 `useAppearance` reads it, `updateAppearance` /
 `setTheme` write it, `useApplyAppearance` projects it onto the DOM. Achievement
 progress lives here so it syncs across devices via [settings

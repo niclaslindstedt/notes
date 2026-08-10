@@ -49,6 +49,7 @@ import {
 import type { NoteMatch } from "../domain/note-find.ts";
 import type { Note } from "../domain/note.ts";
 import { doubleSpacePeriod } from "../domain/sentence.ts";
+import type { CompiledTransform } from "../domain/transform.ts";
 import { useT } from "../i18n/index.ts";
 import { writeClipboard } from "./clipboard.ts";
 import { getEditorPosition, setEditorPosition } from "./editor-position.ts";
@@ -149,6 +150,12 @@ type Props = {
   placement?: AttachmentPlacement;
   /** Trim bare URLs in the preview to this many characters either side (0 = off). */
   shortenLinkChars?: number;
+  /**
+   * The user's compiled **Transform** rules, applied to the preview's text for
+   * display only (`domain/transform.ts`) — the source is never rewritten.
+   * Compiled once by the host so every line's memo sees a stable reference.
+   */
+  transforms?: readonly CompiledTransform[];
   /** Number every line in a gutter down the left edge, code-editor style, each
    *  number a press target that selects its whole line. */
   lineNumbers?: boolean;
@@ -187,6 +194,10 @@ type Props = {
 // A stable empty hit list, so a closed find bar hands every line the identical
 // `NO_HIGHLIGHTS` reference and each `RenderedLine` memo bails out.
 const NO_MATCHES: readonly NoteMatch[] = [];
+
+// Likewise for the Transform rules, so a user with none configured hands every
+// line the identical reference and each `RenderedLine` memo bails out.
+const NO_TRANSFORMS: readonly CompiledTransform[] = [];
 
 // The editor's own channel into the in-app log. It only ever reports an edit it
 // had to refuse — the one failure mode that is otherwise completely silent on a
@@ -230,6 +241,7 @@ export function MarkdownEditor({
   onAttach,
   placement = INLINE_PLACEMENT,
   shortenLinkChars = 0,
+  transforms = NO_TRANSFORMS,
   lineNumbers = false,
   noteId,
   onTabOut,
@@ -1722,6 +1734,7 @@ export function MarkdownEditor({
                   <RenderedLine
                     block={block}
                     shortenLinkChars={shortenLinkChars}
+                    transforms={transforms}
                     highlights={highlightsByLine.get(index)}
                     edgeClass={edgeClass}
                     interactiveTasks

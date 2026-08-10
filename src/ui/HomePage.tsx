@@ -189,6 +189,22 @@ export function HomePage() {
               and files in a block at the end of the note instead of inline.
             </li>
             <li>
+              Set up your own <em>transform rules</em> in Settings and the app
+              rewrites what a note shows without touching what it stores. A rule
+              matches part of a note with a regular expression and displays
+              something else in its place: an issue number like{" "}
+              <code className="text-fg-bright">#134</code> as a link straight to
+              that issue, a shorthand as the words it stands for, or a phone
+              number as <code className="text-fg-bright">076****123</code> so it
+              isn&apos;t readable over your shoulder. The note itself never
+              changes — put the cursor on the line to see exactly what you
+              typed, and copying always copies the original. Everything happens
+              on your device; a rule is a pattern you wrote, and no text is sent
+              anywhere to match it. Each rule is built in a dialog where you
+              type sample text and watch the result underneath, so you can see
+              what it does before you keep it.
+            </li>
+            <li>
               Paste a <em>YouTube link</em> into a note and it becomes a video
               player right where you pasted it — every link shape works (the
               mobile site, <code className="text-fg-bright">youtu.be</code>,
@@ -209,13 +225,6 @@ export function HomePage() {
               only the note in front of you, and never leaves your device.
             </li>
             <li>
-              <em>Copy</em> a note to your clipboard with the button in its
-              header — by default just the body, or, if you choose so in
-              Settings, the title and body or the whole Markdown file with its
-              frontmatter. It stays on your device; the clipboard is written
-              locally.
-            </li>
-            <li>
               <em>Export a note</em> from the up arrow in its header — as a{" "}
               <em>PDF</em>, as a plain{" "}
               <code className="text-fg-bright">.md</code> file, or straight to
@@ -225,9 +234,12 @@ export function HomePage() {
               the page looks: paper size and margins, fonts and their sizes, the
               monospaced family and the background behind code, and the bullet
               character. The Markdown export is the same file the app stores
-              your notes as, so it opens anywhere and comes back unchanged.
-              Every export happens on your device — nothing is uploaded to
-              convert it.
+              your notes as, so it opens anywhere and comes back unchanged. The
+              clipboard option takes, by default, just the body — or, if you
+              choose so in Settings, the title and body or the whole Markdown
+              file with its frontmatter. Every export happens on your device:
+              nothing is uploaded to convert it, and the clipboard is written
+              locally.
             </li>
             <li>
               Lift a <em>code block</em> out of a note in one tap — every block

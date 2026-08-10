@@ -33,10 +33,10 @@ const app = {
   // Accessible label for the desktop right-click menu that replaces the
   // swipe actions on a note row (overview card and side-menu row).
   noteActions: "Note actions",
-  // The editor's copy-to-clipboard button (last in the header cluster). What it
-  // copies is the copy-scope editor setting; see settings.editor.copy*.
+  // The "Copied" confirmation, shared by the export menu's clipboard row and
+  // the copy button on a fenced code block. What the note row copies is the
+  // copy-scope editor setting; see settings.editor.copy*.
   copy: {
-    label: "Copy note",
     copied: "Copied",
   },
   // The export button (the up arrow) in the note header and the three rows of
@@ -49,7 +49,7 @@ const app = {
     clipboard: "Copy to clipboard",
   },
   // The copy button in a fenced code block's top-right corner. It confirms
-  // with the same "Copied" as the header's copy button above.
+  // with the same "Copied" as the export menu's clipboard row above.
   copyCode: "Copy code",
   // Right-click menu entry on a note row: puts the note's own link on the
   // clipboard, so it can be bookmarked or sent to yourself.
@@ -63,7 +63,7 @@ const app = {
     todo: "Not done",
     done: "Done",
   },
-  // The editor's cut button (left of the copy button) and its Ctrl/Cmd+K
+  // The editor's cut button (left of the export button) and its Ctrl/Cmd+K
   // shortcut: the selection, or the rest of the line from a mid-line caret,
   // or the whole line — onto the clipboard on its way out.
   cut: "Cut",
