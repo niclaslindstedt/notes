@@ -337,7 +337,8 @@ describe("MarkdownEditor", () => {
       const { onChange } = renderEditor("", { focusOnMount: true });
       caretIn(rawLine()!, 0);
       beforeInput("insertText", "a");
-      expect(onChange).toHaveBeenLastCalledWith("a");
+      // Capitalised: the first letter of the note opens a sentence.
+      expect(onChange).toHaveBeenLastCalledWith("A");
       expect(screen.queryByText("Start writing…")).toBeNull();
     });
   });
@@ -412,6 +413,64 @@ describe("MarkdownEditor", () => {
       selectRange(rawLine()!, 6, 11);
       beforeInput("insertText", " ");
       expect(onChange).toHaveBeenLastCalledWith("Hello  ");
+    });
+  });
+
+  // The capital that opens a sentence, for the same reason: intercepting every
+  // insertion takes the keystroke out of reach of the keyboard's own
+  // auto-capitalisation, so the editor writes the capital itself.
+  describe("sentence capitals", () => {
+    it("capitalises the first letter after a full stop", () => {
+      const { onChange } = renderEditor("Done. ");
+      caretIn(rawLine()!, 6);
+      beforeInput("insertText", "n");
+      expect(onChange).toHaveBeenLastCalledWith("Done. N");
+    });
+
+    it("capitalises the first letter of a line", () => {
+      const { onChange } = renderEditor("First line\n");
+      caretIn(rawLine()!, 0);
+      beforeInput("insertText", "s");
+      expect(onChange).toHaveBeenLastCalledWith("First line\nS");
+    });
+
+    it("leaves a letter mid-sentence alone", () => {
+      const { onChange } = renderEditor("Hello ");
+      caretIn(rawLine()!, 6);
+      beforeInput("insertText", "w");
+      expect(onChange).toHaveBeenLastCalledWith("Hello w");
+    });
+
+    it("leaves a code block verbatim", () => {
+      const { onChange } = renderEditor("```\n");
+      caretIn(rawLine()!, 0);
+      beforeInput("insertText", "c");
+      expect(onChange).toHaveBeenLastCalledWith("```\nc");
+    });
+
+    it("capitalises what replaces a selection", () => {
+      // What sits after the caret has no say in whether a sentence starts
+      // there, so typing over a selection is capitalised like any other letter.
+      const { onChange } = renderEditor("hello there");
+      selectRange(rawLine()!, 0, 5);
+      beforeInput("insertText", "b");
+      expect(onChange).toHaveBeenLastCalledWith("B there");
+    });
+
+    it("stands down when the setting is off", () => {
+      const { onChange } = renderEditor("Done. ", {
+        capitaliseSentences: false,
+      });
+      caretIn(rawLine()!, 6);
+      beforeInput("insertText", "n");
+      expect(onChange).toHaveBeenLastCalledWith("Done. n");
+    });
+
+    it("stands down when auto correct is turned off", () => {
+      const { onChange } = renderEditor("Done. ", { disableAutocorrect: true });
+      caretIn(rawLine()!, 6);
+      beforeInput("insertText", "n");
+      expect(onChange).toHaveBeenLastCalledWith("Done. n");
     });
   });
 

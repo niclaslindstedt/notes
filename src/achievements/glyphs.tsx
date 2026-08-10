@@ -468,6 +468,18 @@ export function FullStopGlyph({ className }: IconProps) {
   );
 }
 
+// A capital A beside an arrow pointing up — a letter raised to upper case.
+export function CapitalGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 18 7.5 7 12 18" />
+      <path d="M4.4 14.5h6.2" />
+      <path d="M17.5 19V9" />
+      <path d="m14 12.5 3.5-3.5 3.5 3.5" />
+    </Svg>
+  );
+}
+
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;

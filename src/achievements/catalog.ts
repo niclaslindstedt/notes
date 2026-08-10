@@ -25,6 +25,7 @@ import {
   BoldGlyph,
   BroomGlyph,
   CardsGlyph,
+  CapitalGlyph,
   CheckSquareGlyph,
   CloudGlyph,
   CodeGlyph,
@@ -620,6 +621,17 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     // Fired by the editor rewriting a second space as `". "` (`autoPeriodAt`
     // in `src/ui/MarkdownEditor.tsx`) — the dot it writes is indistinguishable
     // from one typed by hand, so there is nothing in the document to derive.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "capitalIdea",
+    tier: "beginner",
+    glyph: CapitalGlyph,
+    learnMore: true,
+    // Fired by the editor writing the capital that opens a sentence
+    // (`autoCapitalAt` in `src/ui/MarkdownEditor.tsx`) — the letter it writes
+    // is indistinguishable from one typed with Shift held, so there is nothing
+    // in the document to derive.
     trigger: { kind: "manual" },
   },
   {

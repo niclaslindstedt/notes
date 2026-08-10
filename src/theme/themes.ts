@@ -206,6 +206,14 @@ export type EditorSettings = {
   // Stop the browser/OS auto-correcting and auto-capitalising what you type
   // (mostly a mobile-keyboard behaviour) so your text goes through verbatim.
   disableAutocorrect: boolean;
+  // Capitalise the first letter of every sentence as you type — after a full
+  // stop / question mark / exclamation mark, and at the start of a line. The
+  // live-preview editor writes the capital itself (see `sentenceCapital` in the
+  // domain), because intercepting every keystroke takes it out of the reach of
+  // the platform's own auto-capitalisation; the Markdown-off textarea and the
+  // title field pass it on to the keyboard as the `autocapitalize` attribute.
+  // `disableAutocorrect` overrides it — that switch turns the whole family off.
+  capitaliseSentences: boolean;
   // Strip trailing spaces / tabs from every line each time a note is saved.
   // See `SaveFormatting` in the domain — applied to the stored bytes only.
   trimTrailingSpaces: boolean;
@@ -240,6 +248,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   lineNumbers: false,
   disableSpellcheck: false,
   disableAutocorrect: false,
+  capitaliseSentences: true,
   trimTrailingSpaces: true,
   trailingNewline: true,
   imagesAtEnd: false,

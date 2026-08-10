@@ -85,12 +85,15 @@ const settings: SettingsCatalog = {
     filesAtEnd: "Filer i slutet",
     filesAtEndHint:
       "Samla bifogade filer (allt som inte är en bild) i ett block längst ned i anteckningen istället för inline.",
+    capitaliseSentences: "Stor bokstav i meningar",
+    capitaliseSentencesHint:
+      "Inled varje mening med stor bokstav medan du skriver — efter punkt, frågetecken och utropstecken, och i början av en rad. Kodblock lämnas orörda, och versalen är en helt vanlig ändring, så Backsteg eller Ångra tar bort den direkt.",
     disableSpellcheck: "Inaktivera stavningskontroll",
     disableSpellcheckHint:
       "Sluta låta enheten kontrollera stavning medan du skriver, döljer de röda vågorna.",
     disableAutocorrect: "Inaktivera autokorrigering",
     disableAutocorrectHint:
-      "Sluta låta enheten autokorrigera och automatiskt göra versaler medan du skriver (påverkar mest mobiltangentbord), och sluta avsluta meningen med punkt när mellanslag trycks två gånger.",
+      "Sluta låta enheten autokorrigera och automatiskt göra versaler medan du skriver (påverkar mest mobiltangentbord), och sluta avsluta meningen med punkt när mellanslag trycks två gånger. Åsidosätter Stor bokstav i meningar.",
     trimTrailingSpaces: "Ta bort släpande blanksteg",
     trimTrailingSpacesHint:
       "Ta bort blanksteg som lämnats kvar i slutet av varje rad när en anteckning sparas.",

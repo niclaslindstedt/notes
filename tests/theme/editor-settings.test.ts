@@ -29,6 +29,7 @@ describe("editor margin helpers", () => {
       lineNumbers: false,
       disableSpellcheck: false,
       disableAutocorrect: false,
+      capitaliseSentences: true,
       trimTrailingSpaces: true,
       trailingNewline: true,
       imagesAtEnd: false,

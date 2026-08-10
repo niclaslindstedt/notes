@@ -107,6 +107,13 @@ const achievements: AchievementsCatalog = {
       learnMore:
         'Tryck mellanslag två gånger efter ett ord så avslutar anteckningen meningen åt dig: det första mellanslaget sväljs och en punkt skrivs i dess ställe, med markören kvar efter ". " redo för nästa mening. Det är samma genväg som telefonen tillämpar i vilket annat textfält som helst — editorn skriver varje tangenttryck in i anteckningen själv, vilket sätter tryckningen utom räckhåll för tangentbordet, så den gör utbytet i stället och gör det likadant på en dator. Två mellanslag efter en punkt förblir två mellanslag, och inuti ett kodblock skrivs ingenting om. Stäng av det med "Inaktivera autokorrigering" under Inställningar → Redigerare.',
     },
+    capitalIdea: {
+      name: "Stor idé",
+      condition:
+        "Låt anteckningen skriva den stora bokstaven som inleder en mening.",
+      learnMore:
+        'Börja en mening så skriver anteckningen den stora bokstaven åt dig \u2014 första tecknet på en rad, och första tecknet efter punkt, frågetecken eller utropstecken. Det är samma versal som telefonen sätter in åt dig överallt annars, gjord av appen eftersom editorn skriver varje tangenttryck in i anteckningen själv, vilket sätter tryckningen utom räckhåll för tangentbordet; det är också därför det fungerar likadant på en dator, där ingenting erbjuder det alls. Ett filnamn eller ett decimaltal behåller sina små bokstäver, kodblock lämnas precis som du skrev dem, och eftersom versalen är en helt vanlig ändring tar Backsteg eller Ångra bort den igen. Stäng av det med "Stor bokstav i meningar" under Inställningar \u2192 Redigerare.',
+    },
     pinpoint: {
       name: "Pricksäker",
       condition: "Hitta text inuti anteckningen du har öppen.",
