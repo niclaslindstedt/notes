@@ -124,3 +124,28 @@ describe("SideMenu — revealing the active note", () => {
     expect(screen.getByText("Orphan")).toBeTruthy();
   });
 });
+
+describe("SideMenu — the read-only eye", () => {
+  // Both glyphs are aria-hidden decoration with nothing to query by role or
+  // text, so the assertion goes by the one shape that tells them apart: the
+  // eye carries a pupil `<circle>`, the document glyph is all paths.
+  function rowGlyphHasPupil(title: string): boolean {
+    const row = screen.getByText(title).closest("button");
+    return row?.querySelector("svg circle") != null;
+  }
+
+  it("wears the eye instead of the document glyph on a locked note", () => {
+    renderMenu(
+      { open: true },
+      {
+        notes: [
+          { ...note("a", "Locked note"), locked: true },
+          note("b", "Open note"),
+        ],
+        activeNoteId: null,
+      },
+    );
+    expect(rowGlyphHasPupil("Locked note")).toBe(true);
+    expect(rowGlyphHasPupil("Open note")).toBe(false);
+  });
+});

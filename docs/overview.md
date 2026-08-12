@@ -2327,7 +2327,15 @@ does — you may look, not touch — and keeps it from being mistaken for a secr
 feature, which it is not. There is only the one glyph, because no second eye
 means "editable" without also meaning "hidden"; the state rides the accent fill
 instead, the treatment the ⋯ / find / formatting toggles use for "this mode is
-on". `App` routes its press to `useNotes().toggleLock`, which flips
+on". The same eye stands in for the document glyph on the note's
+[side-menu row](#side-menu) (`renderNoteRow`, `src/ui/SideMenu.tsx`), so a
+locked note is spottable in the list rather than only after opening it and
+finding the caret gone — the *leading* glyph, because the row's trailing slot is
+already spoken for by the [upload spinner](#per-note-upload-spinner) and the
+[encryption lock](#encryption), and because a locked note is a different kind of
+note, which is what that leading glyph says on the folder rows too. It reads off
+`Note.locked` alone, so it is right even for a note whose body is still deferred
+on an encrypted backend. `App` routes its press to `useNotes().toggleLock`, which flips
 `Note.locked` (`setLocked`, `src/domain/note.ts`) on the shared `DOC_SCOPE` undo
 timeline — structural, like starring, because it changes what may be *done* to a
 note rather than what it says. `updatedAt` is left alone so locking never jumps a
