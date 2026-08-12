@@ -63,7 +63,7 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
   const onToggleFavorite = vi.fn();
   const onToggleLock = vi.fn();
   const onAttach = vi.fn();
-  render(
+  const tree = (extra: Partial<Parameters<typeof Editor>[0]> = {}) => (
     <NavContext.Provider value={nav}>
       <Editor
         note={note()}
@@ -77,9 +77,11 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
         canAttach={false}
         onAttach={onAttach}
         {...props}
+        {...extra}
       />
-    </NavContext.Provider>,
+    </NavContext.Provider>
   );
+  const { rerender } = render(tree());
   return {
     onBack,
     onChange,
@@ -87,6 +89,11 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
     onTitleSettle,
     onToggleFavorite,
     onToggleLock,
+    // Feed the *same* mounted editor a changed prop — the note coming back from
+    // the parent after a header press, which is how the real app updates it
+    // (`App` owns the note; the editor only reports the toggle).
+    update: (extra: Partial<Parameters<typeof Editor>[0]>) =>
+      rerender(tree(extra)),
   };
 }
 
@@ -623,6 +630,111 @@ describe("Editor (narrow header)", () => {
 
     expect(cluster().style.maxWidth).toBe("0px");
     expect(titleHidden()).toBe(false);
+  });
+});
+
+// Two of the cluster's buttons report the open note's state rather than merely
+// acting on it — a filled star for a favorite, a lit eye for a read-only note —
+// so while either is on it steps out of the fold and stays on the row.
+describe("Editor (pinned header state)", () => {
+  function stubNarrow(matches: boolean) {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((media: string) => ({
+        matches: media.includes("max-width") ? matches : false,
+        media,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      })),
+    );
+  }
+
+  // The sliding box, found by its own marker rather than through a button —
+  // which is the whole point here: a pinned button is *not* inside it.
+  function cluster() {
+    return document.querySelector("[data-cluster]") as HTMLElement;
+  }
+
+  function pinned(name: string): boolean {
+    const button = screen.getByRole("button", { name });
+    return !cluster().contains(button);
+  }
+
+  it("keeps a favorite's star on the row while the cluster is folded away", () => {
+    stubNarrow(true);
+    renderEditor({ note: note({ favorite: true }) });
+
+    expect(cluster().style.maxWidth).toBe("0px");
+    expect(pinned("Remove from favorites")).toBe(true);
+    // Only the star: the eye has nothing to report on an editable note.
+    expect(pinned("Lock note")).toBe(false);
+  });
+
+  it("keeps a read-only note's eye on the row while the cluster is folded away", () => {
+    stubNarrow(true);
+    renderEditor({ note: note({ locked: true }) });
+
+    expect(cluster().style.maxWidth).toBe("0px");
+    expect(pinned("Unlock note")).toBe(true);
+  });
+
+  it("folds both away on a note that is neither", () => {
+    stubNarrow(true);
+    renderEditor();
+
+    expect(pinned("Add to favorites")).toBe(false);
+    expect(pinned("Lock note")).toBe(false);
+  });
+
+  it("renders a pinned button once — out of the fold, not in both places", () => {
+    stubNarrow(true);
+    renderEditor({ note: note({ favorite: true, locked: true }) });
+
+    expect(
+      screen.getAllByRole("button", { name: "Remove from favorites" }),
+    ).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Unlock note" })).toHaveLength(
+      1,
+    );
+  });
+
+  it("holds the star on the row after the press that unstarred the note", () => {
+    stubNarrow(true);
+    const { update } = renderEditor({ note: note({ favorite: true }) });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove from favorites" }),
+    );
+    // The parent hands the un-starred note back; the button must not vanish
+    // from under the finger that just pressed it.
+    update({ note: note({ favorite: false }) });
+
+    expect(pinned("Add to favorites")).toBe(true);
+  });
+
+  it("hands the body's Tab to the pinned star rather than the ⋯", () => {
+    stubNarrow(true);
+    renderEditor({ note: note({ favorite: true }) });
+    const body = screen.getByDisplayValue("the body") as HTMLTextAreaElement;
+    body.focus();
+
+    fireEvent.keyDown(body, { key: "Tab" });
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Remove from favorites" }),
+    );
+  });
+
+  it("pins nothing on a wide header, where the whole row is out anyway", () => {
+    stubNarrow(false);
+    renderEditor({ note: note({ favorite: true, locked: true }) });
+
+    expect(pinned("Remove from favorites")).toBe(false);
+    expect(pinned("Unlock note")).toBe(false);
   });
 });
 

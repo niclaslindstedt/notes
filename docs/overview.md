@@ -2087,17 +2087,51 @@ Three things close it again:
   own, so the held-open flag is dropped.
 
 A **selection** opens the same box on its own — see
-[selection actions](#selection-actions) below.
+[selection actions](#selection-actions) below. Two of the six buttons can also
+stay out of the fold on their own account — see
+[pinned header state](#pinned-header-state).
 
 Like the [find bar](#find-in-note) and unlike the
 [styling toolbar](#styling-toolbar), the open state is **not** remembered:
 every note, and every return to a note, opens showing its title. The ⋯ cancels
 its own `mousedown` the way the rest of the cluster does, so unfolding the row
 never costs the caret the buttons behind it are about to act on. While the
-cluster is folded away the editor's [tab order](#editor-tab-order) treats the
-⋯ as the header's first action (`firstAction`), so Tab out of the body lands on
-the control that is actually there. Unfolding it the first time is the **Elbow
-room** achievement.
+cluster is folded away the editor's [tab order](#editor-tab-order) treats
+whatever is actually on the row as the header's first action (`firstAction`) —
+a [pinned](#pinned-header-state) star or eye, and the ⋯ when nothing is pinned
+— so Tab out of the body lands on a control that is really there. Unfolding it
+the first time is the **Elbow room** achievement.
+
+### Pinned header state
+
+`Editor` (`src/ui/NoteEditor.tsx`) — `pinFavorite` / `pinLocked`, `pinnedRef`.
+Two of the cluster's buttons don't only *do* something, they **say** something
+about the note that is open: a filled star means this note is in
+[Favorites](#favorites), and a lit eye means it is
+[read-only](#lock-a-note). Folding those behind the ⋯ turned a fact about the
+open document into something the user had to go looking for — and the eye
+especially, because "why is my typing not landing" is the exact question the
+glyph exists to answer.
+
+So on a narrow header each of those two, **while it is on**, steps out of the
+sliding box and pins to the row between the cluster and the ⋯, in its own
+small flex box (`pinnedRef`, carrying the same `pr-2` the cluster does because
+the row's own `gap-2` is off at this width). It is rendered *once* — pinned out
+there instead of inside the box, never in both places — so nothing is
+duplicated and the [max-width caps](#collapsed-header-actions) simply travel to
+a stop the narrower box doesn't reach. It sits to the **right** of the cluster
+on purpose: that is where it ends up when the row unfolds past it, so pressing
+⋯ never shuffles the pinned glyphs around. Off, a button has nothing to report
+and folds away with the rest, and a **wide** header pins nothing at all — every
+action is already in the row there.
+
+The pin then **latches** for as long as the note is open: pressing the pinned
+star unstars the note, and a button that vanished from under the finger that
+just pressed it would leave the undo one trip through the ⋯ away. So it stays
+out, wearing its now-off artwork, until the note is left. `Editor` is keyed by
+note id in `App`, so the next note starts from its own state — which is also
+why the two latches seed from the note rather than from `false`: a starred note
+opens with its star already on the row rather than fading one in.
 
 ### Selection actions
 
@@ -2235,7 +2269,9 @@ Starring a note lifts it into the side menu's **Favorites** section without
 moving it: it keeps its folder, its place in the recents list, and everything
 else about it. The star is the leading button of the editor header
 (`FavoriteButton`, `src/ui/FavoriteButton.tsx`, drawing the framework's
-`StarIcon` outlined or filled to show the note's current state); `App` routes
+`StarIcon` outlined or filled to show the note's current state — a filled one
+stays on the row on a phone rather than folding behind the ⋯, see
+[pinned header state](#pinned-header-state)); `App` routes
 its press to `useNotes().toggleFavorite`, which flips `Note.favorite`
 (`setFavorite`, `src/domain/note.ts`) on the shared `DOC_SCOPE` undo timeline —
 structural, like archiving, because it changes where a note shows up rather than
@@ -2337,7 +2373,11 @@ button alone, since the other two rewrite the note. The header **folds away** th
 [formatting toggle](#styling-toolbar) and the [cut button](#cut-button) while
 locked, and holds the styling toolbar off the screen without forgetting the
 user's preference, so a Markdown writer's remembered toolbar doesn't arrive as a
-bar of dead buttons over a note it can't touch.
+bar of dead buttons over a note it can't touch. The eye itself goes the other
+way on a phone: a lit one steps *out* of the [collapsed
+cluster](#collapsed-header-actions) and stays on the row, because a note that
+refuses the caret has to say so before the user wonders why — see
+[pinned header state](#pinned-header-state).
 
 **The two write-only buttons slide rather than vanish.** Each rides in a
 `WriteAction` box (`src/ui/NoteEditor.tsx`) that stays mounted and travels
