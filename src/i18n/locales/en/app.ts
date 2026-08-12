@@ -33,11 +33,15 @@ const app = {
   // Accessible label for the desktop right-click menu that replaces the
   // swipe actions on a note row (overview card and side-menu row).
   noteActions: "Note actions",
-  // The "Copied" confirmation, shared by the export menu's clipboard row and
-  // the copy button on a fenced code block. What the note row copies is the
-  // copy-scope editor setting; see settings.editor.copy*.
+  // The "Copied" confirmation, shared by the export menu's clipboard row, the
+  // copy button on a fenced code block, and the editor's selection actions.
+  // What the note row copies is the copy-scope editor setting; see
+  // settings.editor.copy*. `selection` labels the copy button that joins the
+  // narrow editor header while text is selected — it takes the highlighted
+  // text and nothing else.
   copy: {
     copied: "Copied",
+    selection: "Copy selection",
   },
   // The export button (the up arrow) in the note header and the three rows of
   // its menu. On a narrow screen the rows show only their glyph, so each label

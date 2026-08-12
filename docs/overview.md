@@ -2006,6 +2006,9 @@ Three things close it again:
 - **Widening past the breakpoint** — every action is back in the row on its
   own, so the held-open flag is dropped.
 
+A **selection** opens the same box on its own — see
+[selection actions](#selection-actions) below.
+
 Like the [find bar](#find-in-note) and unlike the
 [styling toolbar](#styling-toolbar), the open state is **not** remembered:
 every note, and every return to a note, opens showing its title. The ⋯ cancels
@@ -2015,6 +2018,52 @@ cluster is folded away the editor's [tab order](#editor-tab-order) treats the
 ⋯ as the header's first action (`firstAction`), so Tab out of the body lands on
 the control that is actually there. Unfolding it the first time is the **Elbow
 room** achievement.
+
+### Selection actions
+
+`Editor` (`src/ui/NoteEditor.tsx`) — highlighting text on a phone is the moment
+the actions that operate on a selection are wanted, so under
+`COLLAPSE_QUERY` the [collapsed cluster](#collapsed-header-actions) unfolds
+**itself** then, carrying just the three that act on one: the
+[formatting](#styling-toolbar) toggle, [cut](#cut-button), and a
+[copy](#copy-scope) button that takes the highlighted text and nothing else.
+Reaching them through the ⋯ was two taps for something the user had already
+asked for by highlighting it.
+
+It is **the same box on the same slide** as the ⋯ unfold — one element whose
+contents depend on the mode (`selecting`), travelling to `SELECTION_MAX_WIDTH`
+rather than `ACTIONS_MAX_WIDTH` — not a second panel. That is what makes the ⋯
+behave the way it always has over a selection: pressing it simply widens the
+row that is already out into the full five, because `actionsOpen` wins over
+`selecting`. The ⋯ itself never goes away, and letting the selection go folds
+the buttons back and hands the note's name back.
+
+Two things it deliberately does not do: it does not appear on a wide header
+(every action is in the row there already), and it stands down while the
+[find bar](#find-in-note) is open, where a selection belongs to the search
+rather than to the note.
+
+**Who decides there is a selection.** Both editing surfaces report it —
+`onSelectionChange`, deduped through a ref so `selectionchange` firing on every
+keystroke costs one boolean comparison. The live-preview editor
+(`MarkdownEditor`) reports from the `selectionchange` handler it already runs,
+and only when **both** endpoints are inside its surface, because a drag that
+ran out of the note can't be mapped back to source (see
+[selection mapping](#selection-mapping)); the plain fallback reports from
+`trackCaret`. Each takes its report back down (`false`) when it unmounts — a
+note switch, or Markdown being turned off — and after a cut, whose collapsed
+caret is one the surface sets itself and therefore ignores.
+
+**What copy copies.** `runCopy` asks the mounted surface for its selection
+(`selection()` on either handle) and puts *that* on the clipboard — the note's
+**source**, so copying a heading out of the live preview yields `# Heading`
+rather than the rendered line, the same as Ctrl/Cmd+C there. Copying the
+*whole note* stays where it has always been, the export menu's "Copy to
+clipboard" row with its [copy scope](#copy-scope): this button exists only
+while there is a selection, so it can never take more than what is
+highlighted. It confirms with the tick-and-`Toast` pair the export row uses,
+because a copy is otherwise silent. The first unfold is the **Sleight of
+hand** achievement.
 
 ### Editor position memory
 

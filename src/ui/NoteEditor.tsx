@@ -30,6 +30,7 @@ import { haptics } from "../platform/native-bridge.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { CipherGlyph } from "./CipherGlyph.tsx";
 import { writeClipboard } from "./clipboard.ts";
+import { CopyButton } from "./CopyButton.tsx";
 import { CutButton } from "./CutButton.tsx";
 import {
   getEditorPosition,
@@ -83,6 +84,10 @@ const COLLAPSE_QUERY = "(max-width: 639px)";
 // slide finishes a hair before the timer does.
 const ACTIONS_MAX_WIDTH = "14rem";
 
+// The same cap for the three selection actions (formatting, cut, copy), which
+// unfold out of the ⋯ on their own when text is selected — real width ~8.25rem.
+const SELECTION_MAX_WIDTH = "9rem";
+
 // A stable empty hit list for the closed find bar, so the editing surfaces keep
 // seeing the identical reference and their per-line memos bail out.
 const NO_MATCHES: readonly NoteMatch[] = [];
@@ -95,6 +100,7 @@ const NO_TRANSFORMS: readonly CompiledTransform[] = [];
 type PlainEditorHandle = {
   format: (action: FormatAction) => void;
   cut: () => void;
+  selection: () => string | null;
 };
 
 export function Editor({
@@ -188,9 +194,28 @@ export function Editor({
   // with the title showing.
   const narrow = useMediaQuery(COLLAPSE_QUERY);
   const [actionsOpen, setActionsOpen] = useState(false);
-  // Folded away: narrow, and not currently held open. The wide header never
-  // folds, so it is never "collapsed" no matter what the flag says.
-  const collapsed = narrow && !actionsOpen;
+
+  // Selecting text is the moment the actions that operate on a selection are
+  // wanted, so on a narrow screen the cluster unfolds *itself* then — carrying
+  // just those three (formatting, cut, copy) rather than all five, because
+  // reaching them through the ⋯ is two taps for something you asked for by
+  // highlighting it. The editing surfaces report the selection (they own the
+  // mapping back to the note's source); a selection in the find field is the
+  // bar's own business, so it doesn't count.
+  const [hasSelection, setHasSelection] = useState(false);
+  const selecting = narrow && hasSelection && !findOpen && !actionsOpen;
+  // Which set the cluster carries, and whether it is out at all. The ⋯ always
+  // wins: pressing it unfolds the whole row, the way it always has.
+  const clusterOpen = !narrow || actionsOpen || selecting;
+  // Folded away: narrow, with neither the ⋯ nor a selection holding it out. The
+  // wide header never folds, so it is never "collapsed".
+  const collapsed = !clusterOpen;
+
+  // Unfolding the cluster on a selection is the **Sleight of hand** trophy —
+  // a layout state, nowhere in the note itself.
+  useEffect(() => {
+    if (selecting) unlock("sleightOfHand");
+  }, [selecting]);
 
   // A window grown past the breakpoint puts every action back in the row on its
   // own, which leaves the held-open flag meaning nothing — drop it, so shrinking
@@ -291,6 +316,21 @@ export function Editor({
     else plainEditorRef.current?.cut();
   }
 
+  // The selection actions' copy button, routed to whichever surface is mounted
+  // the same way. It copies the *selection* and nothing else — it is only in
+  // the header while there is one — and it takes the note's **source**, so
+  // copying out of the live preview yields the Markdown that was typed rather
+  // than the rendered text (the same thing Ctrl/Cmd+C does there).
+  async function runCopy(): Promise<boolean> {
+    const text = editor.renderMarkdown
+      ? markdownEditorRef.current?.selection()
+      : plainEditorRef.current?.selection();
+    if (!text) return false;
+    const ok = await writeClipboard(text);
+    if (ok) unlock("copycat");
+    return ok;
+  }
+
   // Move focus from the title field into the body's editing surface, used when
   // the user presses Enter or Arrow-Down in the title. The live-preview editor
   // opens with no active line (so the note renders fully formatted), so there
@@ -371,7 +411,7 @@ export function Editor({
           onFocusBody={focusBody}
           focusOnMount={titleFirst}
           onMultilineChange={setTitleMultiline}
-          hidden={actionsOpen}
+          hidden={narrow && clusterOpen}
           disableSpellcheck={editor.disableSpellcheck}
           disableAutocorrect={editor.disableAutocorrect}
           capitaliseSentences={editor.capitaliseSentences}
@@ -396,31 +436,51 @@ export function Editor({
               third transitioned property is `visibility`, which is what keeps
               the folded-away buttons out of the tab order and off screen
               readers: it flips to hidden only at the *end* of the transition,
-              so the closing slide is still visible while it plays. */}
+              so the closing slide is still visible while it plays.
+
+              A selection unfolds the same box on the same slide, carrying the
+              three actions that operate on one — one box rather than two, so
+              pressing ⋯ with text selected simply widens what is already out
+              into the full row instead of swapping one panel for another. */}
           <div
+            data-cluster={clusterOpen ? "open" : "closed"}
             className={
               narrow
-                ? `flex min-w-0 items-center gap-2 overflow-hidden pr-2 transition-[max-width,opacity,visibility] duration-200 ease-out ${actionsOpen ? "opacity-100" : "invisible opacity-0"}`
+                ? `flex min-w-0 items-center gap-2 overflow-hidden pr-2 transition-[max-width,opacity,visibility] duration-200 ease-out ${clusterOpen ? "opacity-100" : "invisible opacity-0"}`
                 : "flex items-center gap-2"
             }
             style={
               narrow
-                ? { maxWidth: actionsOpen ? ACTIONS_MAX_WIDTH : "0px" }
+                ? {
+                    maxWidth: !clusterOpen
+                      ? "0px"
+                      : selecting
+                        ? SELECTION_MAX_WIDTH
+                        : ACTIONS_MAX_WIDTH,
+                  }
                 : undefined
             }
           >
-            <FavoriteButton
-              favorite={note.favorite === true}
-              onToggle={onToggleFavorite}
-            />
+            {!selecting && (
+              <FavoriteButton
+                favorite={note.favorite === true}
+                onToggle={onToggleFavorite}
+              />
+            )}
             <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
             {!loading && <CutButton onCut={runCut} />}
-            <ExportButton
-              note={note}
-              copyScope={editor.copyScope}
-              transforms={transforms}
-            />
-            <NoteFindButton open={findOpen} onToggle={toggleFind} />
+            {selecting ? (
+              <CopyButton onCopy={runCopy} />
+            ) : (
+              <>
+                <ExportButton
+                  note={note}
+                  copyScope={editor.copyScope}
+                  transforms={transforms}
+                />
+                <NoteFindButton open={findOpen} onToggle={toggleFind} />
+              </>
+            )}
           </div>
           {narrow && (
             <MoreButton
@@ -504,6 +564,7 @@ export function Editor({
             lineNumbers={editor.lineNumbers}
             onTabOut={onBodyTab}
             onLineFormat={toolbarOpen ? setLineFormat : undefined}
+            onSelectionChange={setHasSelection}
             matches={matches}
             activeMatch={activeMatch}
           />
@@ -514,6 +575,7 @@ export function Editor({
             onChange={onChange}
             onTabOut={onBodyTab}
             onLineFormat={toolbarOpen ? setLineFormat : undefined}
+            onSelectionChange={setHasSelection}
             undoScrollSeq={undoScrollSeq}
             wordWrap={editor.wordWrap}
             disableSpellcheck={editor.disableSpellcheck}
@@ -765,6 +827,7 @@ function PlainEditor({
   noteId,
   onTabOut,
   onLineFormat,
+  onSelectionChange,
   matches = NO_MATCHES,
   activeMatch = -1,
   handleRef,
@@ -789,6 +852,9 @@ function PlainEditor({
   /** Report the caret's line to the styling toolbar; only passed while it's
    *  open, so a closed toolbar never pays for the classification. */
   onLineFormat?: (line: LineFormat | null) => void;
+  /** Report a selection appearing / disappearing, so the header can offer the
+   *  actions that operate on one (see the selection actions in `Editor`). */
+  onSelectionChange?: (selected: boolean) => void;
   /** The find bar's hits. A textarea can't paint them, so only the one the bar
    *  is parked on shows — as the field's own selection (see below). */
   matches?: readonly NoteMatch[];
@@ -965,6 +1031,8 @@ function PlainEditor({
     const caret = pointToOffset(next, result.caret);
     pendingSelection.current = { from: caret, to: caret };
     lastOffset.current = caret;
+    // What was selected is gone, so the header's selection actions go with it.
+    reportSelection(false);
   }
 
   useImperativeHandle(handleRef ?? null, () => ({
@@ -990,8 +1058,14 @@ function PlainEditor({
       // Report the selection the press left behind rather than waiting for it
       // to be installed, so the button it lit (or put out) is right at once.
       if (onLineFormat) markCaret(next, from, to);
+      reportSelection(from !== to);
     },
     cut,
+    selection: () => {
+      const el = textareaRef.current;
+      if (!el || el.selectionStart === el.selectionEnd) return null;
+      return el.value.slice(el.selectionStart, el.selectionEnd);
+    },
   }));
 
   // Keep the toolbar's lit buttons in step with the caret. The line decides the
@@ -1029,7 +1103,28 @@ function PlainEditor({
   function trackCaret(el: HTMLTextAreaElement) {
     lastOffset.current = el.selectionStart;
     if (onLineFormat) markCaret(el.value, el.selectionStart, el.selectionEnd);
+    reportSelection(el.selectionStart !== el.selectionEnd);
   }
+
+  // Whether a selection is up, reported out on change only — the caret moves on
+  // every keystroke and the answer is the same for nearly all of them. The
+  // surface takes its report with it when it goes away (a note switch, or
+  // Markdown being turned back on), so the header can't be left offering
+  // actions on a selection that no longer exists.
+  const selected = useRef(false);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
+  function reportSelection(on: boolean) {
+    if (selected.current === on) return;
+    selected.current = on;
+    onSelectionChangeRef.current?.(on);
+  }
+  useEffect(() => {
+    return () => {
+      selected.current = false;
+      onSelectionChangeRef.current?.(false);
+    };
+  }, []);
 
   return (
     <textarea

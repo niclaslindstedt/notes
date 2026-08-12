@@ -402,6 +402,26 @@ export function HistoryGlyph({ className }: IconProps) {
   );
 }
 
+// A dashed frame with an I-beam through it — a run of selected text, which is
+// what puts the editor's selection actions in the header.
+export function TextSelectGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M5 3a2 2 0 0 0-2 2" />
+      <path d="M19 3a2 2 0 0 1 2 2" />
+      <path d="M21 19a2 2 0 0 1-2 2" />
+      <path d="M5 21a2 2 0 0 1-2-2" />
+      <path d="M9 3h2" />
+      <path d="M13 21h2" />
+      <path d="M3 9v2" />
+      <path d="M21 13v2" />
+      <path d="M10 8h4" />
+      <path d="M12 8v8" />
+      <path d="M10 16h4" />
+    </Svg>
+  );
+}
+
 // A magnifier over a stack of text lines — finding text *inside* the open
 // note, as opposed to the plain magnifier that searches across every note.
 export function TextSearchGlyph({ className }: IconProps) {

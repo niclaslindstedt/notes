@@ -3,7 +3,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MarkdownEditor } from "../../src/ui/MarkdownEditor.tsx";
+import {
+  MarkdownEditor,
+  type MarkdownEditorHandle,
+} from "../../src/ui/MarkdownEditor.tsx";
 import {
   getEditorPosition,
   resetEditorPositions,
@@ -1589,5 +1592,75 @@ describe("MarkdownEditor", () => {
         vi.unstubAllGlobals();
       }
     });
+  });
+});
+
+// The editor tells its host when a selection appears and disappears, which is
+// what puts the selection actions in the narrow editor header (see the
+// selection actions in `NoteEditor.tsx`).
+describe("MarkdownEditor (selection reporting)", () => {
+  function selChange() {
+    act(() => {
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+  }
+
+  it("reports a selection appearing and collapsing, once each", () => {
+    const onSelectionChange = vi.fn();
+    renderEditor("hello world", { focusOnMount: false, onSelectionChange });
+
+    selectRange(screen.getByText("hello world"), 0, 5);
+    selChange();
+    expect(onSelectionChange.mock.calls).toEqual([[true]]);
+
+    // A caret move inside the same state says nothing new — the host is only
+    // told when the answer changes.
+    selChange();
+    expect(onSelectionChange.mock.calls).toEqual([[true]]);
+
+    caretIn(rawLine() ?? screen.getByText("hello world"), 2);
+    selChange();
+    expect(onSelectionChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("takes its report with it when the editor goes away", () => {
+    const onSelectionChange = vi.fn();
+    const { unmount } = renderEditor("hello world", {
+      focusOnMount: false,
+      onSelectionChange,
+    });
+
+    selectRange(screen.getByText("hello world"), 0, 5);
+    selChange();
+    expect(onSelectionChange).toHaveBeenLastCalledWith(true);
+
+    unmount();
+    expect(onSelectionChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("hands out the verbatim source the selection covers", () => {
+    const handle: { current: MarkdownEditorHandle | null } = { current: null };
+    renderEditor("# heading\n**bold** tail", {
+      focusOnMount: false,
+      handleRef: handle,
+    });
+
+    // Drawn over the rendered line — which shows neither the `#` nor the `**`
+    // — the handle still answers with the source that was typed.
+    const first = surface().querySelector<HTMLElement>(
+      '[data-line-index="0"]',
+    )!;
+    const last = surface().querySelector<HTMLElement>('[data-line-index="1"]')!;
+    const range = document.createRange();
+    range.setStart(first, 0);
+    range.setEnd(last, last.childNodes.length);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    expect(handle.current?.selection()).toBe("# heading\n**bold** tail");
+
+    sel.removeAllRanges();
+    expect(handle.current?.selection()).toBe(null);
   });
 });

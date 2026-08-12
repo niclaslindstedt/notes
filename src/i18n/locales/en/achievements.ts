@@ -124,6 +124,12 @@ const achievements = {
       learnMore:
         "On a phone the editor's header has room for the note's name or its five action buttons, not both — so the buttons fold into a single ⋯ button on the right. Pressing it slides them back out over the title; pressing it again, or touching the note itself, folds them away and hands the title back. The caret stays exactly where it was through all of it, so the cut and formatting buttons still act on the line you were writing.",
     },
+    sleightOfHand: {
+      name: "Sleight of hand",
+      condition: "Select text in a note on a narrow screen.",
+      learnMore:
+        "Select some text on a phone and the three buttons that act on a selection — formatting, cut and copy — slide out of the ⋯ on their own, so the thing you just asked for is one tap away instead of two. Copy takes the highlighted text and nothing else (copying the whole note stays in the export menu), and cut takes it out onto the clipboard. Press the ⋯ and the row simply widens into the full set of actions, the way it always has; let the selection go and the buttons fold away and hand the note's name back.",
+    },
     pinpoint: {
       name: "Pinpoint",
       condition: "Find text inside the note you have open.",

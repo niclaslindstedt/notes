@@ -20,6 +20,7 @@ const app: AppCatalog = {
   noteActions: "Anteckningsåtgärder",
   copy: {
     copied: "Kopierat",
+    selection: "Kopiera markering",
   },
   export: {
     label: "Exportera",

@@ -97,7 +97,10 @@ export function HomePage() {
               buttons but not both, those buttons fold into a single{" "}
               <span aria-hidden>⋯</span> control on the right — pressing it
               slides them back out over the title, and touching the note again
-              folds them away and hands the title back.
+              folds them away and hands the title back. Select some text and the
+              three buttons that act on a selection — formatting, cut and copy —
+              slide out on their own, so what you just highlighted is one tap
+              from being styled, cut or copied.
             </li>
             <li>
               Reach for the formatting button at the top right of a note to open

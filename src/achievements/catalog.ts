@@ -70,6 +70,7 @@ import {
   SmartphoneGlyph,
   StarGlyph,
   TextSearchGlyph,
+  TextSelectGlyph,
   TypeGlyph,
   UndoGlyph,
   VideoGlyph,
@@ -647,6 +648,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     learnMore: true,
     // Fired by unfolding the narrow header's action cluster (`toggleActions` in
     // `src/ui/NoteEditor.tsx`) — a layout state, nowhere in the document.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "sleightOfHand",
+    tier: "beginner",
+    glyph: TextSelectGlyph,
+    learnMore: true,
+    // Fired when a selection unfolds the narrow header's selection actions
+    // (`selecting` in `src/ui/NoteEditor.tsx`) — a layout state, nowhere in
+    // the document.
     trigger: { kind: "manual" },
   },
   {
