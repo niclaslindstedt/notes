@@ -28,6 +28,16 @@ describe("ChangelogModal", () => {
     expect(screen.getByRole("heading", { name: "Changelog" })).toBeTruthy();
   });
 
+  it("renders through the shared Modal, so it keeps the top safe-area inset", () => {
+    render(<ChangelogModal open onClose={vi.fn()} />);
+    // The shared `Modal`'s mobile sheet opens with an aria-hidden spacer the
+    // height of `env(safe-area-inset-top)`. Its absence means the dialog has
+    // drifted back onto an overlay of its own and will sit under the notch.
+    expect(
+      document.querySelector('[class*="safe-area-inset-top"]'),
+    ).toBeTruthy();
+  });
+
   it("renders nothing when closed", () => {
     const { container } = render(
       <ChangelogModal open={false} onClose={vi.fn()} />,
