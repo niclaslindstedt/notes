@@ -120,6 +120,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Förstoringsglaset i en antecknings sidhuvud fäller ut ett sökfält under toppraden, med markören redan i det. Det du skriver matchas ordagrant och utan hänsyn till versaler mot anteckningen du läser — alla träffar lyser upp samtidigt, pilarna stegar mellan dem (Enter och Skift+Enter gör samma sak från tangentbordet) och räknaren säger vilken av hur många du står på. Den söker bara i den öppna anteckningen; förstoringsglaset i sidomenyn är det som söker i allihop.",
     },
+    starStruck: {
+      name: "Stjärnögd",
+      condition: "Lägg till en anteckning bland favoriterna.",
+      learnMore:
+        "Stjärnan till vänster i en antecknings sidhuvud gör den till favorit, och sidomenyn får ett avsnitt Favoriter ovanför anteckningslistan med allt du stjärnmärkt. Det är en genväg, inte en flytt: anteckningen behåller sin mapp, sin plats i den vanliga listan och allt annat — stjärnan sätter bara en extra dörr på den, så att de få anteckningar du ständigt återvänder till är ett tryck bort hur djupt de än ligger. Som standard struntar Favoriter helt i mapparna och listar anteckningarna platt; under Inställningar → Utseende → Sidomeny kan du i stället låta mappstrukturen synas där.",
+    },
 
     // ── Van ───────────────────────────────────────────────────────────
     collector: {

@@ -124,6 +124,12 @@ const achievements = {
       learnMore:
         "The magnifier in a note's header opens a find bar under the top bar, with the cursor already in it. What you type is matched verbatim and case-insensitively against the note you are reading — every hit lights up at once, the arrows step between them (Enter and Shift+Enter do the same from the keyboard), and the counter says which one of how many you are on. It searches only the open note; the magnifier on the side menu is the one that searches across all of them.",
     },
+    starStruck: {
+      name: "Star-struck",
+      condition: "Add a note to your favorites.",
+      learnMore:
+        "The star at the left of a note's header marks it a favorite, and the side menu grows a Favorites section above the note list holding everything you have starred. It is a shortcut, not a move: the note keeps its folder, its place in the ordinary list, and everything else about it — the star just puts a second door on it, so the handful of notes you keep coming back to are one tap away no matter how deep they are filed or how far down the recents they have slipped. By default Favorites ignores the folders entirely and lists the notes flat; Settings → Appearance → Sidebar can reproduce the folder structure there instead.",
+    },
 
     // ── Intermediate ──────────────────────────────────────────────────
     collector: {

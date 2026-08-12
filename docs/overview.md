@@ -1827,8 +1827,9 @@ source points. The first press of any button unlocks the **Stylist** achievement
 ### Find in note
 
 `NoteFindBar` + `NoteFindButton` (`src/ui/NoteFindBar.tsx`) — a one-line search
-bar for the note that is **open**, raised by the magnifier in the editor header
-and rendered directly beneath it, in the content column, with the same
+bar for the note that is **open**, raised by the magnifier pinned to the far
+right of the editor header (past the actions that change the note, because it
+opens a bar rather than changing anything) and rendered directly beneath it, in the content column, with the same
 `format-toolbar-in` unfold the [styling toolbar](#styling-toolbar) uses. The two
 are independent and can both be up at once; the find bar sits above, closest to
 the header its button lives in. Opening it pushes the note's text down rather
@@ -1981,6 +1982,56 @@ title never starts or ends with a space) and bumps `updatedAt`; exposed as
 and `archivedNotes` partition the list. `useNotes().archive` / `restore` are the
 verbs; archived notes leave the overview but stay for the [archive
 view](#archive-view) and undo.
+
+### Favorites
+
+Starring a note lifts it into the side menu's **Favorites** section without
+moving it: it keeps its folder, its place in the recents list, and everything
+else about it. The star is the leading button of the editor header
+(`FavoriteButton`, `src/ui/FavoriteButton.tsx`, drawing the framework's
+`StarIcon` outlined or filled to show the note's current state); `App` routes
+its press to `useNotes().toggleFavorite`, which flips `Note.favorite`
+(`setFavorite`, `src/domain/note.ts`) on the shared `DOC_SCOPE` undo timeline —
+structural, like archiving, because it changes where a note shows up rather than
+what it says. `updatedAt` is deliberately left alone so starring never jumps a
+note to the top of the recents, and the toggle runs through `withBody` so a
+deferred note on an [encrypted backend](#encryption) is loaded first and the flag
+actually reaches its `.enc` file.
+
+The flag is absent rather than `false` on an unstarred note, so no migration was
+needed and every persistence layer carries it on the same terms as `archived`:
+`favorite: true` in the markdown frontmatter (`storage/markdown/codec.ts`), a
+`favorite` field on the encrypted note JSON (`enc-note-codec.ts`) and on the
+[note index](#encryption) row (`note-index.ts`), and a defensive
+`favorite === true` check in `parse` (`storage/serialize.ts`) so a junk value
+drops the flag instead of reading as truthy.
+
+`favoriteNotes` (`src/domain/note.ts`) is what the section lists: everything
+starred that isn't archived — an archived note is out of sight by definition, so
+it leaves Favorites too and the star comes back with it on restore. The section
+is drawn by `SideMenu` above the **Notes** heading and hides itself entirely
+while nothing is starred (an empty heading is noise in a drawer this dense, and
+the star button is where the feature is discovered). It is uncapped, unlike the
+`MAX_RECENT_NOTES` recents list below it — these are the notes the user picked
+out by hand. Each row is a full note row, so swipe, right-click and drag behave
+exactly as they do in the list below.
+
+By default the section flattens the folder hierarchy away — a favorite is a
+shortcut, and where it is filed is precisely what the section sets aside. The
+`favoritesShowFolders` appearance setting (default **off**, Settings →
+Appearance → Sidebar) reproduces it instead: `groupFavoritesByFolder`
+(`src/domain/note.ts`) buckets the starred notes under the folders that hold at
+least one of them — sorted by the active `noteSortKey`, with the ungrouped run
+last — and each bucket is headed by `FolderLabelRow`
+(`src/ui/SideMenuRows.tsx`), a caption with no behaviour behind it. It is
+deliberately not a `FolderRow`: there is nothing to expand (the run below it is
+already every starred note in the folder), nothing to drop onto, and no rename /
+delete — the Notes section stays the one place a folder is managed. A note
+pointing at a folder the registry no longer carries counts as ungrouped, the
+same way the rest of the drawer treats a stale link.
+
+The **Star-struck** achievement (`starStruck`) derives from the first note in
+the document gaining the flag.
 
 ### Delete
 
@@ -2310,7 +2361,8 @@ edge-swipe still belongs to the side menu's gestures, not to history.
 
 `SideMenu` (`src/ui/SideMenu.tsx`) — the navigation surface: a drawer over a
 dimmed backdrop on phones, an always-docked panel on tablets+. It holds the
-namespace switcher, the recent-notes list (with swipe-to-remove rows), a
+namespace switcher, the [Favorites](#favorites) section, the recent-notes list
+(with swipe-to-remove rows), a
 bordered [button island](#folders-in-the-side-menu) (New note / New folder /
 Show all / Archive over Undo / Redo / Search / the sync glyph) pinned to the foot
 of the list, and a
@@ -2330,7 +2382,8 @@ switched-to namespace's first load is still in flight with nothing seeded
 (`loading` — see [namespace loading](#namespaces)), so the drawer never reads as
 "No notes yet." for the seconds a folder/cloud fetch takes. The drawer's
 presentational leaf components — the `SectionHeader` section label, the generic
-`NavItem` row, the `FolderRow` / `FolderEditRow` folder rows, and the
+`NavItem` row, the `FolderRow` / `FolderEditRow` folder rows, the
+`FolderLabelRow` caption the [Favorites](#favorites) section groups by, and the
 `SwipeToRemove` note-row swipe wrapper — are extracted to a sibling
 `src/ui/SideMenuRows.tsx`: each takes everything via props and touches none of
 the container's drag / folder-expand / namespace state, so the `SideMenu` file

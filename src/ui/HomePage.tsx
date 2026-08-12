@@ -271,6 +271,14 @@ export function HomePage() {
               move it there with everything in it.
             </li>
             <li>
+              Mark the notes you keep coming back to as <em>favorites</em> — the
+              star in a note's header lifts it into a Favorites section at the
+              top of the side menu, so it is one tap away wherever it is filed.
+              The note itself does not move; Favorites lists them flat by
+              default, and a setting can reproduce their folder structure there
+              instead.
+            </li>
+            <li>
               <em>Search across every note</em> from the magnifier on the side
               menu — it matches both titles and body text, is forgiving by
               default (a rough abbreviation still finds the note), and also

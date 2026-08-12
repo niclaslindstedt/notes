@@ -37,6 +37,7 @@ import {
   setEditorPosition,
 } from "./editor-position.ts";
 import { ExportButton } from "./export/ExportButton.tsx";
+import { FavoriteButton } from "./FavoriteButton.tsx";
 import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { ArrowLeftIcon, SpinnerIcon } from "./icons.tsx";
@@ -85,6 +86,7 @@ export function Editor({
   onChange,
   onTitleChange,
   onTitleSettle,
+  onToggleFavorite,
   undoScrollSeq = 0,
   uploading = false,
   loading = false,
@@ -101,6 +103,8 @@ export function Editor({
   onChange: (body: string) => void;
   onTitleChange: (title: string) => void;
   onTitleSettle: () => void;
+  /** Star / unstar the note — the header's leading star button. */
+  onToggleFavorite: () => void;
   /** Ticks when undo / redo swaps the body — cues the editor to scroll the
    *  reverted / re-applied region back into view. */
   undoScrollSeq?: number;
@@ -121,8 +125,8 @@ export function Editor({
   const titleFirst = useRef(isBlank(note)).current;
   const bodyRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
-  // The header's action cluster (find, formatting, cut, copy), which
-  // the body hands focus on to — see `firstAction`.
+  // The header's action cluster (favorite, formatting, cut, export, find),
+  // which the body hands focus on to — see `firstAction`.
   const actionsRef = useRef<HTMLDivElement>(null);
   // Handle on the live-preview editor so the title can hand focus down into the
   // body even when no line is active yet (the body has no textarea until then).
@@ -226,7 +230,8 @@ export function Editor({
   }
 
   // The editor's tab order is spelled out by hand as back → title → body →
-  // find / formatting / copy, because that's the order you work in: name
+  // favorite / formatting / cut / export / find, because that's the order you
+  // work in: name
   // the note, write it, and only then reach for the toolbar. Document order
   // can't say that — the header (and its buttons) precede the body — so the
   // two editing surfaces are kept out of the browser's sequential order
@@ -299,7 +304,14 @@ export function Editor({
           onKeyDown={onActionsKeyDown}
           className="flex shrink-0 items-center gap-2"
         >
-          <NoteFindButton open={findOpen} onToggle={toggleFind} />
+          {/* The star leads the cluster — it says something about the note
+              itself, so it sits closest to the title — and Find is pinned to
+              the far right, past the actions that operate on the note, because
+              it opens a bar rather than changing anything. */}
+          <FavoriteButton
+            favorite={note.favorite === true}
+            onToggle={onToggleFavorite}
+          />
           <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
           {!loading && <CutButton onCut={runCut} />}
           <ExportButton
@@ -307,6 +319,7 @@ export function Editor({
             copyScope={editor.copyScope}
             transforms={transforms}
           />
+          <NoteFindButton open={findOpen} onToggle={toggleFind} />
         </div>
       </header>
 

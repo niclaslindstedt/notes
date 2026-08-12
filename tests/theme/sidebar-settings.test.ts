@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_FAVORITES_SHOW_FOLDERS,
   DEFAULT_FOLDER_PLACEMENT,
   DEFAULT_NOTE_SORT_KEY,
   isFolderPlacement,
@@ -27,6 +28,10 @@ describe("sidebar layout helpers", () => {
     expect(DEFAULT_FOLDER_PLACEMENT).toBe("top");
     expect(DEFAULT_NOTE_SORT_KEY).toBe("modified");
   });
+
+  it("defaults the Favorites section to a flat list", () => {
+    expect(DEFAULT_FAVORITES_SHOW_FOLDERS).toBe(false);
+  });
 });
 
 describe("appearance coercion of sidebar settings", () => {
@@ -34,6 +39,9 @@ describe("appearance coercion of sidebar settings", () => {
     replaceAppearance({ theme: "light" });
     expect(getAppearance().folderPlacement).toBe(DEFAULT_FOLDER_PLACEMENT);
     expect(getAppearance().noteSortKey).toBe(DEFAULT_NOTE_SORT_KEY);
+    expect(getAppearance().favoritesShowFolders).toBe(
+      DEFAULT_FAVORITES_SHOW_FOLDERS,
+    );
   });
 
   it("keeps valid values and repairs invalid ones", () => {
@@ -43,5 +51,14 @@ describe("appearance coercion of sidebar settings", () => {
     replaceAppearance({ folderPlacement: "sideways", noteSortKey: "size" });
     expect(getAppearance().folderPlacement).toBe(DEFAULT_FOLDER_PLACEMENT);
     expect(getAppearance().noteSortKey).toBe(DEFAULT_NOTE_SORT_KEY);
+  });
+
+  it("keeps a stored favorites-folders flag and repairs a junk one", () => {
+    replaceAppearance({ favoritesShowFolders: true });
+    expect(getAppearance().favoritesShowFolders).toBe(true);
+    replaceAppearance({ favoritesShowFolders: "yes" });
+    expect(getAppearance().favoritesShowFolders).toBe(
+      DEFAULT_FAVORITES_SHOW_FOLDERS,
+    );
   });
 });

@@ -296,6 +296,34 @@ export function FolderRow({
   );
 }
 
+// A folder caption with no behaviour behind it: the Favorites section's
+// grouping header when the folder structure is switched on. Deliberately not a
+// `FolderRow` — Favorites is a read-only shortcut list, so there is nothing to
+// expand (the run below it is already every starred note in the folder),
+// nothing to drop onto, and no rename / delete (those live on the real folder
+// row in the Notes section, which stays the one place a folder is managed).
+export function FolderLabelRow({
+  name,
+  count,
+}: {
+  name: string;
+  count: number;
+}) {
+  return (
+    <div className="flex w-full min-w-0 items-center gap-2 py-[var(--density-row-py)] pr-2 pl-3 text-sm text-fg">
+      <span className="text-muted">
+        <FolderOpenIcon className="h-5 w-5" />
+      </span>
+      <span className="flex-1 truncate">{name}</span>
+      {count > 0 && (
+        <span className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-xs text-muted tabular-nums">
+          {count}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // The inline folder name editor, used both for creating a folder (empty) and
 // renaming one (seeded with its name). Committing on Enter or blur with a
 // non-empty trimmed name; an empty name (or Escape) cancels — which is what

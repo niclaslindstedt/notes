@@ -270,6 +270,9 @@ const settings = {
     listLayoutHint:
       "Rows is a compact one-line list; cards are taller, showing more of each note before fading out; list is a bare file-explorer listing of titles only.",
     sidebar: "Sidebar",
+    favoritesFolders: "Folders in Favorites",
+    favoritesFoldersHint:
+      "Group the Favorites section by the folders its notes are filed in. Off, it lists every favorite flat.",
     folderPlacement: "Folders",
     folderPlacementTop: "On top",
     folderPlacementMixed: "Mixed in",

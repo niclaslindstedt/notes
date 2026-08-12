@@ -227,6 +227,7 @@ export function App() {
     remove,
     archive,
     restore,
+    toggleFavorite,
     moveNote,
     createFolder,
     renameFolder,
@@ -716,6 +717,7 @@ export function App() {
                       onChange={(body) => update(editing.id, body)}
                       onTitleChange={(title) => retitle(editing.id, title)}
                       onTitleSettle={sync.releaseSaves}
+                      onToggleFavorite={() => toggleFavorite(editing.id)}
                       undoScrollSeq={undoScrollSeq}
                       uploading={uploadingIds.has(editing.id)}
                       loading={editingDeferred}

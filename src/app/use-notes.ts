@@ -20,6 +20,7 @@ import {
   noteTitle,
   retitleNote,
   setArchived,
+  setFavorite,
   setNoteFolder,
   sortByUpdated,
   sortFoldersByCreated,
@@ -68,6 +69,8 @@ export type NotesStore = {
   archive: (id: string) => void;
   /** Bring an archived note back into the overview. */
   restore: (id: string) => void;
+  /** Star / unstar a note — the side menu's Favorites section lists the starred. */
+  toggleFavorite: (id: string) => void;
   /** Move a note into `folderId`, or out of any folder when `null`. */
   moveNote: (id: string, folderId: string | null) => void;
   /** Create a folder and return its id. */
@@ -453,6 +456,29 @@ export function useNotes(
     [commit, withBody],
   );
 
+  // Star / unstar a note. Structural like archiving — it changes where the note
+  // shows up, not what it says — so it records on the shared timeline and, on
+  // the encrypted backends, promotes a deferred note first so the flag reaches
+  // its `.enc` file.
+  const toggleFavorite = useCallback(
+    (id: string): void => {
+      const target = docRef.current.notes.find((n) => n.id === id);
+      if (!target) return;
+      const next = !target.favorite;
+      const title = noteTitle(target);
+      withBody(id, () =>
+        commit(
+          (prev) => prev.map((n) => (n.id === id ? setFavorite(n, next) : n)),
+          next
+            ? `Favorited note “${title}”`
+            : `Removed note “${title}” from favorites`,
+          DOC_SCOPE,
+        ),
+      );
+    },
+    [commit, withBody],
+  );
+
   // Move a note into a folder (or out of every folder when `folderId` is null).
   // Not coalesced with edits — a move is its own undo step.
   const moveNote = useCallback(
@@ -602,6 +628,7 @@ export function useNotes(
     remove,
     archive,
     restore,
+    toggleFavorite,
     moveNote,
     createFolder,
     renameFolder,

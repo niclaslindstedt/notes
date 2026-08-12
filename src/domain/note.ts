@@ -38,6 +38,12 @@ export type Note = {
   // lists them and offers a restore. Absent on an active note rather than
   // written as `false`, so an older document needs no migration.
   archived?: boolean;
+  // Starred from the editor header, which lifts the note into the side menu's
+  // **Favorites** section so it stays one tap away wherever it is filed.
+  // Purely a pointer — the note keeps its folder and its place in the ordinary
+  // list. Absent on an unstarred note rather than written as `false`, so an
+  // older document needs no migration.
+  favorite?: boolean;
   // Images the user pasted or dropped into the note. Each rides in memory as a
   // `data:` URL the editor renders; on the file backends the storage layer
   // externalises it to a real image file under `attachments/<note-name>/` (see
@@ -169,6 +175,28 @@ export function notesInFolder(
 // than jumping to the top.
 export function setArchived(note: Note, archived: boolean): Note {
   return { ...note, archived };
+}
+
+// Return a copy of `note` starred (lifted into the side menu's Favorites
+// section) or unstarred. `updatedAt` is left untouched: marking a favorite is
+// an organisational change like archiving or filing, so the note keeps its
+// place in the most-recently-edited ordering rather than jumping to the top.
+// The flag is dropped rather than written as `false` when clearing it, so an
+// unstarred note round-trips through storage as minimally as one that was
+// never starred.
+export function setFavorite(note: Note, favorite: boolean): Note {
+  if (favorite) return { ...note, favorite: true };
+  const next: Note = { ...note };
+  delete next.favorite;
+  return next;
+}
+
+// The notes the Favorites section lists: everything starred that isn't
+// archived. An archived note is out of sight by definition, so it drops out of
+// Favorites too rather than keeping a row in a section about what's at hand —
+// restoring it brings the star back with it.
+export function favoriteNotes(notes: readonly Note[]): Note[] {
+  return notes.filter((n) => n.favorite && !n.archived);
 }
 
 /** The notes shown in the overview — everything not archived. */
@@ -348,6 +376,48 @@ export function mixTopLevel(
     return bm - am;
   });
   return items;
+}
+
+// One run of the side menu's Favorites section when it is showing the folder
+// structure: a folder and the starred notes filed in it, or `folder: null` for
+// the starred notes that sit at the top level.
+export type FavoriteGroup = { folder: Folder | null; notes: Note[] };
+
+// Group starred notes under the folders they're filed in, for the Favorites
+// section's opt-in folder view. Only folders that actually hold a favorite get
+// a run — Favorites shows what you starred, never an empty folder — and the
+// ungrouped run comes last so the hierarchy reads top-down. A note pointing at
+// a folder the registry no longer has counts as ungrouped, the same way the
+// rest of the side menu treats a stale link. Folders sort by `key` against the
+// starred notes alone, so "last modified" means the newest *favorite* in the
+// folder rather than the newest note.
+export function groupFavoritesByFolder(
+  favorites: readonly Note[],
+  folders: readonly Folder[],
+  key: NoteSortKey,
+): FavoriteGroup[] {
+  const withFavorites = folders.filter((f) =>
+    favorites.some((n) => n.folderId === f.id),
+  );
+  const groups: FavoriteGroup[] = sortFoldersBy(
+    withFavorites,
+    favorites,
+    key,
+  ).map((folder) => ({
+    folder,
+    notes: sortNotesBy(
+      favorites.filter((n) => n.folderId === folder.id),
+      key,
+    ),
+  }));
+  const folderIds = new Set(withFavorites.map((f) => f.id));
+  const loose = favorites.filter(
+    (n) => !n.folderId || !folderIds.has(n.folderId),
+  );
+  if (loose.length > 0) {
+    groups.push({ folder: null, notes: sortNotesBy(loose, key) });
+  }
+  return groups;
 }
 
 // How a freshly created note is named. `none` leaves the title empty (the user

@@ -42,6 +42,7 @@ import {
   DEFAULT_CUSTOM_THEME,
   DEFAULT_EDITOR_SETTINGS,
   DEFAULT_PDF_SETTINGS,
+  DEFAULT_FAVORITES_SHOW_FOLDERS,
   DEFAULT_FOLDER_PLACEMENT,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SCALE,
@@ -99,6 +100,10 @@ export type Appearance = {
   // What the side menu sorts notes (and, under `mixed`, folders) by — most
   // recently modified, or alphabetically by name.
   noteSortKey: NoteSortKey;
+  // Whether the side menu's **Favorites** section reproduces the folders the
+  // starred notes are filed in. Off by default: Favorites is a shortcut list,
+  // so it flattens the hierarchy away and lists the notes themselves.
+  favoritesShowFolders: boolean;
   // Note-writing surface preferences (margins, wrap, live Markdown).
   editor: EditorSettings;
   // The **Transform** rules: regexes that rewrite what a note body shows —
@@ -136,6 +141,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   listLayout: DEFAULT_LIST_LAYOUT,
   folderPlacement: DEFAULT_FOLDER_PLACEMENT,
   noteSortKey: DEFAULT_NOTE_SORT_KEY,
+  favoritesShowFolders: DEFAULT_FAVORITES_SHOW_FOLDERS,
   editor: DEFAULT_EDITOR_SETTINGS,
   transforms: [],
   pdf: DEFAULT_PDF_SETTINGS,
@@ -296,6 +302,10 @@ function coerce(raw: unknown): Appearance {
     noteSortKey: isNoteSortKey(raw.noteSortKey)
       ? raw.noteSortKey
       : DEFAULT_NOTE_SORT_KEY,
+    favoritesShowFolders:
+      typeof raw.favoritesShowFolders === "boolean"
+        ? raw.favoritesShowFolders
+        : DEFAULT_FAVORITES_SHOW_FOLDERS,
     editor: {
       margin: isEditorMargin(editor.margin)
         ? editor.margin

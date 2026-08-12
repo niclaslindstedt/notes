@@ -35,6 +35,8 @@ const app: AppCatalog = {
     done: "Klar",
   },
   cut: "Klipp ut",
+  favorite: "Lägg till i favoriter",
+  unfavorite: "Ta bort från favoriter",
   format: {
     show: "Formatering",
     hide: "Dölj formatering",
