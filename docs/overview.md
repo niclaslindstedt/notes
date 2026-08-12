@@ -466,6 +466,52 @@ a [link](#rendered-line) opening, an [attachment](#attachments) opening), a
 ranged selection the press ended on (a drag-select, a double-click's word), and
 a keyboard-synthesised click (`detail === 0`) are all left alone.
 
+### Goal column
+
+`goalCol` + `dropGoalColumn` (`src/ui/MarkdownEditor.tsx`) — the column a run of
+Up / Down presses is aiming for, so walking past a short line and out the other
+side comes back to where the run started instead of clinging to column 0.
+
+Every text editor keeps one, browsers included — but the browser's is measured
+in pixels and is reset by any caret placed programmatically, and this editor
+re-places the caret on **every** line change: the line the caret lands on
+re-renders from formatted to raw ([active line](#markdown-editor)), so its DOM
+is thrown away and the browser's memory of the column with it. Sitting at the
+end of a long sentence and pressing Down therefore used to park the caret on the
+next short line and leave it there, column 0 for the rest of the note. The
+editor now remembers the column itself.
+
+It is held as a **source column**, not an x-position, because that is the
+coordinate this editor moves in — and because a line is drawn formatted until
+the caret enters it, so an x remembered over a heading (large text, `# ` hidden)
+would mean something else entirely once that heading opens raw.
+
+**Set** on the first `ArrowUp` / `ArrowDown` / `PageUp` / `PageDown` of a run,
+from the caret's current column, and kept for the whole run — including across
+lines too short to reach it, which is the entire point. When the caret crosses
+onto a new line, that line opens raw at `min(goal, line.length)`: a short line
+parks the caret at its end, and the next press picks the goal back up.
+
+**Dropped** by anything that says the user has chosen a new column: a key that
+isn't one of the four (typing, Backspace, Home / End, Left / Right), any edit
+through `commit` or the [styling toolbar](#styling-toolbar), a pointer press
+(on `pointerdown`, before the browser places its caret, so the
+`selectionchange` that follows reads the cleared goal), a ranged selection,
+focus leaving the surface, and a [live pull](#live-pull) swapping the body out.
+A bare modifier keypress drops nothing — `Shift` goes down *before* `Shift+Down`
+— but an arrow held with Alt / Ctrl / Cmd does, since those are jumps by
+paragraph or to the end of the document rather than a step onto the next line.
+
+The [plain-textarea fallback](#markdown-editor) needs none of this: it never
+re-places the caret, so the browser's own goal column survives there.
+
+One nuance the source-column model carries: on a soft-wrapped line the goal is
+the column counted from the line's start, not from the start of the visual row
+the caret sits in. Stepping down through a wrapped line and out of it therefore
+returns to the column the run began at — which is what a run *started* on a
+wrapped row would not predict, though a run started at the head of a line
+(overwhelmingly the common case) lands exactly where the eye expects.
+
 ### Selection mapping
 
 `src/ui/markdown-selection.ts` — translates a live-preview DOM selection back

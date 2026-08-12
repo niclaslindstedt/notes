@@ -910,6 +910,142 @@ describe("MarkdownEditor", () => {
     });
   });
 
+  // Walking Up / Down keeps aiming at the column the run started from, so a
+  // short line in the middle of the note parks the caret at its end without
+  // resetting the run. jsdom does no layout, so the browser's half of a
+  // vertical move is stood in for: the caret is dropped where a real Down that
+  // ran out of characters would leave it, then `selectionchange` is dispatched
+  // exactly as the browser would.
+  describe("the remembered column", () => {
+    const TOP = "abcdefghijklmnopqrst"; // 20 columns
+    const BOTTOM = "0123456789abcdefghij"; // 20 columns, the line we open on
+    const NOTE = `${TOP}\nbb\n${BOTTOM}`;
+
+    /** The caret's column within the active raw line. */
+    function caretColumn(): number {
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(rawLine()!, 0);
+      range.setEnd(sel.anchorNode!, sel.anchorOffset);
+      return range.toString().length;
+    }
+
+    /** The formatted (non-active) line element showing `text`. */
+    function formatted(text: string): HTMLElement {
+      return screen.getByText(text).closest("[data-line-index]") as HTMLElement;
+    }
+
+    // Drain the microtask the editor re-arms its `selectionchange` handler in
+    // after placing a caret itself. Without it the *next* dispatched
+    // `selectionchange` is swallowed as one of the editor's own.
+    async function settle() {
+      await act(async () => {});
+    }
+
+    // Put the caret where the browser would, and tell the editor about it.
+    async function moveCaret(lineEl: HTMLElement, offset: number) {
+      await settle();
+      caretIn(lineEl, offset);
+      await act(async () => {
+        document.dispatchEvent(new Event("selectionchange"));
+      });
+    }
+
+    /** A vertical key press that lands the caret at `offset` of `lineEl`. */
+    async function arrow(
+      key: "ArrowUp" | "ArrowDown",
+      lineEl: HTMLElement,
+      offset: number,
+    ) {
+      await settle();
+      fireEvent.keyDown(surface(), { key });
+      await moveCaret(lineEl, offset);
+    }
+
+    // Open the note with the caret parked at the end of its bottom line —
+    // column 20, the column every run below is aiming for.
+    async function openAtColumn20() {
+      renderEditor(NOTE);
+      await moveCaret(rawLine()!, 20);
+    }
+
+    it("comes back to the column a short line could not reach", async () => {
+      await openAtColumn20();
+
+      // Up onto the two-character line: the browser can only offer column 2.
+      await arrow("ArrowUp", formatted("bb"), 2);
+      expect(rawLine()?.getAttribute("data-line-index")).toBe("1");
+      expect(caretColumn()).toBe(2);
+
+      // Up again onto a line long enough: column 20 is still what we are after.
+      await arrow("ArrowUp", formatted(TOP), 2);
+      expect(rawLine()?.getAttribute("data-line-index")).toBe("0");
+      expect(caretColumn()).toBe(20);
+    });
+
+    it("takes the browser's column when nothing is being aimed at", async () => {
+      // The same two moves without the arrow keys: a bare selection change is a
+      // caret the user placed, and it is left exactly where it landed.
+      await openAtColumn20();
+
+      await moveCaret(formatted("bb"), 2);
+      await moveCaret(formatted(TOP), 2);
+      expect(rawLine()?.getAttribute("data-line-index")).toBe("0");
+      expect(caretColumn()).toBe(2);
+    });
+
+    it("forgets the column when the caret is moved sideways", async () => {
+      await openAtColumn20();
+      await arrow("ArrowUp", formatted("bb"), 2);
+
+      // A horizontal key says the user picked this column deliberately.
+      fireEvent.keyDown(surface(), { key: "ArrowRight" });
+      await arrow("ArrowUp", formatted(TOP), 2);
+      expect(caretColumn()).toBe(2);
+    });
+
+    it("aims at the column typing left, not the one before it", async () => {
+      await openAtColumn20();
+      await arrow("ArrowUp", formatted("bb"), 2);
+
+      // "bb" becomes "bbx" with the caret at column 3, and that is the column
+      // the next run walks with — column 20 is history the moment an edit lands.
+      beforeInput("insertText", "x");
+      await arrow("ArrowUp", formatted(TOP), 2);
+      expect(caretColumn()).toBe(3);
+    });
+
+    it("forgets the column when a press lands the caret", async () => {
+      await openAtColumn20();
+      await arrow("ArrowUp", formatted("bb"), 2);
+
+      fireEvent.pointerDown(surface(), { pointerType: "mouse" });
+      await arrow("ArrowUp", formatted(TOP), 2);
+      expect(caretColumn()).toBe(2);
+    });
+
+    it("keeps aiming at the column across a bare modifier press", async () => {
+      // Shift goes down before Shift+Down; it must not wipe the run.
+      await openAtColumn20();
+      await arrow("ArrowUp", formatted("bb"), 2);
+
+      fireEvent.keyDown(surface(), { key: "Shift", shiftKey: true });
+      await arrow("ArrowUp", formatted(TOP), 2);
+      expect(caretColumn()).toBe(20);
+    });
+
+    it("leaves a modified arrow to land where it lands", async () => {
+      // Cmd/Alt+Up jumps to the start of the document or the paragraph rather
+      // than stepping onto the next line, so it aims at no remembered column.
+      await openAtColumn20();
+
+      fireEvent.keyDown(surface(), { key: "ArrowUp", metaKey: true });
+      await moveCaret(formatted("bb"), 2);
+      await arrow("ArrowUp", formatted(TOP), 2);
+      expect(caretColumn()).toBe(2);
+    });
+  });
+
   describe("tab order", () => {
     it("reports Tab up instead of indenting, and stays out of the tab order", () => {
       // The host places the editor between the title and the header actions —

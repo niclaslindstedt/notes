@@ -227,6 +227,17 @@ const log = createLogger("editor");
 // its left padding, and the number pushes itself back out of the text by it.
 const GUTTER_GAP = "1rem";
 
+// The keys that walk the caret from line to line, and so aim at the remembered
+// goal column (see `goalCol`). Only unmodified: Alt / Ctrl / Cmd turn the same
+// arrows into by-paragraph and to-document-end jumps, which land where they
+// land rather than at a column.
+const VERTICAL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown"]);
+
+// Pressing a modifier on its own is not the user choosing a new column, so it
+// leaves the goal column standing — Shift is held *before* Shift+Down, and
+// releasing Cmd after a shortcut must not wipe the run that follows.
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock"]);
+
 /** What the editor exposes to its parent: a way to start editing from outside. */
 export type MarkdownEditorHandle = {
   /** Place the caret at the end of the note and start editing there. */
@@ -379,6 +390,29 @@ export function MarkdownEditor({
   // the session position store — restored the next time this note is opened.
   const lastCaret = useRef<SourcePoint | null>(savedCaret);
   const lastScrollTop = useRef<number>(saved?.scrollTop ?? 0);
+
+  // The column a vertical run of caret moves is aiming for — the goal column
+  // every text editor keeps, so walking Down past a short line and out the other
+  // side returns to the column the run started from instead of clinging to the
+  // short line's end. Browsers keep one of their own, but it is measured in
+  // pixels and is reset by every caret placed programmatically — and this editor
+  // re-places the caret on *every* line change, because the line the caret lands
+  // on re-renders from formatted to raw and its DOM (with the browser's memory
+  // of it) is thrown away. So the editor has to remember the column itself.
+  //
+  // Held as a source column rather than an x-position, because that is the
+  // coordinate this editor moves in, and because a line is drawn formatted until
+  // the caret enters it: an x remembered over a heading (large text, `# `
+  // hidden) would mean something else entirely once that heading opens raw.
+  //
+  // Set on the first Up / Down / PageUp / PageDown of a run and kept for the
+  // whole of it — including across lines too short to reach it, which is the
+  // entire point. Dropped by anything that says the user picked a new column: a
+  // horizontal key, typing, a press, a selection, leaving the surface.
+  const goalCol = useRef<number | null>(null);
+  function dropGoalColumn() {
+    goalCol.current = null;
+  }
   // Guards so a caret we place programmatically doesn't re-enter the
   // `selectionchange` handler, and so IME composition isn't disturbed.
   const settingSel = useRef(false);
@@ -443,6 +477,9 @@ export function MarkdownEditor({
   // `remount` forces that fresh node even within one line, for the one caller
   // whose line the browser has mutated behind React's back (see `activate`).
   function commit(nextLines: string[], caret: SourcePoint, remount = false) {
+    // An edit chooses where the caret ends up, so the column a vertical run was
+    // aiming for is history the moment the source changes.
+    dropGoalColumn();
     const next = nextLines.join("\n");
     setValue(next);
     onChange(next);
@@ -534,6 +571,9 @@ export function MarkdownEditor({
     // pull must not steal focus into the body. A locked note never has one to
     // restore.
     pendingCaret.current = editing && !lockedRef.current ? 0 : null;
+    // Another writer's text just landed under the caret; the column a vertical
+    // run was aiming for describes a note that no longer exists.
+    goalCol.current = null;
   }, [body]);
 
   // An undo / redo just swapped the body in. Diff the incoming `body` against
@@ -1041,6 +1081,9 @@ export function MarkdownEditor({
     const cur = activeRef.current.index;
 
     if (!sel.isCollapsed) {
+      // A selection is drawn between two columns the user chose, so whatever a
+      // vertical run was aiming for before it is gone.
+      dropGoalColumn();
       // Both ends have to be in here for the source mapping to work — a drag
       // that ran out of the surface is left to the browser (see
       // `selectionSource`), so it isn't offered the header's actions either.
@@ -1077,8 +1120,17 @@ export function MarkdownEditor({
       markCaret(pt.line, pt.col, pt.col);
     }
     if (L === cur || locked) return;
-    // The caret entered a different line: make that line active (raw) at the col.
-    activate(L, pt?.col ?? 0);
+    // The caret entered a different line: make that line active (raw) at the
+    // column the browser mapped it to — or, mid vertical run, at the column the
+    // run is aiming for, clamped to what this line actually has. Clamping and
+    // *not* forgetting is the whole behaviour: a short line in the middle of the
+    // run parks the caret at its end, and the next press picks the goal back up.
+    const goal = goalCol.current;
+    const col =
+      goal === null
+        ? (pt?.col ?? 0)
+        : Math.min(goal, (linesRef.current[L] ?? "").length);
+    activate(L, col);
   };
 
   // --- Clipboard: copy/cut verbatim source, paste through the engine --------
@@ -1258,6 +1310,15 @@ export function MarkdownEditor({
     // Read before anything else consumes the press: the `beforeinput` this
     // keydown is about to produce asks for it (see `softBreak`).
     softBreak.current = e.key === "Enter" && e.shiftKey;
+    // Open (or carry on) a vertical run: the first Up / Down of the run pins the
+    // column it is aiming for, and every other key means the user has picked a
+    // new one (see `goalCol`). Bare modifiers say nothing either way.
+    if (VERTICAL_KEYS.has(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (goalCol.current === null)
+        goalCol.current = lastCaret.current?.col ?? null;
+    } else if (!MODIFIER_KEYS.has(e.key)) {
+      dropGoalColumn();
+    }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
       e.preventDefault();
       selectAllLines();
@@ -1300,6 +1361,7 @@ export function MarkdownEditor({
     // one — a click in the empty space below the text, the title field handing
     // focus down — simply do nothing rather than focusing an inert surface.
     if (locked) return;
+    dropGoalColumn();
     rootRef.current?.focus();
     const cur = linesRef.current;
     const last = cur.length - 1;
@@ -1427,6 +1489,9 @@ export function MarkdownEditor({
   // spanning lines settles for a caret at its end.
   function format(action: FormatAction) {
     if (locked) return;
+    // Marks up the source and hands the caret (or the span) back itself, so it
+    // picks the column the same way an edit through `commit` does.
+    dropGoalColumn();
     const pts = selectionPoints();
     const at = lastCaret.current ?? { line: 0, col: 0 };
     const sel = pts
@@ -1731,6 +1796,10 @@ export function MarkdownEditor({
           // Remember what pressed, for the caret placement the click brings.
           touchPress.current =
             e.pointerType === "touch" || e.pointerType === "pen";
+          // A press picks a column outright, so it ends any vertical run — and
+          // it does so here, before the browser places its caret, so the
+          // `selectionchange` that follows reads the cleared goal.
+          dropGoalColumn();
         }}
         onMouseDown={(e) => {
           // A click in the empty space below the text lands the caret at the end
@@ -1816,6 +1885,9 @@ export function MarkdownEditor({
               setActive((a) =>
                 a.index === null ? a : { index: null, key: a.key + 1 },
               );
+              // Focus really left: a vertical run cannot span a trip through the
+              // find bar or the title, so its goal column goes with it.
+              dropGoalColumn();
               dropSelectionOnBlur(root);
             });
           }}
