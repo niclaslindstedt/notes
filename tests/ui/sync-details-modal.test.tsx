@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/preact";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { clearLogs, createLogger, getLogs } from "../../src/dev/logger.ts";
 import { SyncDetailsModal } from "../../src/ui/SyncDetailsModal.tsx";
 import type { EncryptionConversionState } from "../../src/ui/settings/EncryptionLogModal.tsx";
 
@@ -14,6 +15,23 @@ const IDLE_CONVERSION: EncryptionConversionState = {
   error: null,
   log: [],
 };
+
+// The sync log reads the shared in-memory buffer, so each test starts from an
+// empty one and copies through a stubbed clipboard.
+const writeText = vi.fn<(text: string) => Promise<void>>(() =>
+  Promise.resolve(),
+);
+
+Object.defineProperty(navigator, "clipboard", {
+  value: { writeText },
+  configurable: true,
+});
+
+afterEach(() => {
+  clearLogs();
+  writeText.mockClear();
+  vi.restoreAllMocks();
+});
 
 function renderModal(props: Partial<Parameters<typeof SyncDetailsModal>[0]>) {
   render(
@@ -86,6 +104,62 @@ describe("SyncDetailsModal", () => {
     });
     expect(screen.getByText("Encrypting attachment diagram.png")).toBeTruthy();
     expect(screen.getByText("3 of 8")).toBeTruthy();
+  });
+
+  it("offers the copy ranges, each labelled with how much it would copy", () => {
+    const log = createLogger("notes-sync");
+    log.info("save start");
+    log.info("save ok");
+    renderModal({});
+
+    fireEvent.click(screen.getByRole("button", { name: /view sync log/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Copy/ }));
+
+    const rows = screen.getAllByRole("menuitem");
+    expect(rows.map((r) => r.textContent)).toEqual([
+      "Last 10 minutes2 lines",
+      "Last 30 minutes2 lines",
+      "Last hour2 lines",
+      "Everything2 lines",
+    ]);
+  });
+
+  it("copies the picked range oldest-first", async () => {
+    const log = createLogger("notes-sync");
+    log.info("save start");
+    log.info("save ok");
+    renderModal({});
+
+    fireEvent.click(screen.getByRole("button", { name: /view sync log/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Copy/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Last hour/ }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    const text = writeText.mock.calls[0]![0] as string;
+    const lines = text.split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("[notes-sync] INFO save start");
+    expect(lines[1]).toContain("[notes-sync] INFO save ok");
+    // The menu closes on the press and the trigger confirms in place.
+    expect(screen.queryByRole("menuitem")).toBeNull();
+    expect(screen.getByRole("button", { name: /Copied/ })).toBeTruthy();
+  });
+
+  it("disables a range no log line falls into", () => {
+    const log = createLogger("notes-sync");
+    log.info("save ok");
+    // Pretend the one entry is two hours old: only "Everything" still reaches
+    // it, and an enabled row that copies nothing would be a lie.
+    const buffer = getLogs();
+    vi.spyOn(Date, "now").mockReturnValue(buffer[0]!.ts + 2 * 60 * 60_000);
+    renderModal({});
+
+    fireEvent.click(screen.getByRole("button", { name: /view sync log/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Copy/ }));
+
+    const rows = screen.getAllByRole("menuitem") as HTMLButtonElement[];
+    expect(rows.slice(0, 3).every((r) => r.disabled)).toBe(true);
+    expect(rows[3]!.disabled).toBe(false);
   });
 
   it("surfaces a stopped conversion's error", () => {

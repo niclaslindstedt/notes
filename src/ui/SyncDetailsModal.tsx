@@ -2,32 +2,43 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   type ReactElement,
   type ReactNode,
 } from "react";
 
-import { useT, type TFunction } from "../i18n/index.ts";
+import { unlock } from "../achievements/index.ts";
+import { useT, type MessageKey, type TFunction } from "../i18n/index.ts";
 import type { SaveStatus } from "../app/use-notes-sync.ts";
 import type { BackendId } from "../storage/backend-preference.ts";
-import {
-  getLogs,
-  subscribeToLogs,
-  type LogEntry,
-  type LogLevel,
-} from "../dev/logger.ts";
+import { getLogs, subscribeToLogs, type LogLevel } from "../dev/logger.ts";
 import { DROPBOX_APP_FOLDER, dropboxWebUrl } from "../storage/dropbox/index.ts";
 import {
   GDRIVE_APP_FOLDER_NAME,
   gdriveWebUrl,
 } from "../storage/gdrive/index.ts";
 import { namespaceNotesFolder } from "../storage/namespaces.ts";
+import { writeClipboard } from "./clipboard.ts";
+import { FloatingPanel } from "./FloatingPanel.tsx";
 import { Button } from "./form/Button.tsx";
+import type { FloatingPlacement } from "./hooks/useFloatingPosition.ts";
 import type { EncryptionConversionState } from "./settings/EncryptionLogModal.tsx";
 import {
+  entriesInRange,
+  formatLogTime,
+  formatSyncLog,
+  SYNC_LOG_RANGES,
+  SYNC_LOG_SCOPES,
+  type SyncLogRange,
+  type SyncLogRangeId,
+} from "./sync-log.ts";
+import {
+  CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   CloseIcon,
+  CopyIcon,
   CloudAlertIcon,
   CloudCheckIcon,
   CloudIcon,
@@ -96,26 +107,22 @@ type ProviderView = {
   url: string | null;
 };
 
-// The logger scopes that make up the cloud-sync story. The Sync log section
-// only surfaces these, so a reader sees the round-trip — auth, the per-note
-// save, retries, the offline mirror, the encryption conversion — without the
-// unrelated noise (seeding, tests) that also flows through the shared buffer.
-const SYNC_LOG_SCOPES: ReadonlySet<string> = new Set([
-  "notes-sync",
-  "dropbox",
-  "gdrive",
-  "folder",
-  "folder-handle",
-  "cache",
-  "oauth",
-  "migration",
-  "encrypt",
-  "storage",
-  "serialize",
-  "migrate",
-  "namespaces",
-  "backend-pref",
-]);
+// Where the Copy menu opens. Anchored right, under the button that sits at the
+// right edge of the log panel's header row.
+const COPY_MENU_PLACEMENT: FloatingPlacement = {
+  width: { kind: "min", minPx: 208 },
+  anchor: "right",
+  coordinateSpace: "viewport",
+};
+
+// Spelled out rather than composed from the range id, so `t()`'s key checking
+// still catches a missing string at compile time.
+const RANGE_LABEL_KEY: Record<SyncLogRangeId, MessageKey> = {
+  last10m: "sync.copyRange.last10m",
+  last30m: "sync.copyRange.last30m",
+  last1h: "sync.copyRange.last1h",
+  everything: "sync.copyRange.everything",
+};
 
 function providerView(backend: BackendId, namespace: string): ProviderView {
   const notesFolder = namespaceNotesFolder(namespace);
@@ -646,33 +653,58 @@ function SyncLogPanel({ t }: { t: TFunction }) {
   const [copyStatus, setCopyStatus] = useState<null | "copied" | "failed">(
     null,
   );
+  const [menuOpen, setMenuOpen] = useState(false);
+  // The clock the menu counts against, frozen when it opens: the row counts and
+  // the copy they trigger must describe the same "last 10 minutes", and a
+  // `Date.now()` re-read on every logger push would slide the counts under the
+  // reader's finger.
+  const [menuNow, setMenuNow] = useState(0);
+  const copyTimer = useRef<number | undefined>(undefined);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuLabelId = useId();
 
   useEffect(() => subscribeToLogs(() => setVersion((v) => v + 1)), []);
+  useEffect(() => () => window.clearTimeout(copyTimer.current), []);
 
   // `version` ticks on every logger push / clear, forcing a re-read of the
-  // ring buffer; the filter narrows it to the cloud-sync scopes.
+  // ring buffer; the filter narrows it to the cloud-sync scopes. Chronological,
+  // the order the buffer keeps and the order a copy is pasted in.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const all = useMemo(() => getLogs(), [version]);
-  // Newest first: the ring buffer is chronological, but the reason the modal is
-  // open is almost always "what just happened", so the latest line sits at the
-  // top of the scroll box instead of below a wall of history.
-  const entries = useMemo(
-    () => all.filter((e) => SYNC_LOG_SCOPES.has(e.scope)).reverse(),
+  const chronological = useMemo(
+    () => all.filter((e) => SYNC_LOG_SCOPES.has(e.scope)),
     [all],
   );
+  // Newest first on screen: the reason the modal is open is almost always "what
+  // just happened", so the latest line sits at the top of the scroll box
+  // instead of below a wall of history.
+  const entries = useMemo(
+    () => chronological.slice().reverse(),
+    [chronological],
+  );
 
-  async function handleCopy() {
-    try {
-      // The copied text stays chronological — it is pasted into bug reports,
-      // where a log reads oldest-first.
-      await navigator.clipboard.writeText(
-        entries.slice().reverse().map(formatLogLine).join("\n"),
-      );
-      setCopyStatus("copied");
-    } catch {
-      setCopyStatus("failed");
-    }
-    setTimeout(() => setCopyStatus(null), 2000);
+  // How many lines each range would copy, so the menu says what it will hand
+  // over before it hands it over — and an empty stretch is visibly empty rather
+  // than a button that silently copies nothing.
+  const rows = useMemo(
+    () =>
+      SYNC_LOG_RANGES.map((range) => ({
+        range,
+        count: entriesInRange(chronological, range, menuNow).length,
+      })),
+    [chronological, menuNow],
+  );
+
+  async function handleCopy(range: SyncLogRange) {
+    setMenuOpen(false);
+    // Counted against the same instant the row's count was rendered from, so
+    // what the menu promised is exactly what lands on the clipboard.
+    const slice = entriesInRange(chronological, range, menuNow);
+    const ok = slice.length > 0 && (await writeClipboard(formatSyncLog(slice)));
+    if (ok) unlock("logKeeper");
+    setCopyStatus(ok ? "copied" : "failed");
+    window.clearTimeout(copyTimer.current);
+    copyTimer.current = window.setTimeout(() => setCopyStatus(null), 2000);
   }
 
   if (entries.length === 0) {
@@ -687,16 +719,65 @@ function SyncLogPanel({ t }: { t: TFunction }) {
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-end">
         <button
+          ref={triggerRef}
           type="button"
-          onClick={handleCopy}
-          className="cursor-pointer rounded border border-line px-2 py-0.5 text-xs text-muted hover:border-accent hover:text-accent"
+          onClick={() => {
+            setMenuNow(Date.now());
+            setMenuOpen((v) => !v);
+          }}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          className={`inline-flex cursor-pointer items-center gap-1 rounded border px-2 py-0.5 text-xs ${
+            menuOpen
+              ? "border-accent text-accent"
+              : "border-line text-muted hover:border-accent hover:text-accent"
+          }`}
         >
+          {copyStatus === "copied" ? (
+            <CheckIcon className="h-3 w-3 shrink-0" />
+          ) : (
+            <CopyIcon className="h-3 w-3 shrink-0" />
+          )}
           {copyStatus === "copied"
             ? t("sync.copied")
             : copyStatus === "failed"
               ? t("sync.copyFailed")
               : t("sync.copyLog")}
+          <ChevronDownIcon className="h-3 w-3 shrink-0" />
         </button>
+        <FloatingPanel
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          triggerRef={triggerRef}
+          placement={COPY_MENU_PLACEMENT}
+          className="py-1"
+        >
+          <div role="menu" aria-labelledby={menuLabelId}>
+            <span
+              id={menuLabelId}
+              className="block px-3 pt-1 pb-1.5 text-[0.65rem] font-bold tracking-wide text-muted uppercase"
+            >
+              {t("sync.copyRange.heading")}
+            </span>
+            {rows.map(({ range, count }) => (
+              <button
+                key={range.id}
+                type="button"
+                role="menuitem"
+                disabled={count === 0}
+                onClick={() => void handleCopy(range)}
+                className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left text-sm text-fg transition-colors hover:bg-accent/15 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+              >
+                <span className="min-w-0 flex-1 truncate">
+                  {t(RANGE_LABEL_KEY[range.id])}
+                </span>
+                <span className="shrink-0 text-xs text-muted tabular-nums">
+                  {t("sync.copyRange.lines", { n: count })}
+                </span>
+              </button>
+            ))}
+          </div>
+        </FloatingPanel>
       </div>
       <ul className="flex max-h-44 flex-col overflow-y-auto rounded border border-line bg-surface-2 font-mono text-xs">
         {entries.map((entry, idx) => (
@@ -723,18 +804,6 @@ function SyncLogPanel({ t }: { t: TFunction }) {
       </ul>
     </div>
   );
-}
-
-function formatLogTime(ts: number): string {
-  const d = new Date(ts);
-  const h = String(d.getHours()).padStart(2, "0");
-  const m = String(d.getMinutes()).padStart(2, "0");
-  const s = String(d.getSeconds()).padStart(2, "0");
-  return `${h}:${m}:${s}`;
-}
-
-function formatLogLine(entry: LogEntry): string {
-  return `${formatLogTime(entry.ts)} [${entry.scope}] ${entry.level.toUpperCase()} ${entry.message}`;
 }
 
 function levelClass(level: LogLevel): string {

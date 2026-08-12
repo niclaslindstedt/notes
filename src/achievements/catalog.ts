@@ -64,6 +64,7 @@ import {
   RefreshGlyph,
   ReplaceGlyph,
   ScaleTextGlyph,
+  ScrollTextGlyph,
   SearchGlyph,
   ServerGlyph,
   ShieldGlyph,
@@ -855,6 +856,15 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     tier: "expert",
     glyph: CodeGlyph,
     learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "logKeeper",
+    tier: "expert",
+    glyph: ScrollTextGlyph,
+    learnMore: true,
+    // Fired by the sync-details modal's Copy menu on a successful write,
+    // whichever time range was picked.
     trigger: { kind: "manual" },
   },
   {

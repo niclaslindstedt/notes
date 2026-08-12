@@ -445,6 +445,12 @@ const achievements = {
       learnMore:
         "Settings → General → Developer mode reveals a Developer tab whose diagnostics — like capturing the in-app log across reloads — help track down a sync problem from the device it happens on.",
     },
+    logKeeper: {
+      name: "Log Keeper",
+      condition: "Copy a slice of the sync log.",
+      learnMore:
+        "The sync log in the cloud-sync dialog has a Copy button that asks how far back to reach — the last 10 minutes, 30 minutes, hour, or everything it still holds. Reproduce the problem, copy the minutes around it, and paste that into a bug report or an AI assistant without the rest of the session's history burying it.",
+    },
     holodeck: {
       name: "Holodeck",
       condition: "Load the sample data set.",

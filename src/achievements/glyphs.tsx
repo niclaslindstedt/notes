@@ -29,6 +29,7 @@ import {
   PaletteIcon,
   PlusIcon,
   RefreshIcon,
+  ScrollTextIcon,
   SearchIcon,
   UndoIcon,
 } from "../ui/icons.tsx";
@@ -528,6 +529,7 @@ export const RefreshGlyph: Glyph = RefreshIcon;
 export const PaletteGlyph: Glyph = PaletteIcon;
 export const CopyGlyph: Glyph = CopyIcon;
 export const SearchGlyph: Glyph = SearchIcon;
+export const ScrollTextGlyph: Glyph = ScrollTextIcon;
 export const FormatGlyph: Glyph = FormatIcon;
 export const LinkGlyph: Glyph = LinkFormatIcon;
 export const QuoteGlyph: Glyph = QuoteFormatIcon;

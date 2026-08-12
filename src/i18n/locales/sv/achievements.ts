@@ -445,6 +445,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Inställningar → Allmänt → Utvecklarläge visar en Utvecklare-flik vars diagnostik — som att spara den inbyggda loggen mellan omladdningar — hjälper dig spåra ett synkproblem från enheten där det inträffar.",
     },
+    logKeeper: {
+      name: "Loggförare",
+      condition: "Kopiera en del av synkningsloggen.",
+      learnMore:
+        "Synkningsloggen i synkdialogen har en Kopiera-knapp som frågar hur långt bakåt du vill nå — senaste 10 minuterna, 30 minuterna, timmen, eller allt som finns kvar. Återskapa problemet, kopiera minuterna omkring det och klistra in dem i en felrapport eller hos en AI-assistent utan att resten av sessionens historik dränker dem.",
+    },
     holodeck: {
       name: "Holodäck",
       condition: "Ladda exempeldatan.",

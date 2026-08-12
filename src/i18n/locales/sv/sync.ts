@@ -38,6 +38,14 @@ const sync: SyncCatalog = {
   copyLog: "Kopiera",
   copied: "Kopierat",
   copyFailed: "Kopiering misslyckades",
+  copyRange: {
+    heading: "Kopiera logg",
+    last10m: "Senaste 10 minuterna",
+    last30m: "Senaste 30 minuterna",
+    last1h: "Senaste timmen",
+    everything: "Allt",
+    lines: "{n} rader",
+  },
 
   offlineHeading: "Du är offline",
   offlineDetail:
