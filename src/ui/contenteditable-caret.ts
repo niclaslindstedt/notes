@@ -162,6 +162,92 @@ function domPointAt(
     : { node: lineEl, offset: 0 };
 }
 
+/** A soft-wrapped line's visual row, as the source columns it spans. */
+export type VisualRow = { start: number; end: number };
+
+// How far apart two characters' rects may sit and still count as the same
+// visual row. Sub-pixel layout jitter is the only difference expected within a
+// row; the row below is a whole line-height away.
+const ROW_EPSILON = 1;
+
+/**
+ * The **visual row** `col` sits in, as `[start, end)` source columns — the row
+ * a soft wrap drew, not the source line, which may be many screens tall.
+ *
+ * This is what lets a vertical caret move land where the eye expects on a
+ * wrapped line: a column is only meaningful relative to the row it is counted
+ * from, and stepping up into a line arrives on its *last* row (see the goal
+ * column in `MarkdownEditor.tsx`).
+ *
+ * Answers `{ start: 0, end: length }` — the whole line as a single row — when
+ * the line doesn't wrap, and equally when the engine reports no geometry for it
+ * (a headless test, a line not laid out yet). Callers then behave as they did
+ * before wrapping was considered at all, rather than acting on a wrong row.
+ */
+export function visualRowAt(lineEl: HTMLElement, col: number): VisualRow {
+  const len = (lineEl.textContent ?? "").length;
+  const whole = { start: 0, end: len };
+  if (len === 0) return whole;
+  const top = charTop(lineEl, Math.max(0, Math.min(col, len - 1)));
+  if (top === null) return whole;
+  const start = rowEdge(lineEl, len, top, true);
+  const last = rowEdge(lineEl, len, top, false);
+  if (start === null || last === null) return whole;
+  // `last` is the row's final *character*; the caret column past it is the
+  // row's end, which is where a goal column longer than the row settles.
+  return { start, end: last + 1 };
+}
+
+// The first (`first`) or last character index sharing `top`'s visual row.
+// `charTop` never decreases across a line — a character is on the same row as
+// the one before it or on a later one — so each edge is a binary search away,
+// which keeps this off the O(n) rect-per-character path a long line would make
+// expensive. Null the moment a measurement comes back without geometry: a
+// half-measured line is worse than treating it as un-wrapped.
+function rowEdge(
+  lineEl: HTMLElement,
+  len: number,
+  top: number,
+  first: boolean,
+): number | null {
+  let lo = 0;
+  let hi = len - 1;
+  let best: number | null = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1;
+    const t = charTop(lineEl, mid);
+    if (t === null) return null;
+    const onRow = first ? t >= top - ROW_EPSILON : t <= top + ROW_EPSILON;
+    if (onRow) {
+      best = mid;
+      if (first) hi = mid - 1;
+      else lo = mid + 1;
+    } else if (first) lo = mid + 1;
+    else hi = mid - 1;
+  }
+  return best;
+}
+
+// The top of the character at `index`, or null when the engine reports no
+// geometry for it. One character rather than a collapsed caret, for the reason
+// `firstCharRect` gives: a range with something in it is what every engine
+// measures, and a single character can only occupy one row.
+function charTop(lineEl: HTMLElement, index: number): number | null {
+  const a = domPointAt(lineEl, index);
+  const b = domPointAt(lineEl, index + 1);
+  const range = lineEl.ownerDocument.createRange();
+  try {
+    range.setStart(a.node, a.offset);
+    range.setEnd(b.node, b.offset);
+  } catch {
+    return null;
+  }
+  const rects = range.getClientRects?.();
+  const rect =
+    rects && rects.length > 0 ? rects[0]! : range.getBoundingClientRect?.();
+  return rect && rect.height > 0 ? rect.top : null;
+}
+
 /** Place a collapsed caret `col` characters into `lineEl`'s text. */
 export function placeCaret(lineEl: HTMLElement, col: number): void {
   placeRange(lineEl, col, col);
