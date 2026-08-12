@@ -6,6 +6,22 @@ import { Editor } from "../../src/ui/NoteEditor.tsx";
 import type { Note } from "../../src/domain/note.ts";
 import { DEFAULT_EDITOR_SETTINGS } from "../../src/theme/themes.ts";
 import { resetEditorPositions } from "../../src/ui/editor-position.ts";
+import { NavContext, type NavContextValue } from "../../src/ui/nav-context.ts";
+
+// The "Copied" toast the copy button raises reads the nav state to dock past a
+// pinned sidebar, so the editor needs a provider above it.
+const nav: NavContextValue = {
+  open: false,
+  toggle: vi.fn(),
+  close: vi.fn(),
+  setDragging: vi.fn(),
+  position: { side: "right", y: 0.5 },
+  setPosition: vi.fn(),
+  showMenuButton: true,
+  setShowMenuButton: vi.fn(),
+  showButton: true,
+  pinned: false,
+};
 
 afterEach(() => {
   cleanup();
@@ -40,18 +56,20 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
   const onToggleFavorite = vi.fn();
   const onAttach = vi.fn();
   render(
-    <Editor
-      note={note()}
-      editor={PLAIN}
-      onBack={onBack}
-      onChange={onChange}
-      onTitleChange={onTitleChange}
-      onTitleSettle={onTitleSettle}
-      onToggleFavorite={onToggleFavorite}
-      canAttach={false}
-      onAttach={onAttach}
-      {...props}
-    />,
+    <NavContext.Provider value={nav}>
+      <Editor
+        note={note()}
+        editor={PLAIN}
+        onBack={onBack}
+        onChange={onChange}
+        onTitleChange={onTitleChange}
+        onTitleSettle={onTitleSettle}
+        onToggleFavorite={onToggleFavorite}
+        canAttach={false}
+        onAttach={onAttach}
+        {...props}
+      />
+    </NavContext.Provider>,
   );
   return { onBack, onChange, onTitleChange, onTitleSettle, onToggleFavorite };
 }
@@ -537,5 +555,121 @@ describe("Editor (narrow header)", () => {
 
     expect(cluster().style.maxWidth).toBe("0px");
     expect(titleHidden()).toBe(false);
+  });
+});
+
+// Selecting text on a narrow screen unfolds the same cluster on its own,
+// carrying the three actions that operate on a selection — so the ⋯ is a
+// detour you don't have to take for the thing you just highlighted.
+describe("Editor (selection actions)", () => {
+  function stubNarrow(matches: boolean) {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((media: string) => ({
+        matches: media.includes("max-width") ? matches : false,
+        media,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      })),
+    );
+  }
+
+  // The box the buttons ride in — reached through whichever of them is out, so
+  // the helper works in both the selection set and the full one.
+  function cluster() {
+    return screen.getByRole("button", { name: "Cut" })
+      .parentElement as HTMLElement;
+  }
+
+  // Highlight part of the body. The plain textarea emits `select` for a real
+  // range, which is what the editor reports its selection from.
+  function selectBody(from: number, to: number) {
+    const body = screen.getByDisplayValue("the body") as HTMLTextAreaElement;
+    body.setSelectionRange(from, to);
+    fireEvent.select(body);
+    return body;
+  }
+
+  function stubClipboard(writeText: () => Promise<void>) {
+    const spy = vi.fn(writeText);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: spy },
+      configurable: true,
+    });
+    return spy;
+  }
+
+  afterEach(() => Reflect.deleteProperty(navigator, "clipboard"));
+
+  it("unfolds formatting, cut and copy when text is selected", () => {
+    stubNarrow(true);
+    renderEditor();
+    expect(cluster().style.maxWidth).toBe("0px");
+
+    selectBody(0, 3);
+
+    expect(cluster().style.maxWidth).toBe("9rem");
+    expect(cluster().dataset.cluster).toBe("open");
+    expect(screen.getByRole("button", { name: "Copy selection" })).toBeTruthy();
+    // Only the three that act on a selection: the star, the export menu and
+    // find stay behind the ⋯.
+    expect(screen.queryByRole("button", { name: "Add to favorites" })).toBe(
+      null,
+    );
+    expect(screen.queryByRole("button", { name: "Export" })).toBe(null);
+  });
+
+  it("folds away again when the selection collapses", () => {
+    stubNarrow(true);
+    renderEditor();
+    selectBody(0, 3);
+    expect(cluster().style.maxWidth).toBe("9rem");
+
+    selectBody(3, 3);
+
+    expect(cluster().style.maxWidth).toBe("0px");
+    expect(screen.queryByRole("button", { name: "Copy selection" })).toBe(null);
+  });
+
+  it("widens into the full row when the ⋯ is pressed over a selection", () => {
+    stubNarrow(true);
+    renderEditor();
+    selectBody(0, 3);
+
+    fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
+
+    expect(cluster().style.maxWidth).toBe("14rem");
+    expect(
+      screen.getByRole("button", { name: "Add to favorites" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Copy selection" })).toBe(null);
+  });
+
+  it("copies only the selected text", async () => {
+    const writeText = stubClipboard(() => Promise.resolve());
+    stubNarrow(true);
+    renderEditor();
+    selectBody(4, 8);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy selection" }));
+    await screen.findByRole("status");
+
+    expect(writeText).toHaveBeenCalledWith("body");
+  });
+
+  it("leaves a wide header's row alone — every action is already in it", () => {
+    stubNarrow(false);
+    renderEditor();
+    selectBody(0, 3);
+
+    expect(cluster().style.maxWidth).toBe("");
+    expect(
+      screen.getByRole("button", { name: "Add to favorites" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Copy selection" })).toBe(null);
   });
 });

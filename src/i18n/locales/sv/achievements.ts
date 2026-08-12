@@ -120,6 +120,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "På en telefon rymmer redigerarens sidhuvud antingen anteckningens namn eller dess fem knappar, inte båda — så knapparna viks ihop till en enda ⋯-knapp till höger. Ett tryck fäller ut dem över titeln; ett tryck till, eller en beröring i själva anteckningen, viker ihop dem igen och lämnar tillbaka titeln. Markören står kvar hela vägen, så klipp- och formateringsknapparna arbetar fortfarande på raden du skrev på.",
     },
+    sleightOfHand: {
+      name: "Snabb i fingrarna",
+      condition: "Markera text i en anteckning på en smal skärm.",
+      learnMore:
+        "Markera text på en telefon så glider de tre knappar som arbetar på en markering — formatering, klipp ut och kopiera — ut ur ⋯ av sig själva, så att det du just bad om ligger ett tryck bort i stället för två. Kopiera tar den markerade texten och inget annat (att kopiera hela anteckningen ligger kvar i exportmenyn), och klipp ut tar den ur anteckningen och lägger den på urklipp. Trycker du på ⋯ breddas raden helt enkelt till hela uppsättningen knappar, precis som förut; släpper du markeringen viks knapparna ihop och lämnar tillbaka anteckningens namn.",
+    },
     pinpoint: {
       name: "Pricksäker",
       condition: "Hitta text inuti anteckningen du har öppen.",

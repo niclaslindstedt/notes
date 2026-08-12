@@ -177,6 +177,13 @@ type Props = {
    */
   onLineFormat?: (line: LineFormat | null) => void;
   /**
+   * Called as a selection over this surface appears and disappears, so the
+   * header can put the actions that operate on a selection within reach (see
+   * the selection actions in `NoteEditor.tsx`). Fires only on a change, never
+   * per caret move.
+   */
+  onSelectionChange?: (selected: boolean) => void;
+  /**
    * Find-bar hits to paint over the note, in source coordinates. Empty (the
    * default) while the bar is closed, so nothing is highlighted and no extra
    * nodes are rendered.
@@ -221,6 +228,9 @@ export type MarkdownEditorHandle = {
   /** Cut to the clipboard: the selection, the text after a mid-line caret, or
    *  the whole line. */
   cut: () => void;
+  /** The verbatim source the current selection covers, or null when there is
+   *  no selection in this editor. */
+  selection: () => string | null;
 };
 
 // The active line's identity: which source line is being edited as raw text, and
@@ -250,6 +260,7 @@ export function MarkdownEditor({
   noteId,
   onTabOut,
   onLineFormat,
+  onSelectionChange,
   matches = NO_MATCHES,
   activeMatch = -1,
   handleRef,
@@ -951,16 +962,41 @@ export function MarkdownEditor({
   // column. A ranged selection is left exactly as the browser drew it — the raw
   // active line maps to source the same as a formatted one (see
   // `markdown-selection.ts`), so there's no need to disturb it mid-selection.
+  //
+  // Whether a selection is up is reported out to the host as it changes (never
+  // per caret move), so the header can offer the actions that operate on one.
+  // Deduped through a ref: `selectionchange` fires on every keystroke, and the
+  // answer is the same for nearly all of them.
+  const selected = useRef(false);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
+  function reportSelection(on: boolean) {
+    if (selected.current === on) return;
+    selected.current = on;
+    onSelectionChangeRef.current?.(on);
+  }
+  // A selection this editor no longer owns is nobody's: a surface going away
+  // (a note switch, Markdown turned off) has to take its report with it, or the
+  // header keeps offering actions on a selection that isn't there.
+  const reportSelectionRef = useRef(reportSelection);
+  reportSelectionRef.current = reportSelection;
+  useEffect(() => () => reportSelectionRef.current(false), []);
+
   const selChangeRef = useRef<() => void>(() => {});
   selChangeRef.current = () => {
     if (settingSel.current || composing.current) return;
     const root = rootRef.current;
     const sel = window.getSelection();
-    if (!root || !sel || sel.rangeCount === 0) return;
-    if (!sel.anchorNode || !root.contains(sel.anchorNode)) return;
+    if (!root || !sel || sel.rangeCount === 0) return reportSelection(false);
+    if (!sel.anchorNode || !root.contains(sel.anchorNode))
+      return reportSelection(false);
     const cur = activeRef.current.index;
 
     if (!sel.isCollapsed) {
+      // Both ends have to be in here for the source mapping to work — a drag
+      // that ran out of the surface is left to the browser (see
+      // `selectionSource`), so it isn't offered the header's actions either.
+      reportSelection(!!sel.focusNode && root.contains(sel.focusNode));
       // A drag is left exactly as the browser is drawing it — but the toolbar
       // still wants to know what it covers, so selecting a bolded word lights
       // Bold. Reading the endpoints doesn't disturb the selection.
@@ -971,6 +1007,7 @@ export function MarkdownEditor({
       else clearCaretSpan();
       return;
     }
+    reportSelection(false);
 
     const lineEl = lineElementOf(root, sel.anchorNode);
     const L = lineIndexOf(lineEl);
@@ -1382,6 +1419,10 @@ export function MarkdownEditor({
     void writeClipboard(r.text);
     unlock("guillotine");
     commit(r.lines, r.caret);
+    // What was selected has just been taken out, so the header's selection
+    // actions go with it — the collapsed caret `commit` installs is set by us,
+    // which the `selectionchange` handler deliberately ignores.
+    reportSelection(false);
   }
 
   // Draw a selection over whole source lines `[from, to]`. The endpoints are
@@ -1563,12 +1604,15 @@ export function MarkdownEditor({
   formatRef.current = format;
   const cutRef = useRef(cut);
   cutRef.current = cut;
+  const selectionSourceRef = useRef(selectionSource);
+  selectionSourceRef.current = selectionSource;
   useImperativeHandle(
     handleRef ?? null,
     () => ({
       focus: () => placeCaretAtEndRef.current(),
       format: (action: FormatAction) => formatRef.current(action),
       cut: () => cutRef.current(),
+      selection: () => selectionSourceRef.current(),
     }),
     [],
   );
