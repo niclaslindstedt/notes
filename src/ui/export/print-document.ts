@@ -17,6 +17,13 @@
 
 const logScope = "export";
 
+// How long to wait for the `srcdoc` document to load before giving up. The
+// document is self-contained — one inline `<style>`, images already `data:`
+// URLs — so there is nothing to fetch and this only ever expires when the
+// frame failed to navigate at all. Bailing beats hanging: the caller's spinner
+// clears and the console says why.
+const READY_TIMEOUT_MS = 5_000;
+
 /**
  * Show the print dialog for a self-contained HTML document.
  *
@@ -38,16 +45,22 @@ export async function printHtmlDocument(html: string): Promise<boolean> {
   frame.setAttribute("tabindex", "-1");
   frame.title = "";
 
-  const loaded = new Promise<void>((resolve) => {
-    frame.addEventListener("load", () => resolve(), { once: true });
-  });
-  document.body.appendChild(frame);
+  // `srcdoc` is set **before** the frame is inserted, and that ordering is the
+  // whole ballgame. Inserting a frame with no `srcdoc` gives it an initial
+  // `about:blank` document, and that document fires a `load` event of its own —
+  // in Chromium, synchronously, during `appendChild`. Assigning `srcdoc`
+  // afterwards therefore loses the race every time: the wait below resolves on
+  // the blank document and `print()` is handed an empty page. With `srcdoc`
+  // already on the element, insertion navigates straight to it and the only
+  // `load` is the real one.
   frame.srcdoc = html;
+  const loaded = whenLoaded(frame);
+  document.body.appendChild(frame);
 
   try {
-    await loaded;
-    const win = frame.contentWindow;
+    const win = (await loaded) ? frame.contentWindow : null;
     if (!win) {
+      console.warn(`[${logScope}] print document never loaded`);
       frame.remove();
       return false;
     }
@@ -64,6 +77,28 @@ export async function printHtmlDocument(html: string): Promise<boolean> {
     frame.remove();
     return false;
   }
+}
+
+// Resolve once the frame's `srcdoc` document has loaded — `false` if it never
+// does. A blank document is refused rather than awaited past: engines disagree
+// about whether the initial `about:blank` still fires its own `load` even when
+// `srcdoc` was set before insertion, and printing that one is precisely the bug
+// this guards. So the listener stays subscribed until a real document arrives.
+function whenLoaded(frame: HTMLIFrameElement): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let timer = 0;
+    const settle = (ok: boolean) => {
+      frame.removeEventListener("load", onLoad);
+      window.clearTimeout(timer);
+      resolve(ok);
+    };
+    const onLoad = () => {
+      if (frame.contentWindow?.location.href === "about:blank") return;
+      settle(true);
+    };
+    frame.addEventListener("load", onLoad);
+    timer = window.setTimeout(() => settle(false), READY_TIMEOUT_MS);
+  });
 }
 
 // Wait for the print document to be ready to lay out: fonts resolved and every

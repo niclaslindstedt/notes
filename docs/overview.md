@@ -1600,6 +1600,14 @@ fonts and images to settle so the first page lays out completely, and tears the
 frame down on `afterprint` with a long timer behind it — removing it early
 cancels an in-flight print.
 
+The frame is given its `srcdoc` **before** it is inserted, and the wait for the
+`load` event refuses a document still sitting on `about:blank`. Both guard the
+same trap: an iframe inserted without a `srcdoc` gets an initial `about:blank`
+document that fires a `load` of its own — synchronously, during `appendChild`,
+in Chromium — so assigning `srcdoc` afterwards hands `print()` an empty page.
+The engine then has nothing to print and says nothing about it, which is what a
+broken PDF export looks like from the outside: no dialog, no error.
+
 ### PDF settings
 
 `PdfSettings` (`src/domain/pdf.ts`) — what an exported note looks like on paper:
