@@ -183,6 +183,33 @@ as a docked sidebar (≥768px) the toast insets past it on the side it docks
 (reading `nav.pinned` / `position.side`) so it centres within the notes content
 area rather than the whole viewport. See also [PWA update](#pwa-update).
 
+### Toast
+
+`Toast` (`src/ui/Toast.tsx`) — the transient confirmation pill: a message, an
+optional leading glyph, and nothing to press. It says "that worked" for an
+action that would otherwise finish silently; today the [export menu](#export)'s
+**Copy to clipboard** row is its one caller, showing `Copied` for 1.6 seconds.
+The **caller owns the timer** and simply stops rendering the toast when it
+expires — the component owns only where it sits and how it announces itself
+(`role="status"` + `aria-live="polite"`, so it is read after the current
+utterance rather than interrupting it, and `pointer-events-none` so it never
+eats a tap meant for the note underneath). It enters on the `toast-in`
+animation in `src/styles/theme.css` (a short rise and fade, zeroed under
+`prefers-reduced-motion`), the same mount-time-`animation` pattern the drawer
+and the styling toolbar use.
+
+It docks the way the [update toast](#update-toast) does — above the bottom
+safe-area inset, inset past the side menu when that is pinned open as a sidebar
+— and **stacks above it**, which is the layering `UpdateToast` was written to
+expect: a persistent "an update is ready" prompt and a 1.6-second tick would
+otherwise land on the same pixels.
+
+It **portals to `document.body`**, for the same reason the
+[floating panel](#custom-dropdown) does: its callers sit in the note header,
+which paints itself with `backdrop-blur`, and a `backdrop-filter` makes an
+element the containing block for its `fixed` descendants — left in place, the
+toast would dock to the bottom of the *header* rather than the screen.
+
 ### Icons
 
 `src/ui/icons.tsx` — the inline-SVG icon set (menu, cog, plus, trash, archive,
@@ -1584,13 +1611,16 @@ It opens a menu of the three ways a note leaves the app:
   [copy scope](#copy-scope). This is the only way to copy a note: the menu is
   where someone looks for "get this note out of the app", and a separate header
   button doing one of its three jobs was one too many in a row that already
-  holds four. Unlocks the **Copycat** achievement.
+  holds four. It confirms with a [toast](#toast) — the row swapping to a tick is
+  confirmation nobody sees, because the menu closes on the press, and copying is
+  the one row that finishes silently with no print dialog or download to show
+  for itself. Unlocks the **Copycat** achievement.
 
-**On a narrow screen the menu rows are glyphs alone; from `sm:` up each glyph is
-followed by its label.** That is a `useMediaQuery` decision rather than a CSS
-`hidden sm:inline`, because the [floating panel](#custom-dropdown) is measured
-and positioned in JS — it has to know it is a strip of icons, or it would be
-sized for text that isn't drawn.
+**Every row is a glyph and its label, at every width** — a phone has room for
+the labelled menu, and three unexplained icons stacked under the header is a
+guessing game. The [floating panel](#custom-dropdown) is measured and positioned
+in JS, so this is a real width the panel is sized for rather than a CSS
+`hidden sm:inline` that would leave it sized for text it doesn't draw.
 
 The work is loaded **on the press**, not at mount (`await import()` from the
 handlers): the Markdown codec, the print renderer and its stylesheet are
@@ -1640,7 +1670,9 @@ the live preview does, so a PDF says what the editor showed: consecutive prose
 lines keep the newlines the writer typed as hard breaks, lists nest by the
 `depth` the parser assigned and ordered lists carry its computed
 numeric → alpha → roman markers, task rows print as boxes showing their state,
-and a fence that was never closed still prints as a code block.
+and a fence that was never closed still prints as a code block. The title
+heading is drawn without a rule beneath it: its size already separates it from
+the body, and a border there reads as a stray `---` the writer never typed.
 
 The document deliberately shares nothing with the app's screen theme: it is
 black on white in a print-safe family, because a note exported to PDF should

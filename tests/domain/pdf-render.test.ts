@@ -53,6 +53,14 @@ describe("renderPrintDocument", () => {
     );
   });
 
+  it("draws no rule under the title", () => {
+    // A border there prints as a horizontal rule the writer never typed —
+    // indistinguishable from the `<hr>` a leading `---` in the body produces.
+    const rule = /h1\.doc-title\{[^}]*\}/.exec(render("Body"))?.[0];
+    expect(rule).toBeDefined();
+    expect(rule).not.toMatch(/border/);
+  });
+
   it("renders headings, rules and paragraphs", () => {
     const html = render("# Title\n\nFirst\nSecond\n\n---");
     expect(html).toContain("<h1>Title</h1>");

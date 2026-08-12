@@ -124,7 +124,10 @@ function printStylesheet(s: PdfSettings): string {
     "h1,h2,h3,h4,h5,h6{margin:1.1em 0 0.45em;line-height:1.25;font-weight:700;page-break-after:avoid;break-after:avoid}",
     ":is(h1,h2,h3,h4,h5,h6):first-child{margin-top:0}",
     headings,
-    "h1.doc-title{margin:0 0 0.8em;padding-bottom:0.3em;border-bottom:1px solid #ccc}",
+    // No rule under the title: the heading's own size already separates it
+    // from the body, and a border there reads as a stray `---` the writer
+    // never typed — especially in a note that opens with one.
+    "h1.doc-title{margin:0 0 0.8em}",
     // Notes are line-based on screen: a hard newline is a line break the writer
     // meant, so paragraphs keep theirs rather than reflowing into one run.
     "p{orphans:2;widows:2}",
