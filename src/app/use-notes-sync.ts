@@ -184,7 +184,22 @@ export function useNotesSync(deps: {
 
   // Adapter and concurrency token survive re-renders.
   const adapterRef = useRef(active);
+  // The backend revision the on-screen document is based on — handed back on
+  // the next save so the backend can refuse to overwrite a newer copy.
   const revisionRef = useRef<string | undefined>(undefined);
+  // Whether `revisionRef` is *authoritative*: whether we have actually seen the
+  // backend's state at that revision, so a save from it is a genuine forward
+  // step rather than a guess. False after a backend swap until something
+  // reconciles — a load that resolves, or the offline mirror's own record of
+  // which revision its bytes were built on.
+  //
+  // The distinction is what stops the "typed a lot on desktop, opened mobile,
+  // desktop's text was gone" failure: an unknown baseline means the queued save
+  // goes out with no `baseRevision`, and the file backends then refuse to touch
+  // any file whose current revision they can't account for (see `isOurs` in
+  // `storage/directory-adapter.ts`) — surfacing the conflict instead of
+  // flattening the other device's work.
+  const baselineKnown = useRef(false);
   // The last snapshot we loaded or saved, handed back to `load` as the
   // `previous` hint so a live pull lists cheaply and re-downloads only the
   // files whose revision actually moved (the file-per-note backends' read half
@@ -306,6 +321,7 @@ export function useNotesSync(deps: {
           transientRetries.current = 0;
           setOffline(false);
           revisionRef.current = stored.revision;
+          baselineKnown.current = true;
           lastStoredRef.current = stored;
           if (pendingDoc.current !== null) {
             flushSaveRef.current();
@@ -443,6 +459,7 @@ export function useNotesSync(deps: {
     pendingDoc.current = null;
     adapterRef.current = active;
     revisionRef.current = undefined;
+    baselineKnown.current = false;
     // A new backend's files are unrelated to the old one's, so drop the
     // incremental-load hint rather than letting it mislead the reuse check.
     lastStoredRef.current = undefined;
@@ -460,9 +477,30 @@ export function useNotesSync(deps: {
     // or a still-sealed encrypted mirror) it parses to a blank document — showing
     // nothing beats showing the wrong namespace's notes. The async `load()` below
     // still runs and reconciles with the live copy.
-    const seeded = parse(active.loadSync?.()?.text);
+    const seed = active.loadSync?.() ?? null;
+    const seeded = parse(seed?.text);
     setDoc(seeded);
     resetHistory?.current(seeded);
+    // The mirror records which backend revision its bytes were built on, so it
+    // is a real baseline — not a guess — for the window before `load()` lands.
+    // Without this an edit made in those first seconds would be written from no
+    // baseline at all, which is how a phone that opened with a stale mirror used
+    // to flatten the long note another device had just written.
+    if (seed?.revision !== undefined) {
+      revisionRef.current = seed.revision;
+      baselineKnown.current = true;
+    }
+    // The mirror also records whether those bytes ever *reached* the backend.
+    // `pending` means they didn't (the app was closed while offline, or a save
+    // was still failing), so this document carries local work the cloud has
+    // never seen. Re-queue it rather than let the load quietly replace it: the
+    // write goes out based on the last revision we did confirm, so if another
+    // device wrote in the meantime the backend refuses it and we ask.
+    if (seed?.pending) {
+      log.info("mount: mirror holds unsynced local edits — re-queueing");
+      pendingDoc.current = seeded;
+      setDirty(true);
+    }
     let cancelled = false;
     // Snapshot the edit counter before the read starts. If the user edits (e.g.
     // toggles a checklist line in a note) while the load is in flight, this
@@ -473,17 +511,51 @@ export function useNotesSync(deps: {
       .load()
       .then((stored) => {
         if (cancelled) return;
-        // A user edit raced the load. The on-screen document already reflects
-        // it (and `scheduleSave` has queued it for persistence), while `stored`
-        // is the pre-edit document we began reading before the edit — adopting
-        // it would revert the edit in front of the user. Keep the local
-        // document; just mark the load resolved so downstream gating un-blocks.
-        if (editSeqRef.current !== editSeqAtLoad) {
-          log.info("load: local edit raced the read — keeping local edits");
+        // A local edit raced the load — either a keystroke while the read was
+        // in flight, or the unsynced mirror we re-queued above. The on-screen
+        // document already reflects it and a write is queued, while `stored` is
+        // the document we began reading before it — adopting that would revert
+        // the edit in front of the user. So we keep the local document.
+        //
+        // What we must NOT do is adopt `stored.revision` along the way. Our
+        // document isn't based on those bytes; we read them and set them aside.
+        // Claiming them as the baseline would tell the backend "this write is a
+        // forward step from your current state" and the queued save would go
+        // straight over another device's edit — the exact loss this is here to
+        // prevent. Two cases instead:
+        //
+        //  - We hold a real baseline (the mirror's revision, or an earlier
+        //    load). Keep it, stale as it is. The queued save is checked against
+        //    it, and the file backends reconcile per note: the other device's
+        //    edit to a *different* note survives untouched, and a collision on
+        //    the *same* note raises the conflict for the user to settle.
+        //  - We hold none — the load is the first thing this device has ever
+        //    heard from the backend. The local edit is then based on nothing
+        //    the backend has confirmed, so there is no honest merge to attempt.
+        //    Surface the divergence and let the user choose.
+        if (
+          editSeqRef.current !== editSeqAtLoad ||
+          pendingDoc.current !== null
+        ) {
+          if (!baselineKnown.current && stored?.revision !== undefined) {
+            log.warn("load: local edits with no baseline — surfacing conflict");
+            setStatus("conflict");
+            setStatusDetail(null);
+            setConflict({
+              remote: parse(stored.text),
+              remoteRevision: stored.revision,
+            });
+          } else {
+            log.info("load: local edit raced the read — keeping local edits");
+            // Push what's queued now that the read is out of the way, rather
+            // than waiting for the next keystroke to arm a timer.
+            flushSaveRef.current();
+          }
           setLoaded(true);
           return;
         }
         revisionRef.current = stored?.revision;
+        baselineKnown.current = true;
         lastStoredRef.current = stored ?? undefined;
         setOffline(stored?.offline ?? false);
         const loadedDoc = parse(stored?.text);
@@ -564,6 +636,7 @@ export function useNotesSync(deps: {
       return;
     }
     revisionRef.current = stored?.revision;
+    baselineKnown.current = true;
     lastStoredRef.current = stored ?? undefined;
     setOffline(stored?.offline ?? false);
     setConflict(null);
@@ -714,6 +787,7 @@ export function useNotesSync(deps: {
         return;
       }
       revisionRef.current = stored.revision;
+      baselineKnown.current = true;
       lastStoredRef.current = stored;
       setOffline(stored.offline ?? false);
       const reloaded = parse(stored.text);
@@ -748,8 +822,11 @@ export function useNotesSync(deps: {
         unlock("peacemaker");
         if (keep === "local") {
           // Overwrite the remote: re-save this device's bytes basing the
-          // write on the remote revision so the backend accepts it.
+          // write on the remote revision so the backend accepts it. The user
+          // has now seen what's out there and chosen, so the baseline is
+          // authoritative either way.
           revisionRef.current = current.remoteRevision;
+          baselineKnown.current = true;
           performSave(docRef.current, current.remoteRevision);
         } else {
           // Adopt the remote bytes as the new in-memory state and stamp its
@@ -759,6 +836,7 @@ export function useNotesSync(deps: {
           inFlight.current = false;
           pendingDoc.current = null;
           revisionRef.current = current.remoteRevision;
+          baselineKnown.current = true;
           setDoc(current.remote);
           resetHistory?.current(current.remote);
           setDirty(false);

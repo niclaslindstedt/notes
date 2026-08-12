@@ -912,9 +912,14 @@ describe("directory adapter — atomic representation switch", () => {
     ).notes;
     expect(recovered[0]!.body).toContain(SECRET_BODY);
 
-    // The retry (no longer crashing) finishes removing the plaintext.
+    // The retry (no longer crashing) finishes removing the plaintext. It loads
+    // first, as the app does when it comes back up after the crash — a save
+    // from an adapter that has never reconciled with the folder is refused as
+    // a conflict, precisely so a stale device can't overwrite what's on disk.
     failRemove = false;
-    await encAdapter(flaky, att, ref).save(plain);
+    const retry = encAdapter(flaky, att, ref);
+    await retry.load();
+    await retry.save(plain);
     expect([...files.keys()].some((p) => p.endsWith(".md"))).toBe(false);
   });
 });

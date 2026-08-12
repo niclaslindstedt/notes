@@ -146,6 +146,62 @@ describe("withLocalCache", () => {
     expect(storage.getItem(localCacheKey("dropbox"))).toContain("queued");
   });
 
+  it("marks an offline save as unsynced, keyed to the last confirmed revision", async () => {
+    // The record that survives the app being closed: these bytes never reached
+    // the backend, and `revision` is the baseline they were written on top of.
+    const storage = memoryStorage();
+    const { adapter, setOffline } = flakyAdapter();
+    const cached = withLocalCache(adapter, {
+      storage,
+      key: localCacheKey("dropbox"),
+    });
+    await cached.save("v1");
+    expect(cached.loadSync?.()?.pending).toBeUndefined();
+
+    setOffline(true);
+    await expect(cached.save("written on the train")).rejects.toThrow();
+    const seed = cached.loadSync?.();
+    expect(seed?.text).toBe("written on the train");
+    expect(seed?.pending).toBe(true);
+    expect(seed?.revision).toBe("r1");
+  });
+
+  it("clears the unsynced mark once the write lands", async () => {
+    const storage = memoryStorage();
+    const { adapter, setOffline } = flakyAdapter();
+    const cached = withLocalCache(adapter, {
+      storage,
+      key: localCacheKey("dropbox"),
+    });
+    await cached.save("v1");
+    setOffline(true);
+    await expect(cached.save("queued")).rejects.toThrow();
+    expect(cached.loadSync?.()?.pending).toBe(true);
+
+    setOffline(false);
+    await cached.save("queued");
+    expect(cached.loadSync?.()?.pending).toBeUndefined();
+  });
+
+  it("keeps the unsynced mark across an offline load", async () => {
+    // Relaunching still offline must not read the queued edit back as synced.
+    const storage = memoryStorage();
+    const { adapter, setOffline } = flakyAdapter();
+    const cached = withLocalCache(adapter, {
+      storage,
+      key: localCacheKey("dropbox"),
+      sleep: async () => {},
+    });
+    await cached.save("v1");
+    setOffline(true);
+    await expect(cached.save("queued")).rejects.toThrow();
+
+    const snap = await cached.load();
+    expect(snap?.text).toBe("queued");
+    expect(snap?.offline).toBe(true);
+    expect(snap?.pending).toBe(true);
+  });
+
   it("advertises loadSync and serves the mirror synchronously for first paint", async () => {
     const storage = memoryStorage();
     const { adapter } = flakyAdapter();
