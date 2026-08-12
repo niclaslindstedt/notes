@@ -25,6 +25,7 @@ import {
   ExportIcon,
   FilePdfIcon,
   ImportIcon,
+  MoreIcon,
   PaletteIcon,
   PlusIcon,
   RefreshIcon,
@@ -514,3 +515,4 @@ export const IndentGlyph: Glyph = IndentFormatIcon;
 export const CutGlyph: Glyph = CutIcon;
 export const ExportGlyph: Glyph = ExportIcon;
 export const PdfGlyph: Glyph = FilePdfIcon;
+export const MoreGlyph: Glyph = MoreIcon;

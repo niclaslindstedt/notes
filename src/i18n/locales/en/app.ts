@@ -72,6 +72,12 @@ const app = {
   // press will do, so it flips with the note's current state.
   favorite: "Add to favorites",
   unfavorite: "Remove from favorites",
+  // The ⋯ toggle a narrow editor header folds its whole action cluster into.
+  // The label states what the press will do, so it flips with the row's state.
+  actions: {
+    show: "Note actions",
+    hide: "Hide note actions",
+  },
   // The styling toolbar: its header toggle, its accessible name, and one
   // label per button — each names the Markdown construct it applies, since
   // the buttons are glyph-only and the label is both tooltip and a11y name.

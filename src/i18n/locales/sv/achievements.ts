@@ -114,6 +114,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         'Börja en mening så skriver anteckningen den stora bokstaven åt dig \u2014 första tecknet på en rad, och första tecknet efter punkt, frågetecken eller utropstecken. Det är samma versal som telefonen sätter in åt dig överallt annars, gjord av appen eftersom editorn skriver varje tangenttryck in i anteckningen själv, vilket sätter tryckningen utom räckhåll för tangentbordet; det är också därför det fungerar likadant på en dator, där ingenting erbjuder det alls. Ett filnamn eller ett decimaltal behåller sina små bokstäver, kodblock lämnas precis som du skrev dem, och eftersom versalen är en helt vanlig ändring tar Backsteg eller Ångra bort den igen. Stäng av det med "Stor bokstav i meningar" under Inställningar \u2192 Redigerare.',
     },
+    elbowRoom: {
+      name: "Armbågsrum",
+      condition: "Öppna en antecknings ⋯-meny på en smal skärm.",
+      learnMore:
+        "På en telefon rymmer redigerarens sidhuvud antingen anteckningens namn eller dess fem knappar, inte båda — så knapparna viks ihop till en enda ⋯-knapp till höger. Ett tryck fäller ut dem över titeln; ett tryck till, eller en beröring i själva anteckningen, viker ihop dem igen och lämnar tillbaka titeln. Markören står kvar hela vägen, så klipp- och formateringsknapparna arbetar fortfarande på raden du skrev på.",
+    },
     pinpoint: {
       name: "Pricksäker",
       condition: "Hitta text inuti anteckningen du har öppen.",

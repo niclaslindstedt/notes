@@ -92,7 +92,12 @@ export function HomePage() {
               numbers can be switched on down the editor's left edge,
               code-editor style, where pressing a number selects that whole
               line. While the app is open, hopping between notes drops you back
-              at the exact spot and cursor position you left each one at.
+              at the exact spot and cursor position you left each one at. On a
+              phone, where the header has room for the note&apos;s name or its
+              buttons but not both, those buttons fold into a single{" "}
+              <span aria-hidden>⋯</span> control on the right — pressing it
+              slides them back out over the title, and touching the note again
+              folds them away and hands the title back.
             </li>
             <li>
               Reach for the formatting button at the top right of a note to open

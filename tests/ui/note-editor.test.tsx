@@ -10,6 +10,7 @@ import { resetEditorPositions } from "../../src/ui/editor-position.ts";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   // The editor remembers each note's caret / scroll for the session in a
   // module-level store; drop it so one case's unmount never seeds the next.
   resetEditorPositions();
@@ -448,5 +449,93 @@ describe("the styling toolbar", () => {
       (screen.getByRole("button", { name: "Outdent" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+  });
+});
+
+// The narrow header folds its five action buttons behind a single ⋯ toggle.
+// jsdom carries no stylesheet, so "folded away" is asserted through the two
+// things that live in the markup rather than in the cascade: the inline
+// max-width the slide animates, and the `hidden` class the title wears while
+// the cluster stands in its place.
+describe("Editor (narrow header)", () => {
+  // The framework's `useMediaQuery` reads `window.matchMedia`, which jsdom
+  // doesn't implement; stub it to answer "yes, this is a phone".
+  function stubNarrow(matches: boolean) {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((media: string) => ({
+        matches: media.includes("max-width") ? matches : false,
+        media,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      })),
+    );
+  }
+
+  // The box that carries the five buttons — the star's parent, which is what
+  // the open / closed transition animates.
+  function cluster() {
+    return screen.getByRole("button", { name: "Add to favorites" })
+      .parentElement as HTMLElement;
+  }
+
+  // Whether the title field is out of the row. Matched as a whole class rather
+  // than a substring — the field is also `overflow-hidden`.
+  function titleHidden() {
+    return screen
+      .getByDisplayValue("My note")
+      .className.split(/\s+/)
+      .includes("hidden");
+  }
+
+  it("keeps every action in the row on a wide header", () => {
+    stubNarrow(false);
+    renderEditor();
+    expect(screen.queryByRole("button", { name: "Note actions" })).toBe(null);
+    expect(cluster().style.maxWidth).toBe("");
+  });
+
+  it("folds the cluster away behind a ⋯ toggle, title still showing", () => {
+    stubNarrow(true);
+    renderEditor();
+
+    const more = screen.getByRole("button", { name: "Note actions" });
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    expect(cluster().style.maxWidth).toBe("0px");
+    expect(titleHidden()).toBe(false);
+  });
+
+  it("unfolds the cluster over the title when the ⋯ is pressed", () => {
+    stubNarrow(true);
+    renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
+
+    expect(cluster().style.maxWidth).toBe("14rem");
+    expect(
+      screen
+        .getByRole("button", { name: "Hide note actions" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(titleHidden()).toBe(true);
+  });
+
+  it("folds back when the note takes focus again", () => {
+    stubNarrow(true);
+    renderEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
+    expect(cluster().style.maxWidth).toBe("14rem");
+
+    // Tapping into the body is the end of the detour — the title comes back
+    // without a second press on the toggle.
+    const body = screen.getByDisplayValue("the body") as HTMLTextAreaElement;
+    fireEvent.pointerDown(body);
+
+    expect(cluster().style.maxWidth).toBe("0px");
+    expect(titleHidden()).toBe(false);
   });
 });

@@ -71,6 +71,29 @@ export function FolderPlusIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * Three dots in a row — "there are more controls behind this button". Worn by
+ * the editor header's [more button](../../docs/overview.md#collapsed-header-actions),
+ * which is the whole action cluster folded into one control at phone widths.
+ * Drawn as filled dots rather than stroked circles so it stays a clear triangle
+ * of marks at the 18px the header renders it at. Not in the framework set.
+ */
+export function MoreIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
+    </svg>
+  );
+}
+
 /** A file with a down-arrow — import notes. Not in the framework set. */
 export function ImportIcon({ className }: IconProps) {
   return (

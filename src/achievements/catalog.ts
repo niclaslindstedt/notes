@@ -52,6 +52,7 @@ import {
   LockGlyph,
   MedalGlyph,
   MergeGlyph,
+  MoreGlyph,
   MousePointerGlyph,
   MoveGlyph,
   PaletteGlyph,
@@ -637,6 +638,15 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     // (`autoCapitalAt` in `src/ui/MarkdownEditor.tsx`) — the letter it writes
     // is indistinguishable from one typed with Shift held, so there is nothing
     // in the document to derive.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "elbowRoom",
+    tier: "beginner",
+    glyph: MoreGlyph,
+    learnMore: true,
+    // Fired by unfolding the narrow header's action cluster (`toggleActions` in
+    // `src/ui/NoteEditor.tsx`) — a layout state, nowhere in the document.
     trigger: { kind: "manual" },
   },
   {

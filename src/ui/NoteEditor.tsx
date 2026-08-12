@@ -26,6 +26,7 @@ import { findMatches, type NoteMatch } from "../domain/note-find.ts";
 import { isBlank, type Note } from "../domain/note.ts";
 import type { CompiledTransform } from "../domain/transform.ts";
 import { useT } from "../i18n/index.ts";
+import { haptics } from "../platform/native-bridge.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { CipherGlyph } from "./CipherGlyph.tsx";
 import { writeClipboard } from "./clipboard.ts";
@@ -39,8 +40,9 @@ import {
 import { ExportButton } from "./export/ExportButton.tsx";
 import { FavoriteButton } from "./FavoriteButton.tsx";
 import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
+import { useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
-import { ArrowLeftIcon, SpinnerIcon } from "./icons.tsx";
+import { ArrowLeftIcon, MoreIcon, SpinnerIcon } from "./icons.tsx";
 import {
   MarkdownEditor,
   type MarkdownEditorHandle,
@@ -63,6 +65,22 @@ function readToolbarOpen(): boolean {
   if (typeof localStorage === "undefined") return false;
   return localStorage.getItem(TOOLBAR_OPEN_KEY) === "true";
 }
+
+// Below this width the header stops trying to carry the note's name *and* the
+// five action buttons at once and folds the cluster behind a single ⋯ toggle
+// (see `MoreButton`). It is Tailwind's `sm` breakpoint from the other side: at
+// 640px and up the row fits, and under it the title was being squeezed to a
+// couple of words. A media query rather than the pane's own width because the
+// editor is the full viewport at every size that collapses — the sidebar only
+// docks at 768px, by which point the row fits again.
+const COLLAPSE_QUERY = "(max-width: 639px)";
+
+// How wide the folded-out cluster is allowed to grow. Only the animation reads
+// it: the buttons size the box, and this cap is what the max-width transition
+// travels to (a width of `auto` can't be transitioned). Kept a little above the
+// real ~13.25rem so no button is ever clipped at rest — the cost is that the
+// slide finishes a hair before the timer does.
+const ACTIONS_MAX_WIDTH = "14rem";
 
 // A stable empty hit list for the closed find bar, so the editing surfaces keep
 // seeing the identical reference and their per-line memos bail out.
@@ -128,6 +146,9 @@ export function Editor({
   // The header's action cluster (favorite, formatting, cut, export, find),
   // which the body hands focus on to — see `firstAction`.
   const actionsRef = useRef<HTMLDivElement>(null);
+  // The ⋯ toggle the cluster folds into on a narrow screen; held so the tab
+  // order can point at it while the cluster itself is away.
+  const moreRef = useRef<HTMLButtonElement>(null);
   // Handle on the live-preview editor so the title can hand focus down into the
   // body even when no line is active yet (the body has no textarea until then).
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null);
@@ -152,6 +173,41 @@ export function Editor({
   const [findOpen, setFindOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [matchCursor, setMatchCursor] = useState(0);
+
+  // The header's action cluster on a narrow screen: five buttons and a note
+  // title don't both fit, and the title is what you need to see while reading,
+  // so the buttons fold behind a ⋯ toggle and slide back out on a press —
+  // taking the title's place while they are out (it is the thing they cover,
+  // and the note itself is right below to say which note this is).
+  //
+  // It is *not* remembered the way the styling toolbar is: the actions are a
+  // detour from writing, so every note — and every return to the note — opens
+  // with the title showing.
+  const narrow = useMediaQuery(COLLAPSE_QUERY);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  // Folded away: narrow, and not currently held open. The wide header never
+  // folds, so it is never "collapsed" no matter what the flag says.
+  const collapsed = narrow && !actionsOpen;
+
+  // A window grown past the breakpoint puts every action back in the row on its
+  // own, which leaves the held-open flag meaning nothing — drop it, so shrinking
+  // back down starts from the title again rather than from a row of buttons.
+  useEffect(() => {
+    if (!narrow) setActionsOpen(false);
+  }, [narrow]);
+
+  function toggleActions() {
+    if (!actionsOpen) unlock("elbowRoom");
+    setActionsOpen(!actionsOpen);
+  }
+
+  // Going back to the note puts the title back: the cluster is a detour, and
+  // the press (or the caret) that returns to the body is the end of it. Wired to
+  // the body's focus *and* pointer-down, because on a phone a tap into the
+  // live-preview surface can land on a line that is already focused.
+  function collapseActions() {
+    if (actionsOpen) setActionsOpen(false);
+  }
 
   // Every hit in the note, recomputed as the query (or the note) changes. A
   // closed bar matches nothing, so nothing downstream pays for it.
@@ -240,6 +296,9 @@ export function Editor({
   // are reversible with Shift+Tab. Nothing tabs back into the body from the
   // toolbar, so tabbing on past the last action leaves the editor for good.
   function firstAction(): HTMLElement | null {
+    // Folded away, the cluster's buttons are `visibility: hidden` — nothing in
+    // there is a tab stop, so the ⋯ toggle is the header's first action.
+    if (collapsed) return moreRef.current;
     return actionsRef.current?.querySelector<HTMLElement>(FOCUSABLE) ?? null;
   }
 
@@ -265,7 +324,7 @@ export function Editor({
           the whole row; once it wraps the header top-aligns so the button and
           the copy/sync buttons stay pinned to the first line. */}
       <header
-        className={`sticky top-0 z-10 flex gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))] ${titleMultiline ? "items-start" : "items-center"}`}
+        className={`sticky top-0 z-10 flex gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))] ${titleMultiline && !actionsOpen ? "items-start" : "items-center"}`}
       >
         <button
           type="button"
@@ -292,6 +351,7 @@ export function Editor({
           onFocusBody={focusBody}
           focusOnMount={titleFirst}
           onMultilineChange={setTitleMultiline}
+          hidden={actionsOpen}
           disableSpellcheck={editor.disableSpellcheck}
           disableAutocorrect={editor.disableAutocorrect}
           capitaliseSentences={editor.capitaliseSentences}
@@ -302,28 +362,66 @@ export function Editor({
         <div
           ref={actionsRef}
           onKeyDown={onActionsKeyDown}
-          className="flex shrink-0 items-center gap-2"
+          className={`ml-auto flex shrink-0 items-center ${narrow ? "" : "gap-2"}`}
         >
           {/* The star leads the cluster — it says something about the note
               itself, so it sits closest to the title — and Find is pinned to
               the far right, past the actions that operate on the note, because
-              it opens a bar rather than changing anything. */}
-          <FavoriteButton
-            favorite={note.favorite === true}
-            onToggle={onToggleFavorite}
-          />
-          <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
-          {!loading && <CutButton onCut={runCut} />}
-          <ExportButton
-            note={note}
-            copyScope={editor.copyScope}
-            transforms={transforms}
-          />
-          <NoteFindButton open={findOpen} onToggle={toggleFind} />
+              it opens a bar rather than changing anything.
+
+              On a narrow screen the whole cluster lives in a box that travels
+              between 0 and its natural width, clipping what doesn't fit yet, so
+              the buttons appear to unfold leftwards out of the ⋯ toggle (the
+              box is right-anchored, so growing it walks its content left). The
+              third transitioned property is `visibility`, which is what keeps
+              the folded-away buttons out of the tab order and off screen
+              readers: it flips to hidden only at the *end* of the transition,
+              so the closing slide is still visible while it plays. */}
+          <div
+            className={
+              narrow
+                ? `flex min-w-0 items-center gap-2 overflow-hidden pr-2 transition-[max-width,opacity,visibility] duration-200 ease-out ${actionsOpen ? "opacity-100" : "invisible opacity-0"}`
+                : "flex items-center gap-2"
+            }
+            style={
+              narrow
+                ? { maxWidth: actionsOpen ? ACTIONS_MAX_WIDTH : "0px" }
+                : undefined
+            }
+          >
+            <FavoriteButton
+              favorite={note.favorite === true}
+              onToggle={onToggleFavorite}
+            />
+            <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
+            {!loading && <CutButton onCut={runCut} />}
+            <ExportButton
+              note={note}
+              copyScope={editor.copyScope}
+              transforms={transforms}
+            />
+            <NoteFindButton open={findOpen} onToggle={toggleFind} />
+          </div>
+          {narrow && (
+            <MoreButton
+              buttonRef={moreRef}
+              open={actionsOpen}
+              onToggle={toggleActions}
+            />
+          )}
         </div>
       </header>
 
-      <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">
+      {/* Coming back to the note folds the header's action cluster away again —
+          see `collapseActions`. Captured on the way down so it fires whichever
+          part of the content area was reached (the find bar and the styling
+          toolbar both live in here too, and both are a way back to writing). */}
+      <div
+        ref={bodyRef}
+        onFocusCapture={collapseActions}
+        onPointerDownCapture={collapseActions}
+        className="flex min-h-0 flex-1 flex-col"
+      >
         {/* The toolbar sits *in* the content column rather than floating over
             it: opening it pushes the note's text down, so the line you are
             about to format is never the line it covers. */}
@@ -431,6 +529,7 @@ function TitleField({
   onFocusBody,
   focusOnMount,
   onMultilineChange,
+  hidden = false,
   disableSpellcheck,
   disableAutocorrect,
   capitaliseSentences,
@@ -444,6 +543,14 @@ function TitleField({
   onFocusBody: () => void;
   focusOnMount: boolean;
   onMultilineChange: (multiline: boolean) => void;
+  /**
+   * The narrow header's folded-out action cluster is standing where the title
+   * goes, so take it out of the row entirely (`display: none`, which also drops
+   * it from the tab order and the accessibility tree) rather than covering it.
+   * The field stays *mounted* through it: unmounting would settle the buffered
+   * title, and renaming the note's file is not what pressing ⋯ asked for.
+   */
+  hidden?: boolean;
   disableSpellcheck: boolean;
   disableAutocorrect: boolean;
   capitaliseSentences: boolean;
@@ -573,8 +680,52 @@ function TitleField({
           onFocusBody();
         }
       }}
-      className="min-w-0 flex-1 resize-none appearance-none overflow-hidden border-0 bg-transparent p-0 font-[inherit] text-lg font-bold leading-tight text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60"
+      className={`min-w-0 flex-1 resize-none appearance-none overflow-hidden border-0 bg-transparent p-0 font-[inherit] text-lg font-bold leading-tight text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60 ${hidden ? "hidden" : ""}`}
     />
+  );
+}
+
+// The narrow header's ⋯ toggle: the editor's whole action cluster folded into
+// one control, so a phone-width header can show the note's name instead of five
+// glyphs. Pressed, it unfolds the cluster over the title; pressed again — or
+// touched anywhere in the note — it folds back.
+//
+// It wears the same lit-when-open treatment as the formatting and find toggles,
+// because that is what it is: a control that holds a surface open. And like
+// them it cancels its own mousedown, so unfolding the row doesn't cost the caret
+// the buttons behind it are about to act on.
+function MoreButton({
+  open,
+  onToggle,
+  buttonRef,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  /** Named `buttonRef`, not `ref`: Preact reserves `ref` for the renderer. */
+  buttonRef: RefObject<HTMLButtonElement>;
+}) {
+  const t = useT();
+  const label = open ? t("app.actions.hide") : t("app.actions.show");
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => {
+        haptics.vibrate(8);
+        onToggle();
+      }}
+      title={label}
+      aria-label={label}
+      aria-expanded={open}
+      className={`inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius)] border transition-colors focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none ${
+        open
+          ? "border-accent bg-accent text-page-bg"
+          : "border-accent/40 bg-transparent text-accent hover:bg-accent/10"
+      }`}
+    >
+      <MoreIcon className="h-[18px] w-[18px]" />
+    </button>
   );
 }
 
