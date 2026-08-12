@@ -110,7 +110,7 @@ const settings = {
       "What Export → Copy to clipboard puts on the clipboard. Body is just what you wrote; the others add the title, or the whole .md file with its YAML frontmatter.",
     copyBody: "Body",
     copyTitleBody: "Title & body",
-    copyFrontMatter: "Front matter",
+    copyFrontMatter: "Front matter & body",
   },
 
   transform: {
