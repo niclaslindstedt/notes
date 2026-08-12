@@ -2965,21 +2965,40 @@ It lays out, top to bottom:
   location.
 - **Sync log** — a collapsible panel reading the cloud-sync scopes straight from
   the in-memory log ring buffer (`getLogs` / `subscribeToLogs`, see
-  [logger](#logger)), filtered to a `SYNC_LOG_SCOPES` allowlist. It shows even
-  when the developer-mode capture toggle is off (capture only governs
-  persistence across reloads, not the live buffer), with a Copy button — so a
-  non-developer can read what sync is doing without entering dev mode. The list
-  is ordered **newest first**, so the line that explains what just happened sits
-  at the top of the scroll box rather than below the whole session's history;
-  the Copy button still writes the entries oldest-first, the order a log is read
-  in when it is pasted into a bug report. (The [Logs](#logs) settings tab keeps
-  its chronological order — it is a full transcript, not a "what just happened"
-  view.)
+  [logger](#logger)), filtered to the `SYNC_LOG_SCOPES` allowlist in
+  `src/ui/sync-log.ts`. It shows even when the developer-mode capture toggle is
+  off (capture only governs persistence across reloads, not the live buffer),
+  with a [Copy](#copy-range) button — so a non-developer can read what sync is
+  doing without entering dev mode. The list is ordered **newest first**, so the
+  line that explains what just happened sits at the top of the scroll box rather
+  than below the whole session's history; a copy still writes the entries
+  oldest-first, the order a log is read in when it is pasted into a bug report.
+  (The [Logs](#logs) settings tab keeps its chronological order — it is a full
+  transcript, not a "what just happened" view.)
 
 The status copy names the bare service ("Synced to Dropbox"), since the
 Encryption column now carries the at-rest state. Its content is short and opens
 no soft keyboard, so it renders as a compact `centered` card rather than the
 full-screen mobile sheet.
+
+### Copy range
+
+The sync log's **Copy** button is a menu, not a one-shot: it asks how far back
+the copy should reach — **Last 10 minutes**, **Last 30 minutes**, **Last hour**,
+**Everything** — because the reason anyone copies this log is to hand the
+minutes around a failure to a bug report or an AI assistant, and a whole
+session's history buries exactly those lines. Each row carries the number of
+lines it would copy, so an empty stretch of time is visible before the press
+rather than a button that silently copies nothing; a range no line falls into is
+disabled. The trigger confirms in place (Copy → Copied / Copy failed) and the
+successful copy unlocks the **Log Keeper** [achievement](#achievements).
+
+The ranges, the filter, and the clipboard formatting live in
+`src/ui/sync-log.ts` (`SYNC_LOG_RANGES`, `entriesInRange`, `formatSyncLog`) —
+pure, so what gets copied is testable without rendering the modal. The window is
+measured from the instant the menu opened, so the count a row shows and the
+lines it copies always agree even as the log keeps growing underneath it; the
+payload is sorted oldest-first whichever way the panel is listing it on screen.
 
 ### Conflict modal
 

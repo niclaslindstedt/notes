@@ -49,6 +49,17 @@ const sync = {
   copyLog: "Copy",
   copied: "Copied",
   copyFailed: "Copy failed",
+  // The Copy button's menu: how far back the copied slice reaches. The counts
+  // are runtime data, so there's no plural engine here either — {n} lines reads
+  // fine at 1.
+  copyRange: {
+    heading: "Copy log",
+    last10m: "Last 10 minutes",
+    last30m: "Last 30 minutes",
+    last1h: "Last hour",
+    everything: "Everything",
+    lines: "{n} lines",
+  },
 
   // Per-state heading shown in the modal's status block, plus the
   // explanatory "what / why" line beneath it.
