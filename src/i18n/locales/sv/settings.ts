@@ -220,7 +220,7 @@ const settings: SettingsCatalog = {
     fontSerif: "Serif",
     fontMono: "Fast breddsteg",
     bodyFontHint:
-      "Typsnittet brödtexten sätts i. Endast utskriftssäkra familjer — appens egna webbtypsnitt är inte tillgängliga för utskriftsmotorn.",
+      "Typsnittet brödtexten sätts i. Endast familjerna som varje PDF-läsare redan har, så filen förblir liten och läses likadant överallt — appens egna webbtypsnitt hör inte dit.",
     fontSize: "Textstorlek",
     lineHeight: "Radavstånd",
     headingScale: "Rubrikstorlek",

@@ -224,7 +224,7 @@ const settings = {
     fontSerif: "Serif",
     fontMono: "Monospace",
     bodyFontHint:
-      "The typeface the body text is set in. Print-safe families only — the app's own webfonts aren't available to the print engine.",
+      "The typeface the body text is set in. Only the families every PDF reader already has, so the file stays small and reads the same everywhere — the app's own webfonts aren't among them.",
     fontSize: "Text size",
     lineHeight: "Line spacing",
     headingScale: "Heading size",
