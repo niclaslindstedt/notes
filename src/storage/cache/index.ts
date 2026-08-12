@@ -102,7 +102,13 @@ export function isOfflineError(err: unknown): boolean {
   return err instanceof TypeError;
 }
 
-type CachedBytes = { text: string; revision?: string };
+// What the mirror holds on disk. `revision` is the backend revision these bytes
+// are keyed to; `pending` flips its meaning from "the revision of this text" to
+// "the last revision the backend confirmed, which this text was written on top
+// of" — see the `pending` write in `save` below. Absent on mirrors written by
+// older builds, which is exactly right: those bytes came from a successful load
+// or save, so they are not pending.
+type CachedBytes = { text: string; revision?: string; pending?: boolean };
 
 /**
  * Build the per-backend, per-namespace localStorage key the cache lives
@@ -244,7 +250,11 @@ export function withLocalCache(
       // to `load()` for that case (only reachable once unlocked anyway; a
       // locked store is served by the no-op adapter, never this one).
       if (isEncryptedEnvelope(cached.text)) return null;
-      return { text: cached.text, revision: cached.revision };
+      return {
+        text: cached.text,
+        revision: cached.revision,
+        pending: cached.pending,
+      };
     },
 
     async load(): Promise<StoredSnapshot | null> {
@@ -271,6 +281,14 @@ export function withLocalCache(
           const snap = await inner.load(previous);
           if (snap) {
             try {
+              // Write-through drops any `pending` mark, because the backend is
+              // reachable again and these are its bytes. The unsynced copy is
+              // not lost by that: `loadSync` runs synchronously at mount, well
+              // before this resolves, so the sync engine has already taken the
+              // pending document and queued it for writing (see the mount
+              // effect in `app/use-notes-sync.ts`). Clearing here is what lets
+              // "keep theirs" on the conflict that write may raise actually
+              // stick, instead of the discarded copy coming back next launch.
               writeCache({
                 text: await sealForCache(snap.text),
                 revision: snap.revision,
@@ -301,6 +319,9 @@ export function withLocalCache(
             const cached = readCache();
             if (cached) {
               log.info("load: backend offline — serving cached copy");
+              // `pending` rides along: these may be bytes that never reached
+              // the backend, and the caller needs to know that its baseline
+              // describes the last confirmed revision rather than this text.
               return {
                 ...cached,
                 text: await unsealFromCache(cached.text),
@@ -336,10 +357,18 @@ export function withLocalCache(
           // reconnect save bases on the right baseline. Re-throw so the sync
           // engine keeps the edit queued and retries it when the network
           // returns (see the `online` listener in `use-notes-sync`).
+          //
+          // `pending: true` is what makes that survive the app being *closed*
+          // rather than merely reloaded: the in-memory queue dies with the
+          // page, so without a mark on disk the next launch reads these bytes
+          // back as though they were synced, and either loses the edit to the
+          // next load or — worse — writes them over another device's newer
+          // work as if nothing had happened.
           try {
             writeCache({
               text: await sealForCache(text),
               revision: readCache()?.revision,
+              pending: true,
             });
           } catch {
             // Couldn't seal the offline edit — drop the mirror update rather

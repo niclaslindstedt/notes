@@ -44,7 +44,9 @@
 //   1. **Only changed notes are written** (hash of the *plaintext* note source,
 //      so a re-encryption with a fresh IV doesn't look like a change).
 //   2. **Conflicts are scoped to the notes being written.**
-//   3. **We never clobber notes we didn't author.**
+//   3. **We never clobber notes we didn't author** — including when the caller
+//      hands in no baseline at all. "I don't know what's out there" is the
+//      state that must ask, not the state that gets a free pass.
 //   4. **Our own lag and lost acks are tolerated per file.**
 
 import type {
@@ -940,6 +942,16 @@ export function createDirectoryAdapter(
     return { toWrite, toRemove, conflicts };
   }
 
+  // May we write (or delete) this path without asking? Only when we can account
+  // for the revision sitting on the backend right now: our own write is still
+  // settling, nothing is there at all, it is exactly the revision we are basing
+  // this save on, or it is one this session produced or read. Anything else is
+  // someone else's edit that we have never seen.
+  //
+  // Note that a *missing* `baseRev` narrows this rather than widening it: with
+  // no baseline to match against, the only paths that clear are the ones we can
+  // vouch for from `producedRevs`. That is deliberate — see the conflict gate in
+  // `save`.
   function isOurs(
     path: string,
     remoteRev: string | undefined,
@@ -1142,9 +1154,17 @@ export function createDirectoryAdapter(
       `${options.id} save: write=${toWrite.length} remove=${toRemove.length} conflicts=${conflicts.length} tracked=${tracked.size}`,
     );
 
-    if (baseRevision !== undefined && conflicts.length > 0) {
+    // The gate runs whether or not a baseline was handed in. A caller with no
+    // baseline is not a caller with permission to overwrite — it is one that
+    // never reconciled with the backend (a mount load that failed, or one the
+    // sync engine declined to adopt because it would have wiped a local edit),
+    // which is exactly when a blind write costs someone the text they typed on
+    // another device. `isOurs` already answers precisely in that case: files we
+    // read or wrote this session pass, files we have never seen do not.
+    if (conflicts.length > 0) {
       log.warn(`${options.id} save: remote moved on files we're writing`, {
         conflicts,
+        baseRevision: baseRevision === undefined ? "none" : "given",
       });
       const remoteText = keys
         ? await readEncryptedSnapshot(keys, before)

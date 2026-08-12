@@ -26,6 +26,15 @@ export type StoredSnapshot = {
   // unreachable. Lets the UI tell the user they're editing a local copy.
   // The local backends never set it.
   offline?: boolean;
+
+  // Set when these bytes carry local edits that never reached the backend —
+  // the app was closed while offline, or the write was still failing. The
+  // accompanying `revision` is then the last revision the backend *did*
+  // confirm, i.e. the baseline this text was written on top of, not a revision
+  // describing this text. Only the offline mirror (`./cache/`) sets it; the
+  // sync engine reads it at mount to re-queue the write instead of letting a
+  // fresh load quietly discard work the cloud has never seen.
+  pending?: boolean;
 };
 
 // Optional-feature tags advertised by each adapter so UI surfaces can gate

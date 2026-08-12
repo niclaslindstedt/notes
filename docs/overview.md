@@ -2344,7 +2344,52 @@ document. A monotonic edit counter (`editSeqRef`, bumped by every
 `scheduleSave`) is snapshotted before the read starts; if it has moved by the
 time the read resolves, a user edit interleaved, so the load keeps the local
 (already-queued-for-save) document instead of adopting the stale bytes it
-read, and just marks itself resolved.
+read, and just marks itself resolved. See [save baseline](#save-baseline) for
+what that keeps-the-local-copy path must *not* do with the revision it read.
+
+### Save baseline
+
+The backend revision a write claims to be a forward step from — `revisionRef`
+in `useNotesSync` (`src/app/use-notes-sync.ts`), handed to `adapter.save` as
+`baseRevision` and checked there against what's actually on the backend.
+Alongside it the engine tracks `baselineKnown`: whether that revision is
+*authoritative*, meaning this device has actually seen the backend's state at
+it. The two are separate because "I know the remote is at r7" and "I have no
+idea what the remote is at" are different states, and only the first is
+permission to overwrite.
+
+`baselineKnown` starts false on every backend swap and becomes true when
+something reconciles: an adopted `load()`/`reload()`, a
+[watch](#live-pull) push, a successful save, a settled
+[conflict](#conflict-modal) — or the [offline mirror](#offline-cache)'s own
+record of which revision its bytes were built on, read at mount from
+`loadSync`. That last one is what covers the window before the first cloud
+round-trip lands: an edit typed in those seconds is written from the mirror's
+revision rather than from nothing.
+
+Two rules keep the baseline honest:
+
+- **A load whose document we decline to adopt does not hand over its
+  revision.** When a keystroke (or an unsynced mirror, below) means the engine
+  keeps the local copy, adopting the revision it just read would tell the
+  backend the next write is a forward step from its current state — and the
+  queued save would go straight over the other device's edit. The stale
+  baseline is kept instead, so the save is checked against it and the
+  [file backends](#directory-adapter) reconcile per note: another device's edit
+  to a *different* note survives untouched, a collision on the *same* note
+  raises the conflict. If there was no baseline at all (the load is the first
+  thing this device ever heard from that backend), there is no honest merge to
+  attempt and the divergence is surfaced as a conflict.
+- **An unknown baseline is not a licence to overwrite.** A save from one goes
+  out with no `baseRevision`, and the directory adapter refuses to touch any
+  file whose current revision it can't account for — see `isOurs` in
+  `src/storage/directory-adapter.ts`, which passes only files that are absent
+  remotely, match the baseline, or carry a revision this session produced or
+  read. This is what stops the "typed a lot on the desktop, opened the phone,
+  the desktop's text was gone" failure: previously an absent `baseRevision`
+  disabled the conflict gate outright, so a device whose load had failed — or
+  whose load result had been declined for a keystroke — wrote its whole stale
+  document over the backend without asking.
 
 ### Live pull
 
@@ -2928,6 +2973,14 @@ shown when a save collides with a newer remote copy (another device edited while
 this one was offline). It summarises each copy (note/word counts) and the user
 picks the winner: "keep this device's copy" re-saves against the remote
 revision, "keep the other copy" adopts the remote bytes.
+
+It is raised from two places. Usually it's a save that came back with
+`ConflictError` — the backend refused a write whose [baseline](#save-baseline)
+it couldn't account for. It is also raised straight from the mount load when
+that load turns up a document this device has no baseline for while local edits
+are already queued: the edit is based on nothing the backend has confirmed, so
+there is nothing to merge against and the choice is the user's. Either way the
+on-screen edit stays put until they pick.
 
 ### Unlock gate
 
@@ -3708,6 +3761,32 @@ its last-known notes on the first frame instead of flashing an empty list while
 the network round-trip runs (the async `load()` then replaces them with the
 fresh remote copy). It returns null while encryption is on, since unsealing the
 mirrored envelope is async — that path stays on the async load.
+
+### Unsynced mirror
+
+The mirror records not just the bytes and their `revision` but whether those
+bytes ever **reached** the backend, as `pending` on the `StoredSnapshot`
+(`src/storage/adapter.ts`). A save that fails offline writes the attempted
+document with `pending: true` and keeps the last revision the backend *did*
+confirm — so on a pending mirror `revision` means "the baseline this text was
+written on top of", not "the revision of this text".
+
+It exists because the in-memory retry queue dies with the page. Closing the app
+with an unsaved edit used to leave bytes on disk indistinguishable from synced
+ones, and the next launch either lost the edit to the incoming load or wrote it
+over another device's newer work as though nothing had happened. Now the
+[sync engine](#sync-engine) reads the mark at mount, re-queues the document as
+dirty, and pushes it against that confirmed revision — so if another device
+wrote in the meantime the backend refuses the write and the
+[conflict modal](#conflict-modal) asks, instead of one side silently winning.
+
+The mark is cleared by any successful save, and by a successful `load()`
+write-through: the backend is reachable again and these are its bytes, while
+the unsynced copy has already been taken by the engine synchronously at mount.
+Clearing there is what lets "keep the other copy" on the resulting conflict
+actually stick rather than reappearing on the next launch. Mirrors written by
+older builds carry no mark, which is correct — they came from a successful load
+or save.
 
 ## Namespaces
 
