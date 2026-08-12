@@ -50,6 +50,7 @@ import {
   LinkGlyph,
   ListOrderedGlyph,
   LockGlyph,
+  LockOpenGlyph,
   MedalGlyph,
   MergeGlyph,
   MoreGlyph,
@@ -98,6 +99,10 @@ const hasMultiLineNote = (snap: Snapshot) =>
 // A note starred with the editor header's star button — the point where
 // someone starts curating the drawer instead of scrolling it.
 const hasFavorite = (snap: Snapshot) => snap.notes.some((n) => n.favorite);
+
+// A note locked read-only from the editor's padlock — the trophy for finding
+// out that a note you only ever read can be made unable to take a keystroke.
+const hasLockedNote = (snap: Snapshot) => snap.notes.some((n) => n.locked);
 
 // A note that has been given a title in its own field — the first time someone
 // uses the dedicated title row rather than letting a note stay untitled.
@@ -680,6 +685,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       slices: (s) => [s.snapshot.notes],
       predicate: (prev, next) =>
         !hasFavorite(prev.snapshot) && hasFavorite(next.snapshot),
+    },
+  },
+  {
+    id: "underLockAndKey",
+    tier: "intermediate",
+    glyph: LockOpenGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasLockedNote(prev.snapshot) && hasLockedNote(next.snapshot),
     },
   },
 

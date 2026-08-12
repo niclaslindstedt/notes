@@ -54,6 +54,7 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
   const onTitleChange = vi.fn();
   const onTitleSettle = vi.fn();
   const onToggleFavorite = vi.fn();
+  const onToggleLock = vi.fn();
   const onAttach = vi.fn();
   render(
     <NavContext.Provider value={nav}>
@@ -65,13 +66,21 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
         onTitleChange={onTitleChange}
         onTitleSettle={onTitleSettle}
         onToggleFavorite={onToggleFavorite}
+        onToggleLock={onToggleLock}
         canAttach={false}
         onAttach={onAttach}
         {...props}
       />
     </NavContext.Provider>,
   );
-  return { onBack, onChange, onTitleChange, onTitleSettle, onToggleFavorite };
+  return {
+    onBack,
+    onChange,
+    onTitleChange,
+    onTitleSettle,
+    onToggleFavorite,
+    onToggleLock,
+  };
 }
 
 describe("Editor", () => {
@@ -85,6 +94,20 @@ describe("Editor", () => {
     renderEditor({ note: note({ favorite: true }) });
     const star = screen.getByRole("button", { name: "Remove from favorites" });
     expect(star.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("locks the note from the header, and labels the button by state", () => {
+    const { onToggleLock } = renderEditor();
+    const padlock = screen.getByRole("button", { name: "Lock note" });
+    expect(padlock.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(padlock);
+    expect(onToggleLock).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the padlock as pressed on a note already locked", () => {
+    renderEditor({ note: note({ locked: true }) });
+    const padlock = screen.getByRole("button", { name: "Unlock note" });
+    expect(padlock.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("renders the title and body and fires onBack from the header", () => {
@@ -571,7 +594,7 @@ describe("Editor (narrow header)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
 
-    expect(cluster().style.maxWidth).toBe("14rem");
+    expect(cluster().style.maxWidth).toBe("17rem");
     expect(
       screen
         .getByRole("button", { name: "Hide note actions" })
@@ -584,7 +607,7 @@ describe("Editor (narrow header)", () => {
     stubNarrow(true);
     renderEditor();
     fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
-    expect(cluster().style.maxWidth).toBe("14rem");
+    expect(cluster().style.maxWidth).toBe("17rem");
 
     // Tapping into the body is the end of the detour — the title comes back
     // without a second press on the toggle.
@@ -680,7 +703,7 @@ describe("Editor (selection actions)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
 
-    expect(cluster().style.maxWidth).toBe("14rem");
+    expect(cluster().style.maxWidth).toBe("17rem");
     expect(
       screen.getByRole("button", { name: "Add to favorites" }),
     ).toBeTruthy();
@@ -709,5 +732,68 @@ describe("Editor (selection actions)", () => {
       screen.getByRole("button", { name: "Add to favorites" }),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Copy selection" })).toBe(null);
+  });
+});
+
+// A locked note is read-only: no caret, no soft keyboard, no edit — and none of
+// the header buttons that would rewrite it. Everything that only reads the note
+// stays exactly where it was.
+describe("Editor (locked)", () => {
+  function locked(over: Partial<Note> = {}) {
+    return renderEditor({ note: note({ locked: true, ...over }) });
+  }
+
+  it("makes the body read-only without a caret", () => {
+    locked();
+    const body = screen.getByDisplayValue("the body") as HTMLTextAreaElement;
+    expect(body.readOnly).toBe(true);
+    // `readOnly` alone keeps the soft keyboard down but still paints a caret on
+    // a desktop, so the caret colour is taken too.
+    expect(body.className).toContain("caret-transparent");
+  });
+
+  it("makes the title read-only too", () => {
+    locked();
+    const title = screen.getByDisplayValue("My note") as HTMLTextAreaElement;
+    expect(title.readOnly).toBe(true);
+    expect(title.className).toContain("caret-transparent");
+  });
+
+  it("refuses a title edit that reaches the field anyway", () => {
+    const { onTitleChange } = locked();
+    const title = screen.getByDisplayValue("My note") as HTMLTextAreaElement;
+    title.focus();
+    title.blur();
+    expect(onTitleChange).not.toHaveBeenCalled();
+  });
+
+  it("drops the two buttons that would rewrite the note", () => {
+    locked();
+    expect(screen.queryByRole("button", { name: "Formatting" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cut" })).toBeNull();
+  });
+
+  it("keeps every button that only reads it", () => {
+    locked({ favorite: true });
+    expect(
+      screen.getByRole("button", { name: "Remove from favorites" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Find in note" })).toBeTruthy();
+  });
+
+  it("keeps the styling toolbar off the screen without forgetting the setting", () => {
+    // The toolbar is remembered across notes and reloads, so a locked note
+    // opened by a Markdown writer would otherwise carry a bar of dead buttons.
+    localStorage.setItem("notes/format-toolbar", "true");
+    try {
+      locked();
+      expect(screen.queryByRole("toolbar")).toBeNull();
+      cleanup();
+      renderEditor();
+      expect(screen.getByRole("toolbar")).toBeTruthy();
+    } finally {
+      localStorage.removeItem("notes/format-toolbar");
+    }
   });
 });

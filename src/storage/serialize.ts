@@ -136,6 +136,13 @@ export function parse(text: string | null | undefined): Snapshot {
         } else {
           delete note.favorite;
         }
+        // The read-only lock is read the same defensive way: only a real `true`
+        // locks the note, so junk can never leave a note the user can't edit.
+        if ((n as { locked?: unknown }).locked === true) {
+          note.locked = true;
+        } else {
+          delete note.locked;
+        }
         return note;
       })
     : [];

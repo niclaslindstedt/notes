@@ -1595,6 +1595,115 @@ describe("MarkdownEditor", () => {
   });
 });
 
+// A locked note is read-only: the surface takes no caret (so no soft keyboard
+// comes up and nothing blinks on a desktop) and refuses every edit — while
+// reading, selecting and the line-number gutter carry on untouched.
+describe("MarkdownEditor (locked)", () => {
+  function gutter(): HTMLElement[] {
+    return [
+      ...surface().querySelectorAll<HTMLElement>(
+        "button[aria-label^='Select line']",
+      ),
+    ];
+  }
+
+  it("is not editable, and says so to a screen reader", () => {
+    renderEditor("hello", { locked: true });
+    expect(surface().getAttribute("contenteditable")).toBe("false");
+    expect(surface().getAttribute("aria-readonly")).toBe("true");
+  });
+
+  it("opens with no raw line even where an unlocked note would have one", () => {
+    // `focusOnMount` asks for the caret at the end of the note; locked, there
+    // is nowhere to put it, so every line renders formatted.
+    renderEditor("# heading", { locked: true, focusOnMount: true });
+    expect(rawLine()).toBeNull();
+    // Formatted, not raw: the `#` is gone and the text sits outside any raw line.
+    expect(screen.getByText("heading").closest("[data-raw]")).toBeNull();
+  });
+
+  it("refuses an edit that reaches the surface anyway", () => {
+    // The attribute alone should keep `beforeinput` from ever firing; this is
+    // the second lock, for an edit that got past it.
+    const { onChange } = renderEditor("hello", { locked: true });
+    beforeInput("insertText", "x");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("takes the raw line back to formatted when the note is locked mid-edit", () => {
+    const { rerender } = render(
+      <MarkdownEditor body="# heading" onChange={vi.fn()} {...editorProps} />,
+    );
+    expect(rawLine()?.textContent).toBe("# heading");
+    act(() => {
+      rerender(
+        <MarkdownEditor
+          body="# heading"
+          onChange={vi.fn()}
+          {...editorProps}
+          locked
+        />,
+      );
+    });
+    expect(rawLine()).toBeNull();
+    // Formatted, not raw: the `#` is gone and the text sits outside any raw line.
+    expect(screen.getByText("heading").closest("[data-raw]")).toBeNull();
+  });
+
+  it("still selects the whole line from the gutter", () => {
+    renderEditor("alpha\nbeta", { locked: true, lineNumbers: true });
+    act(() => {
+      fireEvent.mouseDown(gutter()[0]!);
+    });
+    const sel = window.getSelection()!;
+    expect(sel.isCollapsed).toBe(false);
+    expect(sel.toString()).toBe("alpha");
+  });
+
+  it("still reports that selection, so the header's copy button appears", async () => {
+    const onSelectionChange = vi.fn();
+    renderEditor("alpha\nbeta", {
+      locked: true,
+      lineNumbers: true,
+      onSelectionChange,
+    });
+    act(() => {
+      fireEvent.mouseDown(gutter()[0]!);
+    });
+    // The editor swallows the `selectionchange` its own `setBaseAndExtent`
+    // fires and re-arms the handler in a microtask, so let that drain before
+    // standing in for the browser's event.
+    await act(async () => {});
+    act(() => {
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+    expect(onSelectionChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it("hands out the pressed line's verbatim source, so it can be copied", () => {
+    // The whole point of leaving the gutter working: press a line number on a
+    // locked note and the header's copy button takes the Markdown you typed,
+    // `**` and all, not the rendered text.
+    const handle: { current: MarkdownEditorHandle | null } = { current: null };
+    renderEditor("**bold** tail\nsecond", {
+      locked: true,
+      lineNumbers: true,
+      handleRef: handle,
+    });
+    act(() => {
+      fireEvent.mouseDown(gutter()[0]!);
+    });
+    expect(handle.current?.selection()).toBe("**bold** tail");
+  });
+
+  it("leaves a task checkbox showing state rather than taking a press", () => {
+    const { onChange } = renderEditor("- [ ] milk", { locked: true });
+    const box = surface().querySelector("[data-task-toggle]");
+    expect(box).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
 // The editor tells its host when a selection appears and disappears, which is
 // what puts the selection actions in the narrow editor header (see the
 // selection actions in `NoteEditor.tsx`).

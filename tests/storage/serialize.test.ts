@@ -95,6 +95,28 @@ describe("storage serialize — favorites", () => {
   });
 });
 
+describe("storage serialize — the read-only lock", () => {
+  it("round-trips the locked flag through serialize → parse", () => {
+    const locked = { ...createNote(1), locked: true };
+    const restored = parse(serialize({ notes: [locked] }));
+    expect(restored.notes[0]?.locked).toBe(true);
+  });
+
+  it("drops a non-boolean locked value defensively", () => {
+    // Junk must never leave a note the user can't edit and can't unlock.
+    const text = JSON.stringify({
+      version: LATEST_VERSION,
+      notes: [{ ...createNote(1), locked: "yes" }],
+    });
+    expect(parse(text).notes[0]?.locked).toBeUndefined();
+  });
+
+  it("omits the flag on a note that was never locked", () => {
+    const restored = parse(serialize({ notes: [createNote(1)] }));
+    expect("locked" in restored.notes[0]!).toBe(false);
+  });
+});
+
 describe("storage serialize — folders", () => {
   it("round-trips folders and note.folderId through serialize → parse", () => {
     const note = { ...createNote(1), folderId: "f1" };

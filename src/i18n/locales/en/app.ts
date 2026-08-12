@@ -77,6 +77,12 @@ const app = {
   // press will do, so it flips with the note's current state.
   favorite: "Add to favorites",
   unfavorite: "Remove from favorites",
+  // The editor header's padlock, beside the star: it makes the open note
+  // read-only (no caret, no keyboard, no edits) and unlocks it again. Like the
+  // star's, the label states what the press will do, so it flips with the
+  // note's current state.
+  lock: "Lock note",
+  unlock: "Unlock note",
   // The ⋯ toggle a narrow editor header folds its whole action cluster into.
   // The label states what the press will do, so it flips with the row's state.
   actions: {

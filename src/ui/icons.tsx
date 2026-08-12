@@ -51,6 +51,32 @@ export {
 
 type IconProps = { className?: string };
 
+/**
+ * A padlock with the shackle swung open — the "this note is unlocked, press to
+ * lock it" half of the editor's [lock button](../../docs/overview.md#lock-a-note).
+ * Drawn to the same proportions as the framework's closed `LockIcon` (identical
+ * body, shackle hinged off its right side) so the two read as one glyph
+ * changing state rather than two different marks. Not in the framework set.
+ */
+export function LockOpenIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <rect x="4" y="11" width="16" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 7.7-1.5" />
+    </svg>
+  );
+}
+
 /** A folder with a plus — create a folder. Not in the framework set. */
 export function FolderPlusIcon({ className }: IconProps) {
   return (

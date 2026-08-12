@@ -23,7 +23,7 @@ import {
   type LineFormat,
 } from "../domain/markdown-format.ts";
 import { findMatches, type NoteMatch } from "../domain/note-find.ts";
-import { isBlank, type Note } from "../domain/note.ts";
+import { isBlank, isLocked, type Note } from "../domain/note.ts";
 import type { CompiledTransform } from "../domain/transform.ts";
 import { useT } from "../i18n/index.ts";
 import { haptics } from "../platform/native-bridge.ts";
@@ -41,6 +41,7 @@ import {
 import { ExportButton } from "./export/ExportButton.tsx";
 import { FavoriteButton } from "./FavoriteButton.tsx";
 import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
+import { LockButton } from "./LockButton.tsx";
 import { useFindShortcut } from "./hooks/useFindShortcuts.ts";
 import { useDesktopPointer, useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
@@ -69,7 +70,7 @@ function readToolbarOpen(): boolean {
 }
 
 // Below this width the header stops trying to carry the note's name *and* the
-// five action buttons at once and folds the cluster behind a single ⋯ toggle
+// six action buttons at once and folds the cluster behind a single ⋯ toggle
 // (see `MoreButton`). It is Tailwind's `sm` breakpoint from the other side: at
 // 640px and up the row fits, and under it the title was being squeezed to a
 // couple of words. A media query rather than the pane's own width because the
@@ -80,14 +81,18 @@ const COLLAPSE_QUERY = "(max-width: 639px)";
 // How wide the folded-out cluster is allowed to grow. Only the animation reads
 // it: the buttons size the box, and this cap is what the max-width transition
 // travels to (a width of `auto` can't be transitioned). Kept a little above the
-// real ~13.25rem so no button is ever clipped at rest — the cost is that the
-// slide finishes a hair before the timer does.
-const ACTIONS_MAX_WIDTH = "14rem";
+// real ~16.5rem — six 2.25rem buttons, five 0.5rem gaps and the box's own
+// `pr-2` — so no button is ever clipped at rest; the cost is that the slide
+// finishes a hair before the timer does. **Raise this whenever a button joins
+// the cluster**: the box clips what doesn't fit, so a cap left behind simply
+// swallows the last glyph on a phone.
+const ACTIONS_MAX_WIDTH = "17rem";
 
 // The same cap for the three selection actions (formatting, cut, copy), which
 // unfold out of the ⋯ on their own when text is selected — real width ~8.25rem.
-// Both caps are upper bounds, so the row a desktop pointer gets (no cut button —
-// see `desktopPointer`) simply travels to a stop it doesn't reach.
+// Both caps are upper bounds, so a row carrying fewer than the full set — a
+// desktop pointer gets no cut button (see `desktopPointer`), and a locked note
+// gets neither cut nor formatting — simply travels to a stop it doesn't reach.
 const SELECTION_MAX_WIDTH = "9rem";
 
 // A stable empty hit list for the closed find bar, so the editing surfaces keep
@@ -114,6 +119,7 @@ export function Editor({
   onTitleChange,
   onTitleSettle,
   onToggleFavorite,
+  onToggleLock,
   undoScrollSeq = 0,
   uploading = false,
   loading = false,
@@ -132,6 +138,9 @@ export function Editor({
   onTitleSettle: () => void;
   /** Star / unstar the note — the header's leading star button. */
   onToggleFavorite: () => void;
+  /** Lock / unlock the note — the header's padlock button. A locked note is
+   *  read-only: see `docs/overview.md#lock-a-note`. */
+  onToggleLock: () => void;
   /** Ticks when undo / redo swaps the body — cues the editor to scroll the
    *  reverted / re-applied region back into view. */
   undoScrollSeq?: number;
@@ -145,14 +154,21 @@ export function Editor({
 }) {
   const t = useT();
   const maxWidth = editorMarginMaxWidth(editor.margin);
+  // The note is locked: read-only. The two editing surfaces refuse the caret
+  // (and with it the soft keyboard), and every header action that would rewrite
+  // the note stands down with them — the formatting toolbar, the cut button,
+  // and the title field. What is left is everything that only *reads* the note:
+  // the star, the export menu, find, and copying a selection.
+  const locked = isLocked(note);
   // A brand-new note opens with the caret in the title so it's ready to be
   // named; opening an existing note focuses nothing, so the soft keyboard
   // stays down until the user taps where they want to type. Captured once for
   // mount — typing the title doesn't re-route focus mid-session.
-  const titleFirst = useRef(isBlank(note)).current;
+  const titleFirst = useRef(isBlank(note) && !isLocked(note)).current;
   const bodyRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
-  // The header's action cluster (favorite, formatting, cut, export, find),
+  // The header's action cluster (favorite, lock, formatting, cut, export,
+  // find),
   // which the body hands focus on to — see `firstAction`.
   const actionsRef = useRef<HTMLDivElement>(null);
   // The ⋯ toggle the cluster folds into on a narrow screen; held so the tab
@@ -173,6 +189,11 @@ export function Editor({
   // surface only reports that state while the toolbar is open, so a closed
   // toolbar costs nothing.
   const [toolbarOpen, setToolbarOpen] = useState(readToolbarOpen);
+  // Remembered across notes and reloads, so a locked note opened by someone who
+  // writes in Markdown would otherwise carry a toolbar whose every button is a
+  // no-op. The preference itself is left alone — the next unlocked note gets it
+  // back — this only decides whether the bar is on screen right now.
+  const toolbarUp = toolbarOpen && !locked;
   const [lineFormat, setLineFormat] = useState<LineFormat | null>(null);
 
   // Find in note: whether the bar is up, what is typed in it, and which hit it
@@ -185,7 +206,7 @@ export function Editor({
   // Bumped to pull focus back into an already-open bar — see `openFind`.
   const [findFocusSignal, setFindFocusSignal] = useState(0);
 
-  // The header's action cluster on a narrow screen: five buttons and a note
+  // The header's action cluster on a narrow screen: six buttons and a note
   // title don't both fit, and the title is what you need to see while reading,
   // so the buttons fold behind a ⋯ toggle and slide back out on a press —
   // taking the title's place while they are out (it is the thing they cover,
@@ -422,6 +443,7 @@ export function Editor({
           focusOnMount={titleFirst}
           onMultilineChange={setTitleMultiline}
           hidden={narrow && clusterOpen}
+          readOnly={locked}
           disableSpellcheck={editor.disableSpellcheck}
           disableAutocorrect={editor.disableAutocorrect}
           capitaliseSentences={editor.capitaliseSentences}
@@ -472,13 +494,26 @@ export function Editor({
             }
           >
             {!selecting && (
-              <FavoriteButton
-                favorite={note.favorite === true}
-                onToggle={onToggleFavorite}
+              <>
+                <FavoriteButton
+                  favorite={note.favorite === true}
+                  onToggle={onToggleFavorite}
+                />
+                <LockButton locked={locked} onToggle={onToggleLock} />
+              </>
+            )}
+            {/* The two actions that rewrite the note are simply not offered on
+                a locked one — including in the selection cluster, where copy
+                is then the only thing a selection can be used for. */}
+            {!locked && (
+              <FormatToolbarButton
+                open={toolbarOpen}
+                onToggle={toggleToolbar}
               />
             )}
-            <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
-            {!loading && !desktopPointer && <CutButton onCut={runCut} />}
+            {!loading && !locked && !desktopPointer && (
+              <CutButton onCut={runCut} />
+            )}
             {selecting ? (
               <CopyButton onCopy={runCopy} />
             ) : (
@@ -536,7 +571,7 @@ export function Editor({
             focusSignal={findFocusSignal}
           />
         )}
-        {toolbarOpen && !loading && (
+        {toolbarUp && !loading && (
           <FormatToolbar
             line={lineFormat}
             onAction={runFormat}
@@ -554,6 +589,7 @@ export function Editor({
             body={note.body ?? ""}
             onChange={onChange}
             undoScrollSeq={undoScrollSeq}
+            locked={locked}
             wordWrap={editor.wordWrap}
             disableSpellcheck={editor.disableSpellcheck}
             disableAutocorrect={editor.disableAutocorrect}
@@ -573,7 +609,7 @@ export function Editor({
             transforms={transforms}
             lineNumbers={editor.lineNumbers}
             onTabOut={onBodyTab}
-            onLineFormat={toolbarOpen ? setLineFormat : undefined}
+            onLineFormat={toolbarUp ? setLineFormat : undefined}
             onSelectionChange={setHasSelection}
             matches={matches}
             activeMatch={activeMatch}
@@ -583,8 +619,9 @@ export function Editor({
             handleRef={plainEditorRef}
             body={note.body ?? ""}
             onChange={onChange}
+            locked={locked}
             onTabOut={onBodyTab}
-            onLineFormat={toolbarOpen ? setLineFormat : undefined}
+            onLineFormat={toolbarUp ? setLineFormat : undefined}
             onSelectionChange={setHasSelection}
             undoScrollSeq={undoScrollSeq}
             wordWrap={editor.wordWrap}
@@ -623,6 +660,7 @@ function TitleField({
   focusOnMount,
   onMultilineChange,
   hidden = false,
+  readOnly = false,
   disableSpellcheck,
   disableAutocorrect,
   capitaliseSentences,
@@ -644,6 +682,14 @@ function TitleField({
    * title, and renaming the note's file is not what pressing ⋯ asked for.
    */
   hidden?: boolean;
+  /**
+   * The note is locked, so its name is read-only too — a lock that guarded the
+   * body but let the note be renamed would be a strange half-lock. The field
+   * stays selectable (the title is worth copying) and keeps its place in the
+   * tab order; it simply takes no keystrokes, raises no soft keyboard, and
+   * paints no caret.
+   */
+  readOnly?: boolean;
   disableSpellcheck: boolean;
   disableAutocorrect: boolean;
   capitaliseSentences: boolean;
@@ -744,6 +790,7 @@ function TitleField({
       ref={ref}
       rows={1}
       value={draft}
+      readOnly={readOnly}
       spellcheck={!disableSpellcheck}
       autoCorrect={disableAutocorrect ? "off" : "on"}
       autoCapitalize={
@@ -773,7 +820,7 @@ function TitleField({
           onFocusBody();
         }
       }}
-      className={`min-w-0 flex-1 resize-none appearance-none overflow-hidden border-0 bg-transparent p-0 font-[inherit] text-lg font-bold leading-tight text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60 ${hidden ? "hidden" : ""}`}
+      className={`min-w-0 flex-1 resize-none appearance-none overflow-hidden border-0 bg-transparent p-0 font-[inherit] text-lg font-bold leading-tight text-fg-bright outline-none placeholder:font-bold placeholder:text-muted/60 ${hidden ? "hidden" : ""} ${readOnly ? "caret-transparent" : ""}`}
     />
   );
 }
@@ -828,6 +875,7 @@ function PlainEditor({
   body,
   onChange,
   undoScrollSeq = 0,
+  locked = false,
   wordWrap,
   disableSpellcheck,
   disableAutocorrect,
@@ -846,6 +894,13 @@ function PlainEditor({
   onChange: (body: string) => void;
   /** Ticks when undo / redo swaps the body — see the live-preview editor. */
   undoScrollSeq?: number;
+  /**
+   * The note is **locked**: the textarea goes `readOnly`, which is what stops
+   * the soft keyboard coming up for it, and `caret-transparent` takes the
+   * desktop caret the browser still paints in a read-only field. Selecting and
+   * copying are deliberately left working — a locked note is one you read.
+   */
+  locked?: boolean;
   wordWrap: boolean;
   disableSpellcheck: boolean;
   disableAutocorrect: boolean;
@@ -885,6 +940,10 @@ function PlainEditor({
   // Where the caret / scroll were the last time this note was left this session,
   // read once on mount (the editor is keyed by note id, so it remounts per note).
   const [saved] = useState(() => (noteId ? getEditorPosition(noteId) : null));
+  // Whether the note was locked when this surface mounted — which is all the
+  // position restore below needs, and reading it through a ref keeps that
+  // mount-time effect from re-running when the padlock is pressed.
+  const lockedAtMount = useRef(locked).current;
   // Latest caret offset / scroll, kept current so the unmount handler can stash
   // them for the next open.
   const lastOffset = useRef<number>(
@@ -942,14 +1001,20 @@ function PlainEditor({
   useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!el || !saved) return;
-    if (saved.caret) {
+    // Where you were reading is restored either way; the caret is not, because
+    // a locked note has none to put back (and focusing to place it is exactly
+    // what would raise the keyboard we are keeping down).
+    if (saved.caret && !lockedAtMount) {
       const offset = pointToOffset(el.value, saved.caret);
       el.focus();
       el.setSelectionRange(offset, offset);
       unlock("whereYouLeftOff");
     }
     setScrollTop(el, saved.scrollTop);
-  }, [saved]);
+    // `lockedAtMount` is fixed for this surface's lifetime, so listing it
+    // changes nothing about when this runs — it just satisfies the dependency
+    // check without an exception comment.
+  }, [saved, lockedAtMount]);
 
   // Stash the caret / scroll for this note as the editor unmounts — a note
   // switch remounts it, and the mount effect above reads this back.
@@ -1025,7 +1090,7 @@ function PlainEditor({
   // fire-and-forget: a refused clipboard must not hold up the edit.
   function cut() {
     const el = textareaRef.current;
-    if (!el) return;
+    if (!el || locked) return;
     const source = el.value;
     const result = cutLine(
       source.split("\n"),
@@ -1048,7 +1113,7 @@ function PlainEditor({
   useImperativeHandle(handleRef ?? null, () => ({
     format: (action: FormatAction) => {
       const el = textareaRef.current;
-      if (!el) return;
+      if (!el || locked) return;
       const source = el.value;
       const result = applyFormat(
         source.split("\n"),
@@ -1140,6 +1205,7 @@ function PlainEditor({
     <textarea
       ref={textareaRef}
       value={value}
+      readOnly={locked}
       wrap={wordWrap ? "soft" : "off"}
       spellcheck={!disableSpellcheck}
       autoCorrect={disableAutocorrect ? "off" : "on"}
@@ -1191,7 +1257,7 @@ function PlainEditor({
       style={maxWidth === "none" ? undefined : { maxWidth }}
       className={`mx-auto w-full flex-1 resize-none overscroll-contain bg-page-bg px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none placeholder:text-muted/60 ${
         wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"
-      }`}
+      } ${locked ? "caret-transparent" : ""}`}
     />
   );
 }

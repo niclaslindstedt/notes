@@ -44,6 +44,14 @@ export type Note = {
   // list. Absent on an unstarred note rather than written as `false`, so an
   // older document needs no migration.
   favorite?: boolean;
+  // Locked from the editor header, which makes the note read-only: the editing
+  // surface stops accepting a caret (so no soft keyboard comes up and no
+  // keystroke can land), and the actions that would rewrite it — formatting,
+  // cut, the task checkboxes, the title field — stand down with it. Reading,
+  // selecting, copying, exporting, starring and archiving are untouched: this
+  // guards the *text*, not the note. Absent on an unlocked note rather than
+  // written as `false`, so an older document needs no migration.
+  locked?: boolean;
   // Images the user pasted or dropped into the note. Each rides in memory as a
   // `data:` URL the editor renders; on the file backends the storage layer
   // externalises it to a real image file under `attachments/<note-name>/` (see
@@ -189,6 +197,24 @@ export function setFavorite(note: Note, favorite: boolean): Note {
   const next: Note = { ...note };
   delete next.favorite;
   return next;
+}
+
+// Return a copy of `note` locked (read-only) or unlocked again. `updatedAt` is
+// left untouched for the same reason archiving and starring leave it alone:
+// locking says something *about* the note rather than changing what it says, so
+// it keeps its place in the most-recently-edited ordering. The flag is dropped
+// rather than written as `false` when unlocking, so an unlocked note
+// round-trips through storage as minimally as one that was never locked.
+export function setLocked(note: Note, locked: boolean): Note {
+  if (locked) return { ...note, locked: true };
+  const next: Note = { ...note };
+  delete next.locked;
+  return next;
+}
+
+/** True when the note is locked and its text must not be edited. */
+export function isLocked(note: Note): boolean {
+  return note.locked === true;
 }
 
 // The notes the Favorites section lists: everything starred that isn't

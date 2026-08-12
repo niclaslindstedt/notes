@@ -118,7 +118,7 @@ const achievements: AchievementsCatalog = {
       name: "Armbågsrum",
       condition: "Öppna en antecknings ⋯-meny på en smal skärm.",
       learnMore:
-        "På en telefon rymmer redigerarens sidhuvud antingen anteckningens namn eller dess fem knappar, inte båda — så knapparna viks ihop till en enda ⋯-knapp till höger. Ett tryck fäller ut dem över titeln; ett tryck till, eller en beröring i själva anteckningen, viker ihop dem igen och lämnar tillbaka titeln. Markören står kvar hela vägen, så klipp- och formateringsknapparna arbetar fortfarande på raden du skrev på.",
+        "På en telefon rymmer redigerarens sidhuvud antingen anteckningens namn eller dess knappar, inte båda — så knapparna viks ihop till en enda ⋯-knapp till höger. Ett tryck fäller ut dem över titeln; ett tryck till, eller en beröring i själva anteckningen, viker ihop dem igen och lämnar tillbaka titeln. Markören står kvar hela vägen, så klipp- och formateringsknapparna arbetar fortfarande på raden du skrev på.",
     },
     sleightOfHand: {
       name: "Snabb i fingrarna",
@@ -137,6 +137,12 @@ const achievements: AchievementsCatalog = {
       condition: "Lägg till en anteckning bland favoriterna.",
       learnMore:
         "Stjärnan till vänster i en antecknings sidhuvud gör den till favorit, och sidomenyn får ett avsnitt Favoriter ovanför anteckningslistan med allt du stjärnmärkt. Det är en genväg, inte en flytt: anteckningen behåller sin mapp, sin plats i den vanliga listan och allt annat — stjärnan sätter bara en extra dörr på den, så att de få anteckningar du ständigt återvänder till är ett tryck bort hur djupt de än ligger. Som standard struntar Favoriter helt i mapparna och listar anteckningarna platt; under Inställningar → Utseende → Sidomeny kan du i stället låta mappstrukturen synas där.",
+    },
+    underLockAndKey: {
+      name: "Bakom lås och bom",
+      condition: "Lås en anteckning så att den inte går att redigera.",
+      learnMore:
+        "Hänglåset bredvid stjärnan gör den öppna anteckningen skrivskyddad. En låst anteckning tar inte emot någon markör alls: trycker du i den på en telefon stannar tangentbordet nere, klickar du i den på en dator börjar ingenting blinka — så anteckningen du håller öppen som referens kan inte skrivas i av misstag, eller av fickan. Knapparna som skulle skriva om den följer med markören (formatering, klipp ut, kryssrutorna på uppgiftsrader och namnfältet), medan allt som bara läser den fungerar precis som förut: du kan skrolla, markera, kopiera, söka, exportera, stjärnmärka och arkivera. Radnummerspalten fungerar också, så ett tryck på ett nummer markerar hela raden och kopieringsknappen glider fram för att ta den. Tryck på hänglåset igen för att låsa upp. Låset följer med anteckningen, så den är låst på dina andra enheter också.",
     },
 
     // ── Van ───────────────────────────────────────────────────────────

@@ -21,6 +21,7 @@ import {
   retitleNote,
   setArchived,
   setFavorite,
+  setLocked,
   setNoteFolder,
   sortByUpdated,
   sortFoldersByCreated,
@@ -71,6 +72,8 @@ export type NotesStore = {
   restore: (id: string) => void;
   /** Star / unstar a note — the side menu's Favorites section lists the starred. */
   toggleFavorite: (id: string) => void;
+  /** Lock / unlock a note — a locked note is read-only in the editor. */
+  toggleLock: (id: string) => void;
   /** Move a note into `folderId`, or out of any folder when `null`. */
   moveNote: (id: string, folderId: string | null) => void;
   /** Create a folder and return its id. */
@@ -479,6 +482,27 @@ export function useNotes(
     [commit, withBody],
   );
 
+  // Lock / unlock a note. Structural like starring — it changes what may be
+  // done to the note, not what it says — so it records on the shared timeline
+  // and, on the encrypted backends, promotes a deferred note first so the flag
+  // reaches its `.enc` file.
+  const toggleLock = useCallback(
+    (id: string): void => {
+      const target = docRef.current.notes.find((n) => n.id === id);
+      if (!target) return;
+      const next = !target.locked;
+      const title = noteTitle(target);
+      withBody(id, () =>
+        commit(
+          (prev) => prev.map((n) => (n.id === id ? setLocked(n, next) : n)),
+          next ? `Locked note “${title}”` : `Unlocked note “${title}”`,
+          DOC_SCOPE,
+        ),
+      );
+    },
+    [commit, withBody],
+  );
+
   // Move a note into a folder (or out of every folder when `folderId` is null).
   // Not coalesced with edits — a move is its own undo step.
   const moveNote = useCallback(
@@ -629,6 +653,7 @@ export function useNotes(
     archive,
     restore,
     toggleFavorite,
+    toggleLock,
     moveNote,
     createFolder,
     renameFolder,

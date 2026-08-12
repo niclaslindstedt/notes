@@ -122,7 +122,7 @@ const achievements = {
       name: "Elbow room",
       condition: "Open a note's ⋯ menu on a narrow screen.",
       learnMore:
-        "On a phone the editor's header has room for the note's name or its five action buttons, not both — so the buttons fold into a single ⋯ button on the right. Pressing it slides them back out over the title; pressing it again, or touching the note itself, folds them away and hands the title back. The caret stays exactly where it was through all of it, so the cut and formatting buttons still act on the line you were writing.",
+        "On a phone the editor's header has room for the note's name or its action buttons, not both — so the buttons fold into a single ⋯ button on the right. Pressing it slides them back out over the title; pressing it again, or touching the note itself, folds them away and hands the title back. The caret stays exactly where it was through all of it, so the cut and formatting buttons still act on the line you were writing.",
     },
     sleightOfHand: {
       name: "Sleight of hand",
@@ -141,6 +141,12 @@ const achievements = {
       condition: "Add a note to your favorites.",
       learnMore:
         "The star at the left of a note's header marks it a favorite, and the side menu grows a Favorites section above the note list holding everything you have starred. It is a shortcut, not a move: the note keeps its folder, its place in the ordinary list, and everything else about it — the star just puts a second door on it, so the handful of notes you keep coming back to are one tap away no matter how deep they are filed or how far down the recents they have slipped. By default Favorites ignores the folders entirely and lists the notes flat; Settings → Appearance → Sidebar can reproduce the folder structure there instead.",
+    },
+    underLockAndKey: {
+      name: "Under lock and key",
+      condition: "Lock a note so it can't be edited.",
+      learnMore:
+        "The padlock beside the star makes the open note read-only. A locked note takes no caret at all: tap into it on a phone and the keyboard stays down, click into it on a desktop and nothing starts blinking, so the note you keep open for reference can't be typed into by accident — or by a pocket. The buttons that would rewrite it go with the caret (formatting, cut, the checkboxes on task rows, and the title field), while everything that only reads it carries on exactly as before: you can scroll it, select it, copy from it, search it, export it, star it and archive it. The line-number gutter still works too, so pressing a number selects that whole line and the copy button slides out to take it. Press the padlock again to unlock it. The lock travels with the note, so it is still locked on your other devices.",
     },
 
     // ── Intermediate ──────────────────────────────────────────────────

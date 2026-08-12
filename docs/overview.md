@@ -2039,17 +2039,18 @@ Opening the bar is the **Pinpoint** achievement.
 
 `Editor` (`src/ui/NoteEditor.tsx`) — under `COLLAPSE_QUERY`
 (`max-width: 639px`, Tailwind's `sm` breakpoint from the other side) the
-editor header stops trying to carry the note's name *and* the five-button
-action cluster ([favorite](#favorites), [formatting](#styling-toolbar),
-[cut](#cut-button), [export](#export), [find](#find-in-note)) at once — four of
-them in a narrow window on a desktop pointer, which gets no
-[cut button](#cut-button). The cluster folds behind a single **⋯ button** (`MoreButton`, wearing `MoreIcon`
+editor header stops trying to carry the note's name *and* the six-button
+action cluster ([favorite](#favorites), [lock](#lock-a-note),
+[formatting](#styling-toolbar), [cut](#cut-button), [export](#export),
+[find](#find-in-note)) at once — five of them in a narrow window on a desktop
+pointer, which gets no [cut button](#cut-button), and four on a
+[locked note](#lock-a-note), which gets neither cut nor formatting. The cluster folds behind a single **⋯ button** (`MoreButton`, wearing `MoreIcon`
 from `src/ui/icons.tsx`) pinned to the right of the row; the title gets the
 whole width back. Pressing ⋯ unfolds the buttons *over* the title — the title
 field is taken out of the row with `display: none` while they are out, because
 the note itself is right below to say which note this is.
 
-The unfold is one CSS transition on the box holding the five buttons:
+The unfold is one CSS transition on the box holding the buttons:
 `max-width` from `0` to `ACTIONS_MAX_WIDTH`, plus `opacity`, plus
 `visibility`. The box is right-anchored and clips what doesn't fit yet, so
 growing it walks its content leftwards and the buttons read as unfolding out
@@ -2264,6 +2265,68 @@ same way the rest of the drawer treats a stale link.
 
 The **Star-struck** achievement (`starStruck`) derives from the first note in
 the document gaining the flag.
+
+### Lock a note
+
+A **locked** note is read-only. The padlock sits beside the star in the editor
+header (`LockButton`, `src/ui/LockButton.tsx`, drawing the framework's closed
+`LockIcon` or the app's own `LockOpenIcon` to show the note's current state, and
+filling itself in the accent colour while locked so the state is visible at a
+glance). `App` routes its press to `useNotes().toggleLock`, which flips
+`Note.locked` (`setLocked`, `src/domain/note.ts`) on the shared `DOC_SCOPE` undo
+timeline — structural, like starring, because it changes what may be *done* to a
+note rather than what it says. `updatedAt` is left alone so locking never jumps a
+note to the top of the recents, and the toggle runs through `withBody` so a
+deferred note on an [encrypted backend](#encryption) is loaded first and the flag
+reaches its `.enc` file. The flag is absent rather than `false` when unlocked, so
+no migration was needed and it rides every persistence layer on exactly the terms
+[`favorite`](#favorites) does: `locked: true` in the markdown frontmatter, a
+`locked` field on the encrypted note JSON and on the [note index](#encryption)
+row, and a defensive `locked === true` check in `parse` — junk must never leave a
+note the user can neither edit nor unlock. Because it is part of the document, a
+lock travels to the user's other devices with everything else.
+
+**What the lock takes away is the caret**, and everything follows from that. In
+the [live-preview editor](#markdown-editor) the surface stops being
+`contenteditable` altogether (`contentEditable="false"`, plus `aria-readonly` so
+a screen reader announces the textbox as read-only), which is what keeps the soft
+keyboard down on a phone and stops anything blinking on a desktop. With no caret
+there is no [active raw line](#markdown-editor): a locked note opens fully
+formatted and *stays* that way, and locking a note that is open mid-edit drops
+the raw line back to formatted in the same render. The paths that would mutate
+the source stand down with it — `beforeinput` refuses everything outright (a
+second lock, in case an edit reaches the DOM behind React's back, which is the
+failure the whole interception layer exists to prevent), and `format`, `cut`,
+`indentList`, `placeCaretAtEnd`, `toggleTask`, paste and file drop all return
+early. [Task checkboxes](#task-items) render as state rather than press targets
+(`interactiveTasks={false}`). The Markdown-off [plain fallback](#markdown-editor)
+gets the same treatment through the textarea's own `readOnly` — which is what
+suppresses the mobile keyboard there — plus `caret-transparent`, because a
+read-only field still paints a desktop caret. The [title field](#title-field) is
+read-only on the same terms: a lock that guarded the body but let the note be
+renamed would be a strange half-lock.
+
+**What the lock leaves alone is everything that only reads the note.** Scrolling,
+[selecting](#selection-mapping), copying, [find](#find-in-note),
+[export](#export), [starring](#favorites) and archiving are untouched, and the
+[line-number gutter](#line-numbers) keeps working in full: pressing a number on a
+locked note still draws the whole-line selection, still reports it up to the
+header, and so still unfolds the narrow header's
+[selection actions](#selection-actions) — which on a locked note is the copy
+button alone, since the other two rewrite the note. The header drops the
+[formatting toggle](#styling-toolbar) and the [cut button](#cut-button) while
+locked, and holds the styling toolbar off the screen without forgetting the
+user's preference, so a Markdown writer's remembered toolbar doesn't arrive as a
+bar of dead buttons over a note it can't touch.
+
+The lock is a guard against a stray keystroke — the reference note you keep open,
+the recipe you read while cooking, the pocket that finds the screen — not a
+security boundary. Encryption at rest is a different feature entirely, with a
+different lock glyph on the note card (see [encryption](#encryption)); this one
+you hold the key to, and one press gives it back.
+
+The **Under lock and key** achievement (`underLockAndKey`) derives from the first
+note in the document gaining the flag.
 
 ### Delete
 

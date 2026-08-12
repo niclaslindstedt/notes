@@ -38,6 +38,7 @@ export type IndexEntry = {
   updatedAt: number;
   archived?: boolean;
   favorite?: boolean;
+  locked?: boolean;
   folderId?: string;
   attachments?: IndexAttachment[];
   preview: string;
@@ -58,6 +59,7 @@ export function noteToIndexEntry(note: Note, rev?: string): IndexEntry {
   };
   if (note.archived) entry.archived = true;
   if (note.favorite) entry.favorite = true;
+  if (note.locked) entry.locked = true;
   if (note.folderId) entry.folderId = note.folderId;
   if (note.attachments && note.attachments.length > 0) {
     entry.attachments = note.attachments.map((a) => ({
@@ -82,6 +84,7 @@ export function indexEntryToNote(entry: IndexEntry): Note {
   };
   if (entry.archived) note.archived = true;
   if (entry.favorite) note.favorite = true;
+  if (entry.locked) note.locked = true;
   if (entry.folderId) note.folderId = entry.folderId;
   if (entry.attachments && entry.attachments.length > 0) {
     note.attachments = entry.attachments.map((a) => ({
@@ -141,6 +144,7 @@ function parseEntry(value: unknown): IndexEntry | null {
   };
   if (e.archived === true) entry.archived = true;
   if (e.favorite === true) entry.favorite = true;
+  if (e.locked === true) entry.locked = true;
   if (typeof e.folderId === "string" && e.folderId.length > 0) {
     entry.folderId = e.folderId;
   }

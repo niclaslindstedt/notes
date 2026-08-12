@@ -103,6 +103,18 @@ export function KeyGlyph({ className }: IconProps) {
 
 // ── Per-achievement glyphs ─────────────────────────────────────────────────
 
+// A padlock with its shackle swung open — the editor's read-only lock, which is
+// a lock you hold the key to, not the encryption at rest `LockGlyph` stands for
+// (that one is closed, and its trophy is Paranoid mode).
+export function LockOpenGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 7.7-1.4" />
+    </Svg>
+  );
+}
+
 export function TypeGlyph({ className }: IconProps) {
   return (
     <Svg className={className}>

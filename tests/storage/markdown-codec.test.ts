@@ -92,6 +92,22 @@ describe("markdown codec", () => {
     expect(parseNote(plain.text)?.favorite).toBeUndefined();
   });
 
+  it("round-trips the read-only lock through the frontmatter", () => {
+    const locked: Note = {
+      ...note("lock1", "Reference", "body"),
+      locked: true,
+    };
+    const file = snapshotToFiles({ notes: [locked] })[0]!;
+    expect(file.text).toContain("locked: true");
+    expect(parseNote(file.text)?.locked).toBe(true);
+    // An unlocked note never writes the flag, and parses back without it.
+    const plain = snapshotToFiles({
+      notes: [note("plain2", "New", "body")],
+    })[0]!;
+    expect(plain.text).not.toContain("locked");
+    expect(parseNote(plain.text)?.locked).toBeUndefined();
+  });
+
   it("derives a slug-of-title filename suffixed with the id tail", () => {
     const stem = noteFileStem(note("abcdef123456", "My First Note"));
     expect(stem).toBe("my-first-note-123456");
