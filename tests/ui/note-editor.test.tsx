@@ -702,18 +702,28 @@ describe("Editor (pinned header state)", () => {
     );
   });
 
-  it("holds the star on the row after the press that unstarred the note", () => {
+  it("folds the star away again once the note is unstarred", () => {
     stubNarrow(true);
     const { update } = renderEditor({ note: note({ favorite: true }) });
 
     fireEvent.click(
       screen.getByRole("button", { name: "Remove from favorites" }),
     );
-    // The parent hands the un-starred note back; the button must not vanish
-    // from under the finger that just pressed it.
+    // The parent hands the un-starred note back; with nothing left to report
+    // the star belongs behind the ⋯ with the rest of the cluster.
     update({ note: note({ favorite: false }) });
 
-    expect(pinned("Add to favorites")).toBe(true);
+    expect(pinned("Add to favorites")).toBe(false);
+  });
+
+  it("folds the eye away again once the note is unlocked", () => {
+    stubNarrow(true);
+    const { update } = renderEditor({ note: note({ locked: true }) });
+
+    fireEvent.click(screen.getByRole("button", { name: "Unlock note" }));
+    update({ note: note({ locked: false }) });
+
+    expect(pinned("Lock note")).toBe(false);
   });
 
   it("hands the body's Tab to the pinned star rather than the ⋯", () => {
