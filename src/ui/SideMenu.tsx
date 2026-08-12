@@ -29,6 +29,7 @@ import { useDrawerSwipeClose } from "./hooks/useDrawerSwipeClose.ts";
 import { useMediaQuery } from "./hooks/useMediaQuery.ts";
 import {
   CogIcon,
+  EyeIcon,
   LockIcon,
   MenuIcon,
   NoteIcon,
@@ -496,7 +497,20 @@ export function SideMenu({
   function renderNoteRow(note: Note, indent = false) {
     const row = (
       <NavItem
-        icon={<NoteIcon className="h-5 w-5" />}
+        icon={
+          // A locked note wears the editor header's eye in place of the
+          // document glyph, so "you may look, not touch" is legible from the
+          // list rather than only after opening the note and finding the caret
+          // gone. The leading glyph rather than the trailing slot, because that
+          // slot is already spoken for by the upload spinner and the encryption
+          // lock — and a locked note is a different *kind* of note, which is
+          // exactly what the leading glyph says on the folder rows too.
+          note.locked ? (
+            <EyeIcon className="h-5 w-5" />
+          ) : (
+            <NoteIcon className="h-5 w-5" />
+          )
+        }
         label={noteTitle(note)}
         active={note.id === activeNoteId}
         indent={indent}
