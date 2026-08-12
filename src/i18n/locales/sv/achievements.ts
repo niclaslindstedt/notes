@@ -92,7 +92,7 @@ const achievements: AchievementsCatalog = {
       name: "Giljotinen",
       condition: "Klipp ut något med klipp ut-knappen (eller Ctrl/Cmd+K).",
       learnMore:
-        "Saxknappen uppe till höger i en anteckning klipper ut till urklipp: det du har markerat, eller — utan markering — hela raden som markören står på, så att städa en anteckning blir ett tryck i stället för att markera och sudda eller hålla in Backsteg. Står markören mitt i en mening tas bara det som kommer efter den på raden, så det du ville behålla står kvar. Ctrl/Cmd+K gör samma sak från tangentbordet, och Ångra lägger tillbaka det.",
+        "Saxknappen uppe till höger i en anteckning klipper ut till urklipp: det du har markerat, eller — utan markering — hela raden som markören står på, så att städa en anteckning blir ett tryck i stället för att markera och sudda eller hålla in Backsteg. Står markören mitt i en mening tas bara det som kommer efter den på raden, så det du ville behålla står kvar. Ctrl/Cmd+K gör samma sak från tangentbordet, och Ångra lägger tillbaka det. Knappen finns för pekskärmar: på en dator klipper tangentbordsgenvägen och högerklicksmenyn redan ut, så där behåller rubrikraden utrymmet i stället.",
     },
     stylist: {
       name: "Stilisten",

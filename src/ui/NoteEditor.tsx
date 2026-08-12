@@ -42,7 +42,7 @@ import { ExportButton } from "./export/ExportButton.tsx";
 import { FavoriteButton } from "./FavoriteButton.tsx";
 import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
 import { useFindShortcut } from "./hooks/useFindShortcuts.ts";
-import { useMediaQuery } from "./hooks/useMediaQuery.ts";
+import { useDesktopPointer, useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { ArrowLeftIcon, MoreIcon, SpinnerIcon } from "./icons.tsx";
 import {
@@ -86,6 +86,8 @@ const ACTIONS_MAX_WIDTH = "14rem";
 
 // The same cap for the three selection actions (formatting, cut, copy), which
 // unfold out of the ⋯ on their own when text is selected — real width ~8.25rem.
+// Both caps are upper bounds, so the row a desktop pointer gets (no cut button —
+// see `desktopPointer`) simply travels to a stop it doesn't reach.
 const SELECTION_MAX_WIDTH = "9rem";
 
 // A stable empty hit list for the closed find bar, so the editing surfaces keep
@@ -194,6 +196,14 @@ export function Editor({
   // with the title showing.
   const narrow = useMediaQuery(COLLAPSE_QUERY);
   const [actionsOpen, setActionsOpen] = useState(false);
+
+  // The cut button is a touch affordance and only a touch affordance: with a
+  // mouse and a keyboard the same edit is already two other presses away
+  // (Ctrl/Cmd+K, and the browser's own right-click Cut over a selection), so on
+  // a desktop pointer it is a fourth button in a crowded row buying nothing.
+  // The edit itself is untouched everywhere — the shortcut each editing surface
+  // binds, `cutLine`, and the Guillotine achievement all stay put.
+  const desktopPointer = useDesktopPointer();
 
   // Selecting text is the moment the actions that operate on a selection are
   // wanted, so on a narrow screen the cluster unfolds *itself* then — carrying
@@ -468,7 +478,7 @@ export function Editor({
               />
             )}
             <FormatToolbarButton open={toolbarOpen} onToggle={toggleToolbar} />
-            {!loading && <CutButton onCut={runCut} />}
+            {!loading && !desktopPointer && <CutButton onCut={runCut} />}
             {selecting ? (
               <CopyButton onCopy={runCopy} />
             ) : (
