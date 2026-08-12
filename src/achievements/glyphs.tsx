@@ -480,6 +480,21 @@ export function CapitalGlyph({ className }: IconProps) {
   );
 }
 
+// A five-point star — the favorites mark. Drawn here rather than re-exported
+// from `icons.tsx` so the trophy wears the solid star (a badge for something
+// earned), while the header button keeps the outline/filled pair that shows
+// one note's state.
+export function StarGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path
+        fill="currentColor"
+        d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9Z"
+      />
+    </Svg>
+  );
+}
+
 // Re-exports of the chrome icons reused as achievement glyphs, normalised to
 // the `Glyph` signature so the catalog imports every glyph from one module.
 export const ArchiveGlyph: Glyph = ArchiveIcon;

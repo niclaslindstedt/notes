@@ -79,6 +79,19 @@ describe("markdown codec", () => {
     expect(parseNote(active.text)?.archived).toBeUndefined();
   });
 
+  it("round-trips the favorite flag through the frontmatter", () => {
+    const starred: Note = { ...note("fav1", "Kept", "body"), favorite: true };
+    const file = snapshotToFiles({ notes: [starred] })[0]!;
+    expect(file.text).toContain("favorite: true");
+    expect(parseNote(file.text)?.favorite).toBe(true);
+    // An unstarred note never writes the flag, and parses back without it.
+    const plain = snapshotToFiles({
+      notes: [note("plain1", "New", "body")],
+    })[0]!;
+    expect(plain.text).not.toContain("favorite");
+    expect(parseNote(plain.text)?.favorite).toBeUndefined();
+  });
+
   it("derives a slug-of-title filename suffixed with the id tail", () => {
     const stem = noteFileStem(note("abcdef123456", "My First Note"));
     expect(stem).toBe("my-first-note-123456");

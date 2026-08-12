@@ -301,6 +301,13 @@ export function isFolderPlacement(v: unknown): v is FolderPlacement {
   return v === "top" || v === "mixed";
 }
 
+// Whether the side menu's Favorites section reproduces the folder hierarchy the
+// starred notes are filed in, instead of listing them flat. Off by default:
+// Favorites exists so a note is one tap away regardless of where it lives, and
+// nesting it back behind its folder undoes that. A side-menu layout preference,
+// so it rides alongside the appearance settings like `folderPlacement`.
+export const DEFAULT_FAVORITES_SHOW_FOLDERS = false;
+
 // The side-menu sort preference lives in `domain/note.ts` next to the pure
 // sort helpers that consume it (and its sibling preference types `CopyScope` /
 // `DefaultTitleScheme`); re-exported here so the appearance store and its

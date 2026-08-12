@@ -128,6 +128,14 @@ export function parse(text: string | null | undefined): Snapshot {
         } else {
           delete note.folderId;
         }
+        // Same defensive stance: only a real `true` stars the note, so a junk
+        // value drops the flag instead of riding through via the `...n` spread
+        // and reading as truthy.
+        if ((n as { favorite?: unknown }).favorite === true) {
+          note.favorite = true;
+        } else {
+          delete note.favorite;
+        }
         return note;
       })
     : [];

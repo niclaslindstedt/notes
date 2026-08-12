@@ -10,6 +10,8 @@ import { flushSync } from "react-dom";
 
 import { unlock } from "../achievements/index.ts";
 import {
+  favoriteNotes,
+  groupFavoritesByFolder,
   mixTopLevel,
   noteTitle,
   sortFoldersBy,
@@ -48,6 +50,7 @@ import { SideMenuActionBar } from "./SideMenuActionBar.tsx";
 import { SideMenuFooter } from "./SideMenuFooter.tsx";
 import {
   FolderEditRow,
+  FolderLabelRow,
   FolderRow,
   FooterCollapseRail,
   NavItem,
@@ -70,6 +73,12 @@ import {
 // notes. A "+" pinned to the far right of a folder row starts a new note filed
 // into that folder. A note can be dragged onto a folder (or onto the ungrouped
 // zone to leave one) to file it.
+//
+// Above the note list sits **Favorites** — the notes starred from the editor
+// header's star button, listed flat so a favorite is one tap away regardless of
+// where it is filed. The `favoritesShowFolders` appearance setting reproduces
+// the folder structure there instead; the section hides itself entirely while
+// nothing is starred.
 //
 // Two side-menu layout preferences ride on the appearance store: folders can
 // be pinned above the loose notes (`folderPlacement: "top"`) or interleaved
@@ -222,7 +231,8 @@ export function SideMenu({
   // Side-menu layout preferences (synced via the appearance store): whether
   // folders pin above the loose notes or sort in among them, and the sort key
   // applied to both notes and (under `mixed`) folders.
-  const { folderPlacement, noteSortKey } = useAppearance();
+  const { folderPlacement, noteSortKey, favoritesShowFolders } =
+    useAppearance();
 
   // Folder UI state: which folders are expanded, whether the inline "new
   // folder" input is showing, and which folder (if any) is being renamed in
@@ -467,6 +477,19 @@ export function SideMenu({
   );
   const sortedFolders = sortFoldersBy(folders, notes, noteSortKey);
 
+  // The Favorites section's contents. Uncapped, unlike the recents list below
+  // it: these are the notes the user picked out by hand, so trimming the tail
+  // would defeat the point. Flat by default — a favorite is a shortcut, so
+  // where it is filed is exactly what the section sets aside — with the folder
+  // structure reproduced when `favoritesShowFolders` is on.
+  const favorites = favoriteNotes(notes);
+  const favoriteGroups = favoritesShowFolders
+    ? groupFavoritesByFolder(favorites, folders, noteSortKey)
+    : [];
+  const flatFavorites = favoritesShowFolders
+    ? []
+    : sortNotesBy(favorites, noteSortKey);
+
   // One note row: the swipe/right-click wrapper around a NavItem, made
   // draggable so it can be dropped onto a folder to file it — HTML5 drag on
   // desktop, a press-and-hold gesture on touch (see `note-drag.tsx`).
@@ -661,6 +684,35 @@ export function SideMenu({
           />
         );
       })}
+      {/* Favorites: the notes starred with the editor header's star button,
+          lifted above the ordinary list so they're one tap away wherever they
+          are filed. The section only exists once something is starred — an
+          empty heading would be noise in a drawer this dense, and the star
+          button is where the feature is discovered. Each row is a full note row
+          (swipe / right-click / drag all behave as they do below), so a
+          favorite can be archived or refiled straight from here. */}
+      {favorites.length > 0 && (
+        <>
+          <SectionHeader label={t("nav.favorites")} border />
+          {favoritesShowFolders
+            ? favoriteGroups.map((group) =>
+                group.folder ? (
+                  <div key={group.folder.id}>
+                    <FolderLabelRow
+                      name={group.folder.name}
+                      count={group.notes.length}
+                    />
+                    {group.notes.map((note) => renderNoteRow(note, true))}
+                  </div>
+                ) : (
+                  <div key="favorites-ungrouped">
+                    {group.notes.map((note) => renderNoteRow(note))}
+                  </div>
+                ),
+              )
+            : flatFavorites.map((note) => renderNoteRow(note))}
+        </>
+      )}
       {/* Both add actions — New note and New folder — live on the action bar
           below the list, so the heading carries no trailing "+". A new folder
           drops an inline, unnamed folder input into the list; defocusing it

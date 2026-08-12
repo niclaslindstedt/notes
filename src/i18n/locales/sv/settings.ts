@@ -266,6 +266,9 @@ const settings: SettingsCatalog = {
     listLayoutHint:
       "Rader är en kompakt enradslista; kort är högre och visar mer av varje anteckning innan den tonas ut; lista är en avskalad filträdsvy med endast titlar.",
     sidebar: "Sidofält",
+    favoritesFolders: "Mappar i Favoriter",
+    favoritesFoldersHint:
+      "Gruppera avsnittet Favoriter efter mapparna anteckningarna ligger i. Avstängt listas alla favoriter platt.",
     folderPlacement: "Mappar",
     folderPlacementTop: "Överst",
     folderPlacementMixed: "Blandat",

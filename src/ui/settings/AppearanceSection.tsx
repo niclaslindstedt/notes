@@ -174,6 +174,12 @@ export function AppearanceSection({
             onChange={(v) => onUpdate("noteSortKey", v)}
           />
         </Field>
+        <ToggleRow
+          label={t("settings.appearance.favoritesFolders")}
+          hint={t("settings.appearance.favoritesFoldersHint")}
+          checked={appearance.favoritesShowFolders}
+          onChange={(v) => onUpdate("favoritesShowFolders", v)}
+        />
       </Section>
 
       <Section title={t("settings.appearance.font")}>

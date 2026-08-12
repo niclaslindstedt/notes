@@ -198,6 +198,10 @@ export function noteToMarkdown(note: Note, depth = 0): string {
     // Only written when the note is archived, so an active note's frontmatter
     // stays minimal and an older file (no flag) round-trips as active.
     ...(note.archived ? { archived: "true" } : {}),
+    // Only written when the note is starred, on the same terms as `archived`:
+    // an unstarred note's frontmatter stays minimal, and an older file (no
+    // flag) round-trips unstarred.
+    ...(note.favorite ? { favorite: "true" } : {}),
     // The folder the note belongs to, by id. Only written when set, so an
     // ungrouped note's frontmatter stays minimal. The folder's display name
     // lives in the `folders.json` sidecar the directory adapter keeps, so this
@@ -322,6 +326,8 @@ export function parseNote(text: string): Note | null {
   // Carry the archived flag only when set, mirroring how it's written — an
   // active note never gains an explicit `archived: false`.
   if (front.archived === "true") note.archived = true;
+  // Same for the favorite flag — only a literal `true` stars the note.
+  if (front.favorite === "true") note.favorite = true;
   // Carry the folder link only when present, mirroring how it's written.
   if (front.folder) note.folderId = front.folder;
   return note;

@@ -46,6 +46,7 @@ export {
   LockIcon,
   RestoreIcon,
   SearchIcon,
+  StarIcon,
 } from "@niclaslindstedt/oss-framework/components";
 
 type IconProps = { className?: string };

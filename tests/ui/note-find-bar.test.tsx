@@ -40,6 +40,7 @@ function renderEditor() {
       onChange={vi.fn()}
       onTitleChange={vi.fn()}
       onTitleSettle={vi.fn()}
+      onToggleFavorite={vi.fn()}
       canAttach={false}
       onAttach={vi.fn()}
     />,

@@ -36,6 +36,7 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
   const onChange = vi.fn();
   const onTitleChange = vi.fn();
   const onTitleSettle = vi.fn();
+  const onToggleFavorite = vi.fn();
   const onAttach = vi.fn();
   render(
     <Editor
@@ -45,15 +46,28 @@ function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
       onChange={onChange}
       onTitleChange={onTitleChange}
       onTitleSettle={onTitleSettle}
+      onToggleFavorite={onToggleFavorite}
       canAttach={false}
       onAttach={onAttach}
       {...props}
     />,
   );
-  return { onBack, onChange, onTitleChange, onTitleSettle };
+  return { onBack, onChange, onTitleChange, onTitleSettle, onToggleFavorite };
 }
 
 describe("Editor", () => {
+  it("stars the note from the header, and labels the button by state", () => {
+    const { onToggleFavorite } = renderEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Add to favorites" }));
+    expect(onToggleFavorite).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the star as pressed on a note already favorited", () => {
+    renderEditor({ note: note({ favorite: true }) });
+    const star = screen.getByRole("button", { name: "Remove from favorites" });
+    expect(star.getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("renders the title and body and fires onBack from the header", () => {
     const { onBack } = renderEditor();
 
@@ -142,9 +156,9 @@ describe("Editor", () => {
     body.focus();
 
     fireEvent.keyDown(body, { key: "Tab" });
-    // The leftmost action in the header cluster — the find bar's toggle.
+    // The leftmost action in the header cluster — the favorite star.
     expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "Find in note" }),
+      screen.getByRole("button", { name: "Add to favorites" }),
     );
 
     fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });

@@ -10,6 +10,7 @@ const nav: NavCatalog = {
   expandNamespaces: "Visa alla namnrymder",
   collapseNamespaces: "Fäll ihop namnrymder",
   notes: "Anteckningar",
+  favorites: "Favoriter",
   newNote: "Ny anteckning",
   newFolder: "Ny mapp",
   folderName: "Mappnamn",

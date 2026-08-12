@@ -74,6 +74,27 @@ describe("storage serialize", () => {
   });
 });
 
+describe("storage serialize — favorites", () => {
+  it("round-trips the favorite flag through serialize → parse", () => {
+    const starred = { ...createNote(1), favorite: true };
+    const restored = parse(serialize({ notes: [starred] }));
+    expect(restored.notes[0]?.favorite).toBe(true);
+  });
+
+  it("drops a non-boolean favorite value defensively", () => {
+    const text = JSON.stringify({
+      version: LATEST_VERSION,
+      notes: [{ ...createNote(1), favorite: "yes" }],
+    });
+    expect(parse(text).notes[0]?.favorite).toBeUndefined();
+  });
+
+  it("omits the flag on a note that was never starred", () => {
+    const restored = parse(serialize({ notes: [createNote(1)] }));
+    expect("favorite" in restored.notes[0]!).toBe(false);
+  });
+});
+
 describe("storage serialize — folders", () => {
   it("round-trips folders and note.folderId through serialize → parse", () => {
     const note = { ...createNote(1), folderId: "f1" };

@@ -67,6 +67,7 @@ import {
   ServerGlyph,
   ShieldGlyph,
   SmartphoneGlyph,
+  StarGlyph,
   TextSearchGlyph,
   TypeGlyph,
   UndoGlyph,
@@ -91,6 +92,10 @@ const hasMultiLineNote = (snap: Snapshot) =>
       (n.body ?? "").split("\n").filter((line) => line.trim() !== "").length >=
       2,
   );
+
+// A note starred with the editor header's star button — the point where
+// someone starts curating the drawer instead of scrolling it.
+const hasFavorite = (snap: Snapshot) => snap.notes.some((n) => n.favorite);
 
 // A note that has been given a title in its own field — the first time someone
 // uses the dedicated title row rather than letting a note stay untitled.
@@ -643,6 +648,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     // — searching reads the note without changing it, so there is nothing in
     // the document to derive.
     trigger: { kind: "manual" },
+  },
+  {
+    id: "starStruck",
+    tier: "beginner",
+    glyph: StarGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasFavorite(prev.snapshot) && hasFavorite(next.snapshot),
+    },
   },
 
   // ──────────────────────────────────────────────────────────────

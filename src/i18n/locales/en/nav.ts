@@ -1,7 +1,7 @@
 import type { Widen } from "./_widen.ts";
 
 // Strings for the left navigation drawer — the floating toggle button, the
-// section headers (Namespaces / Notes), the note switcher (each note by
+// section headers (Namespaces / Favorites / Notes), the note switcher (each note by
 // title, plus "new note" and the per-row delete), the namespace manage
 // action, and the undo / redo edit actions.
 
@@ -15,6 +15,9 @@ const nav = {
   expandNamespaces: "Show all namespaces",
   collapseNamespaces: "Collapse namespaces",
   notes: "Notes",
+  // The section above the note list holding the starred notes. It is only
+  // rendered once something is starred, so there is no empty-state string.
+  favorites: "Favorites",
   newNote: "New note",
   newFolder: "New folder",
   folderName: "Folder name",
