@@ -105,7 +105,7 @@ const settings: SettingsCatalog = {
       "Vad Export → Kopiera till urklipp lägger på urklipp. Brödtext är bara det du skrev; de andra lägger till titeln, eller hela .md-filen med dess YAML-frontmatter.",
     copyBody: "Brödtext",
     copyTitleBody: "Titel & brödtext",
-    copyFrontMatter: "Frontmatter",
+    copyFrontMatter: "Frontmatter & brödtext",
   },
 
   transform: {
