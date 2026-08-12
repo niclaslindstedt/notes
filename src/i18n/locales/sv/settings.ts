@@ -198,7 +198,7 @@ const settings: SettingsCatalog = {
   export: {
     title: "Export",
     blurb:
-      "Hur en anteckning ser ut när du exporterar den till PDF. Export till Markdown skriver samma .md-fil som dina anteckningar lagras som, så den har inget att formge.",
+      "Hur en anteckning ser ut när du exporterar den till PDF. Appen sätter och skriver filen själv, så inget annat än din anteckning hamnar på sidan. Export till Markdown skriver samma .md-fil som dina anteckningar lagras som, så den har inget att formge.",
     pageTitle: "Sida",
     textTitle: "Text",
     codeTitle: "Kod",
@@ -230,10 +230,13 @@ const settings: SettingsCatalog = {
     headingScaleLarge: "Stor",
     headingScaleHint:
       "Hur mycket större än brödtexten rubrikerna blir. Platt håller dem nära brödtextens storlek; Stor ger en titelsida mer tyngd.",
+    headingFont: "Rubriktypsnitt",
+    headingFontBody: "Som brödtexten",
+    headingFontHint:
+      "Typsnittet rubrikerna sätts i. Låt dem följa brödtexten, eller blanda de två — sanserifrubriker över en serifbrödtext är den klassiska kombinationen.",
     codeFont: "Kodtypsnitt",
-    codeFontSystem: "Systemets fasta breddsteg",
     codeFontHint:
-      "Kodblock och kod i löpande text har alltid fast breddsteg; här väljer du vilken familj.",
+      "Kodblock och kod i löpande text har alltid fast breddsteg; här väljer du vilken familj. Courier finns i varje PDF-läsare; DejaVu Sans Mono bäddas in i filen, vilket lägger till några kilobyte och läses bättre.",
     codeSize: "Kodstorlek",
     codeBackground: "Kodbakgrund",
     codeBackgroundHint:
@@ -251,6 +254,9 @@ const settings: SettingsCatalog = {
     includeTitle: "Skriv ut titeln",
     includeTitleHint:
       "Inled sidan med anteckningens titel. Stäng av när anteckningen redan börjar med en egen rubrik.",
+    pageNumbers: "Numrera sidorna",
+    pageNumbersHint:
+      "Sätt sidnumret centrerat längst ned på varje sida. Det är det enda appen skriver i marginalerna — webbadressen och datumet som en utskriftsdialog lägger till skrivs aldrig.",
   },
 
   appearance: {

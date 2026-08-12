@@ -270,6 +270,13 @@ export default defineConfig({
         cacheId: CACHE_ID,
         // Precache the app shell: JS, CSS, fonts, icons, and the HTML
         // entry. Source maps stay on the network.
+        //
+        // `ttf` is deliberately **not** in the list. The only ones are the PDF
+        // export's fallback faces (`src/assets/fonts/`), ~186 kB that most
+        // notes never need — the export fetches one the first time a note
+        // actually contains a character the standard PDF fonts can't encode,
+        // and degrades gracefully when it can't. Precaching them would put
+        // that weight on every install for a minority of exports.
         globPatterns: ["**/*.{js,css,html,svg,png,ico,webp,woff2}"],
         globIgnores: ["**/*.map"],
         cleanupOutdatedCaches: true,

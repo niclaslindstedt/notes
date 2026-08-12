@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  bulletGlyphAt,
+  bulletAt,
   coercePdfSettings,
   DEFAULT_PDF_SETTINGS,
   isPdfCodeBackground,
-  pdfPageSizeCss,
+  pdfHeadingFamily,
+  pdfPageSizePt,
   PDF_BULLETS,
 } from "../../src/domain/pdf.ts";
 
@@ -44,9 +45,20 @@ describe("coercePdfSettings", () => {
     expect(settings).toEqual(DEFAULT_PDF_SETTINGS);
   });
 
+  it("retires a code font the writer can no longer produce", () => {
+    // A document written when the export was a browser print job may name a
+    // family only CSS could resolve. Those land on the default like any other
+    // value that isn't offered; `dejavu` still means what it always did.
+    expect(coercePdfSettings({ codeFont: "system" }).codeFont).toBe("courier");
+    expect(coercePdfSettings({ codeFont: "consolas" }).codeFont).toBe(
+      "courier",
+    );
+    expect(coercePdfSettings({ codeFont: "dejavu" }).codeFont).toBe("dejavu");
+  });
+
   it("refuses a code background that isn't a colour", () => {
-    // The value is interpolated straight into the print stylesheet, so
-    // anything but `transparent` or a hex colour has to be thrown away.
+    // The value is written into the document as a fill, so anything but
+    // `transparent` or a hex colour has to be thrown away.
     expect(isPdfCodeBackground("red;} body{display:none")).toBe(false);
     expect(isPdfCodeBackground("url(http://x)")).toBe(false);
     expect(isPdfCodeBackground("transparent")).toBe(true);
@@ -58,29 +70,53 @@ describe("coercePdfSettings", () => {
   });
 });
 
-describe("bulletGlyphAt", () => {
-  it("starts at the chosen glyph", () => {
-    expect(bulletGlyphAt("disc", 0)).toBe("•");
-    expect(bulletGlyphAt("dash", 0)).toBe("–");
+describe("bulletAt", () => {
+  it("starts at the chosen bullet", () => {
+    expect(bulletAt("disc", 0)).toBe("disc");
+    expect(bulletAt("dash", 0)).toBe("dash");
   });
 
   it("rotates onward through the set as lists nest", () => {
-    expect(bulletGlyphAt("disc", 1)).toBe("◦");
-    expect(bulletGlyphAt("disc", 2)).toBe("▪");
+    expect(bulletAt("disc", 1)).toBe("circle");
+    expect(bulletAt("disc", 2)).toBe("square");
     // Past the end of the set the rotation wraps rather than running out.
-    expect(bulletGlyphAt("disc", PDF_BULLETS.length)).toBe("•");
+    expect(bulletAt("disc", PDF_BULLETS.length)).toBe("disc");
   });
 });
 
-describe("pdfPageSizeCss", () => {
-  it("pairs the paper keyword with the orientation", () => {
-    expect(pdfPageSizeCss(DEFAULT_PDF_SETTINGS)).toBe("A4 portrait");
+describe("pdfPageSizePt", () => {
+  it("measures the paper in points", () => {
+    expect(pdfPageSizePt(DEFAULT_PDF_SETTINGS)).toEqual({
+      widthPt: 595.28,
+      heightPt: 841.89,
+    });
+  });
+
+  it("swaps the axes for landscape", () => {
     expect(
-      pdfPageSizeCss({
+      pdfPageSizePt({
         ...DEFAULT_PDF_SETTINGS,
         pageSize: "letter",
         orientation: "landscape",
       }),
-    ).toBe("Letter landscape");
+    ).toEqual({ widthPt: 792, heightPt: 612 });
+  });
+});
+
+describe("pdfHeadingFamily", () => {
+  it("follows the body font by default", () => {
+    expect(
+      pdfHeadingFamily({ ...DEFAULT_PDF_SETTINGS, bodyFont: "serif" }),
+    ).toBe("times");
+  });
+
+  it("takes its own family when one is chosen", () => {
+    expect(
+      pdfHeadingFamily({
+        ...DEFAULT_PDF_SETTINGS,
+        bodyFont: "serif",
+        headingFont: "sans",
+      }),
+    ).toBe("helvetica");
   });
 });

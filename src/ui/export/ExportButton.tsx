@@ -24,9 +24,8 @@ import { Toast } from "../Toast.tsx";
 // The export button: the up arrow in the note header's action cluster, opening
 // a menu of the three ways a note leaves the app.
 //
-//   * **Export to PDF** renders the note for paper with the user's
-//     [PDF settings](../settings/ExportSection.tsx) and raises the print
-//     dialog, where "Save as PDF" writes the file.
+//   * **Export to PDF** typesets the note for paper with the user's
+//     [PDF settings](../settings/ExportSection.tsx) and downloads the file.
 //   * **Export to MD** downloads the `.md` file the file backends would store,
 //     front matter and all.
 //   * **Copy to clipboard** puts the note on the clipboard, as much of it as
@@ -36,15 +35,16 @@ import { Toast } from "../Toast.tsx";
 //     many in a row that already holds four. It confirms with a **`Toast`**,
 //     because the row swapping to a tick is confirmation nobody sees: the menu
 //     closes on the press, and copying is the one row that finishes silently
-//     with no print dialog or download to show for itself.
+//     with no download to show for itself.
 //
 // **Every row is a glyph and its label, at every width.** A phone has room for
 // the labelled menu, and three unexplained icons stacked under the header is a
 // guessing game — so the panel is sized for text on the narrowest screen too.
 //
 // The export work itself is loaded on the press, not at mount: the Markdown
-// codec, the print renderer and its stylesheet are a few kilobytes nobody who
-// never exports should download (see AGENTS.md, "the code-splitting seams").
+// codec, the layout engine and — by far the biggest of them — the PDF writer
+// are not something anyone who never exports should download (see AGENTS.md,
+// "the code-splitting seams").
 
 const MENU_PLACEMENT: FloatingPlacement = {
   width: { kind: "min", minPx: 208 },
@@ -64,8 +64,8 @@ export function ExportButton({
   /** How much of the note the "Copy to clipboard" row takes — see `CopyScope`. */
   copyScope: CopyScope;
   /**
-   * The active display rules. Only the PDF honours them — see `PrintDocument`
-   * in `domain/pdf-render.ts` for why the other two rows export the source.
+   * The active display rules. Only the PDF honours them — see `PdfLayoutInput`
+   * in `domain/pdf-layout.ts` for why the other two rows export the source.
    */
   transforms?: readonly CompiledTransform[];
 }) {
@@ -113,8 +113,8 @@ export function ExportButton({
 
   function run(action: () => Promise<void>) {
     // The menu closes on the press rather than when the work finishes: an
-    // export ends in a print dialog or a download, and a menu still hanging
-    // over the note behind it reads as a stuck UI.
+    // export ends in a download, and a menu still hanging over the note behind
+    // it reads as a stuck UI.
     setOpen(false);
     haptics.vibrate(8);
     void action();

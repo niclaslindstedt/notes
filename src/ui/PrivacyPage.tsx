@@ -111,11 +111,11 @@ export function PrivacyPage() {
             elsewhere to restore from.
           </p>
           <p>
-            Exporting a note keeps it on your device. The PDF export renders the
-            note locally and hands it to your device&apos;s own print dialog;
-            the Markdown export writes a file to your downloads folder; the
-            clipboard export writes to your clipboard. None of the three
-            uploads, converts, or transmits anything.
+            Exporting a note keeps it on your device. The PDF export typesets
+            and writes the file in the page itself and saves it to your
+            downloads folder; the Markdown export writes a file to the same
+            place; the clipboard export writes to your clipboard. None of the
+            three uploads, converts, or transmits anything.
           </p>
           <p>
             While a note is open, the address bar shows a link to it — the

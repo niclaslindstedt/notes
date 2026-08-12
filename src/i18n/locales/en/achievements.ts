@@ -296,7 +296,7 @@ const achievements = {
       name: "Printing press",
       condition: "Export a note to PDF.",
       learnMore:
-        "The up arrow in a note's header exports it. “Export to PDF” lays the note out as a document — headings, lists, quotes and code blocks and all — and hands it to your device's print dialog, where “Save as PDF” writes the file. Settings → Export controls how that page looks: paper size and margins, the fonts and their sizes, the monospaced family and background behind code, and the bullet glyph.",
+        "The up arrow in a note's header exports it. “Export to PDF” typesets the note as a document — headings, lists, quotes and code blocks and all — and downloads the finished file. The app writes the PDF itself rather than going through a print dialog, so nothing stamps a URL or a date into the margins. Settings → Export controls how the page looks: paper size and margins, the body and heading fonts and their sizes, the monospaced family and background behind code, the bullet glyph, and whether the pages are numbered.",
     },
     takeaway: {
       name: "Takeaway",

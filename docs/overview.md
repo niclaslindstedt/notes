@@ -1596,9 +1596,9 @@ the **Appendix** achievement.
 of the editor's (and the read-only archived-note view's) header action cluster.
 It opens a menu of the three ways a note leaves the app:
 
-- **Export to PDF** renders the note for paper and raises the print dialog,
-  where "Save as PDF" writes the file. See [PDF settings](#pdf-settings) for how
-  that page is laid out. Unlocks the **Printing press** achievement.
+- **Export to PDF** typesets the note for paper, writes the PDF, and downloads
+  it. See [PDF settings](#pdf-settings) for how that page is laid out. Unlocks
+  the **Printing press** achievement.
 - **Export to MD** downloads the note as a plain `.md` file. The bytes are the
   ones the file / cloud backends store (`noteToMarkdown` — see the
   [markdown codec](#markdown-codec)), YAML front matter and all, so an exported
@@ -1613,8 +1613,8 @@ It opens a menu of the three ways a note leaves the app:
   button doing one of its three jobs was one too many in a row that already
   holds four. It confirms with a [toast](#toast) — the row swapping to a tick is
   confirmation nobody sees, because the menu closes on the press, and copying is
-  the one row that finishes silently with no print dialog or download to show
-  for itself. Unlocks the **Copycat** achievement.
+  the one row that finishes silently with no download to show for itself.
+  Unlocks the **Copycat** achievement.
 
 **Every row is a glyph and its label, at every width** — a phone has room for
 the labelled menu, and three unexplained icons stacked under the header is a
@@ -1623,64 +1623,114 @@ in JS, so this is a real width the panel is sized for rather than a CSS
 `hidden sm:inline` that would leave it sized for text it doesn't draw.
 
 The work is loaded **on the press**, not at mount (`await import()` from the
-handlers): the Markdown codec, the print renderer and its stylesheet are
-kilobytes nobody who never exports should download. See
-[code splitting](#code-splitting).
+handlers): the Markdown codec, the layout engine and — by far the biggest of
+them — the PDF writer are not something anyone who never exports should
+download. See [code splitting](#code-splitting).
 
-There is no PDF library and no backend to render on. Every surface the app runs
-on — browser, the native WebView, Electron — already carries a production-grade
-PDF writer behind `print()`, so the export builds the page and lets that engine
-typeset it. `printHtmlDocument` (`src/ui/export/print-document.ts`) owns that
-handoff: it prints from an **off-screen iframe** rather than the app's own
-window (which would print the chrome, not the note), waits for the document's
-fonts and images to settle so the first page lays out completely, and tears the
-frame down on `afterprint` with a long timer behind it — removing it early
-cancels an in-flight print.
+#### Why the app writes the PDF itself
 
-The frame is given its `srcdoc` **before** it is inserted, and the wait for the
-`load` event refuses a document still sitting on `about:blank`. Both guard the
-same trap: an iframe inserted without a `srcdoc` gets an initial `about:blank`
-document that fires a `load` of its own — synchronously, during `appendChild`,
-in Chromium — so assigning `srcdoc` afterwards hands `print()` an empty page.
-The engine then has nothing to print and says nothing about it, which is what a
-broken PDF export looks like from the outside: no dialog, no error.
+The export used to build an HTML page and hand it to `window.print()`, letting
+the browser's engine write the PDF. It worked, but the **page furniture belonged
+to the browser**: the print dialog stamps the URL, the date and the page number
+into the margins, and CSS gives a page no way to turn any of that off — zeroing
+the `@page` margin suppresses it, but only by taking the margins with it. The
+file also arrived through a dialog rather than as a download, which on a phone
+means a share sheet rather than a saved file.
+
+So the app paginates and writes the document itself, in two halves either side
+of a seam:
+
+- **`layoutPdf` (`src/domain/pdf-layout.ts`)** — the typesetter. A note in, a
+  list of pages of drawing operations out (`text`, `rect`, `ellipse`, `path`,
+  `image`, `link`), in points from the top-left of the page. Pure, so the whole
+  of pagination is unit-testable without a browser or a PDF library.
+- **`buildPdf` (`src/ui/export/pdf-document.ts`)** — the writer. It drives
+  [jsPDF](https://github.com/parallax/jsPDF), the app's one non-trivial runtime
+  dependency, and is the only module that imports it. Loaded on the export press
+  and nowhere else, so the ~130 kB (gzipped) writer never reaches someone who
+  doesn't export.
+
+Two things the typesetter can't know are injected across that seam: **`measure`**
+— how wide a string is in a given font at a given size, which only the writer's
+metrics can answer — and **`resolveImage`**, an image's pixel dimensions. The
+measurer contract matters more than it looks: it must measure text *as the writer
+will draw it*, fallback font and all, or a line wraps in the wrong place.
+
+#### PDF fallback font
+
+A PDF names its fonts rather than carrying them, and every reader already has the
+**standard fonts** — Helvetica, Times, Courier — so an ordinary note costs the
+file nothing to typeset. Their limit is that they encode Latin-1 only. The writer
+therefore scans each string, splits it into runs the chosen family can and can't
+express, and draws the second kind in an embedded fallback — the same font
+fallback a browser does, done by hand.
+
+The fallback faces are DejaVu Sans subsets committed under `src/assets/fonts/`
+(see the README there for the exact subsetting command and the licence). They
+are **not** precached and not loaded with the app: the export fetches one the
+first time a note actually contains such a character, so a Latin-1 note
+downloads nothing and exports to a ~3 kB file. jsPDF subsets whatever it embeds,
+so even a Cyrillic note only carries the glyphs it used.
+
+The subsets cover Latin-Ext, Greek, Cyrillic, punctuation, currency, arrows,
+maths and a curated handful of symbols. **CJK and emoji are deliberately out** —
+covering them means megabytes, not kilobytes. Text outside both the standard
+fonts and the subset exports as `�`. List markers, checkboxes and rules are
+*drawn* as vectors rather than set as glyphs, so a bullet never depends on any
+of this.
 
 ### PDF settings
 
 `PdfSettings` (`src/domain/pdf.ts`) — what an exported note looks like on paper:
 page size and orientation, margins, the body font / size / line height /
-heading scale, the monospaced family, size and background fill behind code, the
-bullet glyph, and whether the note's title heads the page. It lives in the
-domain (next to the pure renderer that reads it, since `domain/` may not import
-the theme layer) and is re-exported from `src/theme/themes.ts`; the values ride
-on the [appearance store](#appearance-store) as `Appearance.pdf`, so they travel
-with `settings.json` like every other preference, and `coercePdfSettings`
-validates a stored document slot by slot on read.
+heading scale, the heading font, the monospaced family, size and background fill
+behind code, the bullet, whether the note's title heads the page, and whether
+the pages are numbered. It lives in the domain (next to the pure layout engine
+that reads it, since `domain/` may not import the theme layer) and is re-exported
+from `src/theme/themes.ts`; the values ride on the
+[appearance store](#appearance-store) as `Appearance.pdf`, so they travel with
+`settings.json` like every other preference, and `coercePdfSettings` validates a
+stored document slot by slot on read.
 
 Only offered values survive that read, and `codeBackground` is narrowed to
-`transparent` or a hex colour — the value is interpolated straight into the
-print stylesheet, so the allowlist is what stops a hostile `settings.json` from
-smuggling a declaration into the document.
+`transparent` or a hex colour — the value is written into the document as a
+fill, so the allowlist is what stops a hostile `settings.json` from putting
+something else there. That same read is what retires a setting the writer can no
+longer honour: a document from when the export was a browser print job may name
+a code font only CSS could resolve (`system`, `consolas`), and those land on the
+default like any other value that isn't offered.
 
-`renderPrintDocument` (`src/domain/pdf-render.ts`) is the renderer: a note in, a
-complete self-contained `<!doctype html>` document out — one inline `<style>`,
-no external requests, images as `data:` URLs. Pure, so it is unit-testable
-without a browser. It reads through the same [Markdown parser](#markdown-parser)
-the live preview does, so a PDF says what the editor showed: consecutive prose
-lines keep the newlines the writer typed as hard breaks, lists nest by the
-`depth` the parser assigned and ordered lists carry its computed
-numeric → alpha → roman markers, task rows print as boxes showing their state,
-and a fence that was never closed still prints as a code block. The title
-heading is drawn without a rule beneath it: its size already separates it from
-the body, and a border there reads as a stray `---` the writer never typed.
+**Two of the choices are about what a self-contained file can honestly promise.**
+The **heading font** is `body` by default — not a font but a deferral, so
+headings follow the body unless someone deliberately mixes the two. The **code
+font** offers exactly two entries: Courier, which every reader already has, and
+DejaVu Sans Mono, which is embedded into the file. Naming a family the file
+doesn't carry would just be a request the reader substitutes its way out of.
+
+`layoutPdf` (`src/domain/pdf-layout.ts`) reads through the same
+[Markdown parser](#markdown-parser) the live preview does, so a PDF says what
+the editor showed: consecutive prose lines keep the newlines the writer typed as
+hard breaks, lists nest by the `depth` the parser assigned and ordered lists
+carry its computed numeric → alpha → roman markers, task rows print as boxes
+showing their state, and a fence that was never closed still prints as a code
+block. A heading is never left stranded at the foot of a page — it moves down
+with the first line of what follows — and a code block too long for one page is
+split, each slice carrying its own fill. The title heading is drawn without a
+rule beneath it: its size already separates it from the body, and a border there
+reads as a stray `---` the writer never typed.
+
+The **page number** is the only thing written into the margins, centred at the
+foot as `2 / 7`, and it can be switched off. Nothing else goes there — the URL
+and date a print dialog used to stamp in are the reason the app writes the file
+itself.
 
 The document deliberately shares nothing with the app's screen theme: it is
 black on white in a print-safe family, because a note exported to PDF should
 read as a document rather than a screenshot of a dark editor. (The app's bundled
-webfonts aren't loaded in the print document, which is why the font choices are
-generic families.) Note text is escaped and link/image URLs are allowlisted by
-scheme throughout — a note can arrive from a synced folder someone else wrote
-to, so it is treated as untrusted.
+webfonts are not what a PDF can name, which is why the font choices are the
+standard families — see [PDF fallback font](#pdf-fallback-font).) Link and image
+URLs are allowlisted by scheme throughout — a note can arrive from a synced
+folder someone else wrote to, so it is treated as untrusted.
 
 **The PDF honours the [Transform](#transforms) rules; the other two exports
 don't.** This is the one place the three deliberately part company — the PDF is
@@ -1688,16 +1738,18 @@ what you *see*, the Markdown file and the clipboard are what you *stored*. The
 latter two are byte-exact copies of the note by design, and transforms are
 display-only; but a `sensitive` rule masking a phone number exists precisely so
 the original doesn't leave the screen, and a document made to be handed out is
-where it must not reappear. `renderInline` splices the compiled rules into each
+where it must not reappear. The layout splices the compiled rules into each
 parsed line exactly as the live preview does, and a transformed `link` still
-resolves to an anchor when its target is an inert scheme.
+resolves to a clickable annotation when its target is an inert scheme.
 
-Image attachments are resolved to `data:` URLs before rendering
+Image attachments are fetched **and measured** before the layout runs
 (`resolveImages` in `src/ui/export/export-note.ts`, through the
 [on-demand fetcher](#attachments)) — a note from a file/cloud backend carries
-its attachments' metadata but not their bytes, and the print document is
-standalone. An attachment the backend can't produce degrades to its alt text
-rather than to a broken-image box.
+its attachments' metadata but not their bytes, and a PDF has to carry the
+picture itself. The pixel dimensions are what let the typesetter scale a picture
+to the column and reserve its height; an attachment the backend can't produce,
+or that the browser can't decode, degrades to its alt text rather than to a
+broken-image box.
 
 ### Copy scope
 

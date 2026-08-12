@@ -293,7 +293,7 @@ const achievements: AchievementsCatalog = {
       name: "Tryckpress",
       condition: "Exportera en anteckning till PDF.",
       learnMore:
-        "Uppåtpilen i en antecknings sidhuvud exporterar den. ”Exportera till PDF” sätter anteckningen som ett dokument — rubriker, listor, citat och kodblock — och lämnar den till enhetens utskriftsdialog, där ”Spara som PDF” skriver filen. Inställningar → Export styr hur sidan ser ut: pappersstorlek och marginaler, typsnitten och deras storlekar, den fasta breddsteg-familjen och bakgrunden bakom kod, samt punkttecknet.",
+        "Uppåtpilen i en antecknings sidhuvud exporterar den. ”Exportera till PDF” sätter anteckningen som ett dokument — rubriker, listor, citat och kodblock — och laddar ner den färdiga filen. Appen skriver PDF:en själv i stället för att gå via en utskriftsdialog, så ingenting stämplar in en webbadress eller ett datum i marginalerna. Inställningar → Export styr hur sidan ser ut: pappersstorlek och marginaler, typsnitten för brödtext och rubriker och deras storlekar, den fasta breddsteg-familjen och bakgrunden bakom kod, punkttecknet, och om sidorna numreras.",
     },
     takeaway: {
       name: "Avhämtning",

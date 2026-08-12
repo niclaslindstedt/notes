@@ -202,7 +202,7 @@ const settings = {
   export: {
     title: "Export",
     blurb:
-      "How a note is laid out when you export it to PDF. Exporting to Markdown writes the same .md file your notes are stored as, so it has nothing to style.",
+      "How a note is laid out when you export it to PDF. The app typesets and writes the file itself, so nothing but your note ends up on the page. Exporting to Markdown writes the same .md file your notes are stored as, so it has nothing to style.",
     pageTitle: "Page",
     textTitle: "Text",
     codeTitle: "Code",
@@ -234,10 +234,13 @@ const settings = {
     headingScaleLarge: "Large",
     headingScaleHint:
       "How much bigger than the body text your headings run. Flat keeps them close to body size; Large gives a title page more presence.",
+    headingFont: "Heading font",
+    headingFontBody: "Same as body",
+    headingFontHint:
+      "The typeface your headings are set in. Leave it following the body, or mix the two — sans headings over a serif body is the classic pairing.",
     codeFont: "Code font",
-    codeFontSystem: "System monospace",
     codeFontHint:
-      "Code blocks and inline code are always monospaced; this picks which family.",
+      "Code blocks and inline code are always monospaced; this picks which family. Courier comes with every PDF reader; DejaVu Sans Mono is embedded in the file, which adds a few kilobytes and reads better.",
     codeSize: "Code size",
     codeBackground: "Code background",
     codeBackgroundHint:
@@ -255,6 +258,9 @@ const settings = {
     includeTitle: "Print the title",
     includeTitleHint:
       "Head the page with the note's title. Turn it off when the note already opens with its own heading.",
+    pageNumbers: "Number the pages",
+    pageNumbersHint:
+      "Foot every page with its number, centred. This is the only thing the app puts in the margins — the URL and date a print dialog would add are never written.",
   },
 
   appearance: {
