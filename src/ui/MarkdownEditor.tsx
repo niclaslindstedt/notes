@@ -500,8 +500,9 @@ export function MarkdownEditor({
     }));
   }
 
-  // Locking the note while it is open (the header padlock, or another device's
-  // lock arriving on a live pull) takes the caret's line back to formatted. The
+  // Locking the note while it is open (the header's read-only toggle, or
+  // another device's lock arriving on a live pull) takes the caret's line back
+  // to formatted. The
   // surface stops being editable in the same render, so the browser drops the
   // caret itself; this is what stops the line the caret *was* on being left
   // showing its raw markdown, which would read as a stray `#` or `- ` in an

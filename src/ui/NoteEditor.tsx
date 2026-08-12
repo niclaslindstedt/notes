@@ -138,7 +138,8 @@ export function Editor({
   onTitleSettle: () => void;
   /** Star / unstar the note — the header's leading star button. */
   onToggleFavorite: () => void;
-  /** Lock / unlock the note — the header's padlock button. A locked note is
+  /** Lock / unlock the note — the header's read-only (eye) button. A locked
+   *  note is
    *  read-only: see `docs/overview.md#lock-a-note`. */
   onToggleLock: () => void;
   /** Ticks when undo / redo swaps the body — cues the editor to scroll the
@@ -942,7 +943,7 @@ function PlainEditor({
   const [saved] = useState(() => (noteId ? getEditorPosition(noteId) : null));
   // Whether the note was locked when this surface mounted — which is all the
   // position restore below needs, and reading it through a ref keeps that
-  // mount-time effect from re-running when the padlock is pressed.
+  // mount-time effect from re-running when the lock is toggled.
   const lockedAtMount = useRef(locked).current;
   // Latest caret offset / scroll, kept current so the unmount handler can stash
   // them for the next open.

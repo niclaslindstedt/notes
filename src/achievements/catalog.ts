@@ -32,6 +32,7 @@ import {
   CopyGlyph,
   CutGlyph,
   ExportGlyph,
+  EyeGlyph,
   EyeOffGlyph,
   FileQuestionGlyph,
   FlaskGlyph,
@@ -50,7 +51,6 @@ import {
   LinkGlyph,
   ListOrderedGlyph,
   LockGlyph,
-  LockOpenGlyph,
   MedalGlyph,
   MergeGlyph,
   MoreGlyph,
@@ -100,7 +100,7 @@ const hasMultiLineNote = (snap: Snapshot) =>
 // someone starts curating the drawer instead of scrolling it.
 const hasFavorite = (snap: Snapshot) => snap.notes.some((n) => n.favorite);
 
-// A note locked read-only from the editor's padlock — the trophy for finding
+// A note locked read-only from the editor's eye button — the trophy for finding
 // out that a note you only ever read can be made unable to take a keystroke.
 const hasLockedNote = (snap: Snapshot) => snap.notes.some((n) => n.locked);
 
@@ -690,7 +690,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   {
     id: "underLockAndKey",
     tier: "intermediate",
-    glyph: LockOpenGlyph,
+    glyph: EyeGlyph,
     learnMore: true,
     trigger: {
       kind: "derived",

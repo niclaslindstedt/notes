@@ -1,19 +1,25 @@
 import { useT } from "../i18n/index.ts";
 import { haptics } from "../platform/native-bridge.ts";
-import { LockIcon, LockOpenIcon } from "./icons.tsx";
+import { EyeIcon } from "./icons.tsx";
 
-// The editor header's padlock: locks the open note read-only, and unlocks it
-// again. A locked note still opens, reads, selects, copies and exports exactly
-// as before — what the lock takes away is the caret, and with it the soft
-// keyboard and every edit (see `docs/overview.md#lock-a-note`).
+// The editor header's read-only toggle: locks the open note so it can only be
+// read, and unlocks it again. A locked note still opens, reads, selects, copies
+// and exports exactly as before — what the lock takes away is the caret, and
+// with it the soft keyboard and every edit (see `docs/overview.md#lock-a-note`).
 //
-// Like the star beside it, it reports its state through its own artwork — a
-// closed padlock while the note is locked, an open one while it isn't — rather
-// than the filled-background treatment the find and formatting toggles use for
-// "this panel is open". This is a property of the note, not a surface being
-// held open. The closed state is drawn in the accent fill as well, because a
-// locked note is a state the user has to be able to spot at a glance before
-// wondering why their typing isn't landing.
+// It wears an **eye**, not a padlock, and that is the whole point of the glyph:
+// this app already spends the padlock on [encryption at rest](
+// ../../docs/overview.md#encryption) — `LockIcon`, worn by the lock on an
+// encrypted note's card — and two padlocks standing for two unrelated features
+// on one screen read as one feature with a confusing second state. An eye says
+// what this lock actually does: you may look, not touch. (It is not a secrecy
+// feature and must not be mistaken for one.)
+//
+// One glyph rather than the star's outline/filled pair, because there is no
+// second eye that means "editable" without also meaning "hidden" — so the state
+// is carried by the accent fill instead, the treatment the ⋯ / find / formatting
+// toggles use for "this mode is on". A locked note has to be spottable at a
+// glance, before the user wonders why their typing isn't landing.
 export function LockButton({
   locked,
   onToggle,
@@ -43,11 +49,7 @@ export function LockButton({
           : "border-accent/40 bg-transparent text-accent hover:bg-accent/10"
       }`}
     >
-      {locked ? (
-        <LockIcon className="h-[18px] w-[18px]" />
-      ) : (
-        <LockOpenIcon className="h-[18px] w-[18px]" />
-      )}
+      <EyeIcon className="h-[18px] w-[18px]" />
     </button>
   );
 }

@@ -2268,11 +2268,18 @@ the document gaining the flag.
 
 ### Lock a note
 
-A **locked** note is read-only. The padlock sits beside the star in the editor
-header (`LockButton`, `src/ui/LockButton.tsx`, drawing the framework's closed
-`LockIcon` or the app's own `LockOpenIcon` to show the note's current state, and
-filling itself in the accent colour while locked so the state is visible at a
-glance). `App` routes its press to `useNotes().toggleLock`, which flips
+A **locked** note is read-only. Its toggle sits beside the star in the editor
+header (`LockButton`, `src/ui/LockButton.tsx`), wearing an **eye** — `EyeIcon`
+(`src/ui/icons.tsx`), filled in the accent colour while locked so the state is
+visible at a glance. Deliberately *not* a padlock: this app already spends that
+glyph on [encryption at rest](#encryption) (the `LockIcon` on an encrypted note's
+card), and two padlocks standing for two unrelated features on one screen read as
+one feature with a confusing second state. An eye says what this lock actually
+does — you may look, not touch — and keeps it from being mistaken for a secrecy
+feature, which it is not. There is only the one glyph, because no second eye
+means "editable" without also meaning "hidden"; the state rides the accent fill
+instead, the treatment the ⋯ / find / formatting toggles use for "this mode is
+on". `App` routes its press to `useNotes().toggleLock`, which flips
 `Note.locked` (`setLocked`, `src/domain/note.ts`) on the shared `DOC_SCOPE` undo
 timeline — structural, like starring, because it changes what may be *done* to a
 note rather than what it says. `updatedAt` is left alone so locking never jumps a

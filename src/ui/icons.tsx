@@ -52,13 +52,15 @@ export {
 type IconProps = { className?: string };
 
 /**
- * A padlock with the shackle swung open — the "this note is unlocked, press to
- * lock it" half of the editor's [lock button](../../docs/overview.md#lock-a-note).
- * Drawn to the same proportions as the framework's closed `LockIcon` (identical
- * body, shackle hinged off its right side) so the two read as one glyph
- * changing state rather than two different marks. Not in the framework set.
+ * An open eye — the editor's [read-only lock](../../docs/overview.md#lock-a-note).
+ * Deliberately *not* a padlock: this app already spends that glyph on
+ * [encryption at rest](../../docs/overview.md#encryption) (`LockIcon`, on the
+ * note card), and two padlocks meaning two different things on one screen read
+ * as one feature. An eye says the thing the lock actually does — you may look,
+ * not touch. Not in the framework set; drawn to the same proportions as the
+ * achievements set's `EyeOffGlyph`.
  */
-export function LockOpenIcon({ className }: IconProps) {
+export function EyeIcon({ className }: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -71,8 +73,8 @@ export function LockOpenIcon({ className }: IconProps) {
       focusable="false"
       className={className}
     >
-      <rect x="4" y="11" width="16" height="9" rx="2" />
-      <path d="M8 11V8a4 4 0 0 1 7.7-1.5" />
+      <path d="M2 12c1-2.5 5-7 10-7s9 4.5 10 7c-1 2.5-5 7-10 7s-9-4.5-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }
