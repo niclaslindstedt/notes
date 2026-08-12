@@ -303,6 +303,44 @@ describe("the cut button", () => {
     renderEditor({ loading: true });
     expect(screen.queryByRole("button", { name: "Cut" })).toBeNull();
   });
+
+  // The button is a touch affordance: a mouse and a keyboard already reach the
+  // same edit through Ctrl/Cmd+K and the browser's right-click Cut, so the
+  // header doesn't spend a glyph on it there.
+  function stubDesktopPointer() {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((media: string) => ({
+        matches: media.includes("pointer: fine"),
+        media,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      })),
+    );
+  }
+
+  it("is left out of the header on a desktop pointer", () => {
+    stubDesktopPointer();
+    renderEditor();
+    expect(screen.queryByRole("button", { name: "Cut" })).toBeNull();
+    // The rest of the cluster is untouched.
+    expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
+  });
+
+  it("still answers Ctrl+K where the button is gone", () => {
+    stubDesktopPointer();
+    const { onChange } = renderEditor({ note: note({ body: "one\ntwo" }) });
+    const body = bodyField();
+    body.focus();
+    body.setSelectionRange(0, 0);
+
+    fireEvent.keyDown(body, { key: "k", ctrlKey: true });
+    expect(onChange).toHaveBeenCalledWith("two");
+  });
 });
 
 describe("the styling toolbar", () => {

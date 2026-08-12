@@ -1782,6 +1782,19 @@ read-only archived-note view (see [Archive view](#archive-view)), and the button
 is withheld while a note is still [decrypting](#encryption) — there is no
 surface to cut in.
 
+**The button is a touch affordance, so a desktop pointer doesn't get one.**
+`useDesktopPointer` (`(hover: hover) and (pointer: fine)`, the same test that
+swaps a row's swipe for the [right-click menu](#right-click-menu)) drops it
+from the header: with a mouse and a keyboard the edit is already two other
+presses away — `Ctrl/Cmd+K`, and the browser's own right-click **Cut** over a
+selection — so a fourth glyph in that row buys nothing and is one more thing to
+read past. Nothing else changes with it: the shortcut, `cutLine`, and the
+**Guillotine** achievement are untouched, and a touch pointer (phone, tablet,
+a touchscreen laptop's finger) still gets the button. It follows the pointer
+rather than the [platform](#capabilities), because the reason is the
+input device, not the shell — the Electron window and a desktop browser tab are
+the same case, and a tablet running the PWA is not.
+
 What exactly goes is decided by the pure `cutLine` (`src/domain/line-edit.ts`),
 so both surfaces agree:
 
@@ -2028,8 +2041,9 @@ Opening the bar is the **Pinpoint** achievement.
 (`max-width: 639px`, Tailwind's `sm` breakpoint from the other side) the
 editor header stops trying to carry the note's name *and* the five-button
 action cluster ([favorite](#favorites), [formatting](#styling-toolbar),
-[cut](#cut-button), [export](#export), [find](#find-in-note)) at once. The
-cluster folds behind a single **⋯ button** (`MoreButton`, wearing `MoreIcon`
+[cut](#cut-button), [export](#export), [find](#find-in-note)) at once — four of
+them in a narrow window on a desktop pointer, which gets no
+[cut button](#cut-button). The cluster folds behind a single **⋯ button** (`MoreButton`, wearing `MoreIcon`
 from `src/ui/icons.tsx`) pinned to the right of the row; the title gets the
 whole width back. Pressing ⋯ unfolds the buttons *over* the title — the title
 field is taken out of the row with `display: none` while they are out, because
@@ -2077,7 +2091,8 @@ room** achievement.
 the actions that operate on a selection are wanted, so under
 `COLLAPSE_QUERY` the [collapsed cluster](#collapsed-header-actions) unfolds
 **itself** then, carrying just the three that act on one: the
-[formatting](#styling-toolbar) toggle, [cut](#cut-button), and a
+[formatting](#styling-toolbar) toggle, [cut](#cut-button) (on a touch pointer —
+see the cut button), and a
 [copy](#copy-scope) button that takes the highlighted text and nothing else.
 Reaching them through the ⋯ was two taps for something the user had already
 asked for by highlighting it.

@@ -97,7 +97,7 @@ const achievements = {
       name: "Guillotine",
       condition: "Cut something with the cut button (or Ctrl/Cmd+K).",
       learnMore:
-        "The scissors button at the top right of a note cuts to the clipboard: whatever you have selected, or — with nothing selected — the whole line the cursor is on, so tidying a note is one tap instead of a select-and-erase or a held Backspace. Park the cursor mid-sentence and it takes only what comes after it on that line, leaving what you wanted to keep. Ctrl/Cmd+K does the same from the keyboard, and Undo puts it back.",
+        "The scissors button at the top right of a note cuts to the clipboard: whatever you have selected, or — with nothing selected — the whole line the cursor is on, so tidying a note is one tap instead of a select-and-erase or a held Backspace. Park the cursor mid-sentence and it takes only what comes after it on that line, leaving what you wanted to keep. Ctrl/Cmd+K does the same from the keyboard, and Undo puts it back. The button is there for touch: on a computer the keyboard shortcut and the right-click menu already cut, so the header keeps the space instead.",
     },
     stylist: {
       name: "Stylist",

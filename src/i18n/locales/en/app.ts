@@ -67,9 +67,10 @@ const app = {
     todo: "Not done",
     done: "Done",
   },
-  // The editor's cut button (left of the export button) and its Ctrl/Cmd+K
-  // shortcut: the selection, or the rest of the line from a mid-line caret,
-  // or the whole line — onto the clipboard on its way out.
+  // The editor's cut button (left of the export button, and only on a touch
+  // pointer) and its Ctrl/Cmd+K shortcut: the selection, or the rest of the
+  // line from a mid-line caret, or the whole line — onto the clipboard on its
+  // way out.
   cut: "Cut",
   // The editor header's leading star button, which lifts the open note into
   // (and out of) the side menu's Favorites section. The label states what the
