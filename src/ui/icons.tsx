@@ -51,6 +51,34 @@ export {
 
 type IconProps = { className?: string };
 
+/**
+ * An open eye — the editor's [read-only lock](../../docs/overview.md#lock-a-note).
+ * Deliberately *not* a padlock: this app already spends that glyph on
+ * [encryption at rest](../../docs/overview.md#encryption) (`LockIcon`, on the
+ * note card), and two padlocks meaning two different things on one screen read
+ * as one feature. An eye says the thing the lock actually does — you may look,
+ * not touch. Not in the framework set; drawn to the same proportions as the
+ * achievements set's `EyeOffGlyph`.
+ */
+export function EyeIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <path d="M2 12c1-2.5 5-7 10-7s9 4.5 10 7c-1 2.5-5 7-10 7s-9-4.5-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 /** A folder with a plus — create a folder. Not in the framework set. */
 export function FolderPlusIcon({ className }: IconProps) {
   return (

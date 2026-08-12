@@ -202,6 +202,10 @@ export function noteToMarkdown(note: Note, depth = 0): string {
     // an unstarred note's frontmatter stays minimal, and an older file (no
     // flag) round-trips unstarred.
     ...(note.favorite ? { favorite: "true" } : {}),
+    // Only written when the note is locked, on the same terms: an unlocked
+    // note's frontmatter stays minimal, and an older file (no flag) round-trips
+    // unlocked.
+    ...(note.locked ? { locked: "true" } : {}),
     // The folder the note belongs to, by id. Only written when set, so an
     // ungrouped note's frontmatter stays minimal. The folder's display name
     // lives in the `folders.json` sidecar the directory adapter keeps, so this
@@ -328,6 +332,8 @@ export function parseNote(text: string): Note | null {
   if (front.archived === "true") note.archived = true;
   // Same for the favorite flag — only a literal `true` stars the note.
   if (front.favorite === "true") note.favorite = true;
+  // Same for the read-only lock — only a literal `true` locks the note.
+  if (front.locked === "true") note.locked = true;
   // Carry the folder link only when present, mirroring how it's written.
   if (front.folder) note.folderId = front.folder;
   return note;

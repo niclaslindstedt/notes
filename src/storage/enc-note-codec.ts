@@ -20,7 +20,7 @@ type EncAttachmentMeta = { filename: string; mime: string };
 
 // Serialize a note to the canonical JSON sealed into its `.enc` file. Optional
 // fields are omitted when falsy so the encoding is stable (an absent
-// `attachments`/`folderId`/`archived`/`favorite` never differs from
+// `attachments`/`folderId`/`archived`/`favorite`/`locked` never differs from
 // `[]`/`""`/`false`),
 // which keeps the content hash stable across saves that don't touch them.
 export function noteToEncJson(note: Note): string {
@@ -37,6 +37,7 @@ export function noteToEncJson(note: Note): string {
   };
   if (note.archived) obj.archived = true;
   if (note.favorite) obj.favorite = true;
+  if (note.locked) obj.locked = true;
   if (note.folderId) obj.folderId = note.folderId;
   if (meta.length > 0) obj.attachments = meta;
   return JSON.stringify(obj);
@@ -72,6 +73,7 @@ export function encJsonToNote(json: string): Note | null {
   };
   if (n.archived === true) note.archived = true;
   if (n.favorite === true) note.favorite = true;
+  if (n.locked === true) note.locked = true;
   if (typeof n.folderId === "string" && n.folderId.length > 0) {
     note.folderId = n.folderId;
   }

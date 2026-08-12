@@ -228,6 +228,7 @@ export function App() {
     archive,
     restore,
     toggleFavorite,
+    toggleLock,
     moveNote,
     createFolder,
     renameFolder,
@@ -718,6 +719,7 @@ export function App() {
                       onTitleChange={(title) => retitle(editing.id, title)}
                       onTitleSettle={sync.releaseSaves}
                       onToggleFavorite={() => toggleFavorite(editing.id)}
+                      onToggleLock={() => toggleLock(editing.id)}
                       undoScrollSeq={undoScrollSeq}
                       uploading={uploadingIds.has(editing.id)}
                       loading={editingDeferred}

@@ -104,6 +104,19 @@ export function KeyGlyph({ className }: IconProps) {
 
 // ── Per-achievement glyphs ─────────────────────────────────────────────────
 
+// An open eye — the editor's read-only lock, which is about looking without
+// touching rather than about secrecy. The padlock `LockGlyph` is spoken for by
+// encryption at rest (its trophy is Paranoid mode), and the two must not be
+// mistaken for each other.
+export function EyeGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M2 12c1-2.5 5-7 10-7s9 4.5 10 7c-1 2.5-5 7-10 7s-9-4.5-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Svg>
+  );
+}
+
 export function TypeGlyph({ className }: IconProps) {
   return (
     <Svg className={className}>

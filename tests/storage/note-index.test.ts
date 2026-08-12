@@ -45,6 +45,17 @@ describe("note-index", () => {
     expect(back.archived).toBe(true);
   });
 
+  it("carries the read-only lock into the index and back", () => {
+    // The lock has to survive the encrypted backends' fast path too: the list
+    // is rebuilt from the index alone, so a lock that lived only in the note's
+    // `.enc` body would come back unlocked until the note was opened.
+    const note: Note = { ...createNote(3), title: "Ref", locked: true };
+    const entry = noteToIndexEntry(note);
+    expect(entry.locked).toBe(true);
+    expect(indexEntryToNote(entry).locked).toBe(true);
+    expect(noteToIndexEntry(createNote(4)).locked).toBeUndefined();
+  });
+
   it("round-trips through serialize / parse", () => {
     const notes: Note[] = [
       { ...createNote(1), title: "One", body: "first" },

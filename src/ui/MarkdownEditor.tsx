@@ -128,6 +128,14 @@ type Props = {
    * first changed line into view, so the reverted / re-applied part is revealed.
    */
   undoScrollSeq?: number;
+  /**
+   * The note is **locked**: render it read-only. The surface stops being
+   * `contenteditable`, so the browser puts no caret in it and no soft keyboard
+   * comes up, and every path that would mutate the source stands down. Reading,
+   * selecting, copying and the line-number gutter are untouched — see
+   * `docs/overview.md#lock-a-note`.
+   */
+  locked?: boolean;
   /** Wrap long lines, or keep them on one line and scroll horizontally. */
   wordWrap: boolean;
   /** Turn off browser/OS spell check (the red squiggles). */
@@ -243,6 +251,7 @@ export function MarkdownEditor({
   body,
   onChange,
   undoScrollSeq = 0,
+  locked = false,
   wordWrap,
   disableSpellcheck,
   disableAutocorrect,
@@ -302,11 +311,16 @@ export function MarkdownEditor({
     to: number;
   } | null>(null);
   const [active, setActive] = useState<Active>(() => ({
-    index: savedCaret
-      ? Math.min(savedCaret.line, body.split("\n").length - 1)
-      : focusOnMount
-        ? Math.max(0, body.split("\n").length - 1)
-        : null,
+    // A locked note has no active line, ever: the raw line exists so it can be
+    // *edited*, and there is nothing here to edit. It opens the way an
+    // untouched note does — every line formatted, no caret, keyboard down —
+    // whatever caret this note was left on before it was locked.
+    index:
+      locked || (!savedCaret && !focusOnMount)
+        ? null
+        : savedCaret
+          ? Math.min(savedCaret.line, body.split("\n").length - 1)
+          : Math.max(0, body.split("\n").length - 1),
     key: 0,
   }));
 
@@ -318,19 +332,25 @@ export function MarkdownEditor({
   const linesRef = useRef(lines);
   const blocksRef = useRef(blocks);
   const activeRef = useRef(active);
+  // Read by the effects that must see the *current* lock without re-running
+  // when it flips (a mount-time position restore, an out-of-band body swap).
+  const lockedRef = useRef(locked);
   valueRef.current = value;
   linesRef.current = lines;
   blocksRef.current = blocks;
   activeRef.current = active;
+  lockedRef.current = locked;
 
   // The caret column to install after the active line (re)renders, or null when
   // the browser already left the caret where it belongs (a plain caret move).
   const pendingCaret = useRef<number | null>(
-    savedCaret
-      ? savedCaret.col
-      : focusOnMount
-        ? Math.max(0, (lines[lines.length - 1] ?? "").length)
-        : null,
+    locked
+      ? null
+      : savedCaret
+        ? savedCaret.col
+        : focusOnMount
+          ? Math.max(0, (lines[lines.length - 1] ?? "").length)
+          : null,
   );
   // The ranged sibling of `pendingCaret`, for an edit that hands a span back
   // *selected* rather than collapsed — the styling toolbar wrapping a word in
@@ -480,6 +500,21 @@ export function MarkdownEditor({
     }));
   }
 
+  // Locking the note while it is open (the header's read-only toggle, or
+  // another device's lock arriving on a live pull) takes the caret's line back
+  // to formatted. The
+  // surface stops being editable in the same render, so the browser drops the
+  // caret itself; this is what stops the line the caret *was* on being left
+  // showing its raw markdown, which would read as a stray `#` or `- ` in an
+  // otherwise rendered note.
+  useEffect(() => {
+    if (!locked) return;
+    pendingCaret.current = null;
+    pendingRange.current = null;
+    pendingLineSpan.current = null;
+    setActive((a) => (a.index === null ? a : { index: null, key: a.key + 1 }));
+  }, [locked]);
+
   // Adopt an out-of-band change to this note's body — a live cloud pull while
   // the note is open — without disturbing the user's own typing (our keystrokes
   // echo back to the identical string, so a differing `body` is another writer).
@@ -496,8 +531,9 @@ export function MarkdownEditor({
           },
     );
     // Only restore the caret when the editor was actually focused; a background
-    // pull must not steal focus into the body.
-    pendingCaret.current = editing ? 0 : null;
+    // pull must not steal focus into the body. A locked note never has one to
+    // restore.
+    pendingCaret.current = editing && !lockedRef.current ? 0 : null;
   }, [body]);
 
   // An undo / redo just swapped the body in. Diff the incoming `body` against
@@ -564,7 +600,10 @@ export function MarkdownEditor({
   useLayoutEffect(() => {
     if (!saved) return;
     setScrollTop(rootRef.current?.parentElement, saved.scrollTop);
-    if (saved.caret) {
+    // The scroll offset is restored either way — where you were *reading* is
+    // just as true of a locked note — but the caret half of it is not, because
+    // a locked note has no caret to put back.
+    if (saved.caret && !lockedRef.current) {
       const el = activeElRef.current;
       if (el) scrollFocusedIntoView(el, { ifHidden: true });
       unlock("whereYouLeftOff");
@@ -742,6 +781,15 @@ export function MarkdownEditor({
   // (it can't be `preventDefault`ed), and is reconciled on `compositionend`.
   const beforeInputRef = useRef<(e: InputEvent) => void>(() => {});
   beforeInputRef.current = (e: InputEvent) => {
+    // A locked note refuses every edit outright. The surface isn't editable
+    // while locked so this should never fire, but an edit that reached the DOM
+    // behind React's back is exactly the failure this whole interception layer
+    // exists to prevent — so refuse it here too rather than trusting the
+    // attribute.
+    if (locked) {
+      e.preventDefault();
+      return;
+    }
     const it = e.inputType;
     // Let the composition run; `onCompositionEnd` reads the result back.
     if (composing.current || it === "insertCompositionText") return;
@@ -1028,7 +1076,7 @@ export function MarkdownEditor({
       // must put Bold out, and that never re-enters `activate` below.
       markCaret(pt.line, pt.col, pt.col);
     }
-    if (L === cur) return;
+    if (L === cur || locked) return;
     // The caret entered a different line: make that line active (raw) at the col.
     activate(L, pt?.col ?? 0);
   };
@@ -1120,6 +1168,11 @@ export function MarkdownEditor({
   }
 
   function onPaste(e: ReactClipboardEvent<HTMLDivElement>) {
+    // Nothing lands in a locked note — not text, not a file.
+    if (locked) {
+      e.preventDefault();
+      return;
+    }
     const files = canAttach ? attachableFilesFrom(e.clipboardData) : [];
     if (files.length > 0) {
       e.preventDefault();
@@ -1142,7 +1195,7 @@ export function MarkdownEditor({
   }
 
   function onDrop(e: ReactDragEvent<HTMLDivElement>) {
-    if (!canAttach) return;
+    if (!canAttach || locked) return;
     const files = attachableFilesFrom(e.dataTransfer);
     if (files.length === 0) return;
     e.preventDefault();
@@ -1184,6 +1237,7 @@ export function MarkdownEditor({
   // and when a Shift+Tab has nothing left to unindent, so the outer level of a
   // list is never a place the keyboard can't tab out of.
   function indentList(outdent: boolean): boolean {
+    if (locked) return false;
     const pts = selectionPoints();
     const at = lastCaret.current;
     const span = pts ?? (at ? { start: at, end: at } : null);
@@ -1242,6 +1296,10 @@ export function MarkdownEditor({
   // doesn't bump `updatedAt`. Shared by the click-below handler and the
   // imperative `focus()` the title hands down.
   function placeCaretAtEnd() {
+    // A locked note has nowhere to put a caret, so the gestures that ask for
+    // one — a click in the empty space below the text, the title field handing
+    // focus down — simply do nothing rather than focusing an inert surface.
+    if (locked) return;
     rootRef.current?.focus();
     const cur = linesRef.current;
     const last = cur.length - 1;
@@ -1274,6 +1332,7 @@ export function MarkdownEditor({
   // moves the caret, so there is no line to reveal, and leaving it set would
   // yank the view on whatever the *next* tap happens to be.
   function toggleTask(index: number) {
+    if (locked) return;
     const cur = linesRef.current;
     const flipped = toggleTaskLine(cur[index] ?? "");
     if (flipped === null) return;
@@ -1322,6 +1381,10 @@ export function MarkdownEditor({
     // A press the content already answered (a link opened, an attachment
     // opened) or one no pointer made (a keyboard-synthesised click).
     if (e.defaultPrevented || e.detail === 0) return;
+    // On a locked note a press reveals no raw line and lands no caret. The
+    // browser has already handled what it *should* do — following a link,
+    // starting a selection — and there is nothing for us to adjust.
+    if (locked) return;
     const root = rootRef.current;
     const lineEl = (e.target as Element | null)?.closest?.("[data-line-index]");
     if (!root || !(lineEl instanceof HTMLElement) || !root.contains(lineEl))
@@ -1363,6 +1426,7 @@ export function MarkdownEditor({
   // leaves it highlighted and a second press unbolds it, while a result
   // spanning lines settles for a caret at its end.
   function format(action: FormatAction) {
+    if (locked) return;
     const pts = selectionPoints();
     const at = lastCaret.current ?? { line: 0, col: 0 };
     const sel = pts
@@ -1410,6 +1474,7 @@ export function MarkdownEditor({
   // yet tapped — there is no line to point at, so the press does nothing
   // rather than guess at one.
   function cut() {
+    if (locked) return;
     const pts = selectionPoints();
     const at = lastCaret.current;
     const span = pts ?? (at ? { start: at, end: at } : null);
@@ -1677,7 +1742,7 @@ export function MarkdownEditor({
         }}
         onDrop={onDrop}
         onDragOver={(e) => {
-          if (canAttach && carriesFiles(e)) e.preventDefault();
+          if (canAttach && !locked && carriesFiles(e)) e.preventDefault();
         }}
       >
         {/* The "start writing" prompt for an empty note, drawn as an overlay
@@ -1713,7 +1778,11 @@ export function MarkdownEditor({
           // it from the title and out of it via `onTabOut`, so the surface is
           // never reached twice (and never traps focus in the header).
           tabIndex={-1}
-          contentEditable={editableMode}
+          // Locked: not editable at all, which is what keeps the caret out (and
+          // with it the soft keyboard). The node stays a `textbox` so screen
+          // readers still announce it as the note's text, marked read-only.
+          contentEditable={locked ? "false" : editableMode}
+          aria-readonly={locked || undefined}
           spellcheck={!disableSpellcheck}
           autoCorrect={disableAutocorrect ? "off" : "on"}
           // The editor writes the sentence capital itself (`autoCapitalAt`),
@@ -1810,7 +1879,7 @@ export function MarkdownEditor({
                     transforms={transforms}
                     highlights={highlightsByLine.get(index)}
                     edgeClass={edgeClass}
-                    interactiveTasks
+                    interactiveTasks={!locked}
                   />
                   {code !== undefined && (
                     <CodeCopyButton

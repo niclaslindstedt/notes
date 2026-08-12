@@ -60,6 +60,30 @@ describe("noteToEncJson", () => {
     );
   });
 
+  it("round-trips the read-only lock", () => {
+    const json = noteToEncJson({
+      id: "n1",
+      title: "",
+      body: "",
+      createdAt: 1,
+      updatedAt: 2,
+      locked: true,
+    });
+    expect(json).toContain('"locked":true');
+    expect(encJsonToNote(json)?.locked).toBe(true);
+    // An unlocked note omits the key entirely, so the encoding — and with it
+    // the content hash — stays stable across saves that don't touch it.
+    const plain = noteToEncJson({
+      id: "n1",
+      title: "",
+      body: "",
+      createdAt: 1,
+      updatedAt: 2,
+    });
+    expect(plain).not.toContain("locked");
+    expect(encJsonToNote(plain)?.locked).toBeUndefined();
+  });
+
   it("includes archived, folderId, and attachment metadata when present", () => {
     const obj = JSON.parse(noteToEncJson(fullNote()));
     expect(obj.archived).toBe(true);
