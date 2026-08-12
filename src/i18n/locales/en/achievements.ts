@@ -118,6 +118,12 @@ const achievements = {
       learnMore:
         'Start a sentence and the note writes the capital for you \u2014 the first letter of a line, and the first letter after a full stop, question mark or exclamation mark. It is the capital your phone puts in for you anywhere else, done by the app because the editor writes every keystroke into the note itself, which puts the keystroke out of the keyboard\'s reach; that is also why it works the same on a computer, where nothing offers it at all. A file name or a decimal keeps its lower case, code blocks are left exactly as typed, and because the capital is an ordinary edit, Backspace or Undo takes it back off. Turn it off with "Capitalise sentences" in Settings \u2192 Editor.',
     },
+    elbowRoom: {
+      name: "Elbow room",
+      condition: "Open a note's ⋯ menu on a narrow screen.",
+      learnMore:
+        "On a phone the editor's header has room for the note's name or its five action buttons, not both — so the buttons fold into a single ⋯ button on the right. Pressing it slides them back out over the title; pressing it again, or touching the note itself, folds them away and hands the title back. The caret stays exactly where it was through all of it, so the cut and formatting buttons still act on the line you were writing.",
+    },
     pinpoint: {
       name: "Pinpoint",
       condition: "Find text inside the note you have open.",

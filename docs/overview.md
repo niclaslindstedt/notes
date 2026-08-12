@@ -1932,6 +1932,52 @@ The query is **not** remembered across notes the way the toolbar's open state is
 — a query is about the note you were reading, so the next note starts clean.
 Opening the bar is the **Pinpoint** achievement.
 
+### Collapsed header actions
+
+`Editor` (`src/ui/NoteEditor.tsx`) — under `COLLAPSE_QUERY`
+(`max-width: 639px`, Tailwind's `sm` breakpoint from the other side) the
+editor header stops trying to carry the note's name *and* the five-button
+action cluster ([favorite](#favorites), [formatting](#styling-toolbar),
+[cut](#cut-button), [export](#export), [find](#find-in-note)) at once. The
+cluster folds behind a single **⋯ button** (`MoreButton`, wearing `MoreIcon`
+from `src/ui/icons.tsx`) pinned to the right of the row; the title gets the
+whole width back. Pressing ⋯ unfolds the buttons *over* the title — the title
+field is taken out of the row with `display: none` while they are out, because
+the note itself is right below to say which note this is.
+
+The unfold is one CSS transition on the box holding the five buttons:
+`max-width` from `0` to `ACTIONS_MAX_WIDTH`, plus `opacity`, plus
+`visibility`. The box is right-anchored and clips what doesn't fit yet, so
+growing it walks its content leftwards and the buttons read as unfolding out
+of the ⋯ itself. `visibility` is the third property for a reason that isn't
+cosmetic: it flips to `hidden` only at the *end* of a transition (the one
+discrete property CSS defines that way), which keeps the closing slide visible
+while it plays and still leaves the folded-away buttons out of the tab order
+and off screen readers the rest of the time. Reduced motion drops all of it to
+a jump through the global rule in `src/styles/theme.css`.
+
+Three things close it again:
+
+- **Pressing ⋯ a second time** — it carries `aria-expanded` and the same
+  lit-when-open treatment as the formatting and find toggles.
+- **Going back to the note** — `collapseActions` is wired to the content
+  area's `onFocusCapture` *and* `onPointerDownCapture`, so a tap into the
+  writing surface (or focus arriving anywhere below the header, including the
+  find field) hands the title back. This is what makes the row a detour rather
+  than a mode: you never have to dismiss it.
+- **Widening past the breakpoint** — every action is back in the row on its
+  own, so the held-open flag is dropped.
+
+Like the [find bar](#find-in-note) and unlike the
+[styling toolbar](#styling-toolbar), the open state is **not** remembered:
+every note, and every return to a note, opens showing its title. The ⋯ cancels
+its own `mousedown` the way the rest of the cluster does, so unfolding the row
+never costs the caret the buttons behind it are about to act on. While the
+cluster is folded away the editor's [tab order](#editor-tab-order) treats the
+⋯ as the header's first action (`firstAction`), so Tab out of the body lands on
+the control that is actually there. Unfolding it the first time is the **Elbow
+room** achievement.
+
 ### Editor position memory
 
 `src/ui/editor-position.ts` — a **session-scoped** memory of where the caret sat
