@@ -11,7 +11,6 @@ import { writeClipboard } from "../clipboard.ts";
 import { buildCopyText } from "../copy-note.ts";
 import { FloatingPanel } from "../FloatingPanel.tsx";
 import type { FloatingPlacement } from "../hooks/useFloatingPosition.ts";
-import { useMediaQuery } from "../hooks/useMediaQuery.ts";
 import {
   CheckIcon,
   CopyIcon,
@@ -20,6 +19,7 @@ import {
   FilePdfIcon,
   SpinnerIcon,
 } from "../icons.tsx";
+import { Toast } from "../Toast.tsx";
 
 // The export button: the up arrow in the note header's action cluster, opening
 // a menu of the three ways a note leaves the app.
@@ -33,26 +33,21 @@ import {
 //     the copy-scope setting says. This is the *only* way to copy a note —
 //     the menu is where someone looks for "get this note out of the app", and
 //     a second header button doing one of its three jobs was one button too
-//     many in a row that already holds four.
+//     many in a row that already holds four. It confirms with a **`Toast`**,
+//     because the row swapping to a tick is confirmation nobody sees: the menu
+//     closes on the press, and copying is the one row that finishes silently
+//     with no print dialog or download to show for itself.
 //
-// **On a narrow screen the rows are glyphs alone**; from `sm:` up each glyph is
-// followed by its label. That is a deliberate media-query decision rather than
-// a CSS `hidden sm:inline`, because the floating panel is measured and
-// positioned in JS — the panel has to know it is a strip of icons, or it would
-// be sized for text that isn't drawn.
+// **Every row is a glyph and its label, at every width.** A phone has room for
+// the labelled menu, and three unexplained icons stacked under the header is a
+// guessing game — so the panel is sized for text on the narrowest screen too.
 //
 // The export work itself is loaded on the press, not at mount: the Markdown
 // codec, the print renderer and its stylesheet are a few kilobytes nobody who
 // never exports should download (see AGENTS.md, "the code-splitting seams").
 
-const MENU_PLACEMENT_WIDE: FloatingPlacement = {
+const MENU_PLACEMENT: FloatingPlacement = {
   width: { kind: "min", minPx: 208 },
-  anchor: "right",
-  coordinateSpace: "viewport",
-};
-
-const MENU_PLACEMENT_NARROW: FloatingPlacement = {
-  width: { kind: "min", minPx: 56 },
   anchor: "right",
   coordinateSpace: "viewport",
 };
@@ -82,7 +77,6 @@ export function ExportButton({
   const [busy, setBusy] = useState<Busy>(null);
   const [copied, setCopied] = useState(false);
   const copiedTimer = useRef<number | undefined>(undefined);
-  const withLabels = useMediaQuery("(min-width: 640px)");
 
   useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
 
@@ -182,7 +176,7 @@ export function ExportButton({
         open={open}
         onClose={() => setOpen(false)}
         triggerRef={triggerRef}
-        placement={withLabels ? MENU_PLACEMENT_WIDE : MENU_PLACEMENT_NARROW}
+        placement={MENU_PLACEMENT}
         // The header is pinned to the top of the screen, so there is nothing
         // useful above it to flip into (see `FloatingPanel`).
         drop="down"
@@ -198,22 +192,22 @@ export function ExportButton({
               // from the header must not blur the editing surface.
               onMouseDown={(e) => e.preventDefault()}
               onClick={row.onSelect}
-              title={withLabels ? undefined : row.label}
-              aria-label={withLabels ? undefined : row.label}
-              className={`flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left text-sm text-fg transition-colors hover:bg-accent/15 ${
-                withLabels ? "" : "justify-center"
-              }`}
+              className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left text-sm text-fg transition-colors hover:bg-accent/15"
             >
               <span className="flex h-5 w-5 shrink-0 items-center justify-center">
                 {row.icon}
               </span>
-              {withLabels && (
-                <span className="min-w-0 flex-1 truncate">{row.label}</span>
-              )}
+              <span className="min-w-0 flex-1 truncate">{row.label}</span>
             </button>
           ))}
         </div>
       </FloatingPanel>
+      {copied && (
+        <Toast
+          message={t("app.copy.copied")}
+          icon={<CheckIcon className="h-4 w-4 shrink-0 text-accent" />}
+        />
+      )}
     </>
   );
 }
