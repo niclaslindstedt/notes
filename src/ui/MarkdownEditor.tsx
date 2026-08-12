@@ -64,6 +64,7 @@ import {
   lineIndexOf,
   placeCaret,
   placeRange,
+  visualRowAt,
 } from "./contenteditable-caret.ts";
 import {
   anchoredScrollTop,
@@ -405,13 +406,38 @@ export function MarkdownEditor({
   // the caret enters it: an x remembered over a heading (large text, `# `
   // hidden) would mean something else entirely once that heading opens raw.
   //
+  // Counted from the start of the caret's **visual row**, not of its source
+  // line, because a soft-wrapped line is many rows tall and only the row makes
+  // a column mean anything: column 700 of a paragraph is somewhere in its
+  // middle, while "44 into this row" is the place the eye is actually on.
+  //
   // Set on the first Up / Down / PageUp / PageDown of a run and kept for the
   // whole of it — including across lines too short to reach it, which is the
   // entire point. Dropped by anything that says the user picked a new column: a
   // horizontal key, typing, a press, a selection, leaving the surface.
   const goalCol = useRef<number | null>(null);
+  // Which way the latest vertical press went, and so which visual row of the
+  // line it lands on the caret arrives at: walking up enters a line from below
+  // and belongs on its **last** row, walking down on its **first**. Read once
+  // the line has rendered raw, in the caret-placement effect — the formatted
+  // line it was before wraps differently, so its geometry says nothing.
+  const pendingRow = useRef<"first" | "last" | null>(null);
+  const upwards = useRef(false);
   function dropGoalColumn() {
     goalCol.current = null;
+    pendingRow.current = null;
+  }
+
+  // The caret's column counted from the head of the visual row it sits in — the
+  // goal column a vertical run starts aiming at. Falls back to the source column
+  // when the caret isn't in the active raw line (nothing to measure against),
+  // which is also what an un-wrapped line answers.
+  function rowRelativeCaretColumn(): number | null {
+    const at = lastCaret.current;
+    if (!at) return null;
+    const el = activeElRef.current;
+    if (!el || activeRef.current.index !== at.line) return at.col;
+    return Math.max(0, at.col - visualRowAt(el, at.col).start);
   }
   // Guards so a caret we place programmatically doesn't re-enter the
   // `selectionchange` handler, and so IME composition isn't disturbed.
@@ -505,6 +531,11 @@ export function MarkdownEditor({
         : { line, from, to },
     );
   }
+
+  // So the caret-placement effect can report a column without taking `markCaret`
+  // (rebuilt every render) as a dependency and re-running on each one.
+  const markCaretRef = useRef(markCaret);
+  markCaretRef.current = markCaret;
 
   // A selection spanning lines has no single line's columns to report.
   function clearCaretSpan() {
@@ -607,6 +638,23 @@ export function MarkdownEditor({
     else placeCaret(el, pendingCaret.current!);
     pendingRange.current = null;
     pendingCaret.current = null;
+    // A vertical run just stepped onto this line, which is only now drawn raw
+    // and so only now has the wrapping the caret has to be measured against.
+    // The row it belongs on is the one the caret came in through — the last
+    // when walking up, the first when walking down — and the goal column is
+    // counted from that row's head, so a paragraph many rows tall is entered at
+    // the column the eye is on rather than at its first row.
+    const row = pendingRow.current;
+    const goal = goalCol.current;
+    pendingRow.current = null;
+    if (row && goal !== null) {
+      const text = el.textContent ?? "";
+      const at = visualRowAt(el, row === "last" ? text.length : 0);
+      const col = Math.min(at.start + goal, at.end);
+      placeCaret(el, col);
+      lastCaret.current = { line: active.index, col };
+      markCaretRef.current(active.index, col, col);
+    }
     // A touch tap that just landed the caret on a new line: scroll that line
     // clear of the soft keyboard. The keyboard shrinks the visual viewport
     // *after* the browser's own focus-time reveal, so a line tapped in the lower
@@ -1125,12 +1173,17 @@ export function MarkdownEditor({
     // run is aiming for, clamped to what this line actually has. Clamping and
     // *not* forgetting is the whole behaviour: a short line in the middle of the
     // run parks the caret at its end, and the next press picks the goal back up.
+    //
+    // Which visual *row* of the line that column is counted from can only be
+    // settled once the line has rendered raw, so the effect that places the
+    // caret finishes the job; this is the un-wrapped answer it starts from.
     const goal = goalCol.current;
-    const col =
-      goal === null
-        ? (pt?.col ?? 0)
-        : Math.min(goal, (linesRef.current[L] ?? "").length);
-    activate(L, col);
+    if (goal === null) {
+      activate(L, pt?.col ?? 0);
+      return;
+    }
+    pendingRow.current = upwards.current ? "last" : "first";
+    activate(L, Math.min(goal, (linesRef.current[L] ?? "").length));
   };
 
   // --- Clipboard: copy/cut verbatim source, paste through the engine --------
@@ -1314,8 +1367,11 @@ export function MarkdownEditor({
     // column it is aiming for, and every other key means the user has picked a
     // new one (see `goalCol`). Bare modifiers say nothing either way.
     if (VERTICAL_KEYS.has(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      if (goalCol.current === null)
-        goalCol.current = lastCaret.current?.col ?? null;
+      // Read every press, not just the run's first: a run is free to turn
+      // around, and it is the *latest* direction that says which visual row of
+      // the next line the caret arrives on.
+      upwards.current = e.key === "ArrowUp" || e.key === "PageUp";
+      if (goalCol.current === null) goalCol.current = rowRelativeCaretColumn();
     } else if (!MODIFIER_KEYS.has(e.key)) {
       dropGoalColumn();
     }

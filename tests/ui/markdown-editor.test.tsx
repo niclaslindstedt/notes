@@ -1044,6 +1044,112 @@ describe("MarkdownEditor", () => {
       await arrow("ArrowUp", formatted(TOP), 2);
       expect(caretColumn()).toBe(2);
     });
+
+    // A soft-wrapped line is many rows tall, and a column only means anything
+    // relative to the row it is counted from. jsdom lays nothing out, so
+    // wrapping is simulated the same way `visualRowAt`'s own tests do it: every
+    // measured range reports the row its first character falls in, at
+    // `PER_ROW` characters per row.
+    describe("on a soft-wrapped line", () => {
+      const PER_ROW = 10;
+      const realGetClientRects = Range.prototype.getClientRects;
+
+      function wrapAt10Characters() {
+        Range.prototype.getClientRects = function (this: Range) {
+          const line = lineElementOf(this.startContainer);
+          const column = line
+            ? columnOf(line, this.startContainer, this.startOffset)
+            : 0;
+          return [
+            { top: Math.floor(column / PER_ROW) * 20, height: 20 },
+          ] as unknown as DOMRectList;
+        };
+      }
+
+      /** The `[data-line-index]` element a node sits in. */
+      function lineElementOf(node: Node): HTMLElement | null {
+        const el =
+          node.nodeType === Node.TEXT_NODE
+            ? node.parentElement
+            : (node as Element);
+        return el?.closest("[data-line-index]") as HTMLElement | null;
+      }
+
+      /** The column a (node, offset) sits at within `line`. */
+      function columnOf(line: HTMLElement, node: Node, offset: number): number {
+        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+        let column = 0;
+        let text = walker.nextNode() as Text | null;
+        while (text) {
+          if (text === node) return column + offset;
+          column += text.data.length;
+          text = walker.nextNode() as Text | null;
+        }
+        return column + offset;
+      }
+
+      afterEach(() => {
+        Range.prototype.getClientRects = realGetClientRects;
+      });
+
+      // Four rows of ten: 0-9, 10-19, 20-29, 30-34.
+      const PARAGRAPH = "p".repeat(35);
+
+      /** The line element for source line `index`, formatted or raw. */
+      function lineEl(index: number): HTMLElement {
+        return surface().querySelector(
+          `[data-line-index="${index}"]`,
+        ) as HTMLElement;
+      }
+
+      it("arrives on the last row when walking up into it", async () => {
+        // The bug this describes: the caret used to land at column 4 of the
+        // paragraph — its *first* row — while the eye expects the row the caret
+        // came in through, the last one.
+        renderEditor(`${PARAGRAPH}\ntail`);
+        wrapAt10Characters();
+        await moveCaret(rawLine()!, 4);
+
+        await arrow("ArrowUp", lineEl(0), 0);
+        expect(rawLine()?.getAttribute("data-line-index")).toBe("0");
+        // Row 3 starts at column 30, so four columns into it is 34.
+        expect(caretColumn()).toBe(34);
+      });
+
+      it("arrives on the first row when walking down into it", async () => {
+        renderEditor(`head\n${PARAGRAPH}`);
+        wrapAt10Characters();
+        await moveCaret(lineEl(0), 4);
+
+        await arrow("ArrowDown", lineEl(1), 0);
+        expect(rawLine()?.getAttribute("data-line-index")).toBe("1");
+        expect(caretColumn()).toBe(4);
+      });
+
+      it("aims at the column within the row the run started on", async () => {
+        // Leaving a wrapped line takes the column counted from the row the
+        // caret sits in, not the source column — which on row 3 is 34, and
+        // would run off the end of every short line after it.
+        renderEditor(`${PARAGRAPH}\ntail`);
+        wrapAt10Characters();
+        await moveCaret(lineEl(0), 34);
+
+        await arrow("ArrowDown", lineEl(1), 0);
+        expect(rawLine()?.getAttribute("data-line-index")).toBe("1");
+        expect(caretColumn()).toBe(4);
+      });
+
+      it("parks at the end of a row too short to reach the column", async () => {
+        // Row 3 holds only five characters, so a column-8 run settles at its
+        // end rather than spilling past the line.
+        renderEditor(`${PARAGRAPH}\nlonger tail`);
+        wrapAt10Characters();
+        await moveCaret(rawLine()!, 8);
+
+        await arrow("ArrowUp", lineEl(0), 0);
+        expect(caretColumn()).toBe(35);
+      });
+    });
   });
 
   describe("tab order", () => {

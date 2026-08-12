@@ -486,11 +486,33 @@ coordinate this editor moves in — and because a line is drawn formatted until
 the caret enters it, so an x remembered over a heading (large text, `# ` hidden)
 would mean something else entirely once that heading opens raw.
 
+The column is counted from the head of the caret's **visual row**, not of its
+source line, and the row is resolved by `visualRowAt`
+(`src/ui/contenteditable-caret.ts`). A soft-wrapped paragraph is many rows tall,
+and only the row makes a column mean anything: "column 700" is somewhere in the
+middle of a paragraph, while "44 into this row" is the place the eye is on.
+
 **Set** on the first `ArrowUp` / `ArrowDown` / `PageUp` / `PageDown` of a run,
-from the caret's current column, and kept for the whole run — including across
-lines too short to reach it, which is the entire point. When the caret crosses
-onto a new line, that line opens raw at `min(goal, line.length)`: a short line
-parks the caret at its end, and the next press picks the goal back up.
+from the caret's current row-relative column, and kept for the whole run —
+including across lines too short to reach it, which is the entire point.
+
+**Applied** when the caret crosses onto a different source line. The row it
+lands on is the one it came in through: the line's **last** row when walking up,
+its **first** when walking down — so stepping up into a thirteen-row paragraph
+arrives at its bottom edge, where the press visually came from, rather than at
+its first row thirteen rows further up. The caret settles at
+`min(row.start + goal, row.end)`, so a row too short to reach the column parks
+at its end and the next press picks the goal back up.
+
+Resolving the row has to wait for the destination line to render **raw**: the
+formatted line it was a moment earlier wraps differently, so its geometry says
+nothing about where the caret belongs. `selChangeRef` therefore activates the
+line at the un-wrapped column and leaves a `pendingRow` marker; the
+caret-placement effect measures the freshly-raw line and moves the caret onto
+the right row. `visualRowAt` binary-searches the row's edges over per-character
+rects (they only ever step *down* the line), and answers "the whole line as one
+row" when the engine reports no geometry — a headless test, a line not laid out
+yet — so the un-wrapped behaviour is the fallback rather than a wrong row.
 
 **Dropped** by anything that says the user has chosen a new column: a key that
 isn't one of the four (typing, Backspace, Home / End, Left / Right), any edit
@@ -505,12 +527,9 @@ paragraph or to the end of the document rather than a step onto the next line.
 The [plain-textarea fallback](#markdown-editor) needs none of this: it never
 re-places the caret, so the browser's own goal column survives there.
 
-One nuance the source-column model carries: on a soft-wrapped line the goal is
-the column counted from the line's start, not from the start of the visual row
-the caret sits in. Stepping down through a wrapped line and out of it therefore
-returns to the column the run began at — which is what a run *started* on a
-wrapped row would not predict, though a run started at the head of a line
-(overwhelmingly the common case) lands exactly where the eye expects.
+Moving *within* one wrapped line — down from its row 2 to its row 3 — is left
+entirely to the browser, which already keeps the caret's x across a row step and
+never has its work undone, since no line changes and nothing re-renders.
 
 ### Selection mapping
 
