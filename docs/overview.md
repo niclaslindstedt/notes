@@ -2125,13 +2125,12 @@ on purpose: that is where it ends up when the row unfolds past it, so pressing
 and folds away with the rest, and a **wide** header pins nothing at all — every
 action is already in the row there.
 
-The pin then **latches** for as long as the note is open: pressing the pinned
-star unstars the note, and a button that vanished from under the finger that
-just pressed it would leave the undo one trip through the ⋯ away. So it stays
-out, wearing its now-off artwork, until the note is left. `Editor` is keyed by
-note id in `App`, so the next note starts from its own state — which is also
-why the two latches seed from the note rather than from `false`: a starred note
-opens with its star already on the row rather than fading one in.
+The pin is a **live readout**, not a latch: it follows the note's current state
+in both directions, so unstarring or unlocking from the pinned row folds that
+button straight back behind the ⋯. There is deliberately no grace period for a
+second press — the row is meant to answer "what is set on this note?" at a
+glance, and a star left sitting there on a note that is no longer starred
+answers it wrong. Turning the setting back on is one ⋯ away.
 
 ### Selection actions
 

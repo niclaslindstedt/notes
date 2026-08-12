@@ -235,29 +235,16 @@ export function Editor({
   // the question the glyph is there to answer. So while either is *on*, that
   // button steps out of the cluster and pins to the row beside the ⋯, where the
   // narrow header shows it the whole time. Off, it has nothing to report and
-  // folds away with the rest.
-  //
-  // The pin then *latches* for as long as the note is open: pressing the pinned
-  // star unstars the note, and a button that vanished from under the finger
-  // that just pressed it would put the undo one trip through the ⋯ away. So it
-  // stays out, wearing its now-off artwork, until the note is left. `Editor` is
-  // keyed by note id in `App`, so the next note starts from its own state —
-  // which is also why these seed from the note rather than from `false`: a
-  // starred note must open with its star already in the row, not fade one in.
+  // folds away with the rest — the moment it is switched off, including from
+  // the pinned row itself. The glyph is a readout of the note's state and
+  // nothing else, so an unstarred note carries no star: turning it back on is
+  // one ⋯ away, and the row stays honest about what is actually set.
   const favorite = note.favorite === true;
-  const [starPinned, setStarPinned] = useState(favorite);
-  const [eyePinned, setEyePinned] = useState(locked);
-  useEffect(() => {
-    if (favorite) setStarPinned(true);
-  }, [favorite]);
-  useEffect(() => {
-    if (locked) setEyePinned(true);
-  }, [locked]);
   // A wide header carries everything in one row already, so there is nothing to
   // pin out of: both buttons stay in their usual place at the head of the
   // cluster.
-  const pinFavorite = narrow && starPinned;
-  const pinLocked = narrow && eyePinned;
+  const pinFavorite = narrow && favorite;
+  const pinLocked = narrow && locked;
 
   // The cut button is a touch affordance and only a touch affordance: with a
   // mouse and a keyboard the same edit is already two other presses away
