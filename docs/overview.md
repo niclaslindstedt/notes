@@ -1684,8 +1684,9 @@ of this.
 `PdfSettings` (`src/domain/pdf.ts`) — what an exported note looks like on paper:
 page size and orientation, margins, the body font / size / line height /
 heading scale, the heading font, the monospaced family, size and background fill
-behind code, the bullet, whether the note's title heads the page, and whether
-the pages are numbered. It lives in the domain (next to the pure layout engine
+behind code, the bullet, whether the note's title heads the page, and whether —
+and how — the pages are numbered. It lives in the domain (next to the pure
+layout engine
 that reads it, since `domain/` may not import the theme layer) and is re-exported
 from `src/theme/themes.ts`; the values ride on the
 [appearance store](#appearance-store) as `Appearance.pdf`, so they travel with
@@ -1719,10 +1720,22 @@ split, each slice carrying its own fill. The title heading is drawn without a
 rule beneath it: its size already separates it from the body, and a border there
 reads as a stray `---` the writer never typed.
 
-The **page number** is the only thing written into the margins, centred at the
-foot as `2 / 7`, and it can be switched off. Nothing else goes there — the URL
-and date a print dialog used to stamp in are the reason the app writes the file
-itself.
+The **page number** is the only thing written into the margins, and it can be
+switched off. Nothing else goes there — the URL and date a print dialog used to
+stamp in are the reason the app writes the file itself. What it says and where
+it sits are the user's: **number style** picks between the spelled-out `2 of 7`,
+the terse `2 / 7` and a bare `2` for a document whose end the reader doesn't need
+to know about, and **number position** sets it against the left, centre or right
+of the *text column* (not the paper edge, so it lines up with the body above it).
+Both live under the toggle in [Export settings](#export-settings) and only appear
+while numbering is on. `pdfPageNumberText` (`src/domain/pdf.ts`) is the pure
+formatter behind all three forms, and the settings picker labels its options by
+calling it — so the option you choose is literally the string that gets printed.
+The one word the `2 of 7` form spells out is handed *in* to the typesetter
+(`PdfLayoutInput.pageNumberOf`, sourced from `app.export.pageNumberOf` by
+`ExportButton`): `domain/` holds no catalogue, and a Swedish reader's PDF should
+still say `2 av 7`. Both settings default to the centred `2 / 7` the export has
+always written, so a document stored before they existed prints unchanged.
 
 The document deliberately shares nothing with the app's screen theme: it is
 black on white in a print-safe family, because a note exported to PDF should
@@ -2320,11 +2333,26 @@ renamed would be a strange half-lock.
 locked note still draws the whole-line selection, still reports it up to the
 header, and so still unfolds the narrow header's
 [selection actions](#selection-actions) — which on a locked note is the copy
-button alone, since the other two rewrite the note. The header drops the
+button alone, since the other two rewrite the note. The header **folds away** the
 [formatting toggle](#styling-toolbar) and the [cut button](#cut-button) while
 locked, and holds the styling toolbar off the screen without forgetting the
 user's preference, so a Markdown writer's remembered toolbar doesn't arrive as a
 bar of dead buttons over a note it can't touch.
+
+**The two write-only buttons slide rather than vanish.** Each rides in a
+`WriteAction` box (`src/ui/NoteEditor.tsx`) that stays mounted and travels
+between its full width and zero on the same 200ms `max-width` / `opacity` /
+`visibility` transition the [narrow header's cluster](#the-editor) uses — so
+pressing the eye reads as the row folding its writing tools up, and pressing it
+again unfolds them. `visibility` flips to hidden only at the *end* of the
+closing slide, which is what takes the folded button out of the tab order and
+off screen readers without cutting the animation short. The box also carries a
+negative left margin while folded, cancelling the row's own `gap-2` so a
+collapsed action leaves no dead space behind (`first:ml-0` gives it back when
+there is no preceding sibling — during a [selection](#selection-actions) the
+star and the eye aren't rendered and the box leads the row). The cut button uses
+the same box for the decrypting pause, so it fades in with the note rather than
+appearing.
 
 The lock is a guard against a stray keystroke — the reference note you keep open,
 the recipe you read while cooking, the pocket that finds the screen — not a
@@ -3172,7 +3200,11 @@ default-title scheme, and the [copy](#copy-scope) scope. The values are the
 control over the [PDF renderer](#pdf-settings), grouped by what it affects (the
 sheet, the body text, code, lists, and what the page carries beyond the body).
 The code background is a swatch row plus a native colour input, the way the
-custom-theme editor picks a colour. Only the PDF path reads any of it — the
+custom-theme editor picks a colour. The page-number **style** is the tab's one
+dropdown, because its options are the footer strings themselves rather than
+words that fit a segmented row; it and the **position** control sit under the
+"Number the pages" toggle and are only rendered while it's on, since neither
+means anything without a number to write. Only the PDF path reads any of it — the
 Markdown export is a file the storage layer already writes and the clipboard
 export is plain text, so neither has anything to style. Like the other
 appearance tabs, each control edits the dialog's `draft` and takes effect on

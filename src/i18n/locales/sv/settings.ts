@@ -256,7 +256,15 @@ const settings: SettingsCatalog = {
       "Inled sidan med anteckningens titel. Stäng av när anteckningen redan börjar med en egen rubrik.",
     pageNumbers: "Numrera sidorna",
     pageNumbersHint:
-      "Sätt sidnumret centrerat längst ned på varje sida. Det är det enda appen skriver i marginalerna — webbadressen och datumet som en utskriftsdialog lägger till skrivs aldrig.",
+      "Sätt sidnumret längst ned på varje sida. Det är det enda appen skriver i marginalerna — webbadressen och datumet som en utskriftsdialog lägger till skrivs aldrig.",
+    pageNumberFormat: "Nummerstil",
+    pageNumberFormatHint:
+      "Hur sidfoten skriver numret. Utelämna totalen när läsaren inte behöver veta var dokumentet slutar.",
+    pageNumberAlign: "Nummerplacering",
+    pageNumberAlignHint: "Vilken kant av textspalten numret ligger mot.",
+    alignLeft: "Vänster",
+    alignCenter: "Mitten",
+    alignRight: "Höger",
   },
 
   appearance: {

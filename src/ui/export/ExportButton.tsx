@@ -84,7 +84,15 @@ export function ExportButton({
     setBusy("pdf");
     try {
       const mod = await import("./export-note.ts");
-      const ok = await mod.exportPdf(note, pdf, fetchAttachment, transforms);
+      const ok = await mod.exportPdf(
+        note,
+        pdf,
+        fetchAttachment,
+        transforms,
+        // The one word the page furniture spells out — the typesetter is pure
+        // and can't reach the catalogue itself.
+        t("app.export.pageNumberOf"),
+      );
       if (ok) unlock("printPress");
     } finally {
       setBusy(null);

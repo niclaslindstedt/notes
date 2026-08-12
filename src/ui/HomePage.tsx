@@ -256,7 +256,11 @@ export function HomePage() {
               decides how the page looks: paper size and margins, the body and
               heading fonts and their sizes, the monospaced family and the
               background behind code, the bullet character, and whether the
-              pages are numbered. The Markdown export is the same file the app
+              pages are numbered — down to how that number reads (
+              <code className="text-fg-bright">2 of 7</code>,{" "}
+              <code className="text-fg-bright">2 / 7</code> or a bare{" "}
+              <code className="text-fg-bright">2</code>) and which edge of the
+              page it sits against. The Markdown export is the same file the app
               stores your notes as, so it opens anywhere and comes back
               unchanged. The clipboard option takes, by default, just the body —
               or, if you choose so in Settings, the title and body or the whole

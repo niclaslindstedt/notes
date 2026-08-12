@@ -27,6 +27,7 @@ const app: AppCatalog = {
     pdf: "Exportera till PDF",
     markdown: "Exportera till MD",
     clipboard: "Kopiera till urklipp",
+    pageNumberOf: "av",
   },
   copyCode: "Kopiera kod",
   copyLink: "Kopiera länk",

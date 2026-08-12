@@ -51,6 +51,10 @@ const app = {
     pdf: "Export to PDF",
     markdown: "Export to MD",
     clipboard: "Copy to clipboard",
+    // The connector in a PDF's "1 of 7" footer. It lives here rather than in
+    // the settings catalogue because it is *printed content*, not a label —
+    // the export hands it to the pure typesetter, which holds no catalogue.
+    pageNumberOf: "of",
   },
   // The copy button in a fenced code block's top-right corner. It confirms
   // with the same "Copied" as the export menu's clipboard row above.

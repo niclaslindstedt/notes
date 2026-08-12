@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
   type Ref,
   type RefObject,
 } from "react";
@@ -92,7 +93,8 @@ const ACTIONS_MAX_WIDTH = "17rem";
 // unfold out of the ⋯ on their own when text is selected — real width ~8.25rem.
 // Both caps are upper bounds, so a row carrying fewer than the full set — a
 // desktop pointer gets no cut button (see `desktopPointer`), and a locked note
-// gets neither cut nor formatting — simply travels to a stop it doesn't reach.
+// folds its cut and formatting buttons to zero width (see `WriteAction`) —
+// simply travels to a stop it doesn't reach.
 const SELECTION_MAX_WIDTH = "9rem";
 
 // A stable empty hit list for the closed find bar, so the editing surfaces keep
@@ -503,17 +505,21 @@ export function Editor({
                 <LockButton locked={locked} onToggle={onToggleLock} />
               </>
             )}
-            {/* The two actions that rewrite the note are simply not offered on
-                a locked one — including in the selection cluster, where copy
-                is then the only thing a selection can be used for. */}
-            {!locked && (
+            {/* The two actions that rewrite the note aren't offered on a locked
+                one — including in the selection cluster, where copy is then the
+                only thing a selection can be used for. They *slide* away rather
+                than disappearing, so pressing the eye reads as the row folding
+                the writing tools up (see `WriteAction`). */}
+            <WriteAction shown={!locked}>
               <FormatToolbarButton
                 open={toolbarOpen}
                 onToggle={toggleToolbar}
               />
-            )}
-            {!loading && !locked && !desktopPointer && (
-              <CutButton onCut={runCut} />
+            </WriteAction>
+            {!desktopPointer && (
+              <WriteAction shown={!locked && !loading}>
+                <CutButton onCut={runCut} />
+              </WriteAction>
             )}
             {selecting ? (
               <CopyButton onCopy={runCopy} />
@@ -867,6 +873,44 @@ function MoreButton({
     >
       <MoreIcon className="h-[18px] w-[18px]" />
     </button>
+  );
+}
+
+// A header action that only means anything while the note can be written to —
+// the formatting toggle and the cut button. Both stay mounted and *slide* out
+// of the row instead of being conditionally rendered, so pressing the eye reads
+// as the header folding its writing tools up rather than as two buttons
+// blinking out of existence (and unlocking unfolds them again).
+//
+// It is the same slide the whole cluster uses on a narrow screen: `max-width`
+// travelling to zero, because a width of `auto` can't be transitioned; opacity
+// alongside it; and `visibility` last, which is what takes the folded-away
+// button out of the tab order and off screen readers — it flips to hidden only
+// at the *end* of the transition, so the closing slide is still visible while
+// it plays.
+//
+// The negative margin pays for the row's own `gap-2`: a zero-width child still
+// sits between two gaps, so without it every collapsed action would leave
+// 0.5rem of dead space in the row. `first:ml-0` gives it back when there is no
+// preceding sibling to be spaced from — during a selection the star and the eye
+// aren't rendered and this box leads the row.
+function WriteAction({
+  shown,
+  children,
+}: {
+  shown: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`flex shrink-0 items-center overflow-hidden transition-[max-width,opacity,visibility,margin] duration-200 ease-out ${
+        shown
+          ? "max-w-9 opacity-100"
+          : "invisible -ml-2 max-w-0 opacity-0 first:ml-0"
+      }`}
+    >
+      {children}
+    </div>
   );
 }
 

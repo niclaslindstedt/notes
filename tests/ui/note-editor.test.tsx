@@ -48,6 +48,13 @@ function note(overrides: Partial<Note> = {}): Note {
 // the live-preview editor is exercised by its own suite.
 const PLAIN = { ...DEFAULT_EDITOR_SETTINGS, renderMarkdown: false };
 
+// The sliding box a write-only header action rides in (`WriteAction`). jsdom
+// loads no stylesheet, so the fold is asserted on the classes that drive it
+// rather than on a computed width.
+function writeAction(name: string): HTMLElement {
+  return screen.getByRole("button", { name }).parentElement as HTMLElement;
+}
+
 function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
   const onBack = vi.fn();
   const onChange = vi.fn();
@@ -322,9 +329,9 @@ describe("the cut button", () => {
     expect(down).toBe(false);
   });
 
-  it("is withheld while the note is still decrypting", () => {
+  it("is folded away while the note is still decrypting", () => {
     renderEditor({ loading: true });
-    expect(screen.queryByRole("button", { name: "Cut" })).toBeNull();
+    expect(writeAction("Cut").className).toContain("max-w-0");
   });
 
   // The button is a touch affordance: a mouse and a keyboard already reach the
@@ -639,11 +646,10 @@ describe("Editor (selection actions)", () => {
     );
   }
 
-  // The box the buttons ride in — reached through whichever of them is out, so
-  // the helper works in both the selection set and the full one.
+  // The box the buttons ride in. Found by its own marker rather than through a
+  // button, because the write-only actions sit one box deeper (`WriteAction`).
   function cluster() {
-    return screen.getByRole("button", { name: "Cut" })
-      .parentElement as HTMLElement;
+    return document.querySelector("[data-cluster]") as HTMLElement;
   }
 
   // Highlight part of the body. The plain textarea emits `select` for a real
@@ -767,10 +773,25 @@ describe("Editor (locked)", () => {
     expect(onTitleChange).not.toHaveBeenCalled();
   });
 
-  it("drops the two buttons that would rewrite the note", () => {
+  it("folds away the two buttons that would rewrite the note", () => {
     locked();
-    expect(screen.queryByRole("button", { name: "Formatting" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Cut" })).toBeNull();
+    // They stay mounted so the lock can *play* — the box they ride in travels
+    // to zero width and goes `invisible`, which is what takes them out of the
+    // tab order and off screen readers once the slide has finished.
+    for (const name of ["Formatting", "Cut"]) {
+      const box = writeAction(name);
+      expect(box.className).toContain("max-w-0");
+      expect(box.className).toContain("invisible");
+    }
+  });
+
+  it("has them out at full width on an unlocked note", () => {
+    renderEditor();
+    for (const name of ["Formatting", "Cut"]) {
+      const box = writeAction(name);
+      expect(box.className).toContain("max-w-9");
+      expect(box.className).not.toContain("invisible");
+    }
   });
 
   it("keeps every button that only reads it", () => {

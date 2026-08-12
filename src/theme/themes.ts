@@ -331,6 +331,8 @@ export {
   type PdfHeadingFont,
   type PdfCodeFont,
   type PdfBullet,
+  type PdfPageNumberFormat,
+  type PdfPageNumberAlign,
   DEFAULT_PDF_SETTINGS,
   PDF_PAGE_SIZES,
   PDF_ORIENTATIONS,
@@ -345,7 +347,10 @@ export {
   PDF_CODE_BACKGROUNDS,
   PDF_CODE_BACKGROUND_NONE,
   PDF_BULLETS,
+  PDF_PAGE_NUMBER_FORMATS,
+  PDF_PAGE_NUMBER_ALIGNS,
   coercePdfSettings,
+  pdfPageNumberText,
 } from "../domain/pdf.ts";
 
 export type RadiusPreset = "none" | "sm" | "md" | "lg";

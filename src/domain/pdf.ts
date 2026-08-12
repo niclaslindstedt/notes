@@ -173,6 +173,55 @@ export function bulletAt(bullet: PdfBullet, depth: number): PdfBullet {
   return PDF_BULLETS[(from + level) % PDF_BULLETS.length]!.id;
 }
 
+/**
+ * How the footer writes a page number. `ofTotal` spells the connector out
+ * (`1 of 7`), `slash` is the terse form (`1 / 7`), and `plain` prints the page
+ * on its own — which is what you want when the reader never needs to know the
+ * document is finished, or when the pages are going into a binder with other
+ * things.
+ */
+export type PdfPageNumberFormat = "ofTotal" | "slash" | "plain";
+
+export const PDF_PAGE_NUMBER_FORMATS: readonly PdfPageNumberFormat[] = [
+  "ofTotal",
+  "slash",
+  "plain",
+];
+
+/** Which margin edge the page number sits against. */
+export type PdfPageNumberAlign = "left" | "center" | "right";
+
+export const PDF_PAGE_NUMBER_ALIGNS: readonly PdfPageNumberAlign[] = [
+  "left",
+  "center",
+  "right",
+];
+
+/**
+ * The English connector in the `ofTotal` form. The typesetter is pure and has
+ * no business reaching into the i18n runtime, so the translated word is passed
+ * *in* (`PdfLayoutInput.pageNumberOf`) by the export handler, which has a `t`;
+ * this is the fallback for every caller that doesn't — the tests, and any
+ * future headless writer.
+ */
+export const PDF_PAGE_NUMBER_OF = "of";
+
+/**
+ * The text of the footer on page `page` of `total`. Pure, and shared with the
+ * settings picker so the option labels are literally what the PDF will print
+ * rather than a hand-written approximation of it.
+ */
+export function pdfPageNumberText(
+  format: PdfPageNumberFormat,
+  page: number,
+  total: number,
+  ofWord: string = PDF_PAGE_NUMBER_OF,
+): string {
+  if (format === "plain") return `${page}`;
+  if (format === "ofTotal") return `${page} ${ofWord} ${total}`;
+  return `${page} / ${total}`;
+}
+
 /** The persisted PDF-renderer settings. */
 export type PdfSettings = {
   pageSize: PdfPageSize;
@@ -196,13 +245,19 @@ export type PdfSettings = {
   bullet: PdfBullet;
   /** Print the note's title as the page's heading. */
   includeTitle: boolean;
-  /** Foot each page with `2 / 7`. */
+  /** Foot each page with its number. */
   pageNumbers: boolean;
+  /** How that number is written — see `pdfPageNumberText`. */
+  pageNumberFormat: PdfPageNumberFormat;
+  /** Which margin edge it sits against. */
+  pageNumberAlign: PdfPageNumberAlign;
 };
 
 // Standard document defaults: A4 portrait with 20mm margins, 11pt sans at 1.5
 // leading, headings following the body font, code one notch smaller in Courier
-// on a light grey fill, a plain round bullet, and numbered pages.
+// on a light grey fill, a plain round bullet, and pages numbered `1 / 7` in the
+// middle of the bottom margin — the form the export has always written, so the
+// two new choices default to what an existing document already looks like.
 export const DEFAULT_PDF_SETTINGS: PdfSettings = {
   pageSize: "a4",
   orientation: "portrait",
@@ -218,6 +273,8 @@ export const DEFAULT_PDF_SETTINGS: PdfSettings = {
   bullet: "disc",
   includeTitle: true,
   pageNumbers: true,
+  pageNumberFormat: "slash",
+  pageNumberAlign: "center",
 };
 
 const PAGE_SIZE_IDS = new Set<string>(PDF_PAGE_SIZES.map((p) => p.id));
@@ -247,6 +304,20 @@ export function isPdfCodeFont(v: unknown): v is PdfCodeFont {
 
 export function isPdfBullet(v: unknown): v is PdfBullet {
   return typeof v === "string" && BULLET_IDS.has(v);
+}
+
+export function isPdfPageNumberFormat(v: unknown): v is PdfPageNumberFormat {
+  return (
+    typeof v === "string" &&
+    (PDF_PAGE_NUMBER_FORMATS as readonly string[]).includes(v)
+  );
+}
+
+export function isPdfPageNumberAlign(v: unknown): v is PdfPageNumberAlign {
+  return (
+    typeof v === "string" &&
+    (PDF_PAGE_NUMBER_ALIGNS as readonly string[]).includes(v)
+  );
 }
 
 /**
@@ -326,6 +397,14 @@ export function coercePdfSettings(raw: unknown): PdfSettings {
       typeof v.pageNumbers === "boolean"
         ? v.pageNumbers
         : DEFAULT_PDF_SETTINGS.pageNumbers,
+    // Absent in a document written before the footer was configurable, which
+    // lands it on the `1 / 7` centred form that build already wrote.
+    pageNumberFormat: isPdfPageNumberFormat(v.pageNumberFormat)
+      ? v.pageNumberFormat
+      : DEFAULT_PDF_SETTINGS.pageNumberFormat,
+    pageNumberAlign: isPdfPageNumberAlign(v.pageNumberAlign)
+      ? v.pageNumberAlign
+      : DEFAULT_PDF_SETTINGS.pageNumberAlign,
   };
 }
 
