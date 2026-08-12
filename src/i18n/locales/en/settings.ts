@@ -127,7 +127,8 @@ const settings = {
     editAria: "Edit {name}",
     deleteAria: "Delete {name}",
 
-    ruleTitle: "Transform",
+    ruleTitleAdd: "Add transform",
+    ruleTitleEdit: "Edit transform",
     name: "Name",
     namePlaceholder: "Issue links",
     scope: "Applies to",

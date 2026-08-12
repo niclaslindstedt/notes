@@ -949,8 +949,9 @@ prepends); a test asserts every token has copy in both languages and compiles in
 the position it is typed into.
 
 **Add transform** and the edit button open the same dialog,
-`TransformRuleModal` (`src/ui/settings/TransformRuleModal.tsx`), laid out in the
-order a rule is written in: the name, the **Applies to** scope (a
+`TransformRuleModal` (`src/ui/settings/TransformRuleModal.tsx`) — titled **Add
+transform** or **Edit transform** after which of the two opened it — laid out in
+the order a rule is written in: the name, the **Applies to** scope (a
 [`SelectPicker`](#custom-dropdown) of *All namespaces* plus every namespace,
 shown only when there is more than one), the pattern, the kind, the replacement
 (its label and hint follow the kind, and the mask picker appears only for
@@ -964,6 +965,12 @@ where you're standing. The sample is saved with the rule, so re-opening it shows
 the example that proved it. Save is refused while the pattern is empty or the
 regex engine rejects it (the error is shown verbatim), and while a `link` rule
 has nowhere to point.
+
+Unlike the app's other small dialogs it is **not** a centred card: it renders as
+the [full-screen mobile sheet](#modal) (a card on desktop). The form is long and
+almost every field raises the soft keyboard, and a card sized to the space left
+above the keyboard pushes the result pane — the reason the dialog exists — out
+of view on a phone.
 
 ### YouTube player
 

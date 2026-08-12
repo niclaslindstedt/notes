@@ -211,6 +211,7 @@ export function TransformSection({
       <TransformRuleModal
         open={editing !== null}
         rule={editing}
+        isNew={editing !== null && !rules.some((r) => r.id === editing.id)}
         namespaces={scoped ? namespaces : []}
         onSave={save}
         onClose={() => setEditing(null)}
