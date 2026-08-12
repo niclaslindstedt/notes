@@ -38,6 +38,10 @@ import { Field, SegmentedRow } from "./shared.tsx";
 // The rule is edited as a local draft and handed back on Save, so Cancel drops
 // it; the *list* is then committed with the rest of the settings dialog's
 // draft, which is what makes Cancel there drop the whole edit too.
+//
+// It opens as the full-screen mobile sheet rather than a centred card: the form
+// is long, and every field but one raises the soft keyboard, so a card leaves
+// the pane it exists to show — the result — squeezed against the keyboard.
 
 const INPUT_CLASS =
   "w-full rounded-[var(--radius)] border border-line bg-surface-2 px-2 py-1.5 text-sm text-fg outline-none focus:border-accent";
@@ -49,6 +53,7 @@ const ALL_NAMESPACES = "";
 export function TransformRuleModal({
   open,
   rule,
+  isNew,
   namespaces,
   onSave,
   onClose,
@@ -56,6 +61,8 @@ export function TransformRuleModal({
   open: boolean;
   /** The rule being edited, or null when the dialog is closed. */
   rule: TransformRule | null;
+  /** Whether `rule` is a fresh one being added rather than one from the list. */
+  isNew: boolean;
   /**
    * Namespaces the rule can be scoped to. Empty when the device has only one
    * namespace, which hides the scope field: there is nothing to choose
@@ -176,14 +183,16 @@ export function TransformRuleModal({
     (draft.kind !== "link" || draft.replacement.trim() !== "");
 
   return (
-    <Modal open={open} onClose={onClose} labelledBy={titleId} centered>
+    <Modal open={open} onClose={onClose} labelledBy={titleId}>
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-line bg-surface-3 px-4 py-3">
         <h2
           id={titleId}
           className="flex items-center gap-2 text-sm font-bold tracking-wide text-fg-bright"
         >
           <WandIcon className="h-4 w-4 text-accent" />
-          {t("settings.transform.ruleTitle")}
+          {isNew
+            ? t("settings.transform.ruleTitleAdd")
+            : t("settings.transform.ruleTitleEdit")}
         </h2>
         <button
           type="button"

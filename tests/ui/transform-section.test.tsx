@@ -199,6 +199,18 @@ describe("TransformRuleModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add transform" }));
   }
 
+  it("titles itself for the button that opened it", () => {
+    renderSection(withRules([ISSUE_RULE]), vi.fn());
+
+    fireEvent.click(screen.getByRole("button", { name: "Add transform" }));
+    expect(screen.getByRole("heading", { name: "Add transform" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Issue links" }));
+    expect(
+      screen.getByRole("heading", { name: "Edit transform" }),
+    ).toBeTruthy();
+  });
+
   it("previews the sample through the draft rule", () => {
     openBlankDialog();
     fireEvent.input(screen.getByRole("textbox", { name: "Match" }), {

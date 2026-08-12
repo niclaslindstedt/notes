@@ -122,7 +122,8 @@ const settings: SettingsCatalog = {
     editAria: "Redigera {name}",
     deleteAria: "Ta bort {name}",
 
-    ruleTitle: "Omvandling",
+    ruleTitleAdd: "Lägg till omvandling",
+    ruleTitleEdit: "Redigera omvandling",
     name: "Namn",
     namePlaceholder: "Ärendelänkar",
     scope: "Gäller för",
