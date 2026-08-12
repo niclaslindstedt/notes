@@ -1861,7 +1861,10 @@ source points. The first press of any button unlocks the **Stylist** achievement
 `NoteFindBar` + `NoteFindButton` (`src/ui/NoteFindBar.tsx`) — a one-line search
 bar for the note that is **open**, raised by the magnifier pinned to the far
 right of the editor header (past the actions that change the note, because it
-opens a bar rather than changing anything) and rendered directly beneath it, in the content column, with the same
+opens a bar rather than changing anything) — or by **⌘F / Ctrl+F**, which the
+app takes from the browser while a note is open (see
+[the find shortcut](#the-find-shortcut) below) — and rendered directly beneath
+the header, in the content column, with the same
 `format-toolbar-in` unfold the [styling toolbar](#styling-toolbar) uses. The two
 are independent and can both be up at once; the find bar sits above, closest to
 the header its button lives in. Opening it pushes the note's text down rather
@@ -1897,9 +1900,33 @@ What the bar shows and does:
   legible rather than a mystery;
 - **Escape**, the close button, or the header toggle puts it away.
 
-The browser's own find bar (⌘F, "find on page") is not reachable from a web
-page — it can't be opened, positioned, or read, and there is no way to put its
+The browser's own find bar ("find on page") is not reachable from a web page —
+it can't be opened, positioned, or read, and there is no way to put its
 prev/next arrows on a phone's keyboard accessory bar — so this is the app's own.
+
+#### The find shortcut
+
+`useFindShortcut` (`src/ui/hooks/useFindShortcut.ts`), mounted by the editor,
+answers **⌘F / Ctrl+F** with this bar and calls `preventDefault()` so the
+browser's "find on page" never opens. It is the better answer to that keystroke
+in a note: the browser's bar searches what the Markdown *renders to* rather than
+what the note says, highlights it somewhere the app can't read back, and offers
+nothing to step it with on a phone.
+
+Where it deliberately differs from [select all](#selection-mapping)'s shortcut,
+which stands down inside every editable element: this one fires **even while the
+caret is in the note** (the likeliest place to press it from), because no
+field-level "find" exists for it to trample. It does stand down while a modal is
+up — `isModalOpen()` — so ⌘F over the [search modal](#search) or settings is
+still the browser's, and it ignores the modified variants (⌘⇧F, ⌥⌘F) so those
+keep whatever the platform binds them to.
+
+Pressing it on an **already-open** bar does not close it (the header toggle is
+what closes it): `openFind` bumps a `focusSignal` prop the bar re-focuses and
+**selects** its query on, so a second press types a fresh search over the old
+one — matching what ⌘F does everywhere else. Both the open and the refocus run
+through `flushSync`, keeping the focus inside the gesture that asked for it,
+which is what raises a soft keyboard on iOS.
 
 The hits reach the live-preview editor as the `matches` / `activeMatch` props on
 [`MarkdownEditor`](#markdown-editor), which buckets them by line and hands each

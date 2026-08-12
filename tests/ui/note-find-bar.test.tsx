@@ -132,3 +132,71 @@ describe("find in note", () => {
     expect(screen.queryByPlaceholderText("Find in note…")).toBeNull();
   });
 });
+
+// ⌘F / Ctrl+F is the keystroke everyone already presses to search what is in
+// front of them; while a note is open it belongs to this bar rather than to the
+// browser's "find on page", which searches the rendered page and can't be
+// stepped from a phone.
+describe("find in note: the ⌘F / Ctrl+F shortcut", () => {
+  function pressFind(mods: KeyboardEventInit) {
+    const e = new KeyboardEvent("keydown", {
+      key: "f",
+      bubbles: true,
+      cancelable: true,
+      ...mods,
+    });
+    (document.activeElement ?? window).dispatchEvent(e);
+    return e;
+  }
+
+  it("opens the bar with the field focused, and takes the key from the browser", () => {
+    renderEditor();
+    expect(screen.queryByPlaceholderText("Find in note…")).toBeNull();
+
+    const e = pressFind({ metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+
+    const field = screen.getByRole("textbox", { name: "Find in note" });
+    expect(document.activeElement).toBe(field);
+  });
+
+  it("answers Ctrl+F the same way", () => {
+    renderEditor();
+    pressFind({ ctrlKey: true });
+    expect(screen.getByPlaceholderText("Find in note…")).toBeTruthy();
+  });
+
+  // Pressing it again is "search for something else", not "put the bar away" —
+  // the toggle in the header is what closes it.
+  it("re-focuses an open bar and selects the query rather than closing it", () => {
+    renderEditor();
+    const field = openFind();
+    fireEvent.input(field, { target: { value: "alpha" } });
+    expect(screen.getByText("1 of 2")).toBeTruthy();
+
+    const body = screen.getByPlaceholderText("Start writing…");
+    body.focus();
+    expect(document.activeElement).toBe(body);
+
+    pressFind({ metaKey: true });
+
+    expect(document.activeElement).toBe(field);
+    expect(field.value).toBe("alpha");
+    expect(field.selectionStart).toBe(0);
+    expect(field.selectionEnd).toBe(5);
+    // Still the same search, not a fresh bar.
+    expect(screen.getByText("1 of 2")).toBeTruthy();
+  });
+
+  it("leaves the browser's own find alone for the modified variants", () => {
+    renderEditor();
+    expect(pressFind({ metaKey: true, shiftKey: true }).defaultPrevented).toBe(
+      false,
+    );
+    expect(pressFind({ metaKey: true, altKey: true }).defaultPrevented).toBe(
+      false,
+    );
+    expect(pressFind({}).defaultPrevented).toBe(false);
+    expect(screen.queryByPlaceholderText("Find in note…")).toBeNull();
+  });
+});

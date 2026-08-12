@@ -128,7 +128,7 @@ const achievements = {
       name: "Pinpoint",
       condition: "Find text inside the note you have open.",
       learnMore:
-        "The magnifier in a note's header opens a find bar under the top bar, with the cursor already in it. What you type is matched verbatim and case-insensitively against the note you are reading — every hit lights up at once, the arrows step between them (Enter and Shift+Enter do the same from the keyboard), and the counter says which one of how many you are on. It searches only the open note; the magnifier on the side menu is the one that searches across all of them.",
+        "The magnifier in a note's header — or ⌘F / Ctrl+F, which the app answers instead of the browser's own find-on-page — opens a find bar under the top bar, with the cursor already in it. What you type is matched verbatim and case-insensitively against the note you are reading — every hit lights up at once, the arrows step between them (Enter and Shift+Enter do the same from the keyboard), and the counter says which one of how many you are on. It searches only the open note; the magnifier on the side menu is the one that searches across all of them.",
     },
     starStruck: {
       name: "Star-struck",
