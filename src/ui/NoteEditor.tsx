@@ -86,7 +86,9 @@ const COLLAPSE_QUERY = "(max-width: 639px)";
 // `pr-2` — so no button is ever clipped at rest; the cost is that the slide
 // finishes a hair before the timer does. **Raise this whenever a button joins
 // the cluster**: the box clips what doesn't fit, so a cap left behind simply
-// swallows the last glyph on a phone.
+// swallows the last glyph on a phone. (A star or eye that has pinned itself out
+// of the box — see `pinFavorite` / `pinLocked` — leaves it *narrower* than the
+// cap, which is an upper bound, so there is nothing to adjust there.)
 const ACTIONS_MAX_WIDTH = "17rem";
 
 // The same cap for the three selection actions (formatting, cut, copy), which
@@ -177,6 +179,10 @@ export function Editor({
   // The ⋯ toggle the cluster folds into on a narrow screen; held so the tab
   // order can point at it while the cluster itself is away.
   const moreRef = useRef<HTMLButtonElement>(null);
+  // The buttons that pin themselves outside the ⋯ because they are *reporting*
+  // rather than offering — see `pinFavorite`. Held for the same reason: while
+  // the cluster is folded away these are the header's real first actions.
+  const pinnedRef = useRef<HTMLDivElement>(null);
   // Handle on the live-preview editor so the title can hand focus down into the
   // body even when no line is active yet (the body has no textarea until then).
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null);
@@ -220,6 +226,38 @@ export function Editor({
   // with the title showing.
   const narrow = useMediaQuery(COLLAPSE_QUERY);
   const [actionsOpen, setActionsOpen] = useState(false);
+
+  // Two of those six buttons don't only *do* something, they *say* something
+  // about the note that is open: a filled star means this note is in Favorites,
+  // and a lit eye means it is read-only. Folding those behind the ⋯ turns a
+  // fact about the open document into something you have to go looking for —
+  // and the eye especially, because "why is my typing not landing" is exactly
+  // the question the glyph is there to answer. So while either is *on*, that
+  // button steps out of the cluster and pins to the row beside the ⋯, where the
+  // narrow header shows it the whole time. Off, it has nothing to report and
+  // folds away with the rest.
+  //
+  // The pin then *latches* for as long as the note is open: pressing the pinned
+  // star unstars the note, and a button that vanished from under the finger
+  // that just pressed it would put the undo one trip through the ⋯ away. So it
+  // stays out, wearing its now-off artwork, until the note is left. `Editor` is
+  // keyed by note id in `App`, so the next note starts from its own state —
+  // which is also why these seed from the note rather than from `false`: a
+  // starred note must open with its star already in the row, not fade one in.
+  const favorite = note.favorite === true;
+  const [starPinned, setStarPinned] = useState(favorite);
+  const [eyePinned, setEyePinned] = useState(locked);
+  useEffect(() => {
+    if (favorite) setStarPinned(true);
+  }, [favorite]);
+  useEffect(() => {
+    if (locked) setEyePinned(true);
+  }, [locked]);
+  // A wide header carries everything in one row already, so there is nothing to
+  // pin out of: both buttons stay in their usual place at the head of the
+  // cluster.
+  const pinFavorite = narrow && starPinned;
+  const pinLocked = narrow && eyePinned;
 
   // The cut button is a touch affordance and only a touch affordance: with a
   // mouse and a keyboard the same edit is already two other presses away
@@ -391,8 +429,14 @@ export function Editor({
   // toolbar, so tabbing on past the last action leaves the editor for good.
   function firstAction(): HTMLElement | null {
     // Folded away, the cluster's buttons are `visibility: hidden` — nothing in
-    // there is a tab stop, so the ⋯ toggle is the header's first action.
-    if (collapsed) return moreRef.current;
+    // there is a tab stop, so the first action is whatever pinned itself
+    // outside the fold (the star / the eye), and the ⋯ toggle when nothing did.
+    if (collapsed) {
+      return (
+        pinnedRef.current?.querySelector<HTMLElement>(FOCUSABLE) ??
+        moreRef.current
+      );
+    }
     return actionsRef.current?.querySelector<HTMLElement>(FOCUSABLE) ?? null;
   }
 
@@ -496,14 +540,14 @@ export function Editor({
                 : undefined
             }
           >
-            {!selecting && (
-              <>
-                <FavoriteButton
-                  favorite={note.favorite === true}
-                  onToggle={onToggleFavorite}
-                />
-                <LockButton locked={locked} onToggle={onToggleLock} />
-              </>
+            {/* Either of these may have pinned itself outside the box, where a
+                narrow header shows it even folded — it is then rendered once,
+                out there, rather than twice. */}
+            {!selecting && !pinFavorite && (
+              <FavoriteButton favorite={favorite} onToggle={onToggleFavorite} />
+            )}
+            {!selecting && !pinLocked && (
+              <LockButton locked={locked} onToggle={onToggleLock} />
             )}
             {/* The two actions that rewrite the note aren't offered on a locked
                 one — including in the selection cluster, where copy is then the
@@ -534,6 +578,29 @@ export function Editor({
               </>
             )}
           </div>
+          {/* Outside the sliding box, so these never fold: whatever the ⋯ is
+              doing, the star and the eye keep reporting the open note's state.
+              They sit between the cluster and the ⋯ — right where they end up
+              when the row unfolds past them, so unfolding never shuffles them.
+              The `pr-2` is there for the same reason the cluster carries one:
+              the row's own `gap-2` is off on a narrow header, so that the
+              closed cluster can collapse to nothing at all. */}
+          {(pinFavorite || pinLocked) && (
+            <div
+              ref={pinnedRef}
+              className="flex shrink-0 items-center gap-2 pr-2"
+            >
+              {pinFavorite && (
+                <FavoriteButton
+                  favorite={favorite}
+                  onToggle={onToggleFavorite}
+                />
+              )}
+              {pinLocked && (
+                <LockButton locked={locked} onToggle={onToggleLock} />
+              )}
+            </div>
+          )}
           {narrow && (
             <MoreButton
               buttonRef={moreRef}
