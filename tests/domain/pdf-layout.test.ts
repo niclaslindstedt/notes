@@ -111,6 +111,43 @@ describe("layoutPdf", () => {
       expect(footer!.y).toBeGreaterThan(contentBottom);
       expect(footer!.y).toBeLessThan(result.heightPt);
     });
+
+    it("writes the number in the chosen form", () => {
+      expect(texts(layout("hello", { pageNumberFormat: "plain" }))).toContain(
+        "1",
+      );
+      expect(texts(layout("hello", { pageNumberFormat: "ofTotal" }))).toContain(
+        "1 of 1",
+      );
+    });
+
+    it("takes the spelled-out connector from the caller", () => {
+      const result = layout(
+        "hello",
+        { pageNumberFormat: "ofTotal" },
+        { pageNumberOf: "av" },
+      );
+      expect(texts(result)).toContain("1 av 1");
+    });
+
+    it("sits against the chosen edge of the text column", () => {
+      const margin = (20 * 72) / 25.4;
+      const footerX = (align: "left" | "center" | "right"): number =>
+        opsOfKind(layout("hello", { pageNumberAlign: align }), "text").find(
+          (op) => op.text === "1 / 1",
+        )!.x;
+
+      const contentWidth = layout("hello").widthPt - margin * 2;
+      // The mock measurer makes every glyph half the size wide; the footer runs
+      // at 80% of the 11pt body, so "1 / 1" is 5 glyphs of 4.4pt.
+      const width = 5 * 11 * 0.8 * 0.5;
+
+      expect(footerX("left")).toBeCloseTo(margin);
+      expect(footerX("center")).toBeCloseTo(
+        margin + (contentWidth - width) / 2,
+      );
+      expect(footerX("right")).toBeCloseTo(margin + contentWidth - width);
+    });
   });
 
   describe("wrapping", () => {

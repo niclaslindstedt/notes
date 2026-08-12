@@ -11,17 +11,23 @@ import {
   PDF_LINE_HEIGHTS,
   PDF_MARGINS_MM,
   PDF_ORIENTATIONS,
+  PDF_PAGE_NUMBER_ALIGNS,
+  PDF_PAGE_NUMBER_FORMATS,
   PDF_PAGE_SIZES,
+  pdfPageNumberText,
   type PdfBodyFont,
   type PdfBullet,
   type PdfCodeFont,
   type PdfHeadingFont,
   type PdfOrientation,
+  type PdfPageNumberAlign,
+  type PdfPageNumberFormat,
   type PdfPageSize,
   type PdfSettings,
 } from "../../theme/themes.ts";
 import { useT, type TFunction } from "../../i18n/index.ts";
 import type { Appearance } from "../../theme/useTheme.ts";
+import { SelectPicker } from "../form/SelectPicker.tsx";
 import { Field, Section, SegmentedRow, ToggleRow } from "./shared.tsx";
 
 type UpdateAppearance = <K extends keyof Appearance>(
@@ -51,6 +57,9 @@ export function ExportSection({
 }) {
   const t = useT();
   const pdf = appearance.pdf;
+  // The connector the `1 of 7` form spells out, in the reader's language — the
+  // same string the export hands the pure typesetter (`PdfLayoutInput`).
+  const ofWord = t("app.export.pageNumberOf");
 
   function update<K extends keyof PdfSettings>(
     key: K,
@@ -86,6 +95,12 @@ export function ExportSection({
   const codeFontLabel: Record<PdfCodeFont, string> = {
     courier: "Courier",
     dejavu: "DejaVu Sans Mono",
+  };
+
+  const alignLabel: Record<PdfPageNumberAlign, string> = {
+    left: t("settings.export.alignLeft"),
+    center: t("settings.export.alignCenter"),
+    right: t("settings.export.alignRight"),
   };
 
   const bulletLabel: Record<PdfBullet, string> = {
@@ -274,6 +289,43 @@ export function ExportSection({
           checked={pdf.pageNumbers}
           onChange={(v) => update("pageNumbers", v)}
         />
+        {/* Both only mean anything while there is a number to write, so they
+            follow the toggle rather than sitting greyed out beneath it. */}
+        {pdf.pageNumbers && (
+          <>
+            <Field label={t("settings.export.pageNumberFormat")}>
+              <SelectPicker<PdfPageNumberFormat>
+                value={pdf.pageNumberFormat}
+                options={PDF_PAGE_NUMBER_FORMATS.map((f) => ({
+                  value: f,
+                  // The option *is* the footer: the same pure formatter the
+                  // typesetter calls, on a two-page document, so what you pick
+                  // is literally what gets printed.
+                  label: pdfPageNumberText(f, 1, 2, ofWord),
+                }))}
+                onChange={(v) => update("pageNumberFormat", v)}
+                ariaLabel={t("settings.export.pageNumberFormat")}
+              />
+              <p className="text-xs text-muted">
+                {t("settings.export.pageNumberFormatHint")}
+              </p>
+            </Field>
+            <Field label={t("settings.export.pageNumberAlign")}>
+              <SegmentedRow<PdfPageNumberAlign>
+                ariaLabel={t("settings.export.pageNumberAlign")}
+                value={pdf.pageNumberAlign}
+                options={PDF_PAGE_NUMBER_ALIGNS.map((a) => ({
+                  value: a,
+                  label: alignLabel[a],
+                }))}
+                onChange={(v) => update("pageNumberAlign", v)}
+              />
+              <p className="text-xs text-muted">
+                {t("settings.export.pageNumberAlignHint")}
+              </p>
+            </Field>
+          </>
+        )}
       </Section>
     </>
   );

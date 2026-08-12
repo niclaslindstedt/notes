@@ -260,7 +260,16 @@ const settings = {
       "Head the page with the note's title. Turn it off when the note already opens with its own heading.",
     pageNumbers: "Number the pages",
     pageNumbersHint:
-      "Foot every page with its number, centred. This is the only thing the app puts in the margins — the URL and date a print dialog would add are never written.",
+      "Foot every page with its number. This is the only thing the app puts in the margins — the URL and date a print dialog would add are never written.",
+    pageNumberFormat: "Number style",
+    pageNumberFormatHint:
+      "How the footer writes the number. Drop the total when the reader doesn't need to know where the document ends.",
+    pageNumberAlign: "Number position",
+    pageNumberAlignHint:
+      "Which edge of the text column the number sits against.",
+    alignLeft: "Left",
+    alignCenter: "Centre",
+    alignRight: "Right",
   },
 
   appearance: {

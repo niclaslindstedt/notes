@@ -38,6 +38,7 @@ import {
   pdfBodyFamily,
   pdfCodeFamily,
   pdfHeadingFamily,
+  pdfPageNumberText,
   pdfPageSizePt,
   PDF_CODE_BACKGROUND_NONE,
   type PdfBullet,
@@ -161,6 +162,13 @@ export type PdfLayoutInput = {
    */
   transforms?: readonly CompiledTransform[];
   resolveImage?: (href: string) => PdfImage | undefined;
+  /**
+   * The word between the page and the total in the `ofTotal` page-number form
+   * — `of`, `av`, … The typesetter is pure and holds no catalogue, so the one
+   * translated word the page furniture needs is handed in by the caller (which
+   * has a `t`); it falls back to English when nobody passes one.
+   */
+  pageNumberOf?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -770,16 +778,26 @@ class Layout {
       bold: false,
       italic: false,
     };
-    // Centred in the bottom margin band — the same place the browser's print
-    // engine used to stamp its own, minus the URL and the date nobody asked
-    // for.
+    // In the bottom margin band — the same place the browser's print engine
+    // used to stamp its own, minus the URL and the date nobody asked for. It
+    // sits against whichever edge the user picked, flush with the text column
+    // rather than the paper edge, so it lines up with the body above it.
     const baseline = this.pageHeight - this.margin / 2 + size * 0.35;
+    const align = this.s.pageNumberAlign;
     this.pages.forEach((ops, i) => {
-      const label = `${i + 1} / ${this.pages.length}`;
+      const label = pdfPageNumberText(
+        this.s.pageNumberFormat,
+        i + 1,
+        this.pages.length,
+        this.input.pageNumberOf,
+      );
       const width = this.measure(label, font, size);
+      const slack = this.contentWidth - width;
       ops.push({
         kind: "text",
-        x: this.margin + (this.contentWidth - width) / 2,
+        x:
+          this.margin +
+          (align === "left" ? 0 : align === "right" ? slack : slack / 2),
         y: baseline,
         text: label,
         font,

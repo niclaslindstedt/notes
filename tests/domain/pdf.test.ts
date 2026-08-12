@@ -6,6 +6,7 @@ import {
   DEFAULT_PDF_SETTINGS,
   isPdfCodeBackground,
   pdfHeadingFamily,
+  pdfPageNumberText,
   pdfPageSizePt,
   PDF_BULLETS,
 } from "../../src/domain/pdf.ts";
@@ -41,8 +42,18 @@ describe("coercePdfSettings", () => {
       codeFontScale: 3,
       bullet: "star",
       codeFont: "comic",
+      pageNumberFormat: "roman",
+      pageNumberAlign: "justified",
     });
     expect(settings).toEqual(DEFAULT_PDF_SETTINGS);
+  });
+
+  it("numbers the pages the way it always did when the document predates the choice", () => {
+    // Neither field existed before the footer was configurable, so a stored
+    // document without them has to keep printing `1 / 7` in the middle.
+    const settings = coercePdfSettings({ pageNumbers: true });
+    expect(settings.pageNumberFormat).toBe("slash");
+    expect(settings.pageNumberAlign).toBe("center");
   });
 
   it("retires a code font the writer can no longer produce", () => {
@@ -67,6 +78,20 @@ describe("coercePdfSettings", () => {
     expect(
       coercePdfSettings({ codeBackground: "red;}x{" }).codeBackground,
     ).toBe(DEFAULT_PDF_SETTINGS.codeBackground);
+  });
+});
+
+describe("pdfPageNumberText", () => {
+  it("writes each of the three forms", () => {
+    expect(pdfPageNumberText("ofTotal", 2, 7)).toBe("2 of 7");
+    expect(pdfPageNumberText("slash", 2, 7)).toBe("2 / 7");
+    expect(pdfPageNumberText("plain", 2, 7)).toBe("2");
+  });
+
+  it("takes the connector from the caller, which is where the catalogue is", () => {
+    expect(pdfPageNumberText("ofTotal", 2, 7, "av")).toBe("2 av 7");
+    // Only the spelled-out form has one to translate.
+    expect(pdfPageNumberText("slash", 2, 7, "av")).toBe("2 / 7");
   });
 });
 

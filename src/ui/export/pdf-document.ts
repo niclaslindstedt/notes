@@ -42,6 +42,8 @@ export type PdfBuildInput = {
   images?: ReadonlyMap<string, LoadedImage>;
   /** Resolve a Markdown image href to a key in `images`. */
   imageKeyFor?: (href: string) => string | undefined;
+  /** The translated `of` for the `1 of 7` footer — see `PdfLayoutInput`. */
+  pageNumberOf?: string;
 };
 
 export type LoadedImage = {
@@ -355,6 +357,7 @@ export async function buildPdf(input: PdfBuildInput): Promise<Blob | null> {
     settings,
     measure,
     transforms: input.transforms,
+    pageNumberOf: input.pageNumberOf,
     resolveImage: (href): PdfImage | undefined => {
       const key = input.imageKeyFor?.(href);
       const image = key ? images.get(key) : undefined;

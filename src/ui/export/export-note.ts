@@ -84,12 +84,17 @@ function download(blob: Blob, filename: string): void {
  *
  * `transforms` are the active display rules — the PDF shows what the screen
  * shows, so a masked run stays masked on paper.
+ *
+ * `pageNumberOf` is the translated `of` the `1 of 7` footer needs. The
+ * typesetter is pure and holds no catalogue, so the one word the page furniture
+ * spells out is handed down from the component that has a `t`.
  */
 export async function exportPdf(
   note: Note,
   settings: PdfSettings,
   fetchAttachment?: AttachmentFetcher | null,
   transforms?: readonly CompiledTransform[],
+  pageNumberOf?: string,
 ): Promise<boolean> {
   try {
     const [{ buildPdf }, images] = await Promise.all([
@@ -103,6 +108,7 @@ export async function exportPdf(
       transforms,
       images,
       imageKeyFor: (href) => attachmentFilenameFromHref(href) ?? undefined,
+      pageNumberOf,
     });
     if (!blob) return false;
     download(blob, `${exportFileStem(note)}.pdf`);
