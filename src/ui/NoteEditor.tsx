@@ -40,6 +40,7 @@ import {
 import { ExportButton } from "./export/ExportButton.tsx";
 import { FavoriteButton } from "./FavoriteButton.tsx";
 import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
+import { useFindShortcut } from "./hooks/useFindShortcuts.ts";
 import { useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { ArrowLeftIcon, MoreIcon, SpinnerIcon } from "./icons.tsx";
@@ -173,6 +174,8 @@ export function Editor({
   const [findOpen, setFindOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [matchCursor, setMatchCursor] = useState(0);
+  // Bumped to pull focus back into an already-open bar — see `openFind`.
+  const [findFocusSignal, setFindFocusSignal] = useState(0);
 
   // The header's action cluster on a narrow screen: five buttons and a note
   // title don't both fit, and the title is what you need to see while reading,
@@ -226,9 +229,15 @@ export function Editor({
     setMatchCursor((activeMatch + delta + matches.length) % matches.length);
   }
 
-  function toggleFind() {
+  function openFind() {
+    // Already up: don't reopen it (which would throw the query away), just put
+    // the caret back in the field with the old query selected — what pressing
+    // ⌘F a second time does everywhere else.
     if (findOpen) {
-      setFindOpen(false);
+      // Flushed for the same reason the open path below is: the refocus has to
+      // land inside the gesture that asked for it, or a soft keyboard won't
+      // come back up for it.
+      flushSync(() => setFindFocusSignal((n) => n + 1));
       return;
     }
     unlock("pinpoint");
@@ -239,6 +248,17 @@ export function Editor({
     // side menu uses to open the cross-note search modal.
     flushSync(() => setFindOpen(true));
   }
+
+  function toggleFind() {
+    if (findOpen) {
+      setFindOpen(false);
+      return;
+    }
+    openFind();
+  }
+
+  // ⌘F / Ctrl+F is the app's, not the browser's, while a note is open.
+  useFindShortcut(openFind);
 
   function toggleToolbar() {
     setToolbarOpen((open) => {
@@ -443,6 +463,7 @@ export function Editor({
             onPrevious={() => stepMatch(-1)}
             onClose={() => setFindOpen(false)}
             maxWidth={maxWidth}
+            focusSignal={findFocusSignal}
           />
         )}
         {toolbarOpen && !loading && (

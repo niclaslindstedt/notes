@@ -25,10 +25,11 @@ import {
 // answers "where in *this* note", matching the typed characters verbatim and
 // case-insensitively, painting every hit in the note and stepping between them.
 //
-// The browser's own find bar (⌘F / the "find on page" menu item) can't be
-// opened, positioned, or read from a web page — there is no API for it, and no
-// way to put its prev/next arrows on a phone's keyboard accessory bar — so this
-// is the app's own. What it *can* borrow is the platform behaviour a soft
+// The browser's own find bar (the "find on page" menu item) can't be opened,
+// positioned, or read from a web page — there is no API for it, and no way to
+// put its prev/next arrows on a phone's keyboard accessory bar — so this is the
+// app's own, and ⌘F / Ctrl+F is taken from the browser and routed here (see
+// `useFindShortcut`). What it *can* borrow is the platform behaviour a soft
 // keyboard keys off: `inputMode="search"` and `enterKeyHint="next"` label the
 // virtual keyboard's action key, and Enter / Shift+Enter step the matches from
 // it without the field ever losing focus.
@@ -43,6 +44,7 @@ export function NoteFindBar({
   onPrevious,
   onClose,
   maxWidth,
+  focusSignal = 0,
 }: {
   query: string;
   onQueryChange: (query: string) => void;
@@ -53,17 +55,31 @@ export function NoteFindBar({
   onClose: () => void;
   /** The writing column's width, so the bar lines up with the text. */
   maxWidth: string;
+  /**
+   * Bumped by the host to pull focus back into the field on an already-open
+   * bar — what ⌘F does when the bar is up but the caret has moved on.
+   */
+  focusSignal?: number;
 }) {
   const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus the field the moment the bar mounts. A layout effect (rather than a
-  // passive one) keeps the focus inside the tap that opened the bar — the host
-  // opens it through `flushSync`, and that pairing is the only context in which
-  // iOS raises the soft keyboard for a programmatic focus.
+  // Focus the field the moment the bar mounts, and again whenever the host
+  // bumps `focusSignal`. A layout effect (rather than a passive one) keeps the
+  // focus inside the tap that opened the bar — the host opens it through
+  // `flushSync`, and that pairing is the only context in which iOS raises the
+  // soft keyboard for a programmatic focus. The query is selected rather than
+  // just focused, so re-pressing ⌘F over a bar that already holds a search
+  // types a fresh one instead of appending to the old.
   useLayoutEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    const input = inputRef.current;
+    if (!input) return;
+    // `focus()` first and explicitly: `select()` alone is what raises the soft
+    // keyboard in a browser, but jsdom implements only the selection half of
+    // it, and the focus is the half every caller here depends on.
+    input.focus();
+    input.select();
+  }, [focusSignal]);
 
   const none = total === 0;
 

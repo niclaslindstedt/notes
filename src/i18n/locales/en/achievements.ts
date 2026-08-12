@@ -128,7 +128,7 @@ const achievements = {
       name: "Pinpoint",
       condition: "Find text inside the note you have open.",
       learnMore:
-        "The magnifier in a note's header opens a find bar under the top bar, with the cursor already in it. What you type is matched verbatim and case-insensitively against the note you are reading — every hit lights up at once, the arrows step between them (Enter and Shift+Enter do the same from the keyboard), and the counter says which one of how many you are on. It searches only the open note; the magnifier on the side menu is the one that searches across all of them.",
+        "The magnifier in a note's header — or ⌘F / Ctrl+F, which the app answers instead of the browser's own find-on-page — opens a find bar under the top bar, with the cursor already in it. What you type is matched verbatim and case-insensitively against the note you are reading — every hit lights up at once, the arrows step between them (Enter and Shift+Enter do the same from the keyboard), and the counter says which one of how many you are on. It searches only the open note; the magnifier on the side menu is the one that searches across all of them.",
     },
     starStruck: {
       name: "Star-struck",
@@ -308,7 +308,7 @@ const achievements = {
       name: "Seeker",
       condition: "Search your notes.",
       learnMore:
-        "The magnifier on the side-menu action bar searches every note's title and body at once. It's plain text and fuzzy by default — type a rough abbreviation and it still finds the note — and also takes wildcards (recipe*, dr?ft) or a /regex/. On encrypted backends it searches the same preview the note index already holds, so it works without unlocking every note.",
+        "The magnifier on the side-menu action bar — or ⌘⇧F / Ctrl+Shift+F from anywhere, the wider twin of the ⌘F that searches inside one note — searches every note's title and body at once. It's plain text and fuzzy by default — type a rough abbreviation and it still finds the note — and also takes wildcards (recipe*, dr?ft) or a /regex/. On encrypted backends it searches the same preview the note index already holds, so it works without unlocking every note.",
     },
     whereYouLeftOff: {
       name: "Right where you left off",

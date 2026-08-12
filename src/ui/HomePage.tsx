@@ -235,10 +235,11 @@ export function HomePage() {
             </li>
             <li>
               <em>Find text inside the note you have open</em> — the magnifier
-              in a note's header drops a search bar under the top bar, lights up
-              every match as you type, and steps between them with arrows (or
-              Enter) while telling you which of how many you are on. It reads
-              only the note in front of you, and never leaves your device.
+              in a note's header, or <em>⌘F / Ctrl+F</em>, drops a search bar
+              under the top bar, lights up every match as you type, and steps
+              between them with arrows (or Enter) while telling you which of how
+              many you are on. It reads only the note in front of you, and never
+              leaves your device.
             </li>
             <li>
               <em>Export a note</em> from the up arrow in its header — as a{" "}
@@ -285,11 +286,12 @@ export function HomePage() {
             </li>
             <li>
               <em>Search across every note</em> from the magnifier on the side
-              menu — it matches both titles and body text, is forgiving by
-              default (a rough abbreviation still finds the note), and also
-              understands wildcards and regular expressions. The search runs
-              entirely in your browser, and finds your notes even when they're
-              stored encrypted, without sending anything anywhere.
+              menu, or with <em>⌘⇧F / Ctrl+Shift+F</em> — it matches both titles
+              and body text, is forgiving by default (a rough abbreviation still
+              finds the note), and also understands wildcards and regular
+              expressions. The search runs entirely in your browser, and finds
+              your notes even when they're stored encrypted, without sending
+              anything anywhere.
             </li>
             <li>
               Pick a theme and appearance that suits you — including whether the

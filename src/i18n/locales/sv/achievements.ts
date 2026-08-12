@@ -124,7 +124,7 @@ const achievements: AchievementsCatalog = {
       name: "Pricksäker",
       condition: "Hitta text inuti anteckningen du har öppen.",
       learnMore:
-        "Förstoringsglaset i en antecknings sidhuvud fäller ut ett sökfält under toppraden, med markören redan i det. Det du skriver matchas ordagrant och utan hänsyn till versaler mot anteckningen du läser — alla träffar lyser upp samtidigt, pilarna stegar mellan dem (Enter och Skift+Enter gör samma sak från tangentbordet) och räknaren säger vilken av hur många du står på. Den söker bara i den öppna anteckningen; förstoringsglaset i sidomenyn är det som söker i allihop.",
+        "Förstoringsglaset i en antecknings sidhuvud — eller ⌘F / Ctrl+F, som appen svarar på i stället för webbläsarens egen sidsökning — fäller ut ett sökfält under toppraden, med markören redan i det. Det du skriver matchas ordagrant och utan hänsyn till versaler mot anteckningen du läser — alla träffar lyser upp samtidigt, pilarna stegar mellan dem (Enter och Skift+Enter gör samma sak från tangentbordet) och räknaren säger vilken av hur många du står på. Den söker bara i den öppna anteckningen; förstoringsglaset i sidomenyn är det som söker i allihop.",
     },
     starStruck: {
       name: "Stjärnögd",
@@ -305,7 +305,7 @@ const achievements: AchievementsCatalog = {
       name: "Sökare",
       condition: "Sök bland dina anteckningar.",
       learnMore:
-        "Förstoringsglaset på sidomenyns åtgärdsrad söker igenom varje antecknings titel och brödtext på en gång. Den är vanlig text och luddig som standard — skriv en grov förkortning så hittar den ändå anteckningen — och tar även jokertecken (recipe*, dr?ft) eller ett /regex/. På krypterade lagringsbackender söker den i samma förhandsvisning som anteckningsindexet redan har, så den fungerar utan att låsa upp varje anteckning.",
+        "Förstoringsglaset på sidomenyns åtgärdsrad — eller ⌘⇧F / Ctrl+Skift+F var du än är, den bredare tvillingen till ⌘F som söker inuti en enda anteckning — söker igenom varje antecknings titel och brödtext på en gång. Den är vanlig text och luddig som standard — skriv en grov förkortning så hittar den ändå anteckningen — och tar även jokertecken (recipe*, dr?ft) eller ett /regex/. På krypterade lagringsbackender söker den i samma förhandsvisning som anteckningsindexet redan har, så den fungerar utan att låsa upp varje anteckning.",
     },
     whereYouLeftOff: {
       name: "Precis där du var",
