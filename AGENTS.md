@@ -337,6 +337,15 @@ lands back in everyone's first download:
   back into the first paint. The things that must answer at boot were split
   into their own small modules for exactly this reason:
   `cache/offline-error.ts`, `dropbox/pending.ts`, `cloud-configured.ts`.
+- **`src/ui/export/pdf-document.ts` holds the PDF writer.** It is the only
+  module that imports [jsPDF](https://github.com/parallax/jsPDF) — the app's one
+  heavy runtime dependency, ~130 kB gzipped — and it is imported from the export
+  handler, never at mount. **Never import it statically.** Its Unicode fallback
+  faces (`src/assets/fonts/`) go one step further: they are fetched at export
+  time, only when a note actually contains a character the PDF standard fonts
+  can't encode, and are deliberately kept out of the service worker's precache.
+  The pagination itself is pure and lives in `src/domain/pdf-layout.ts`, which
+  pulls in nothing.
 - **Dev-only code is imported at the point of use.** The seed dataset loads
   behind `import.meta.env.VITE_SEED` (which folds to `false` and drops the
   module in an ordinary build), and the fake-data adapter is imported when the
@@ -455,10 +464,14 @@ The source tree under `src/` is organized by concern, not by file type:
 
 - `src/app/` — the root component (`App.tsx`), the entry point
   (`main.tsx`), and top-level state hooks (`use-notes.ts`).
-- `src/domain/` — pure functions over the note model (`note.ts`) and a
+- `src/domain/` — pure functions over the note model (`note.ts`), a
   dependency-free Markdown parser (`markdown.ts`) the live-preview editor
-  renders from. No DOM, no I/O, trivially testable. The boundary is enforced
-  by eslint.
+  renders from, and the PDF typesetter (`pdf-layout.ts`) that paginates a note
+  into pages of drawing operations. No DOM, no I/O, trivially testable. The
+  boundary is enforced by eslint.
+- `src/assets/` — binaries the build emits as hashed files rather than bundles.
+  Today only `fonts/`: the PDF export's Unicode fallback faces, fetched on
+  demand at export time. See its `README.md` for provenance and licence.
 - `src/storage/` — persistence, built on a `StorageAdapter` byte contract
   (`adapter.ts`). The serialize/migrate pipeline (`serialize.ts`,
   `migrations.ts`) runs on every load/save so backends only move bytes.
@@ -574,6 +587,7 @@ So when a feature request arrives while you are working in a wrapper:
 | A pure transform over the note model     | `src/domain/note.ts`               |
 | A new persistence backend                | `src/storage/<backend>/index.ts`   |
 | Attachment behaviour (image / file)      | `src/domain/attachment.ts`, `src/storage/attachment-store.ts`, `src/ui/attachments/` |
+| How an exported PDF looks on the page    | `src/domain/pdf-layout.ts` (never the writer) |
 | A presentational component               | `src/ui/`                          |
 | Top-level state / a new view             | `src/app/`                         |
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |

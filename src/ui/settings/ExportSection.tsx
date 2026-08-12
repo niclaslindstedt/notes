@@ -1,6 +1,7 @@
 import {
   PDF_BODY_FONTS,
   PDF_BULLETS,
+  PDF_HEADING_FONTS,
   PDF_CODE_BACKGROUND_NONE,
   PDF_CODE_BACKGROUNDS,
   PDF_CODE_FONTS,
@@ -14,13 +15,13 @@ import {
   type PdfBodyFont,
   type PdfBullet,
   type PdfCodeFont,
+  type PdfHeadingFont,
   type PdfOrientation,
   type PdfPageSize,
   type PdfSettings,
 } from "../../theme/themes.ts";
 import { useT, type TFunction } from "../../i18n/index.ts";
 import type { Appearance } from "../../theme/useTheme.ts";
-import { SelectPicker } from "../form/SelectPicker.tsx";
 import { Field, Section, SegmentedRow, ToggleRow } from "./shared.tsx";
 
 type UpdateAppearance = <K extends keyof Appearance>(
@@ -75,10 +76,15 @@ export function ExportSection({
     mono: t("settings.export.fontMono"),
   };
 
+  const headingFontLabel: Record<PdfHeadingFont, string> = {
+    body: t("settings.export.headingFontBody"),
+    sans: t("settings.export.fontSans"),
+    serif: t("settings.export.fontSerif"),
+    mono: t("settings.export.fontMono"),
+  };
+
   const codeFontLabel: Record<PdfCodeFont, string> = {
-    system: t("settings.export.codeFontSystem"),
     courier: "Courier",
-    consolas: "Consolas",
     dejavu: "DejaVu Sans Mono",
   };
 
@@ -183,18 +189,32 @@ export function ExportSection({
             {t("settings.export.headingScaleHint")}
           </p>
         </Field>
+        <Field label={t("settings.export.headingFont")}>
+          <SegmentedRow<PdfHeadingFont>
+            ariaLabel={t("settings.export.headingFont")}
+            value={pdf.headingFont}
+            options={PDF_HEADING_FONTS.map((f) => ({
+              value: f,
+              label: headingFontLabel[f],
+            }))}
+            onChange={(v) => update("headingFont", v)}
+          />
+          <p className="text-xs text-muted">
+            {t("settings.export.headingFontHint")}
+          </p>
+        </Field>
       </Section>
 
       <Section title={t("settings.export.codeTitle")}>
         <Field label={t("settings.export.codeFont")}>
-          <SelectPicker<PdfCodeFont>
+          <SegmentedRow<PdfCodeFont>
+            ariaLabel={t("settings.export.codeFont")}
             value={pdf.codeFont}
             options={PDF_CODE_FONTS.map((f) => ({
               value: f.id,
               label: codeFontLabel[f.id],
             }))}
             onChange={(v) => update("codeFont", v)}
-            ariaLabel={t("settings.export.codeFont")}
           />
           <p className="text-xs text-muted">
             {t("settings.export.codeFontHint")}
@@ -247,6 +267,12 @@ export function ExportSection({
           hint={t("settings.export.includeTitleHint")}
           checked={pdf.includeTitle}
           onChange={(v) => update("includeTitle", v)}
+        />
+        <ToggleRow
+          label={t("settings.export.pageNumbers")}
+          hint={t("settings.export.pageNumbersHint")}
+          checked={pdf.pageNumbers}
+          onChange={(v) => update("pageNumbers", v)}
         />
       </Section>
     </>
