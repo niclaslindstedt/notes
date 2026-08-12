@@ -188,7 +188,9 @@ describe("find in note: the ⌘F / Ctrl+F shortcut", () => {
     expect(screen.getByText("1 of 2")).toBeTruthy();
   });
 
-  it("leaves the browser's own find alone for the modified variants", () => {
+  // Shift widens the search to every note (the search modal, bound by
+  // `SearchModalHost`), so the note's own bar must not answer it too.
+  it("ignores the modified variants, Shift included", () => {
     renderEditor();
     expect(pressFind({ metaKey: true, shiftKey: true }).defaultPrevented).toBe(
       false,

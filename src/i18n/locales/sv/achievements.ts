@@ -305,7 +305,7 @@ const achievements: AchievementsCatalog = {
       name: "Sökare",
       condition: "Sök bland dina anteckningar.",
       learnMore:
-        "Förstoringsglaset på sidomenyns åtgärdsrad söker igenom varje antecknings titel och brödtext på en gång. Den är vanlig text och luddig som standard — skriv en grov förkortning så hittar den ändå anteckningen — och tar även jokertecken (recipe*, dr?ft) eller ett /regex/. På krypterade lagringsbackender söker den i samma förhandsvisning som anteckningsindexet redan har, så den fungerar utan att låsa upp varje anteckning.",
+        "Förstoringsglaset på sidomenyns åtgärdsrad — eller ⌘⇧F / Ctrl+Skift+F var du än är, den bredare tvillingen till ⌘F som söker inuti en enda anteckning — söker igenom varje antecknings titel och brödtext på en gång. Den är vanlig text och luddig som standard — skriv en grov förkortning så hittar den ändå anteckningen — och tar även jokertecken (recipe*, dr?ft) eller ett /regex/. På krypterade lagringsbackender söker den i samma förhandsvisning som anteckningsindexet redan har, så den fungerar utan att låsa upp varje anteckning.",
     },
     whereYouLeftOff: {
       name: "Precis där du var",

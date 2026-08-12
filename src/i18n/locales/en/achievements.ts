@@ -308,7 +308,7 @@ const achievements = {
       name: "Seeker",
       condition: "Search your notes.",
       learnMore:
-        "The magnifier on the side-menu action bar searches every note's title and body at once. It's plain text and fuzzy by default — type a rough abbreviation and it still finds the note — and also takes wildcards (recipe*, dr?ft) or a /regex/. On encrypted backends it searches the same preview the note index already holds, so it works without unlocking every note.",
+        "The magnifier on the side-menu action bar — or ⌘⇧F / Ctrl+Shift+F from anywhere, the wider twin of the ⌘F that searches inside one note — searches every note's title and body at once. It's plain text and fuzzy by default — type a rough abbreviation and it still finds the note — and also takes wildcards (recipe*, dr?ft) or a /regex/. On encrypted backends it searches the same preview the note index already holds, so it works without unlocking every note.",
     },
     whereYouLeftOff: {
       name: "Right where you left off",

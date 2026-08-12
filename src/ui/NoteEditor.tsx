@@ -40,7 +40,7 @@ import {
 import { ExportButton } from "./export/ExportButton.tsx";
 import { FavoriteButton } from "./FavoriteButton.tsx";
 import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
-import { useFindShortcut } from "./hooks/useFindShortcut.ts";
+import { useFindShortcut } from "./hooks/useFindShortcuts.ts";
 import { useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { ArrowLeftIcon, MoreIcon, SpinnerIcon } from "./icons.tsx";

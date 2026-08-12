@@ -1863,7 +1863,7 @@ bar for the note that is **open**, raised by the magnifier pinned to the far
 right of the editor header (past the actions that change the note, because it
 opens a bar rather than changing anything) — or by **⌘F / Ctrl+F**, which the
 app takes from the browser while a note is open (see
-[the find shortcut](#the-find-shortcut) below) — and rendered directly beneath
+[the find shortcuts](#the-find-shortcuts) below) — and rendered directly beneath
 the header, in the content column, with the same
 `format-toolbar-in` unfold the [styling toolbar](#styling-toolbar) uses. The two
 are independent and can both be up at once; the find bar sits above, closest to
@@ -1904,22 +1904,33 @@ The browser's own find bar ("find on page") is not reachable from a web page —
 it can't be opened, positioned, or read, and there is no way to put its
 prev/next arrows on a phone's keyboard accessory bar — so this is the app's own.
 
-#### The find shortcut
+#### The find shortcuts
 
-`useFindShortcut` (`src/ui/hooks/useFindShortcut.ts`), mounted by the editor,
-answers **⌘F / Ctrl+F** with this bar and calls `preventDefault()` so the
-browser's "find on page" never opens. It is the better answer to that keystroke
-in a note: the browser's bar searches what the Markdown *renders to* rather than
-what the note says, highlights it somewhere the app can't read back, and offers
-nothing to step it with on a phone.
+`src/ui/hooks/useFindShortcuts.ts` holds the **⌘F family** — the two shortcuts
+that answer "search what I'm looking at", both taken from the browser's "find on
+page" and split by Shift the way the app splits searching in two:
 
-Where it deliberately differs from [select all](#selection-mapping)'s shortcut,
-which stands down inside every editable element: this one fires **even while the
-caret is in the note** (the likeliest place to press it from), because no
-field-level "find" exists for it to trample. It does stand down while a modal is
-up — `isModalOpen()` — so ⌘F over the [search modal](#search) or settings is
-still the browser's, and it ignores the modified variants (⌘⇧F, ⌥⌘F) so those
-keep whatever the platform binds them to.
+| Keystroke              | Opens                                  | Bound by           |
+| ---------------------- | -------------------------------------- | ------------------ |
+| ⌘F / Ctrl+F            | this note's find bar                   | the editor         |
+| ⌘⇧F / Ctrl+Shift+F     | the cross-note [search modal](#search) | `SearchModalHost`  |
+
+`useFindShortcut`, mounted by the editor, calls `preventDefault()` so the
+browser's bar never opens: it is the wrong tool in a note, searching what the
+Markdown *renders to* rather than what the note says, highlighting it somewhere
+the app can't read back, with nothing to step it with on a phone.
+`useSearchShortcut` is the same key held with Shift — the same question asked
+wider, which is also how editors everywhere spell "search more than this file".
+It lives on the modal's host rather than on the editor because searching every
+note is a question you can ask from the list or the archive just as well as from
+inside a note, and that host is mounted the whole time the app is.
+
+Where they deliberately differ from [select all](#selection-mapping)'s shortcut,
+which stands down inside every editable element: these fire **even while the
+caret is in the note** (the likeliest place to press them from), because no
+field-level "find" exists for them to trample. Both stand down while a modal is
+up — `isModalOpen()` — so neither fires over the search modal itself or over
+settings, and ⌥⌘F is left to whatever the platform binds it to.
 
 Pressing it on an **already-open** bar does not close it (the header toggle is
 what closes it): `openFind` bumps a `focusSignal` prop the bar re-focuses and
@@ -2701,9 +2712,11 @@ backend-specific delete). See [namespaces](#namespaces).
 `SearchModal` (`src/ui/SearchModal.tsx`) — find any note across the whole
 namespace at once. Opened from the magnifier on the [action bar](#folders-in-the-side-menu)
 (`SideMenuActionBar`, on the history row to the right of Undo / Redo) via a `{ kind: "search" }`
-command on the [modal bus](#modal-bus); `SearchModalHost` owns its open state and
-is handed the live document (`sync.doc`) and `switchTo` from `App`. It is a plain
-`Modal`, so it fills the screen on mobile and centres on desktop.
+command on the [modal bus](#modal-bus), or from **⌘⇧F / Ctrl+Shift+F** anywhere
+in the app (`useSearchShortcut`, bound by the host — see
+[the find shortcuts](#the-find-shortcuts)); `SearchModalHost` owns its open state
+and is handed the live document (`sync.doc`) and `switchTo` from `App`. It is a
+plain `Modal`, so it fills the screen on mobile and centres on desktop.
 
 The engine is pure and lives in the domain layer (`src/domain/search.ts`, no
 DOM): `buildSearchIndex(snapshot)` flattens the document into a flat list of

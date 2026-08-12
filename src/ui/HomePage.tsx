@@ -286,11 +286,12 @@ export function HomePage() {
             </li>
             <li>
               <em>Search across every note</em> from the magnifier on the side
-              menu — it matches both titles and body text, is forgiving by
-              default (a rough abbreviation still finds the note), and also
-              understands wildcards and regular expressions. The search runs
-              entirely in your browser, and finds your notes even when they're
-              stored encrypted, without sending anything anywhere.
+              menu, or with <em>⌘⇧F / Ctrl+Shift+F</em> — it matches both titles
+              and body text, is forgiving by default (a rough abbreviation still
+              finds the note), and also understands wildcards and regular
+              expressions. The search runs entirely in your browser, and finds
+              your notes even when they're stored encrypted, without sending
+              anything anywhere.
             </li>
             <li>
               Pick a theme and appearance that suits you — including whether the
