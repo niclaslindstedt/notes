@@ -17,9 +17,10 @@ import { EyeIcon } from "./icons.tsx";
 //
 // One glyph rather than the star's outline/filled pair, because there is no
 // second eye that means "editable" without also meaning "hidden" — so the state
-// is carried by the accent fill instead, the treatment the ⋯ / find / formatting
-// toggles use for "this mode is on". A locked note has to be spottable at a
-// glance, before the user wonders why their typing isn't landing.
+// rests entirely on the accent fill, the treatment the ⋯ / find / formatting
+// toggles use for "this mode is on" and the one the [star](./FavoriteButton.tsx)
+// wears too. A locked note has to be spottable at a glance, before the user
+// wonders why their typing isn't landing.
 export function LockButton({
   locked,
   onToggle,
