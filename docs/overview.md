@@ -3030,6 +3030,14 @@ dimmed backdrop, Escape-to-close (topmost only), backdrop-click close, and a
 `centered` (card) vs full-screen-sheet mode. It manages a modal stack so nested
 confirmations don't collapse every layer at once.
 
+The sheet mode is also what keeps a dialog clear of the notch: it opens with an
+`aria-hidden` spacer the height of `env(safe-area-inset-top)` (and a matching
+`env(safe-area-inset-bottom)` one under a footer), and positions itself against
+the app's visual-viewport rect. **A dialog that rolls its own overlay loses all
+of that** — that is why the changelog modal renders its chrome here rather than
+using the framework's ready-made component (see [changelog
+modal](#changelog-modal)).
+
 ### Modal bus
 
 `src/ui/modal-bus.ts` + `ModalBusProvider` (`src/ui/ModalBusProvider.tsx`) — a
@@ -3136,6 +3144,17 @@ new", listing every shipped release (newest first) from the parsed
 [changelog data](#changelog-data) with inline Markdown. A bullet carrying
 `[Learn more](feature:<slug>)` drills into a [feature doc](#feature-docs) in
 place, with a back button.
+
+The dialog's chrome (header, scroll panes, drill-down state) is app-side on top
+of the shared [`Modal`](#modal), **deliberately rather than** the framework's
+ready-made `ChangelogModal`: that one portals into a private overlay of its own,
+so on mobile it renders flush against the top edge with its header under the
+status bar, and it also misses the visual-viewport rect, the stacked-Escape
+handling and swipe-down-to-close. Only the shell is local — the parser and both
+Markdown renderers still come from the framework, so there is no forked parser.
+`tests/ui/changelog-modal.test.tsx` asserts the safe-area spacer is present, so
+a drift back onto a private overlay fails loudly. Drop the local shell once the
+framework component sits on the shared modal.
 
 ### Achievements modal
 
@@ -4500,9 +4519,11 @@ this file, the dictionary, and `docs/architecture.md`).
 
 ### Changelog renderer
 
-`src/ui/changelog/render.tsx` — the dependency-free Markdown renderer for the
-changelog body and feature docs, with the `feature:<slug>` link scheme for
-in-modal cross-links.
+`renderInlineMarkdown` / `renderMarkdownDoc`
+(`@niclaslindstedt/oss-framework/changelog`, called from
+`src/ui/changelog/ChangelogModal.tsx`) — the dependency-free Markdown renderers
+for the changelog bullets and the feature-doc bodies, with the `feature:<slug>`
+link scheme for in-modal cross-links.
 
 ## Internationalization
 

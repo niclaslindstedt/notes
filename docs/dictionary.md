@@ -186,7 +186,7 @@ Honour these when naming a new file, key, or string.
 | **Clear button** / **empty the field** / **the circled x**  | `ClearFieldIcon` (`src/ui/icons.tsx`); rendered in the search field of `SearchModal` (`src/ui/SearchModal.tsx`). Not the plain `CloseIcon` a dialog's close button uses. [→](overview.md#clear-button) |
 | **Settings modal** / **preferences**                       | `SettingsModal` (`src/ui/settings/SettingsModal.tsx`). [→](overview.md#settings-modal)                       |
 | **Namespaces modal** / **manage namespaces**               | `NamespacesModal` (`src/ui/NamespacesModal.tsx`). [→](overview.md#namespaces-modal)                          |
-| **Changelog modal** / **what's new**                       | `ChangelogModal` (`src/ui/changelog/ChangelogModal.tsx`). [→](overview.md#changelog-modal)                   |
+| **Changelog modal** / **what's new**                       | `ChangelogModal` (`src/ui/changelog/ChangelogModal.tsx`) — app-side chrome on the shared [`Modal`](overview.md#modal), not the framework's own `ChangelogModal`. [→](overview.md#changelog-modal) |
 | **Achievements modal** / **trophy tour**                   | `AchievementsModal` (`src/ui/achievements/AchievementsModal.tsx`). [→](overview.md#achievements-modal)        |
 | **Unlock modal** / **achievement notification**            | `AchievementUnlockModal` (`src/ui/achievements/AchievementUnlockModal.tsx`). [→](overview.md#unlock-modal)    |
 | **Sync details modal** / **cloud sync command centre** / **what went wrong with sync** / **sync log (in the modal)** | `SyncDetailsModal` (`src/ui/SyncDetailsModal.tsx`); the in-modal sync-log panel filters the [logger](#logger) buffer by `SYNC_LOG_SCOPES` and lists it newest-first (`SyncLogPanel`). [→](overview.md#sync-details-modal)                       |
@@ -315,7 +315,7 @@ Honour these when naming a new file, key, or string.
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | **Changelog data** / **parsed CHANGELOG**                  | `src/ui/changelog/data.ts`, `parse.ts`. [→](overview.md#changelog-data)                                      |
 | **Feature docs** / **"Learn more"**                        | `feature-docs.ts` (`src/ui/changelog/`); `docs/features/<slug>.md`. [→](overview.md#feature-docs)            |
-| **Changelog renderer**                                     | `render.tsx` (`src/ui/changelog/`). [→](overview.md#changelog-renderer)                                      |
+| **Changelog renderer**                                     | `renderInlineMarkdown` / `renderMarkdownDoc` (`@niclaslindstedt/oss-framework/changelog`), called from `ChangelogModal.tsx`. [→](overview.md#changelog-renderer) |
 
 ## Internationalization
 
