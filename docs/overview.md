@@ -2171,9 +2171,10 @@ the first time is the **Elbow room** achievement.
 
 `Editor` (`src/ui/NoteEditor.tsx`) — `pinFavorite` / `pinLocked`, `pinnedRef`.
 Two of the cluster's buttons don't only *do* something, they **say** something
-about the note that is open: a filled star means this note is in
+about the note that is open: a lit star means this note is in
 [Favorites](#favorites), and a lit eye means it is
-[read-only](#lock-a-note). Folding those behind the ⋯ turned a fact about the
+[read-only](#lock-a-note) — both filled to the edges with the accent, so the
+row's two readouts look like one another. Folding those behind the ⋯ turned a fact about the
 open document into something the user had to go looking for — and the eye
 especially, because "why is my typing not landing" is the exact question the
 glyph exists to answer.
@@ -2333,9 +2334,14 @@ Starring a note lifts it into the side menu's **Favorites** section without
 moving it: it keeps its folder, its place in the recents list, and everything
 else about it. The star is the leading button of the editor header
 (`FavoriteButton`, `src/ui/FavoriteButton.tsx`, drawing the framework's
-`StarIcon` outlined or filled to show the note's current state — a filled one
-stays on the row on a phone rather than folding behind the ⋯, see
-[pinned header state](#pinned-header-state)); `App` routes
+`StarIcon`). Starred, it lights the *whole* button: the accent fills it edge to
+edge and the star is knocked out of it in the page colour — the inverted
+treatment the [eye](#lock-a-note) wears, so the two facts the header reports
+about the open note read alike rather than one being a lit chip and the other a
+slightly heavier glyph. The artwork still swaps outline→filled with the state,
+which is what keeps the star legible once it paints in the background colour.
+A lit star stays on the row on a phone rather than folding behind the ⋯, see
+[pinned header state](#pinned-header-state); `App` routes
 its press to `useNotes().toggleFavorite`, which flips `Note.favorite`
 (`setFavorite`, `src/domain/note.ts`) on the shared `DOC_SCOPE` undo timeline —
 structural, like archiving, because it changes where a note shows up rather than
