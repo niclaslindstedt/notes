@@ -62,6 +62,15 @@ export type NotesStore = {
   // and returns how many were added.
   importFiles: (files: readonly { name: string; text: string }[]) => number;
   update: (id: string, body: string) => void;
+  /**
+   * Rewrite a note's body as **one, standalone** undo step — the find bar's
+   * replace. Deliberately not `update`: that one coalesces continuous edits, so
+   * a replace-all landing right after a typing burst can merge into it and take
+   * the typing with it when undone. A replace is a single deliberate act over
+   * text the user is not looking at line by line, and is exactly the edit they
+   * reach for undo after.
+   */
+  replaceBody: (id: string, body: string) => void;
   /** Attach a pasted / dropped file (its bytes) to a note. */
   attach: (id: string, attachment: Attachment) => void;
   retitle: (id: string, title: string) => void;
@@ -372,6 +381,22 @@ export function useNotes(
     [commit, bodyEditKey],
   );
 
+  // The find bar's replace, landing as its own undo step (no merge key) — see
+  // `replaceBody` on the store type for why it isn't `update`.
+  const replaceBody = useCallback(
+    (id: string, body: string): void => {
+      const existing = docRef.current.notes.find((n) => n.id === id);
+      if (existing && existing.body === body) return;
+      const title = existing ? noteTitle(existing) : "note";
+      commit(
+        (prev) => prev.map((n) => (n.id === id ? editNote(n, body) : n)),
+        `Replaced text in “${title}”`,
+        id,
+      );
+    },
+    [commit],
+  );
+
   // Attach a pasted / dropped file to a note. The editor inserts the body
   // reference separately; this only adds the attachment record (its bytes),
   // which the storage layer externalises to a file on the file backends.
@@ -647,6 +672,7 @@ export function useNotes(
     create,
     importFiles,
     update,
+    replaceBody,
     attach,
     retitle,
     remove,

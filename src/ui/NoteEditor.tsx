@@ -23,7 +23,17 @@ import {
   type FormatAction,
   type LineFormat,
 } from "../domain/markdown-format.ts";
-import { findMatches, type NoteMatch } from "../domain/note-find.ts";
+import {
+  findMatches,
+  isPatternValid,
+  type NoteMatch,
+} from "../domain/note-find.ts";
+import {
+  previewReplacements,
+  replaceAll,
+  replaceOne,
+  type PreviewLine,
+} from "../domain/note-replace.ts";
 import { isBlank, isLocked, type Note } from "../domain/note.ts";
 import type { CompiledTransform } from "../domain/transform.ts";
 import { useT } from "../i18n/index.ts";
@@ -107,6 +117,10 @@ const NO_MATCHES: readonly NoteMatch[] = [];
 // per-line memos bailing out.
 const NO_TRANSFORMS: readonly CompiledTransform[] = [];
 
+// The find bar's preview while it is closed — nothing to show, and one stable
+// reference so the bar's props don't churn.
+const NO_PREVIEW: readonly PreviewLine[] = [];
+
 /** What the plain-textarea fallback exposes, mirroring the live-preview one. */
 type PlainEditorHandle = {
   format: (action: FormatAction) => void;
@@ -120,6 +134,7 @@ export function Editor({
   transforms = NO_TRANSFORMS,
   onBack,
   onChange,
+  onReplace,
   onTitleChange,
   onTitleSettle,
   onToggleFavorite,
@@ -138,6 +153,13 @@ export function Editor({
   /** Leave the editor and return to the overview (the header back button). */
   onBack: () => void;
   onChange: (body: string) => void;
+  /**
+   * A body rewritten by the find bar's replace. Separate from `onChange` so it
+   * lands as its own undo step rather than merging into the typing run before
+   * it — see `replaceBody` in `src/app/use-notes.ts`. Omitted (in tests, and
+   * anywhere replacing isn't offered) it falls back to `onChange`.
+   */
+  onReplace?: (body: string) => void;
   onTitleChange: (title: string) => void;
   onTitleSettle: () => void;
   /** Star / unstar the note — the header's leading star button. */
@@ -214,6 +236,14 @@ export function Editor({
   const [matchCursor, setMatchCursor] = useState(0);
   // Bumped to pull focus back into an already-open bar — see `openFind`.
   const [findFocusSignal, setFindFocusSignal] = useState(0);
+  // The bar's folded-away second half: whether the replace row is unfolded,
+  // what is typed in it, whether the query is read as a pattern, and whether
+  // the preview panel is showing. All of it starts clean with the query, for
+  // the same reason it does.
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replacement, setReplacement] = useState("");
+  const [regex, setRegex] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // The header's action cluster on a narrow screen: six buttons and a note
   // title don't both fit, and the title is what you need to see while reading,
@@ -296,21 +326,100 @@ export function Editor({
     if (actionsOpen) setActionsOpen(false);
   }
 
+  // Replacing is an edit, so it stands down on a locked note exactly the way
+  // the toolbar and the cut button do — the bar itself stays, because reading a
+  // locked note is what locking it is for.
+  const canReplace = !locked;
+
   // Every hit in the note, recomputed as the query (or the note) changes. A
   // closed bar matches nothing, so nothing downstream pays for it.
   const matches = useMemo<readonly NoteMatch[]>(
-    () => (findOpen ? findMatches(note.body ?? "", query) : NO_MATCHES),
-    [findOpen, note.body, query],
+    () =>
+      findOpen ? findMatches(note.body ?? "", query, { regex }) : NO_MATCHES,
+    [findOpen, note.body, query, regex],
   );
+  // A pattern that doesn't compile is the state most of a regex's keystrokes
+  // pass through, so the bar reports it in the counter's place rather than
+  // pretending the note simply has no matches.
+  const patternInvalid = findOpen && regex && !isPatternValid(query, { regex });
   // The cursor is clamped rather than corrected: editing the note (or the
   // query) can shrink the list under it, and clamping keeps the bar on the
   // last hit instead of flipping it back to the first.
   const activeMatch =
     matches.length === 0 ? -1 : Math.min(matchCursor, matches.length - 1);
 
+  // What a replace-all would write — computed only while the panel is actually
+  // up, since it walks every hit and builds a diff for each affected line.
+  const preview = useMemo<readonly PreviewLine[]>(
+    () =>
+      findOpen && canReplace && replaceOpen && previewOpen
+        ? previewReplacements(note.body ?? "", query, replacement, { regex })
+        : NO_PREVIEW,
+    [
+      findOpen,
+      canReplace,
+      replaceOpen,
+      previewOpen,
+      note.body,
+      query,
+      replacement,
+      regex,
+    ],
+  );
+
   function stepMatch(delta: number) {
     if (matches.length === 0) return;
     setMatchCursor((activeMatch + delta + matches.length) % matches.length);
+  }
+
+  // Both replace paths write through `onReplace` so the edit lands as its own
+  // undo step; `onChange` is the fallback for a host that doesn't offer one.
+  const applyReplacement = onReplace ?? onChange;
+
+  // Rewrite the hit the bar is parked on and step to whatever follows the text
+  // just inserted — which is what keeps holding Enter walking the note instead
+  // of stalling when a replacement matches the query again (`a` → `aa`).
+  function runReplace() {
+    if (!canReplace || activeMatch < 0) return;
+    const result = replaceOne(
+      note.body ?? "",
+      query,
+      replacement,
+      activeMatch,
+      { regex },
+    );
+    if (!result) return;
+    unlock("swapMeet");
+    applyReplacement(result.body);
+    setMatchCursor(Math.max(result.index, 0));
+  }
+
+  function runReplaceAll() {
+    if (!canReplace || matches.length === 0) return;
+    const next = replaceAll(note.body ?? "", query, replacement, { regex });
+    if (next === (note.body ?? "")) return;
+    unlock("swapMeet");
+    applyReplacement(next);
+    setMatchCursor(0);
+  }
+
+  function toggleRegex() {
+    setRegex((on) => {
+      if (!on) unlock("patternSeeker");
+      return !on;
+    });
+    // The hit list is about to be rebuilt under a different reading of the same
+    // query, so the old position means nothing.
+    setMatchCursor(0);
+  }
+
+  function toggleReplaceRow() {
+    setReplaceOpen((open) => {
+      // Folding the row away takes the preview with it: it describes an edit
+      // whose controls just left the screen.
+      if (open) setPreviewOpen(false);
+      return !open;
+    });
   }
 
   function openFind() {
@@ -623,11 +732,27 @@ export function Editor({
               // would park the bar somewhere arbitrary in the new list.
               setMatchCursor(0);
             }}
+            regex={regex}
+            onRegexToggle={toggleRegex}
+            patternInvalid={patternInvalid}
             total={matches.length}
             current={activeMatch}
             onNext={() => stepMatch(1)}
             onPrevious={() => stepMatch(-1)}
             onClose={() => setFindOpen(false)}
+            canReplace={canReplace}
+            replaceOpen={replaceOpen}
+            onReplaceOpenToggle={toggleReplaceRow}
+            replacement={replacement}
+            onReplacementChange={setReplacement}
+            onReplace={runReplace}
+            onReplaceAll={runReplaceAll}
+            previewOpen={previewOpen}
+            onPreviewToggle={() => {
+              if (!previewOpen) unlock("dryRun");
+              setPreviewOpen(!previewOpen);
+            }}
+            preview={preview}
             maxWidth={maxWidth}
             focusSignal={findFocusSignal}
           />

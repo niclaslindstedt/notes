@@ -133,6 +133,30 @@ const app = {
     close: "Close",
     count: "{index} of {total}",
     none: "No matches",
+    // The regex switch, wearing `.*` as its face. Its label is what it does
+    // to the search field, not what the characters spell.
+    regex: "Use a regular expression",
+    // Shown in the match counter's place, which shares its row with the field
+    // — hence one word rather than the sentence, which is the hover title.
+    invalid: "Invalid",
+    invalidPattern: "That isn’t a valid regular expression",
+    // The search field's magnifier doubles as the disclosure for the second
+    // row. Its label says what the press will do, so it flips with the state.
+    replaceRow: "Show replace",
+    hideReplace: "Hide replace",
+    replaceField: "Replace with",
+    replacePlaceholder: "Replace with…",
+    replace: "Replace this match",
+    replaceAll: "Replace all matches",
+    // The preview panel: it writes nothing, so its copy is about what *would*
+    // happen rather than what has.
+    preview: "Preview the replacement",
+    previewPanel: "Replacement preview",
+    previewSummary: "Preview: {matches} matches on {lines} lines",
+    previewSummaryOneLine: "Preview: {matches} matches on 1 line",
+    previewSummaryOne: "Preview: 1 match on 1 line",
+    previewMore: "{count} more lines",
+    previewMoreOne: "1 more line",
   },
   // The inline YouTube player a bare YouTube link renders as: the press that
   // starts the video, and the widescreen button that lifts the player out of

@@ -132,6 +132,18 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Förstoringsglaset i en antecknings sidhuvud — eller ⌘F / Ctrl+F, som appen svarar på i stället för webbläsarens egen sidsökning — fäller ut ett sökfält under toppraden, med markören redan i det. Det du skriver matchas ordagrant och utan hänsyn till versaler mot anteckningen du läser — alla träffar lyser upp samtidigt, pilarna stegar mellan dem (Enter och Skift+Enter gör samma sak från tangentbordet) och räknaren säger vilken av hur många du står på. Den söker bara i den öppna anteckningen; förstoringsglaset i sidomenyn är det som söker i allihop.",
     },
+    swapMeet: {
+      name: "Bytesmarknad",
+      condition: "Ersätt text från sökfältet.",
+      learnMore:
+        "Ett tryck på förstoringsglaset inuti en antecknings sökfält fäller ut en andra rad: ett fält för vad träffarna ska bli, och de två knappar som tillämpar det — en för träffen du står på, en för alla träffar på en gång. Sökningen du redan skrivit är den som ersätts, så att gå över kostar ingenting. Enter i ersättningsfältet ersätter den aktuella träffen och stegar till nästa, så en följd av dem är en nedtryckt tangent; Ctrl/Cmd+Enter tar allihop. En ersättning är alltid en ångring bort, hur många rader den än rörde, och den hålls tillbaka på en skrivskyddad anteckning tillsammans med alla andra ändringar.",
+    },
+    dryRun: {
+      name: "Torrsim",
+      condition: "Förhandsgranska en ersättning innan du tillämpar den.",
+      learnMore:
+        "Glasögonen i ersättningsraden visar vad ersättningen skulle skriva — och skriver ingenting. Varje rad den skulle röra listas, numrerad som redigerarens marginal numrerar dem, med texten varje träff tar bort överstruken och texten som kommer i dess ställe upplyst bredvid, så att ändringen läses i radens sammanhang i stället för som en abstrakt siffra. Rubriken ovanför säger hur många träffar på hur många rader, vilket är svaret du faktiskt vill ha innan du trycker Ersätt alla i en lång anteckning. Ingenting sparas förrän du trycker på någon av knapparna.",
+    },
     starStruck: {
       name: "Stjärnögd",
       condition: "Lägg till en anteckning bland favoriterna.",
@@ -348,6 +360,12 @@ const achievements: AchievementsCatalog = {
     },
 
     // ── Proffs ────────────────────────────────────────────────────────
+    patternSeeker: {
+      name: "Mönstersökaren",
+      condition: "Sök i en anteckning med ett reguljärt uttryck.",
+      learnMore:
+        "Omkopplaren `.*` inuti sökfältet slutar läsa din sökning som bokstavliga tecken och lämnar den i stället till ett reguljärt uttryck — så `^#{1,3} ` hittar varje rubrik, och `\\d{4}-\\d{2}-\\d{2}` hittar varje datum. Varje rad matchas för sig, så `^` och `$` betyder radens början och slut och ingen träff sträcker sig någonsin över ett radbrott. Det är också det som ger `$1` i ersättningsfältet en innebörd: ett mönsters grupper kan klistras rakt in i det som ersätter det. Ett halvskrivet mönster säger till där träffräknaren brukar stå, i stället för att låtsas att anteckningen är tom.",
+    },
     shapeshifter: {
       name: "Formskiftaren",
       condition: "Lägg till en omvandlingsregel.",
