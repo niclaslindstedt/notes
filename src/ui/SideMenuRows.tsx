@@ -14,6 +14,7 @@ import { RowActionMenu } from "./RowActionMenu.tsx";
 import {
   ArchiveIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   ChevronUpIcon,
   FolderIcon,
@@ -608,6 +609,69 @@ export function FooterCollapseRail({
         <ChevronUpIcon className="h-4 w-4" />
       ) : (
         <ChevronDownIcon className="h-4 w-4" />
+      )}
+    </button>
+  );
+}
+
+// The vertical twin of `FooterCollapseRail`: the full-height rail seated on
+// the *inner* edge of the docked sidebar (the edge that faces the notes), which
+// folds the whole panel away and brings it back. Only the docked layout has one
+// — the phone drawer closes instead of collapsing.
+//
+// It is a real, always-present strip of layout rather than an overlay on the
+// panel's edge, for two reasons: an overlay would sit on top of the rows'
+// trailing "+" / cog buttons and swallow their presses, and a hover target that
+// only exists while the pointer is already over it is a target nobody finds.
+// Collapsed, that strip *is* the sidebar — so it keeps the panel's own border
+// and reads as the page's edge gutter.
+//
+// The chevron itself stays invisible until the rail is hovered or focused, so
+// the resting state is a quiet 1px line rather than a permanent button: the
+// affordance appears exactly when the pointer arrives at the edge, and points
+// the way the panel will move (out toward the edge to collapse, in toward the
+// content to restore). `title` keeps it discoverable for a pointer that pauses
+// there; `aria-expanded` / `aria-controls` keep it legible to a screen reader,
+// which sees a plain toggle button no matter what the hover styling does.
+export function SidebarCollapseRail({
+  collapsed,
+  side,
+  label,
+  controls,
+  onClick,
+}: {
+  /** Whether the sidebar is currently folded away. */
+  collapsed: boolean;
+  /** Which edge of the viewport the sidebar docks on. */
+  side: "left" | "right";
+  /** Accessible name / tooltip — "Hide sidebar" or "Show sidebar". */
+  label: string;
+  /**
+   * Id of the panel this rail toggles, for `aria-controls` — left off while
+   * the panel is collapsed, since there is no element for the id to resolve to.
+   */
+  controls?: string;
+  onClick: () => void;
+}) {
+  // Collapsed on the left edge, the way back in is rightward; docked on the
+  // right, every direction mirrors.
+  const pointsRight = side === "left" ? collapsed : !collapsed;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-expanded={!collapsed}
+      aria-controls={controls}
+      title={label}
+      className={`group relative flex h-full w-4 shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:bg-surface-2 hover:text-fg-bright focus-visible:bg-surface-2 focus-visible:text-fg-bright focus-visible:outline-none ${
+        collapsed ? "" : "bg-surface"
+      } ${side === "left" ? "border-r border-line" : "order-last border-l border-line"}`}
+    >
+      {pointsRight ? (
+        <ChevronRightIcon className="h-4 w-4 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" />
+      ) : (
+        <ChevronLeftIcon className="h-4 w-4 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" />
       )}
     </button>
   );

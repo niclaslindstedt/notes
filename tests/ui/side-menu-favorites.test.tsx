@@ -34,6 +34,8 @@ function renderMenu(notes: Note[]) {
     showButton: false,
     // Docked, so the section list renders without an open/close beat.
     pinned: true,
+    sidebarCollapsed: false,
+    toggleSidebar: vi.fn(),
   };
   return render(
     <ModalBusContext.Provider

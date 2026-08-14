@@ -2,7 +2,7 @@ import { useT } from "../i18n/index.ts";
 import { usePwaUpdate } from "../pwa/usePwaUpdate.ts";
 import { Button } from "./form/Button.tsx";
 import { RestoreIcon } from "./icons.tsx";
-import { useNav } from "./nav-context.ts";
+import { dockedSidebarWidth, useNav } from "./nav-context.ts";
 
 // Soft "an update is ready" prompt. The new service worker has already
 // downloaded and is parked in the `waiting` state; pressing the Update
@@ -18,17 +18,19 @@ import { useNav } from "./nav-context.ts";
 //
 // When the side menu is pinned open as a docked sidebar (≥768px), inset the
 // toast past it on the side it docks so it centres within the notes content
-// area rather than the whole viewport. The sidebar is `w-64` (16rem) and
-// docks on `position.side`.
+// area rather than the whole viewport. How wide that is depends on whether the
+// sidebar is folded away to its collapse rail, so `dockedSidebarWidth` answers
+// it for both toasts.
 export function UpdateToast() {
   const t = useT();
   const { needRefresh, incomingVersion, reload, dismiss } = usePwaUpdate();
-  const { pinned, position } = useNav();
+  const nav = useNav();
+  const { position } = nav;
   if (!needRefresh) return null;
 
-  // Match the docked sidebar's 16rem width so `mx-auto` centres the toast in
-  // the remaining content band; fall back to the 0.75rem edge gutter.
-  const sidebar = pinned ? "16rem" : undefined;
+  // Match whatever the side menu occupies on its edge so `mx-auto` centres the
+  // toast in the remaining content band; fall back to the 0.75rem edge gutter.
+  const sidebar = dockedSidebarWidth(nav);
   const insetStyle = {
     left: position.side === "left" ? sidebar : undefined,
     right: position.side === "right" ? sidebar : undefined,

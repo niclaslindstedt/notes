@@ -29,6 +29,8 @@ function renderWithNav(overrides: Partial<NavContextValue> = {}) {
     setShowMenuButton,
     showButton: true,
     pinned: false,
+    sidebarCollapsed: false,
+    toggleSidebar: vi.fn(),
     ...overrides,
   };
   render(

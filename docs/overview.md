@@ -2997,6 +2997,49 @@ downward can't arm a refresh at the same time (see
 (`src/ui/hooks/useMediaQuery.ts`) — at tablet width and up the menu docks open
 as a sidebar and the floating button disappears; below that it's a drawer.
 
+### Collapsing the docked sidebar
+
+The docked sidebar isn't wanted every minute of the day, so it can be folded
+away. `SidebarCollapseRail` (`src/ui/SideMenuRows.tsx`) is the vertical twin of
+the [footer collapse rail](#folders-in-the-side-menu): a full-height, `w-4`
+(16px) button seated on the panel's **inner** edge — the one facing the notes —
+whose chevron points out toward the edge to collapse and back in toward the
+content to restore. Pressing it drops the panel entirely, leaving just the rail
+as the page's edge gutter; hovering that rail brings the chevron back, now
+pointing inward. Everything mirrors when the menu docks right
+(`position.side`), where the rail carries `order-last` so it still lands
+between the panel and the notes.
+
+Three decisions in it are load-bearing:
+
+- **The rail is a flex sibling, not an overlay on the panel's edge.** An
+  absolutely-positioned strip over that edge would sit on top of the section
+  headers' cog and the folder rows' trailing "+", swallowing their presses. It
+  therefore also owns the border that separates the menu from the notes — the
+  panel drops its own `border-r` when docked, or the two would draw a double
+  line against each other.
+- **The chevron is invisible until hover or keyboard focus** (`group-hover` /
+  `group-focus-visible` on opacity, `motion-reduce` honoured), so the resting
+  state is a quiet 1px line rather than a permanent button. `title`,
+  `aria-label`, `aria-expanded` and `aria-controls` carry the meaning that the
+  hover styling doesn't — a screen reader sees a plain toggle button either way.
+  `aria-controls` is dropped while collapsed, since the panel it names is gone.
+- **The choice is per device**, not synced: it rides `localStorage` under
+  `notes/sidebar-collapsed` alongside the floating button's position
+  (`useNavState`, `src/app/use-nav.ts`), because a wide desktop and a small
+  laptop want different answers. Collapsing (not restoring) fires the
+  `clearTheDecks` achievement.
+
+The state reaches the rest of the app as `sidebarCollapsed` / `toggleSidebar` on
+the [nav context](#side-menu). Only the docked layout has any of this — the
+phone drawer closes rather than collapses, and `drawerShowing` (which springs
+the active note's folder open) reads `open || (pinned && !sidebarCollapsed)` so
+a folded-away sidebar counts as not showing. Overlays that inset themselves past
+the menu — the [toast](#toast) and the [update toast](#update-toast) — ask
+`dockedSidebarWidth(nav)` (`src/ui/nav-context.ts`) rather than hard-coding
+`16rem`: it answers `calc(16rem + 1rem)` for the panel plus its rail, `1rem`
+once collapsed, and `undefined` where there is no docked sidebar at all.
+
 ### Viewport height
 
 `useViewportHeight` (`src/ui/hooks/useViewportHeight.ts`) reads the visual

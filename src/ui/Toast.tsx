@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { usePwaUpdate } from "../pwa/usePwaUpdate.ts";
-import { useNav } from "./nav-context.ts";
+import { dockedSidebarWidth, useNav } from "./nav-context.ts";
 
 // A transient confirmation pill — "Copied", and whatever else needs to say
 // "that worked" without stealing focus or asking for a press. The caller owns
@@ -33,12 +33,15 @@ export function Toast({
   /** Optional leading glyph, sized by the caller (`h-4 w-4` reads best). */
   icon?: ReactNode;
 }) {
-  const { pinned, position } = useNav();
+  const nav = useNav();
+  const { position } = nav;
   const { needRefresh } = usePwaUpdate();
 
-  // Match the docked sidebar's 16rem width so `mx-auto` centres the pill in
-  // the remaining content band; fall back to the 0.75rem edge gutter.
-  const sidebar = pinned ? "16rem" : undefined;
+  // Match whatever the side menu occupies on its edge — the docked panel plus
+  // its collapse rail, or just the rail once folded away — so `mx-auto`
+  // centres the pill in the remaining content band; fall back to the 0.75rem
+  // edge gutter when there is no docked sidebar at all.
+  const sidebar = dockedSidebarWidth(nav);
   const gutter = "max(0.75rem,env(safe-area-inset-bottom))";
 
   return createPortal(

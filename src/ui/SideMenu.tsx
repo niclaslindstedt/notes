@@ -56,6 +56,7 @@ import {
   FooterCollapseRail,
   NavItem,
   SectionHeader,
+  SidebarCollapseRail,
   SwipeToRemove,
 } from "./SideMenuRows.tsx";
 
@@ -65,8 +66,10 @@ import {
 // that same side over a dimmed backdrop. From the smallest iPad up
 // (`nav.pinned`) the same panel is instead docked open as a permanent
 // sidebar beside the content — no button, no backdrop, no open/close — so
-// wider screens always see the navigation. Both variants render the
-// identical section list (`sections` below); only the framing differs.
+// wider screens always see the navigation, unless they fold it away to the
+// thin collapse rail on its inner edge (`nav.sidebarCollapsed`). Both variants
+// render the identical section list (`sections` below); only the framing
+// differs.
 //
 // The drawer lists every note by its title (the switcher — tap to open it
 // in the editor). Notes can be grouped into folders: the action bar's New
@@ -390,6 +393,8 @@ export function SideMenu({
     setPosition,
     showButton,
     pinned,
+    sidebarCollapsed,
+    toggleSidebar,
   } = useNav();
   const drag = useDraggableMenuButton(position, setPosition);
   // Drag the open drawer back toward its resting edge to close it (the mobile
@@ -446,7 +451,9 @@ export function SideMenu({
     activeFolderId && folders.some((f) => f.id === activeFolderId)
       ? activeFolderId
       : null;
-  const drawerShowing = open || pinned;
+  // The rows are only on screen when the drawer is open or the docked sidebar
+  // is showing — a sidebar folded away to its rail renders none of them.
+  const drawerShowing = open || (pinned && !sidebarCollapsed);
   useEffect(() => {
     if (!drawerShowing || !revealFolderId) return;
     setExpandedFolders((prev) =>
@@ -845,10 +852,17 @@ export function SideMenu({
   );
 
   // Pinned: a permanent docked sidebar beside the content. No floating
-  // button, no backdrop, no open/close — it's simply always there. App lays
-  // it out as a flex sibling of the main view, so a fixed width and a single
-  // inner border (on whichever edge faces the content) is all the framing it
-  // needs. It docks on the same side the floating button rests on.
+  // button, no backdrop, no open/close gestures — it's simply always there.
+  // App lays it out as a flex sibling of the main view, so a fixed width and a
+  // single inner border is all the framing it needs. It docks on the same side
+  // the floating button rests on.
+  //
+  // On desktop the panel isn't wanted every minute of the day, so a
+  // `SidebarCollapseRail` rides its inner edge and folds it away to just that
+  // rail (the choice persists — see `use-nav.ts`). The rail is a flex sibling
+  // rather than an overlay so it never sits on top of the rows' trailing
+  // buttons, and it owns the border that separates the menu from the notes —
+  // the panel would otherwise draw a second line against it.
   //
   // The top padding drops the drawer's first section header a touch below the
   // safe-area inset so its small-caps label lines up with the vertically
@@ -859,15 +873,34 @@ export function SideMenu({
   // `max(1.125rem, env(safe-area-inset-top) + 0.375rem)`. Both nav variants
   // (docked and drawer) share the formula.
   if (pinned) {
+    const rail = (
+      <SidebarCollapseRail
+        collapsed={sidebarCollapsed}
+        side={onRight ? "right" : "left"}
+        controls={sidebarCollapsed ? undefined : drawerId}
+        label={sidebarCollapsed ? t("nav.showSidebar") : t("nav.hideSidebar")}
+        onClick={toggleSidebar}
+      />
+    );
+    // The rail always sits on the panel's inner edge, so it renders after the
+    // panel when the menu docks left and before it when it docks right (both
+    // carry `order-last` there, and equal order values fall back to DOM order).
     return (
-      <nav
-        aria-label={t("nav.label")}
-        className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-top:max(0.375rem,calc(env(safe-area-inset-top)_-_0.375rem))] ${
-          onRight ? "order-last border-l border-line" : "border-r border-line"
-        }`}
-      >
-        {sections}
-      </nav>
+      <>
+        {onRight && rail}
+        {!sidebarCollapsed && (
+          <nav
+            id={drawerId}
+            aria-label={t("nav.label")}
+            className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-top:max(0.375rem,calc(env(safe-area-inset-top)_-_0.375rem))] ${
+              onRight ? "order-last" : ""
+            }`}
+          >
+            {sections}
+          </nav>
+        )}
+        {!onRight && rail}
+      </>
     );
   }
 
