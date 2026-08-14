@@ -47,7 +47,37 @@ export type NavContextValue = {
    * panel is simply always there beside the content.
    */
   pinned: boolean;
+  /**
+   * Whether the docked sidebar is folded away to its edge rail, handing its
+   * width to the note. Only meaningful while `pinned` — the phone drawer
+   * closes instead of collapsing.
+   */
+  sidebarCollapsed: boolean;
+  /** Fold the docked sidebar away to its rail, or bring it back. */
+  toggleSidebar: () => void;
 };
+
+/** The docked sidebar panel's own width (`w-64`). */
+export const SIDEBAR_PANEL_WIDTH = "16rem";
+/**
+ * The width of the collapse rail that sits on the panel's inner edge — the
+ * only thing left of the sidebar once it is folded away (`w-4`). Wide enough
+ * to hover and press without a precise aim, narrow enough to read as a gutter
+ * rather than a second panel.
+ */
+export const SIDEBAR_RAIL_WIDTH = "1rem";
+
+/**
+ * How much horizontal space the side menu occupies on the edge it docks on,
+ * for the overlays that inset themselves past it (the toasts). `undefined`
+ * when there is no docked sidebar at all, so a caller can fall back to its
+ * own edge gutter.
+ */
+export function dockedSidebarWidth(nav: NavContextValue): string | undefined {
+  if (!nav.pinned) return undefined;
+  if (nav.sidebarCollapsed) return SIDEBAR_RAIL_WIDTH;
+  return `calc(${SIDEBAR_PANEL_WIDTH} + ${SIDEBAR_RAIL_WIDTH})`;
+}
 
 export const NavContext = createContext<NavContextValue | null>(null);
 

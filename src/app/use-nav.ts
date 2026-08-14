@@ -1,7 +1,8 @@
 // Owns the top-level navigation state App feeds into `NavContext`: the
 // drawer's open/close, whether the menu is pinned open as a docked sidebar
-// (a media query), the live drag flag, and the floating button's resting
-// position (persisted to localStorage so it survives reloads). The
+// (a media query), whether that docked sidebar is folded away to its edge
+// rail, the live drag flag, and the floating button's resting position (the
+// last two persisted to localStorage so they survive reloads). The
 // component tree reads this through `useNav`, never the raw state here —
 // mirroring how `useTheme` owns the theme. The richer per-view navigation
 // checklist carries (view switching, edge-swipe-to-open) can grow in here
@@ -17,7 +18,15 @@ import type { MenuButtonPosition } from "../ui/sideMenuPosition.ts";
 
 const STORAGE_KEY = "notes/menu-position";
 const SHOW_BUTTON_KEY = "notes/show-menu-button";
+const SIDEBAR_COLLAPSED_KEY = "notes/sidebar-collapsed";
 const DEFAULT_POSITION: MenuButtonPosition = { side: "left", y: 0.5 };
+
+function readSidebarCollapsed(): boolean {
+  if (typeof localStorage === "undefined") return false;
+  // Absent or anything but an explicit "true" leaves the sidebar docked open —
+  // the historical layout, and the one a first-time visitor should meet.
+  return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+}
 
 function readShowMenuButton(): boolean {
   if (typeof localStorage === "undefined") return true;
@@ -52,6 +61,8 @@ export function useNavState(): NavContextValue {
     useState<MenuButtonPosition>(readStoredPosition);
   const [showMenuButton, setShowMenuButtonState] =
     useState<boolean>(readShowMenuButton);
+  const [sidebarCollapsed, setSidebarCollapsed] =
+    useState<boolean>(readSidebarCollapsed);
   // From the smallest iPad up the menu docks open as a permanent sidebar
   // rather than a drawer (matches checklist's breakpoint).
   const pinned = useMediaQuery("(min-width: 768px)");
@@ -73,6 +84,24 @@ export function useNavState(): NavContextValue {
         // Quota exceeded or storage disabled — keep the in-memory value.
       }
     }
+  }, []);
+  // Folding the docked sidebar away is a per-device layout choice, so it rides
+  // localStorage beside the button position rather than the synced appearance
+  // store — a wide desktop and a small laptop want different answers.
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      // Collapsing it (not restoring it) is what earns the trophy.
+      if (next) unlock("clearTheDecks");
+      if (typeof localStorage !== "undefined") {
+        try {
+          localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+        } catch {
+          // Quota exceeded or storage disabled — keep the in-memory value.
+        }
+      }
+      return next;
+    });
   }, []);
   const setShowMenuButton = useCallback((next: boolean) => {
     setShowMenuButtonState(next);
@@ -102,6 +131,8 @@ export function useNavState(): NavContextValue {
       // PWA may hide it in favour of the edge swipe, but nowhere else.
       showButton: standaloneMobile ? showMenuButton : true,
       pinned,
+      sidebarCollapsed,
+      toggleSidebar,
     }),
     [
       open,
@@ -114,6 +145,8 @@ export function useNavState(): NavContextValue {
       setShowMenuButton,
       standaloneMobile,
       pinned,
+      sidebarCollapsed,
+      toggleSidebar,
     ],
   );
 }

@@ -38,6 +38,10 @@ const nav = {
   // away to hand its vertical space to the note list, and back.
   collapseFooter: "Hide footer",
   expandFooter: "Show footer",
+  // The full-height rail on the docked sidebar's inner edge, which folds the
+  // whole menu away to that rail and brings it back (desktop only).
+  hideSidebar: "Hide sidebar",
+  showSidebar: "Show sidebar",
   // The archive entry at the foot of the notes list and the page it opens.
   archive: "Archive",
   archiveHeading: "Archive",

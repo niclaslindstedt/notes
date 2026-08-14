@@ -26,6 +26,8 @@ const nav: NavCatalog = {
   redo: "Gör om",
   collapseFooter: "Dölj sidfot",
   expandFooter: "Visa sidfot",
+  hideSidebar: "Dölj sidomenyn",
+  showSidebar: "Visa sidomenyn",
   archive: "Arkiv",
   archiveHeading: "Arkiv",
   archiveEmpty:

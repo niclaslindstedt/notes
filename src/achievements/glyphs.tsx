@@ -360,6 +360,18 @@ export function PanelBottomGlyph({ className }: IconProps) {
   );
 }
 
+// A panel with a narrow left column and an arrow pointing back into it — the
+// "fold the sidebar away" glyph (collapse the docked side menu to its rail).
+export function PanelLeftGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16" />
+      <path d="M16 9l-3 3 3 3" />
+    </Svg>
+  );
+}
+
 // Two stacked panels — the note-list layout glyph (switch the overview between
 // the compact rows and the taller, multi-line cards).
 export function CardsGlyph({ className }: IconProps) {

@@ -21,6 +21,8 @@ const nav: NavContextValue = {
   setShowMenuButton: vi.fn(),
   showButton: true,
   pinned: false,
+  sidebarCollapsed: false,
+  toggleSidebar: vi.fn(),
 };
 
 afterEach(() => {

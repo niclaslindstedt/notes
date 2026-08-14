@@ -39,6 +39,8 @@ function renderMenu(
     setShowMenuButton: vi.fn(),
     showButton: true,
     pinned: false,
+    sidebarCollapsed: false,
+    toggleSidebar: vi.fn(),
     ...nav,
   };
   return render(
@@ -122,6 +124,40 @@ describe("SideMenu — revealing the active note", () => {
     // A stale link renders the note ungrouped, so it shows without any folder
     // being expanded.
     expect(screen.getByText("Orphan")).toBeTruthy();
+  });
+});
+
+describe("SideMenu — the docked sidebar's collapse rail", () => {
+  it("offers the rail beside the panel while the sidebar is docked open", () => {
+    renderMenu({ pinned: true });
+    const rail = screen.getByRole("button", { name: "Hide sidebar" });
+    expect(rail.getAttribute("aria-expanded")).toBe("true");
+    // The rail points at the panel it folds away, and the panel is on screen.
+    const panel = screen.getByRole("navigation");
+    expect(rail.getAttribute("aria-controls")).toBe(panel.id);
+  });
+
+  it("folds the panel away when collapsed, leaving only the rail", () => {
+    renderMenu({ pinned: true, sidebarCollapsed: true });
+    // No panel, no rows — the rail is the whole side menu now, and it invites
+    // the user back in rather than out.
+    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(screen.queryByText("Filed note")).toBeNull();
+    const rail = screen.getByRole("button", { name: "Show sidebar" });
+    expect(rail.getAttribute("aria-expanded")).toBe("false");
+    expect(rail.getAttribute("aria-controls")).toBeNull();
+  });
+
+  it("toggles through the nav state when pressed", () => {
+    const toggleSidebar = vi.fn();
+    renderMenu({ pinned: true, toggleSidebar });
+    fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
+    expect(toggleSidebar).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the rail off the phone drawer, which closes instead", () => {
+    renderMenu({ open: true, pinned: false });
+    expect(screen.queryByRole("button", { name: "Hide sidebar" })).toBeNull();
   });
 });
 
