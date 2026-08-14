@@ -337,6 +337,22 @@ export function sortNotesBy(notes: readonly Note[], key: NoteSortKey): Note[] {
   return [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+// The loose notes the side menu actually lists: the `limit` most-recently-edited
+// notes, ordered for display by the active key. The two criteria are separate on
+// purpose — the drawer's job is to keep what you are working on within reach
+// (the rest lives behind "Show all"), so the *window* is always the newest
+// notes, and `key` only decides how that window is arranged. Sorting by `key`
+// first and slicing after would make `name` select the alphabetically-first
+// notes instead, which hides a freshly created note from the drawer outright
+// whenever its title sorts past the cap.
+export function recentNotesBy(
+  notes: readonly Note[],
+  key: NoteSortKey,
+  limit: number,
+): Note[] {
+  return sortNotesBy(sortByUpdated(notes).slice(0, limit), key);
+}
+
 // A folder's effective "modified" time: the newest `updatedAt` among the notes
 // filed in it, falling back to its own creation time when it's empty. Lets a
 // folder sort by recency against loose notes under `mixed` placement.

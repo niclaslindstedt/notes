@@ -6,6 +6,7 @@ import {
   isNoteSortKey,
   mixTopLevel,
   NOTE_SORT_KEYS,
+  recentNotesBy,
   sortFoldersBy,
   sortNotesBy,
   type Folder,
@@ -65,6 +66,50 @@ describe("sortNotesBy", () => {
     const input = [a, b, c];
     sortNotesBy(input, "name");
     expect(input.map((n) => n.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("recentNotesBy", () => {
+  // Titled so alphabetical order is the exact reverse of edit order: the newest
+  // note sorts last by name, which is what the drawer used to drop.
+  const older = [
+    note({ id: "1", title: "alpha", updatedAt: 50 }),
+    note({ id: "2", title: "bravo", updatedAt: 40 }),
+    note({ id: "3", title: "charlie", updatedAt: 30 }),
+  ];
+  const fresh = note({ id: "new", title: "zulu", updatedAt: 99 });
+
+  it("keeps a just-created note in the window under `name`", () => {
+    // The regression: sorting by name and slicing after picked the
+    // alphabetically-first notes, so a new note titled late in the alphabet
+    // never reached the side menu even though the overview listed it on top.
+    const kept = recentNotesBy([...older, fresh], "name", 2);
+    expect(kept.map((n) => n.id)).toContain("new");
+  });
+
+  it("selects by recency, then orders that window by the key", () => {
+    const kept = recentNotesBy([...older, fresh], "name", 2);
+    // The two newest are "zulu" (99) and "alpha" (50), displayed alphabetically.
+    expect(kept.map((n) => n.id)).toEqual(["1", "new"]);
+  });
+
+  it("orders the same window newest-first under `modified`", () => {
+    const kept = recentNotesBy([...older, fresh], "modified", 2);
+    expect(kept.map((n) => n.id)).toEqual(["new", "1"]);
+  });
+
+  it("returns every note when the limit exceeds the list", () => {
+    expect(recentNotesBy(older, "name", 10).map((n) => n.id)).toEqual([
+      "1",
+      "2",
+      "3",
+    ]);
+  });
+
+  it("never mutates the input", () => {
+    const input = [...older, fresh];
+    recentNotesBy(input, "name", 2);
+    expect(input.map((n) => n.id)).toEqual(["1", "2", "3", "new"]);
   });
 });
 

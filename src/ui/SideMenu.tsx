@@ -14,6 +14,7 @@ import {
   groupFavoritesByFolder,
   mixTopLevel,
   noteTitle,
+  recentNotesBy,
   sortFoldersBy,
   sortNotesBy,
   type Folder,
@@ -468,12 +469,16 @@ export function SideMenu({
     (n) => !n.folderId || !folderIds.has(n.folderId),
   );
 
-  // The loose notes the drawer actually shows, sorted by the active key and
-  // capped so the list never crowds out the menu below. Folders are sorted by
-  // the same key — by name, or by their most-recently-edited note (`mixed`
-  // placement interleaves the two runs; `top` keeps folders above the notes).
-  const recentUngrouped = sortNotesBy(ungrouped, noteSortKey).slice(
-    0,
+  // The loose notes the drawer actually shows: the most recently edited ones,
+  // capped so the list never crowds out the menu below, then ordered by the
+  // active key (see `recentNotesBy` — the cap always takes the newest notes, so
+  // a note created moments ago is in the drawer whichever key is chosen).
+  // Folders are sorted by the same key — by name, or by their
+  // most-recently-edited note (`mixed` placement interleaves the two runs;
+  // `top` keeps folders above the notes).
+  const recentUngrouped = recentNotesBy(
+    ungrouped,
+    noteSortKey,
     MAX_RECENT_NOTES,
   );
   const sortedFolders = sortFoldersBy(folders, notes, noteSortKey);

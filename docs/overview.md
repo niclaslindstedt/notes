@@ -4184,7 +4184,17 @@ How the folders and loose notes are ordered is two appearance preferences (see
 timestamp (`folderModifiedAt`). These ordering helpers (and `mixTopLevel`,
 and the `NoteSortKey` type itself) are pure functions over the note model in
 `src/domain/note.ts` — `SideMenu` only consumes them. The loose notes are
-still capped at `MAX_RECENT_NOTES`. Both are set in **Appearance → Sidebar**.
+still capped at `MAX_RECENT_NOTES`, and `recentNotesBy` is what applies that
+cap: it takes the most-recently-edited notes **first** and only then orders
+that window by `noteSortKey`. The two criteria are deliberately separate —
+the drawer keeps what you are working on within reach and leaves the rest to
+"Show all", so the window is always the newest notes and the key only decides
+their arrangement. (Sorting by the key and slicing afterwards instead made
+`name` select the alphabetically-first notes, which hid a freshly created note
+from the drawer entirely whenever its title sorted past the cap, even though
+the uncapped overview listed it at the top.) The Favorites section and a
+folder's contents are uncapped, so they still sort with plain `sortNotesBy`.
+Both are set in **Appearance → Sidebar**.
 
 The **button island** is one bordered block (`BarButton`), extracted as a
 self-contained `SideMenuActionBar` (`src/ui/SideMenuActionBar.tsx`) the drawer
