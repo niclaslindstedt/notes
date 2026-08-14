@@ -2040,7 +2040,17 @@ What the bar shows and does:
   key). The arrows cancel their `mousedown`, so stepping never drops focus — or
   the keyboard — out of the field;
 - a **counter** — "3 of 12", or "No matches" — so wrapping past the last hit is
-  legible rather than a mystery;
+  legible rather than a mystery. It hangs **underneath** the arrows rather than
+  sitting in the field: it is the widest fixture the bar carries and it never
+  shrinks, so in the field it left a phone three or four characters of query to
+  read. Under the arrows it costs the row no width at all and sits with the two
+  buttons it describes. Its line is rendered even while the query is empty, so
+  the bar doesn't grow by a row the moment the first character lands;
+- a **`.*` toggle** that reads the query as a pattern — see
+  [regex mode](#regex-mode);
+- a **chevron** at the head of the bar that unfolds the second row — see
+  [replace in note](#replace-in-note). It is absent on a
+  [locked note](#lock-a-note);
 - **Escape**, the close button, or the header toggle puts it away.
 
 The browser's own find bar ("find on page") is not reachable from a web page —
@@ -2110,8 +2120,132 @@ is still counted, so the counter stays honest; focus is restored afterwards in
 case the browser moved it on `setSelectionRange`.
 
 The query is **not** remembered across notes the way the toolbar's open state is
-— a query is about the note you were reading, so the next note starts clean.
+— a query is about the note you were reading, so the next note starts clean. The
+replacement, the regex switch and the preview go with it, for the same reason.
 Opening the bar is the **Pinpoint** achievement.
+
+### Regex mode
+
+The **`.*` toggle** beside the search field (`NoteFindBar`,
+`src/ui/NoteFindBar.tsx`) stops reading the query as literal characters and
+hands it to `RegExp` as typed. It wears the pattern it turns on rather than a
+drawn glyph — `.*` is the smallest thing the feature *is*, and someone who wants
+it recognises it on sight while someone who doesn't reads it as punctuation and
+leaves it alone. It sits *beside* the field rather than inside it: inside, it
+read as part of the match counter it sat against, and a counter is a readout
+where this is a control.
+
+Everything else about the scan is unchanged, which is the point:
+
+- it still runs **per line**, so `^` and `$` anchor to a line, `.` never
+  swallows a line break, and no match ever spans one;
+- it is still **case-insensitive** — the bar is one search field, not a settings
+  panel, and the promise it makes ("case doesn't matter here") shouldn't flip
+  with a toggle about something else;
+- **zero-length matches are dropped.** A literal query can't produce one, but
+  `x*` matches the empty string at every column; there is no span to highlight,
+  step onto or replace, so `findHits` skips past them (`domain/note-find.ts`).
+
+A pattern that doesn't compile is the state most of a regex's keystrokes pass
+through, so it is reported rather than treated as "no matches": `isPatternValid`
+answers it, the field's ring turns `danger`, and the counter's slot reads
+**Invalid**. One word, deliberately — the full sentence is the hover title,
+because a phrase in that slot pushes the half-typed pattern it is about out of
+sight.
+
+Regex mode is also what makes `$1` mean anything in a replacement — see
+[replace in note](#replace-in-note). Turning it on is the **Pattern seeker**
+achievement.
+
+This is **not** a [Transform](#transforms) rule, which also takes a regular
+expression: a Transform rewrites what a note *shows* and never touches what it
+stores, is persisted in the appearance store, and runs on every line forever.
+This one is a search you typed, it lasts as long as the bar is open, and the
+replace buttons beside it change the note for real.
+
+### Replace in note
+
+The **chevron** at the head of the find bar unfolds the bar's second half: a
+replace field and the three buttons that act on it (`NoteFindBar`,
+`src/ui/NoteFindBar.tsx`; the state and actions `replaceOpen`, `replacement`,
+`runReplace`, `runReplaceAll` in `src/ui/NoteEditor.tsx`). It is indented past
+the chevron so its field lines up under the search field and its buttons sit in
+the same three columns as the arrows above them — the column is what says the
+two rows are one control. Both halves share **one query**, so the search already
+typed is the one replace acts on and nothing has to be re-entered to cross over.
+
+- **Replace** (`⇄`) rewrites the hit the bar is parked on and steps to the next.
+- **Replace all** (`⇄` with trailing dots) rewrites every hit in one pass.
+- **Preview** (the spectacles) writes nothing — see
+  [replacement preview](#replacement-preview).
+
+**Enter** in the replace field replaces the current hit and steps on, so a run
+of them is one key held down; **Ctrl/Cmd+Enter** does the lot. Unfolding the row
+moves the caret into the field it just revealed, since the press that opened it
+said what the user wants to type next — but not on the bar's first render, where
+the *search* field owns the focus even if the row came up already open.
+
+`domain/note-replace.ts` is the engine, pure and shared with the preview so what
+the panel promises and what the buttons apply cannot drift:
+
+- **`replaceAll`** rebuilds each affected line left to right **from the original
+  line**, so inserted text is never itself matched (`a` → `aa` terminates rather
+  than feeding on its own output) and the columns stay in step as the line's
+  length changes underneath.
+- **`replaceOne`** rewrites one hit and then re-scans the *rewritten* body to
+  find the first hit at or after the text it just inserted. That is what makes
+  pressing Replace repeatedly walk the note rather than stall: a replacement
+  that matches the query again leaves a hit exactly where the cursor was, and
+  stepping past it is the only reading that terminates. It wraps to the first
+  hit when it replaced the last, and reports `-1` when nothing is left.
+- A replacement is inserted **verbatim** in literal mode — replacing with `$1`
+  writes those two characters, because a literal search promises that what you
+  typed is what you get on *both* sides of it. In [regex mode](#regex-mode) the
+  template expands `$&`, `$1`…`$99`, `$<name>` and `$$`. That expansion is not
+  reimplemented here: it is `expandReplacement` (`domain/transform.ts`), which
+  already speaks the grammar for the [Transform](#transforms) rules — one
+  grammar, one implementation.
+
+**A replace is always one undo**, however many lines it touched. It writes
+through `replaceBody` (`src/app/use-notes.ts`) rather than the editor's ordinary
+`update`, which coalesces continuous edits: a replace-all landing right after a
+typing burst can share that burst's merge key and be swallowed by it, so undoing
+the replace would take the typing with it. `replaceBody` commits with no merge
+key at all, which also breaks the chain for whatever is typed next.
+
+**The whole half is withheld on a [locked note](#lock-a-note)** — no chevron, no
+row — alongside the styling toolbar, the cut button and the title field.
+Finding still works there, because reading a locked note is what locking it is
+for. Landing a replace is the **Swap meet** achievement.
+
+### Replacement preview
+
+The **spectacles** in the replace row (`PreviewPanel`, `src/ui/NoteFindBar.tsx`)
+unfold a panel showing what the replacement *would* write — and write nothing.
+Deliberately not an eye: the app already spends that glyph on the editor's
+[read-only lock](#lock-a-note), and the two would sit centimetres apart on one
+screen meaning different things.
+
+`previewReplacements` (`domain/note-replace.ts`) returns one entry per affected
+line — untouched lines are left out entirely, so a long note changed in two
+places is two rows rather than a wall of context — each as a run of `kept` /
+`removed` / `added` segments. The panel draws them **in place**: the line
+numbered the way the [gutter](#line-numbers) numbers it, the text each hit takes
+away struck through in `danger`, and the text arriving lit in the accent right
+beside it, so the change reads in the context of its line rather than as a pair
+of before/after blocks. An empty run is never emitted, so replacing with nothing
+yields a `removed` with no `added` next to it.
+
+Above the list is the **scope** — "Preview: 3 matches on 3 lines" — because "how
+much of my note does this touch" is the question the preview exists to answer,
+and it stays answered even when the list is truncated. `PREVIEW_LIMIT` caps the
+drawn rows at 40 and says how many more there are: a replace-all over a long
+note can touch hundreds of lines, and a panel that long is a wall, not an
+answer.
+
+Folding the replace row away takes the preview with it — it describes an edit
+whose controls just left the screen — and unfolding the row again does not bring
+it back on its own. Opening it is the **Dry run** achievement.
 
 ### Collapsed header actions
 

@@ -222,6 +222,7 @@ export function App() {
     create,
     importFiles,
     update,
+    replaceBody,
     attach,
     retitle,
     remove,
@@ -716,6 +717,7 @@ export function App() {
                       transforms={transforms}
                       onBack={showAll}
                       onChange={(body) => update(editing.id, body)}
+                      onReplace={(body) => replaceBody(editing.id, body)}
                       onTitleChange={(title) => retitle(editing.id, title)}
                       onTitleSettle={sync.releaseSaves}
                       onToggleFavorite={() => toggleFavorite(editing.id)}

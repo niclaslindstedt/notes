@@ -136,6 +136,18 @@ const achievements = {
       learnMore:
         "The magnifier in a note's header — or ⌘F / Ctrl+F, which the app answers instead of the browser's own find-on-page — opens a find bar under the top bar, with the cursor already in it. What you type is matched verbatim and case-insensitively against the note you are reading — every hit lights up at once, the arrows step between them (Enter and Shift+Enter do the same from the keyboard), and the counter says which one of how many you are on. It searches only the open note; the magnifier on the side menu is the one that searches across all of them.",
     },
+    swapMeet: {
+      name: "Swap meet",
+      condition: "Replace some text from the find bar.",
+      learnMore:
+        "The chevron at the head of a note's find bar unfolds a second row: a field for what the matches should become, and the two buttons that apply it — one for the match you are standing on, one for every match at once. The search you already typed is the one it acts on, so crossing over costs nothing. Enter in the replace field replaces the current match and steps to the next, so a run of them is one key held down; Ctrl/Cmd+Enter does the lot. A replace is always a single undo away, however many lines it touched, and it is withheld on a read-only note along with every other edit.",
+    },
+    dryRun: {
+      name: "Dry run",
+      condition: "Preview a replacement before applying it.",
+      learnMore:
+        "The spectacles in the replace row show you what the replacement would write — and write nothing. Every line it would touch is listed, numbered the way the editor's gutter numbers them, with the text each match takes away struck through and the text arriving in its place lit up beside it, so the change reads in the context of the line rather than as an abstract count. The heading above says how many matches on how many lines, which is the answer you actually want before pressing Replace all on a long note. Nothing is committed until you press one of the buttons.",
+    },
     starStruck: {
       name: "Star-struck",
       condition: "Add a note to your favorites.",
@@ -343,6 +355,12 @@ const achievements = {
     },
 
     // ── Pro ───────────────────────────────────────────────────────────
+    patternSeeker: {
+      name: "Pattern seeker",
+      condition: "Search a note with a regular expression.",
+      learnMore:
+        "The `.*` switch inside the find field stops reading your search as literal characters and hands it to a regular expression instead — so `^#{1,3} ` finds every heading, and `\\d{4}-\\d{2}-\\d{2}` finds every date. Each line is matched on its own, so `^` and `$` mean the start and end of a line and no match ever spans a line break. It is what makes the replace field's `$1` mean anything: a pattern's capture groups can be pasted straight into what replaces it. A half-typed pattern says so where the match count usually is, rather than pretending the note has nothing in it.",
+    },
     shapeshifter: {
       name: "Shapeshifter",
       condition: "Add a transform rule.",

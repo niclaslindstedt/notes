@@ -247,6 +247,21 @@ export function HomePage() {
               leaves your device.
             </li>
             <li>
+              <em>Find and replace</em> — the chevron on that same search bar
+              unfolds a second field: what the matches should become, and the
+              buttons that apply it to the one you are standing on or to all of
+              them at once. The <code className="text-fg-bright">.*</code>{" "}
+              switch reads what you typed as a <em>regular expression</em>{" "}
+              instead of literal text, so a pattern can find what a plain search
+              can&apos;t and its capture groups can be pasted into the
+              replacement as <code className="text-fg-bright">$1</code>. Before
+              you commit to anything, <em>preview</em> lists every line that
+              would change — what goes, and what arrives in its place — while
+              writing nothing; and once you do, the whole replacement is a
+              single undo away. All of it runs in your browser, on the note you
+              have open.
+            </li>
+            <li>
               <em>Export a note</em> from the up arrow in its header — as a{" "}
               <em>PDF</em>, as a plain{" "}
               <code className="text-fg-bright">.md</code> file, or straight to

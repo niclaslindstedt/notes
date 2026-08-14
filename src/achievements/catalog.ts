@@ -61,8 +61,11 @@ import {
   PdfGlyph,
   PaperclipGlyph,
   PlusGlyph,
+  PreviewGlyph,
   QuoteGlyph,
   RefreshGlyph,
+  RegexGlyph,
+  ReplaceAllGlyph,
   ReplaceGlyph,
   ScaleTextGlyph,
   ScrollTextGlyph,
@@ -677,6 +680,27 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     trigger: { kind: "manual" },
   },
   {
+    id: "swapMeet",
+    tier: "intermediate",
+    glyph: ReplaceAllGlyph,
+    learnMore: true,
+    // Fired by either of the find bar's replace buttons landing an edit
+    // (`runReplace` / `runReplaceAll` in `src/ui/NoteEditor.tsx`) — the text it
+    // writes is indistinguishable from text typed by hand, so there is nothing
+    // in the document to derive.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "dryRun",
+    tier: "intermediate",
+    glyph: PreviewGlyph,
+    learnMore: true,
+    // Fired by opening the replacement preview (`onPreviewToggle` in
+    // `src/ui/NoteEditor.tsx`) — the preview's whole point is that it leaves
+    // the document untouched, so there is nothing in it to derive.
+    trigger: { kind: "manual" },
+  },
+  {
     id: "starStruck",
     tier: "beginner",
     glyph: StarGlyph,
@@ -704,6 +728,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   // ──────────────────────────────────────────────────────────────
   // Pro — "Make it sync, take it everywhere."
   // ──────────────────────────────────────────────────────────────
+  {
+    id: "patternSeeker",
+    tier: "pro",
+    glyph: RegexGlyph,
+    learnMore: true,
+    // Fired by switching the find bar's `.*` toggle on (`toggleRegex` in
+    // `src/ui/NoteEditor.tsx`) — how a query is *read* is bar state, nowhere in
+    // the document.
+    trigger: { kind: "manual" },
+  },
   {
     id: "shapeshifter",
     tier: "pro",

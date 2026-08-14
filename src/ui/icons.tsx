@@ -383,6 +383,95 @@ export function WandIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * A pair of arrows swapping places — the find bar's **Replace**, which puts one
+ * piece of text where another was. Four long strokes and nothing else: this
+ * renders at 18px in a crowded bar, where the achievements set's more detailed
+ * `ReplaceGlyph` (two boxes and a hooked arrow, drawn for a 40px trophy tile)
+ * collapses into a squiggle.
+ */
+export function ReplaceIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <path d="M4 8h13" />
+      <path d="m14 5 3 3-3 3" />
+      <path d="M20 16H7" />
+      <path d="m10 13-3 3 3 3" />
+    </svg>
+  );
+}
+
+/**
+ * The same swap with a row of dots trailing it — the find bar's **Replace
+ * all**: this exchange, and then the next one, and the next. The pair reads as
+ * a set (same arrows, same weight), and the dots are what say the second button
+ * keeps going — which is the only difference between them, and the one worth
+ * being sure about before pressing.
+ */
+export function ReplaceAllIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <path d="M4 6h13" />
+      <path d="m14 3 3 3-3 3" />
+      <path d="M20 13H7" />
+      <path d="m10 10-3 3 3 3" />
+      <circle cx="6" cy="20" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="20" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="20" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/**
+ * A pair of spectacles — the find bar's **Preview**, which shows what a replace
+ * would write without writing it. Deliberately *not* an eye: this app already
+ * spends that glyph on the editor's [read-only
+ * lock](../../docs/overview.md#lock-a-note) (`EyeIcon`), and the two would sit
+ * a few centimetres apart on the same screen meaning two different things.
+ * Glasses say "have a look at this" without borrowing the lock's shape.
+ */
+export function PreviewIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <circle cx="6" cy="14" r="3.5" />
+      <circle cx="18" cy="14" r="3.5" />
+      <path d="M9.5 14a2.5 2.5 0 0 1 5 0" />
+      <path d="M2.5 14 4 8.5" />
+      <path d="M21.5 14 20 8.5" />
+    </svg>
+  );
+}
+
 /** The app's wordmark glyph — a dog-eared note sheet. App-specific. */
 export function NotesMarkIcon({ className }: IconProps) {
   return (

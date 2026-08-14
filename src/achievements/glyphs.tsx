@@ -28,7 +28,9 @@ import {
   MoreIcon,
   PaletteIcon,
   PlusIcon,
+  PreviewIcon,
   RefreshIcon,
+  ReplaceAllIcon,
   ScrollTextIcon,
   SearchIcon,
   UndoIcon,
@@ -450,6 +452,21 @@ export function TextSearchGlyph({ className }: IconProps) {
   );
 }
 
+// A dot and an asterisk — the find bar's `.*` switch, which reads the search as
+// a regular expression. The one glyph in the set that is a *quotation* of the
+// feature rather than a picture of it, because the feature's own face is those
+// two characters, here drawn large enough to read as artwork.
+export function RegexGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <circle cx="5.5" cy="17" r="1.8" fill="currentColor" stroke="none" />
+      <path d="M15 5v13" />
+      <path d="m9.4 8.2 11.2 6.6" />
+      <path d="m20.6 8.2-11.2 6.6" />
+    </Svg>
+  );
+}
+
 // One box turning into another across an arrow — a Transform rule, which
 // takes the text it matches and shows something else in its place.
 export function ReplaceGlyph({ className }: IconProps) {
@@ -542,6 +559,10 @@ export const RefreshGlyph: Glyph = RefreshIcon;
 export const PaletteGlyph: Glyph = PaletteIcon;
 export const CopyGlyph: Glyph = CopyIcon;
 export const SearchGlyph: Glyph = SearchIcon;
+// The two find-bar buttons wear their own trophies, so pressing the button and
+// earning the trophy show the same picture.
+export const ReplaceAllGlyph: Glyph = ReplaceAllIcon;
+export const PreviewGlyph: Glyph = PreviewIcon;
 export const ScrollTextGlyph: Glyph = ScrollTextIcon;
 export const FormatGlyph: Glyph = FormatIcon;
 export const LinkGlyph: Glyph = LinkFormatIcon;
