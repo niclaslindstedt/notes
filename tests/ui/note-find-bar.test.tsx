@@ -179,18 +179,31 @@ describe("find in note", () => {
 // The bar's folded-away second half: the chevron, the replace field, the two
 // buttons that write, and the preview that doesn't.
 describe("find in note: replace", () => {
-  it("keeps the replace row folded away until the chevron asks for it", () => {
+  // The search field's own magnifier is the disclosure — it costs the row no
+  // width, and its face is the state: a magnifier while the bar only finds, the
+  // replace arrows once it can also write.
+  it("keeps the replace row folded away until the magnifier asks for it", () => {
     render(<LiveEditor />);
     openFind();
     expect(screen.queryByPlaceholderText("Replace with…")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Show replace" }));
+    const toggle = screen.getByRole("button", { name: "Show replace" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(toggle);
     const field = screen.getByPlaceholderText("Replace with…");
     // The press that revealed the field said what the user wants to type next.
     expect(document.activeElement).toBe(field);
+    // Same control, now saying the opposite thing.
+    expect(
+      screen
+        .getByRole("button", { name: "Hide replace" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
 
     fireEvent.click(screen.getByRole("button", { name: "Hide replace" }));
     expect(screen.queryByPlaceholderText("Replace with…")).toBeNull();
+    expect(screen.getByRole("button", { name: "Show replace" })).toBeTruthy();
   });
 
   it("replaces the match the bar is parked on and steps to the next", () => {

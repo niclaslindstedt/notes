@@ -136,7 +136,7 @@ const achievements: AchievementsCatalog = {
       name: "Bytesmarknad",
       condition: "Ersätt text från sökfältet.",
       learnMore:
-        "Vinkeln längst fram i en antecknings sökfält fäller ut en andra rad: ett fält för vad träffarna ska bli, och de två knappar som tillämpar det — en för träffen du står på, en för alla träffar på en gång. Sökningen du redan skrivit är den som ersätts, så att gå över kostar ingenting. Enter i ersättningsfältet ersätter den aktuella träffen och stegar till nästa, så en följd av dem är en nedtryckt tangent; Ctrl/Cmd+Enter tar allihop. En ersättning är alltid en ångring bort, hur många rader den än rörde, och den hålls tillbaka på en skrivskyddad anteckning tillsammans med alla andra ändringar.",
+        "Ett tryck på förstoringsglaset inuti en antecknings sökfält fäller ut en andra rad: ett fält för vad träffarna ska bli, och de två knappar som tillämpar det — en för träffen du står på, en för alla träffar på en gång. Sökningen du redan skrivit är den som ersätts, så att gå över kostar ingenting. Enter i ersättningsfältet ersätter den aktuella träffen och stegar till nästa, så en följd av dem är en nedtryckt tangent; Ctrl/Cmd+Enter tar allihop. En ersättning är alltid en ångring bort, hur många rader den än rörde, och den hålls tillbaka på en skrivskyddad anteckning tillsammans med alla andra ändringar.",
     },
     dryRun: {
       name: "Torrsim",

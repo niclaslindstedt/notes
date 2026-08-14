@@ -10,7 +10,6 @@ import { useT } from "../i18n/index.ts";
 import { haptics } from "../platform/native-bridge.ts";
 import {
   ChevronDownIcon,
-  ChevronRightIcon,
   ChevronUpIcon,
   CloseIcon,
   PreviewIcon,
@@ -30,19 +29,19 @@ import {
 // note", matching the typed characters verbatim and case-insensitively,
 // painting every hit in the note and stepping between them.
 //
-// The bar has a second, folded-away half. The chevron at its head opens the
-// **replace row**: a second field, and the three buttons that act on it —
-// replace the hit you are parked on, replace every hit, and *preview*, which
-// writes nothing and unfolds a panel showing what the other two would do, line
-// by line. Both halves share one query, so the search you already typed is the
+// The bar has a second, folded-away half. Pressing the magnifier inside the
+// search field opens the **replace row**: a second field, and the three buttons
+// that act on it — replace the hit you are parked on, replace every hit, and
+// *preview*, which writes nothing and unfolds a panel showing what the other
+// two would do, line by line. Both halves share one query, so the search you already typed is the
 // one replace acts on; nothing has to be re-entered to cross over. The `.*`
 // toggle beside the search field reads that query as a regular expression
 // instead of literal text, which is also what makes `$1` in a replacement mean
 // anything (see `domain/note-replace.ts`).
 //
-// Replace is withheld entirely on a locked (read-only) note — no chevron, no
-// row. Find still works there, because reading a locked note is the point of
-// locking it.
+// Replace is withheld entirely on a locked (read-only) note: the magnifier goes
+// back to being a plain label, and there is no row to open. Find still works
+// there, because reading a locked note is the point of locking it.
 //
 // The browser's own find bar (the "find on page" menu item) can't be opened,
 // positioned, or read from a web page — there is no API for it, and no way to
@@ -100,7 +99,8 @@ export function NoteFindBar({
   onClose: () => void;
   /**
    * Whether replacing is offered at all. False on a locked note, which folds
-   * the whole second half away — chevron included.
+   * the whole second half away, leaving the search field's magnifier as a
+   * plain label with nothing to open.
    */
   canReplace: boolean;
   replaceOpen: boolean;
@@ -201,32 +201,53 @@ export function NoteFindBar({
       >
         {/* Top-aligned rather than centred: the button cluster on the right
             carries the match counter slung underneath it, which makes it taller
-            than everything beside it — centring would push the field and the
-            chevron down against nothing. */}
+            than everything beside it — centring would push the field down
+            against nothing. */}
         <div className="flex items-start gap-2">
-          {/* The disclosure for the replace half. A chevron rather than a
-              labelled button: it is the one control here that reveals more of
-              the bar rather than acting on the note, and pointing it down when
-              open is the only affordance that says so without words. */}
-          {canReplace && (
-            <FindBarButton
-              label={
-                replaceOpen
-                  ? t("app.find.hideReplace")
-                  : t("app.find.replaceRow")
-              }
-              pressed={replaceOpen}
-              onClick={onReplaceOpenToggle}
-            >
-              <ChevronRightIcon
-                className={`h-[18px] w-[18px] transition-transform duration-150 ${
-                  replaceOpen ? "rotate-90" : ""
-                }`}
-              />
-            </FindBarButton>
-          )}
           <FieldPill invalid={patternInvalid}>
-            <SearchIcon className="h-4 w-4 shrink-0 text-muted" />
+            {/* The field's leading glyph is also the disclosure for the replace
+                half — the one control here that reveals more of the bar rather
+                than acting on the note. Folding it into the glyph the field
+                already carries costs the row no width at all, which on a phone
+                is the whole budget, and its *face* is the state: a magnifier
+                while the bar only finds, the replace arrows once it can also
+                write. It is the field's label and its mode switch at once. */}
+            {canReplace ? (
+              <button
+                type="button"
+                title={
+                  replaceOpen
+                    ? t("app.find.hideReplace")
+                    : t("app.find.replaceRow")
+                }
+                aria-label={
+                  replaceOpen
+                    ? t("app.find.hideReplace")
+                    : t("app.find.replaceRow")
+                }
+                aria-expanded={replaceOpen}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  haptics.vibrate(8);
+                  onReplaceOpenToggle();
+                }}
+                // Pulled back by the padding it adds around the glyph, so the
+                // icon still sits where a plain one would and the press target
+                // reaches into the pill's own left padding rather than eating
+                // into the text.
+                className={`-my-1 -ml-1.5 inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-accent/15 hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
+                  replaceOpen ? "bg-accent/20 text-accent" : "text-muted"
+                }`}
+              >
+                {replaceOpen ? (
+                  <ReplaceIcon className="h-4 w-4" />
+                ) : (
+                  <SearchIcon className="h-4 w-4" />
+                )}
+              </button>
+            ) : (
+              <SearchIcon className="h-4 w-4 shrink-0 text-muted" />
+            )}
             <input
               ref={inputRef}
               type="text"
@@ -304,13 +325,18 @@ export function NoteFindBar({
           </div>
         </div>
 
-        {/* The replace row, indented past the chevron so its field lines up
-            under the search field and the three buttons sit under the three
-            above them — the column is what says the two rows are one control.  */}
+        {/* The replace row. It starts at the same left edge as the search
+            field — there is no chevron to indent past — so the two fields read
+            as one stacked control and the buttons sit in the same columns. */}
         {showReplace && (
-          <div className="mt-2 flex items-center gap-2 pl-10">
+          <div className="mt-2 flex items-center gap-2">
+            {/* No leading glyph: the search field's own glyph has already
+                turned into the replace arrows to say which mode the bar is in,
+                and repeating them here would put the same picture on both rows
+                — leaving the question of which field is which to the
+                placeholders anyway. Without it the field is wider, which is the
+                point of every other decision in this bar. */}
             <FieldPill>
-              <ReplaceIcon className="h-4 w-4 shrink-0 text-muted" />
               <input
                 ref={replaceRef}
                 type="text"
@@ -379,7 +405,7 @@ function PreviewPanel({
     <div
       role="region"
       aria-label={t("app.find.previewPanel")}
-      className="mt-2 ml-10 rounded-[var(--radius)] border border-line bg-surface-2"
+      className="mt-2 rounded-[var(--radius)] border border-line bg-surface-2"
     >
       {/* The scope, above the detail: "how much of my note does this touch" is
           the question the preview exists to answer, and the count answers it

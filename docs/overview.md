@@ -2048,9 +2048,9 @@ What the bar shows and does:
   the bar doesn't grow by a row the moment the first character lands;
 - a **`.*` toggle** that reads the query as a pattern — see
   [regex mode](#regex-mode);
-- a **chevron** at the head of the bar that unfolds the second row — see
-  [replace in note](#replace-in-note). It is absent on a
-  [locked note](#lock-a-note);
+- the **magnifier** in the field, which is also the disclosure for the second
+  row — see [replace in note](#replace-in-note). On a
+  [locked note](#lock-a-note) it goes back to being a plain label;
 - **Escape**, the close button, or the header toggle puts it away.
 
 The browser's own find bar ("find on page") is not reachable from a web page —
@@ -2165,13 +2165,23 @@ replace buttons beside it change the note for real.
 
 ### Replace in note
 
-The **chevron** at the head of the find bar unfolds the bar's second half: a
+**The magnifier inside the search field** unfolds the bar's second half: a
 replace field and the three buttons that act on it (`NoteFindBar`,
 `src/ui/NoteFindBar.tsx`; the state and actions `replaceOpen`, `replacement`,
-`runReplace`, `runReplaceAll` in `src/ui/NoteEditor.tsx`). It is indented past
-the chevron so its field lines up under the search field and its buttons sit in
-the same three columns as the arrows above them — the column is what says the
-two rows are one control. Both halves share **one query**, so the search already
+`runReplace`, `runReplaceAll` in `src/ui/NoteEditor.tsx`). It starts at the same
+left edge as the search field — there is nothing to indent past — so the two
+fields read as one stacked control and the buttons sit in the same three columns
+as the arrows above them.
+
+The disclosure is the **field's own leading glyph**, and its *face* is the state:
+a magnifier while the bar only finds, the replace arrows once it can also write.
+Folding it into a glyph the field already carried costs the row no width at all,
+which on a phone is the whole budget — but it is a less discoverable affordance
+than the chevron other editors put there, so the glyph carries a hover title, an
+`aria-expanded`, and a lit chip behind it while open. The replace field below
+deliberately carries **no** leading glyph: the search field's arrows already say
+which mode the bar is in, and repeating them would put the same picture on both
+rows while leaving the placeholders to say which field is which anyway. Both halves share **one query**, so the search already
 typed is the one replace acts on and nothing has to be re-entered to cross over.
 
 - **Replace** (`⇄`) rewrites the hit the bar is parked on and steps to the next.
@@ -2213,8 +2223,8 @@ typing burst can share that burst's merge key and be swallowed by it, so undoing
 the replace would take the typing with it. `replaceBody` commits with no merge
 key at all, which also breaks the chain for whatever is typed next.
 
-**The whole half is withheld on a [locked note](#lock-a-note)** — no chevron, no
-row — alongside the styling toolbar, the cut button and the title field.
+**The whole half is withheld on a [locked note](#lock-a-note)** — the magnifier
+goes back to being a plain label and there is no row to open — alongside the styling toolbar, the cut button and the title field.
 Finding still works there, because reading a locked note is what locking it is
 for. Landing a replace is the **Swap meet** achievement.
 

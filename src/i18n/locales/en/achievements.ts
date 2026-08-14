@@ -140,7 +140,7 @@ const achievements = {
       name: "Swap meet",
       condition: "Replace some text from the find bar.",
       learnMore:
-        "The chevron at the head of a note's find bar unfolds a second row: a field for what the matches should become, and the two buttons that apply it — one for the match you are standing on, one for every match at once. The search you already typed is the one it acts on, so crossing over costs nothing. Enter in the replace field replaces the current match and steps to the next, so a run of them is one key held down; Ctrl/Cmd+Enter does the lot. A replace is always a single undo away, however many lines it touched, and it is withheld on a read-only note along with every other edit.",
+        "Pressing the magnifier inside a note's find bar unfolds a second row: a field for what the matches should become, and the two buttons that apply it — one for the match you are standing on, one for every match at once. The search you already typed is the one it acts on, so crossing over costs nothing. Enter in the replace field replaces the current match and steps to the next, so a run of them is one key held down; Ctrl/Cmd+Enter does the lot. A replace is always a single undo away, however many lines it touched, and it is withheld on a read-only note along with every other edit.",
     },
     dryRun: {
       name: "Dry run",

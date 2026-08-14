@@ -140,7 +140,8 @@ const app = {
     // — hence one word rather than the sentence, which is the hover title.
     invalid: "Invalid",
     invalidPattern: "That isn’t a valid regular expression",
-    // The chevron that unfolds the second row, and everything on it.
+    // The search field's magnifier doubles as the disclosure for the second
+    // row. Its label says what the press will do, so it flips with the state.
     replaceRow: "Show replace",
     hideReplace: "Hide replace",
     replaceField: "Replace with",
