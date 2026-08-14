@@ -2363,10 +2363,8 @@ starred that isn't archived — an archived note is out of sight by definition, 
 it leaves Favorites too and the star comes back with it on restore. The section
 is drawn by `SideMenu` above the **Notes** heading and hides itself entirely
 while nothing is starred (an empty heading is noise in a drawer this dense, and
-the star button is where the feature is discovered). It is uncapped, unlike the
-`MAX_RECENT_NOTES` recents list below it — these are the notes the user picked
-out by hand. Each row is a full note row, so swipe, right-click and drag behave
-exactly as they do in the list below.
+the star button is where the feature is discovered). Each row is a full note
+row, so swipe, right-click and drag behave exactly as they do in the list below.
 
 By default the section flattens the folder hierarchy away — a favorite is a
 shortcut, and where it is filed is precisely what the section sets aside. The
@@ -4183,18 +4181,30 @@ How the folders and loose notes are ordered is two appearance preferences (see
 `sortFoldersBy` orders the folders — by name, or by their newest note's
 timestamp (`folderModifiedAt`). These ordering helpers (and `mixTopLevel`,
 and the `NoteSortKey` type itself) are pure functions over the note model in
-`src/domain/note.ts` — `SideMenu` only consumes them. The loose notes are
-still capped at `MAX_RECENT_NOTES`, and `recentNotesBy` is what applies that
-cap: it takes the most-recently-edited notes **first** and only then orders
-that window by `noteSortKey`. The two criteria are deliberately separate —
-the drawer keeps what you are working on within reach and leaves the rest to
-"Show all", so the window is always the newest notes and the key only decides
-their arrangement. (Sorting by the key and slicing afterwards instead made
-`name` select the alphabetically-first notes, which hid a freshly created note
-from the drawer entirely whenever its title sorted past the cap, even though
-the uncapped overview listed it at the top.) The Favorites section and a
-folder's contents are uncapped, so they still sort with plain `sortNotesBy`.
-Both are set in **Appearance → Sidebar**.
+`src/domain/note.ts` — `SideMenu` only consumes them. Both are set in
+**Appearance → Sidebar**.
+
+The drawer lists **every** loose note, not a window of the most recent few.
+It used to cap the list at `MAX_RECENT_NOTES` (6) and leave the rest to
+"Show all", which had a sharp edge: the cap was applied by sorting with
+`noteSortKey` and slicing afterwards, so under `name` it kept the
+*alphabetically first* six rather than the six most recent — a freshly created
+note whose title sorted past the cap never appeared in the drawer at all, on
+any device, while the uncapped overview listed it at the top. Listing
+everything removes the failure mode along with the cap.
+
+That makes the note list the one part of the drawer that can outgrow the
+viewport, so it is its **own scroll region**: everything above the
+[button island](#folders-in-the-side-menu) (the namespace switcher, Favorites,
+the folders and the loose notes) sits in a `flex-1 min-h-0 overflow-y-auto`
+container, and the island, the footer-collapse rail and the footer are pinned
+outside it. Both `<nav>` variants — the docked sidebar and the slide-in drawer
+— are therefore `overflow-hidden` rather than `overflow-y-auto`: the frame no
+longer scrolls as one column, so a long list can never carry the island and
+the footer off the bottom. `min-h-0` is load-bearing (a flex item's floor is
+its content height without it, which would push the pinned rows off-screen
+instead of scrolling), and `flex-1` is what keeps the island at the foot when
+the list is short — the job the island's own `mt-auto` used to do alone.
 
 The **button island** is one bordered block (`BarButton`), extracted as a
 self-contained `SideMenuActionBar` (`src/ui/SideMenuActionBar.tsx`) the drawer
