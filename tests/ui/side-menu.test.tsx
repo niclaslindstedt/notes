@@ -161,6 +161,31 @@ describe("SideMenu — the docked sidebar's collapse rail", () => {
   });
 });
 
+describe("SideMenu — listing every note", () => {
+  // The drawer used to show only the six most-recently-edited loose notes and
+  // leave the rest to "Show all", which hid a just-created note outright when
+  // the list was sorted by name (the cap sliced *after* the alphabetical sort).
+  // It now lists them all and scrolls instead, so nothing goes missing.
+  const many = Array.from({ length: 20 }, (_, i) =>
+    note(`n${i}`, `Note ${String(i).padStart(2, "0")}`),
+  );
+
+  it("lists every loose note, well past the old six-note cap", () => {
+    renderMenu({ open: true }, { notes: many, activeNoteId: null });
+    for (const n of many) {
+      expect(screen.getByText(n.title)).toBeTruthy();
+    }
+  });
+
+  it("keeps a newly created note listed whatever its title sorts as", () => {
+    // "zulu" sorts last alphabetically and is the newest by timestamp — the
+    // exact note the old cap dropped under the `name` sort key.
+    const fresh: Note = { ...note("new", "zulu"), updatedAt: 999 };
+    renderMenu({ open: true }, { notes: [...many, fresh], activeNoteId: null });
+    expect(screen.getByText("zulu")).toBeTruthy();
+  });
+});
+
 describe("SideMenu — the read-only eye", () => {
   // Both glyphs are aria-hidden decoration with nothing to query by role or
   // text, so the assertion goes by the one shape that tells them apart: the

@@ -105,12 +105,6 @@ import {
 // deletion is recorded on the undo timeline (the Undo button at the foot of
 // the drawer brings it back), so no confirming second tap is needed.
 
-// The drawer stays focused on what you're working on: it lists only the most
-// recently edited notes and hides the rest behind the "Show all" entry, which
-// opens the full overview. Tuned so the list never crowds out the menu below
-// it on a phone.
-const MAX_RECENT_NOTES = 6;
-
 // The dataTransfer MIME used when dragging a note onto a folder with the
 // desktop HTML5 path. The touch path and the ungrouped-zone sentinel
 // (`NOTE_DROP_ROOT`) are shared from `note-drag.tsx`.
@@ -475,14 +469,12 @@ export function SideMenu({
     (n) => !n.folderId || !folderIds.has(n.folderId),
   );
 
-  // The loose notes the drawer actually shows, sorted by the active key and
-  // capped so the list never crowds out the menu below. Folders are sorted by
-  // the same key — by name, or by their most-recently-edited note (`mixed`
-  // placement interleaves the two runs; `top` keeps folders above the notes).
-  const recentUngrouped = sortNotesBy(ungrouped, noteSortKey).slice(
-    0,
-    MAX_RECENT_NOTES,
-  );
+  // Every loose note, ordered by the active key — the drawer lists them all and
+  // scrolls when they overflow (see the scroll area in `sections`), rather than
+  // showing a window of the newest few. Folders are sorted by the same key — by
+  // name, or by their most-recently-edited note (`mixed` placement interleaves
+  // the two runs; `top` keeps folders above the notes).
+  const looseNotes = sortNotesBy(ungrouped, noteSortKey);
   const sortedFolders = sortFoldersBy(folders, notes, noteSortKey);
 
   // The Favorites section's contents. Uncapped, unlike the recents list below
@@ -643,157 +635,172 @@ export function SideMenu({
   // the framing `<nav>` differs between the two, so the rows live here once.
   const sections = (
     <>
-      {/* Namespaces switcher: tap a row to switch which set of notes is
+      {/* Everything above the button island scrolls as one region, so a long
+          note list stays fully reachable without carrying the island and the
+          footer off the bottom of the drawer with it. `min-h-0` is what lets
+          this flex child shrink below its content and actually scroll (without
+          it a flex item's floor is its content height, and the overflow would
+          push the pinned rows off-screen instead). `flex-1` keeps the island at
+          the foot of the drawer when the list is short, which is what the
+          island's own `mt-auto` used to do on its own. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+        {/* Namespaces switcher: tap a row to switch which set of notes is
           shown; the heading's cogwheel opens the full manage dialog (add /
           rename / icon / delete) — a cog, not a "+", because it manages
           rather than adds inline. */}
-      <SectionHeader
-        label={t("nav.namespaces")}
-        onAdd={() => pick(() => dispatch({ kind: "namespaces" }))}
-        addLabel={t("nav.manageNamespaces")}
-        addIcon={<CogIcon className="h-4 w-4" />}
-        collapsible
-        collapsed={namespacesCollapsed}
-        onToggle={() => setNamespacesCollapsed((v) => !v)}
-        toggleLabel={
-          namespacesCollapsed
-            ? t("nav.expandNamespaces")
-            : t("nav.collapseNamespaces")
-        }
-      />
-      {/* Collapsed, the switcher shows only the active namespace (so you always
+        <SectionHeader
+          label={t("nav.namespaces")}
+          onAdd={() => pick(() => dispatch({ kind: "namespaces" }))}
+          addLabel={t("nav.manageNamespaces")}
+          addIcon={<CogIcon className="h-4 w-4" />}
+          collapsible
+          collapsed={namespacesCollapsed}
+          onToggle={() => setNamespacesCollapsed((v) => !v)}
+          toggleLabel={
+            namespacesCollapsed
+              ? t("nav.expandNamespaces")
+              : t("nav.collapseNamespaces")
+          }
+        />
+        {/* Collapsed, the switcher shows only the active namespace (so you always
           see where you are); expanded, it lists them all. */}
-      {(namespacesCollapsed
-        ? namespaces.filter((ns) => ns.slug === activeNamespace)
-        : namespaces
-      ).map((ns) => {
-        // A namespace that picked an icon or colour shows its own glyph,
-        // tinted to that colour. One left untouched gets the plain folder
-        // fallback; the active set reads at a glance from the row's accent
-        // highlight (and the icon's accent tint) rather than a swapped-in
-        // checkmark.
-        const customised = Boolean(ns.glyph || ns.color);
-        const icon = customised ? (
-          <NamespaceGlyph
-            name={ns.glyph}
-            className="h-5 w-5"
-            style={ns.color ? { color: ns.color } : undefined}
-          />
-        ) : (
-          <NamespaceGlyph className="h-5 w-5" />
-        );
-        // Every namespace but the active one is a drop target: dropping a note
-        // — or a whole folder — onto it moves it into that namespace.
-        const droppable = ns.slug !== activeNamespace;
-        const nsKey = noteDropNamespaceKey(ns.slug);
-        return (
-          <NavItem
-            key={ns.slug}
-            icon={icon}
-            label={ns.name}
-            active={ns.slug === activeNamespace}
-            dropId={droppable ? nsKey : undefined}
-            isDropTarget={
-              droppable && (dropTarget === nsKey || activeDropKey === nsKey)
-            }
-            onDragOver={
-              droppable ? (e) => allowDropOn(e, nsKey, true) : undefined
-            }
-            onDragLeave={droppable ? () => setDropTarget(null) : undefined}
-            onDrop={droppable ? (e) => dropOnNamespace(e, ns.slug) : undefined}
-            onClick={() => onSwitchNamespace(ns.slug)}
-          />
-        );
-      })}
-      {/* Favorites: the notes starred with the editor header's star button,
+        {(namespacesCollapsed
+          ? namespaces.filter((ns) => ns.slug === activeNamespace)
+          : namespaces
+        ).map((ns) => {
+          // A namespace that picked an icon or colour shows its own glyph,
+          // tinted to that colour. One left untouched gets the plain folder
+          // fallback; the active set reads at a glance from the row's accent
+          // highlight (and the icon's accent tint) rather than a swapped-in
+          // checkmark.
+          const customised = Boolean(ns.glyph || ns.color);
+          const icon = customised ? (
+            <NamespaceGlyph
+              name={ns.glyph}
+              className="h-5 w-5"
+              style={ns.color ? { color: ns.color } : undefined}
+            />
+          ) : (
+            <NamespaceGlyph className="h-5 w-5" />
+          );
+          // Every namespace but the active one is a drop target: dropping a note
+          // — or a whole folder — onto it moves it into that namespace.
+          const droppable = ns.slug !== activeNamespace;
+          const nsKey = noteDropNamespaceKey(ns.slug);
+          return (
+            <NavItem
+              key={ns.slug}
+              icon={icon}
+              label={ns.name}
+              active={ns.slug === activeNamespace}
+              dropId={droppable ? nsKey : undefined}
+              isDropTarget={
+                droppable && (dropTarget === nsKey || activeDropKey === nsKey)
+              }
+              onDragOver={
+                droppable ? (e) => allowDropOn(e, nsKey, true) : undefined
+              }
+              onDragLeave={droppable ? () => setDropTarget(null) : undefined}
+              onDrop={
+                droppable ? (e) => dropOnNamespace(e, ns.slug) : undefined
+              }
+              onClick={() => onSwitchNamespace(ns.slug)}
+            />
+          );
+        })}
+        {/* Favorites: the notes starred with the editor header's star button,
           lifted above the ordinary list so they're one tap away wherever they
           are filed. The section only exists once something is starred — an
           empty heading would be noise in a drawer this dense, and the star
           button is where the feature is discovered. Each row is a full note row
           (swipe / right-click / drag all behave as they do below), so a
           favorite can be archived or refiled straight from here. */}
-      {favorites.length > 0 && (
-        <>
-          <SectionHeader label={t("nav.favorites")} border />
-          {favoritesShowFolders
-            ? favoriteGroups.map((group) =>
-                group.folder ? (
-                  <div key={group.folder.id}>
-                    <FolderLabelRow
-                      name={group.folder.name}
-                      count={group.notes.length}
-                    />
-                    {group.notes.map((note) => renderNoteRow(note, true))}
-                  </div>
-                ) : (
-                  <div key="favorites-ungrouped">
-                    {group.notes.map((note) => renderNoteRow(note))}
-                  </div>
-                ),
-              )
-            : flatFavorites.map((note) => renderNoteRow(note))}
-        </>
-      )}
-      {/* Both add actions — New note and New folder — live on the action bar
+        {favorites.length > 0 && (
+          <>
+            <SectionHeader label={t("nav.favorites")} border />
+            {favoritesShowFolders
+              ? favoriteGroups.map((group) =>
+                  group.folder ? (
+                    <div key={group.folder.id}>
+                      <FolderLabelRow
+                        name={group.folder.name}
+                        count={group.notes.length}
+                      />
+                      {group.notes.map((note) => renderNoteRow(note, true))}
+                    </div>
+                  ) : (
+                    <div key="favorites-ungrouped">
+                      {group.notes.map((note) => renderNoteRow(note))}
+                    </div>
+                  ),
+                )
+              : flatFavorites.map((note) => renderNoteRow(note))}
+          </>
+        )}
+        {/* Both add actions — New note and New folder — live on the action bar
           below the list, so the heading carries no trailing "+". A new folder
           drops an inline, unnamed folder input into the list; defocusing it
           empty discards it (see FolderEditRow). */}
-      <SectionHeader label={t("nav.notes")} border />
-      {creatingFolder && (
-        <FolderEditRow
-          placeholder={t("nav.folderName")}
-          onCommit={(name) => {
-            const id = onCreateFolder(name);
-            setCreatingFolder(false);
-            setExpandedFolders((prev) => new Set(prev).add(id));
-          }}
-          onCancel={() => setCreatingFolder(false)}
-        />
-      )}
-      {/* The top-level list: folders (each expandable, a "+" on its far right
+        <SectionHeader label={t("nav.notes")} border />
+        {creatingFolder && (
+          <FolderEditRow
+            placeholder={t("nav.folderName")}
+            onCommit={(name) => {
+              const id = onCreateFolder(name);
+              setCreatingFolder(false);
+              setExpandedFolders((prev) => new Set(prev).add(id));
+            }}
+            onCancel={() => setCreatingFolder(false)}
+          />
+        )}
+        {/* The top-level list: folders (each expandable, a "+" on its far right
           starts a note inside it) and the loose recent notes, ordered by the
           active sort key. Under `top` placement the folders stay pinned above
           the notes; under `mixed` the two runs interleave in sort order. The
           whole region is the root drop zone — dropping a note here (outside any
           folder) returns it to the top level. */}
-      <div
-        {...{ [NOTE_DROP_ATTR]: NOTE_DROP_ROOT }}
-        onDragOver={(e) => allowDropOn(e, NOTE_DROP_ROOT)}
-        onDragLeave={() => setDropTarget(null)}
-        onDrop={(e) => dropOn(e, null)}
-        className={
-          noteDropActive(NOTE_DROP_ROOT) ? "rounded-sm bg-accent/10" : undefined
-        }
-      >
-        {sortedFolders.length === 0 && recentUngrouped.length === 0 ? (
-          loading ? (
-            <p className="flex items-center gap-2 px-5 py-[var(--density-row-py)] text-sm text-muted">
-              <SpinnerIcon className="h-4 w-4 shrink-0 animate-spin" />
-              {t("nav.notesLoading")}
-            </p>
+        <div
+          {...{ [NOTE_DROP_ATTR]: NOTE_DROP_ROOT }}
+          onDragOver={(e) => allowDropOn(e, NOTE_DROP_ROOT)}
+          onDragLeave={() => setDropTarget(null)}
+          onDrop={(e) => dropOn(e, null)}
+          className={
+            noteDropActive(NOTE_DROP_ROOT)
+              ? "rounded-sm bg-accent/10"
+              : undefined
+          }
+        >
+          {sortedFolders.length === 0 && looseNotes.length === 0 ? (
+            loading ? (
+              <p className="flex items-center gap-2 px-5 py-[var(--density-row-py)] text-sm text-muted">
+                <SpinnerIcon className="h-4 w-4 shrink-0 animate-spin" />
+                {t("nav.notesLoading")}
+              </p>
+            ) : (
+              <p className="px-5 py-[var(--density-row-py)] text-sm text-muted">
+                {t("nav.notesEmpty")}
+              </p>
+            )
+          ) : folderPlacement === "mixed" ? (
+            mixTopLevel(sortedFolders, looseNotes, notes, noteSortKey).map(
+              (item) =>
+                item.kind === "folder"
+                  ? renderFolder(item.folder)
+                  : renderNoteRow(item.note),
+            )
           ) : (
-            <p className="px-5 py-[var(--density-row-py)] text-sm text-muted">
-              {t("nav.notesEmpty")}
-            </p>
-          )
-        ) : folderPlacement === "mixed" ? (
-          mixTopLevel(sortedFolders, recentUngrouped, notes, noteSortKey).map(
-            (item) =>
-              item.kind === "folder"
-                ? renderFolder(item.folder)
-                : renderNoteRow(item.note),
-          )
-        ) : (
-          <>
-            {sortedFolders.map(renderFolder)}
-            {recentUngrouped.map((note) => renderNoteRow(note))}
-          </>
-        )}
+            <>
+              {sortedFolders.map(renderFolder)}
+              {looseNotes.map((note) => renderNoteRow(note))}
+            </>
+          )}
+        </div>
       </div>
-      {/* The button island below the list — see `SideMenuActionBar`. The drawer
-          owns the live drag state, so the Archive cell's drop-target wiring is
-          threaded down; every other action is a plain callback (the ones that
-          leave the drawer close it first). */}
+      {/* The button island below the list — see `SideMenuActionBar`. Pinned
+          outside the scroll area above, so it and the footer stay put however
+          long the note list runs. The drawer owns the live drag state, so the
+          Archive cell's drop-target wiring is threaded down; every other action
+          is a plain callback (the ones that leave the drawer close it first). */}
       <SideMenuActionBar
         onNewNote={() => {
           onAddNote();
@@ -892,7 +899,7 @@ export function SideMenu({
           <nav
             id={drawerId}
             aria-label={t("nav.label")}
-            className={`relative flex h-full w-64 shrink-0 flex-col overflow-y-auto bg-surface select-none [padding-top:max(0.375rem,calc(env(safe-area-inset-top)_-_0.375rem))] ${
+            className={`relative flex h-full w-64 shrink-0 flex-col overflow-hidden bg-surface select-none [padding-top:max(0.375rem,calc(env(safe-area-inset-top)_-_0.375rem))] ${
               onRight ? "order-last" : ""
             }`}
           >
@@ -959,7 +966,7 @@ export function SideMenu({
             ref={swipeClose.panelRef as RefObject<HTMLElement>}
             aria-label={t("nav.label")}
             style={{ transform: `translateX(${swipeClose.offset}px)` }}
-            className={`relative flex w-64 max-w-[80%] flex-col overflow-y-auto bg-surface shadow-xl select-none [touch-action:pan-y] [padding-top:max(0.375rem,calc(env(safe-area-inset-top)_-_0.375rem))] ${
+            className={`relative flex w-64 max-w-[80%] flex-col overflow-hidden bg-surface shadow-xl select-none [touch-action:pan-y] [padding-top:max(0.375rem,calc(env(safe-area-inset-top)_-_0.375rem))] ${
               swipeClose.animating ? "transition-transform duration-200" : ""
             } ${
               onRight
