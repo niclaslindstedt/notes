@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   dockedSidebarWidth,
-  SIDEBAR_RAIL_WIDTH,
+  SIDEBAR_PANEL_WIDTH,
   type NavContextValue,
 } from "../../src/ui/nav-context.ts";
 
@@ -35,14 +35,15 @@ describe("dockedSidebarWidth", () => {
     ).toBeUndefined();
   });
 
-  it("counts the panel and its rail while the sidebar is docked open", () => {
-    const width = dockedSidebarWidth(nav({ pinned: true }));
-    expect(width).toBe("calc(16rem + 1rem)");
+  it("is the bare panel while the sidebar is docked open", () => {
+    // The collapse rail overlays the panel's inner edge rather than sitting
+    // beside it, so it adds nothing to the footprint.
+    expect(dockedSidebarWidth(nav({ pinned: true }))).toBe(SIDEBAR_PANEL_WIDTH);
   });
 
-  it("shrinks to the bare rail once the sidebar is folded away", () => {
+  it("gives every pixel back once the sidebar is folded away", () => {
     expect(
       dockedSidebarWidth(nav({ pinned: true, sidebarCollapsed: true })),
-    ).toBe(SIDEBAR_RAIL_WIDTH);
+    ).toBeUndefined();
   });
 });

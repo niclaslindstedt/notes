@@ -18,9 +18,8 @@ import { dockedSidebarWidth, useNav } from "./nav-context.ts";
 //
 // When the side menu is pinned open as a docked sidebar (≥768px), inset the
 // toast past it on the side it docks so it centres within the notes content
-// area rather than the whole viewport. How wide that is depends on whether the
-// sidebar is folded away to its collapse rail, so `dockedSidebarWidth` answers
-// it for both toasts.
+// area rather than the whole viewport. A sidebar folded away leaves nothing
+// behind to inset past, so `dockedSidebarWidth` answers it for both toasts.
 export function UpdateToast() {
   const t = useT();
   const { needRefresh, incomingVersion, reload, dismiss } = usePwaUpdate();

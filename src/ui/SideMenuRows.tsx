@@ -4,6 +4,7 @@ import {
   useState,
   type DragEvent as ReactDragEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 import { useT } from "../i18n/index.ts";
@@ -614,30 +615,43 @@ export function FooterCollapseRail({
   );
 }
 
-// The vertical twin of `FooterCollapseRail`: the full-height rail seated on
-// the *inner* edge of the docked sidebar (the edge that faces the notes), which
-// folds the whole panel away and brings it back. Only the docked layout has one
-// — the phone drawer closes instead of collapsing.
+// The vertical twin of `FooterCollapseRail`: the control seated on the *inner*
+// edge of the docked sidebar (the edge that faces the notes), which folds the
+// whole panel away and brings it back. Only the docked layout has one — the
+// phone drawer closes instead of collapsing.
 //
-// It is a real, always-present strip of layout rather than an overlay on the
-// panel's edge, for two reasons: an overlay would sit on top of the rows'
-// trailing "+" / cog buttons and swallow their presses, and a hover target that
-// only exists while the pointer is already over it is a target nobody finds.
-// Collapsed, that strip *is* the sidebar — so it keeps the panel's own border
-// and reads as the page's edge gutter.
+// It costs the layout nothing, and at rest it costs the *pointer* nothing
+// either. Two nested pieces do that:
 //
-// The chevron itself stays invisible until the rail is hovered or focused, so
-// the resting state is a quiet 1px line rather than a permanent button: the
-// affordance appears exactly when the pointer arrives at the edge, and points
-// the way the panel will move (out toward the edge to collapse, in toward the
-// content to restore). `title` keeps it discoverable for a pointer that pauses
-// there; `aria-expanded` / `aria-controls` keep it legible to a screen reader,
-// which sees a plain toggle button no matter what the hover styling does.
+// - The `<button>` itself is a full-height, invisible sensor straddling the
+//   edge, and is `pointer-events-none` for its whole life. `useEdgeHover`
+//   measures its box against the cursor to decide `revealed` — which is why it
+//   can be click-through and still know when it's being approached, something
+//   plain `:hover` can't do.
+// - The grip inside it is the only thing ever drawn or pressed, and only once
+//   `revealed` turns its opacity and its pointer events back on together. A
+//   descendant may take pointer events back from a `none` ancestor, and the
+//   press still bubbles to the button's handler.
+//
+// So approaching anywhere along the edge summons the grip, but the pixels it
+// can swallow are just its own small box — never a whole edge's worth of the
+// rows' trailing "+" buttons or of the note underneath.
+//
+// The grip is centred on the divider rather than covering it, so revealing it
+// doesn't appear to shift the line the panel draws. It points the way the panel
+// will move (out toward the edge to collapse, in toward the content to
+// restore). `title` keeps it discoverable for a pointer that pauses there;
+// keyboard focus reveals it on its own terms (a focused button takes Enter
+// without needing pointer events at all), and `aria-expanded` / `aria-controls`
+// keep it legible to a screen reader either way.
 export function SidebarCollapseRail({
   collapsed,
   side,
   label,
   controls,
+  offset,
+  revealed,
+  elementRef,
   onClick,
 }: {
   /** Whether the sidebar is currently folded away. */
@@ -651,6 +665,15 @@ export function SidebarCollapseRail({
    * the panel is collapsed, since there is no element for the id to resolve to.
    */
   controls?: string;
+  /** How far in from `side` the sensor's band starts, as a CSS length. */
+  offset: string;
+  /**
+   * Whether the grip is currently drawn and pressable — the two go together,
+   * so an invisible grip can never swallow a press (see `useEdgeHover`).
+   */
+  revealed: boolean;
+  /** Measured by `useEdgeHover` to decide `revealed`. Not a renderer `ref`. */
+  elementRef?: RefObject<HTMLButtonElement>;
   onClick: () => void;
 }) {
   // Collapsed on the left edge, the way back in is rightward; docked on the
@@ -658,21 +681,29 @@ export function SidebarCollapseRail({
   const pointsRight = side === "left" ? collapsed : !collapsed;
   return (
     <button
+      ref={elementRef}
       type="button"
       onClick={onClick}
       aria-label={label}
       aria-expanded={!collapsed}
       aria-controls={controls}
       title={label}
-      className={`group relative flex h-full w-4 shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:bg-surface-2 hover:text-fg-bright focus-visible:bg-surface-2 focus-visible:text-fg-bright focus-visible:outline-none ${
-        collapsed ? "" : "bg-surface"
-      } ${side === "left" ? "border-r border-line" : "order-last border-l border-line"}`}
+      style={{ [side]: offset }}
+      className="group pointer-events-none absolute inset-y-0 z-40 flex w-4 items-center justify-center focus-visible:outline-none"
     >
-      {pointsRight ? (
-        <ChevronRightIcon className="h-4 w-4 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" />
-      ) : (
-        <ChevronLeftIcon className="h-4 w-4 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" />
-      )}
+      <span
+        className={`flex h-16 w-4 items-center justify-center rounded-[var(--radius)] border border-line bg-surface-3 text-fg-bright shadow-md transition-opacity duration-150 group-focus-visible:opacity-100 group-focus-visible:ring-2 group-focus-visible:ring-accent motion-reduce:transition-none ${
+          revealed
+            ? "pointer-events-auto cursor-pointer opacity-100"
+            : "opacity-0"
+        }`}
+      >
+        {pointsRight ? (
+          <ChevronRightIcon className="h-4 w-4" />
+        ) : (
+          <ChevronLeftIcon className="h-4 w-4" />
+        )}
+      </span>
     </button>
   );
 }

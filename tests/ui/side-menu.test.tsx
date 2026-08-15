@@ -159,6 +159,54 @@ describe("SideMenu — the docked sidebar's collapse rail", () => {
     renderMenu({ open: true, pinned: false });
     expect(screen.queryByRole("button", { name: "Hide sidebar" })).toBeNull();
   });
+
+  it("overlays the rail instead of reserving a gutter for it", () => {
+    renderMenu({ pinned: true });
+    const rail = screen.getByRole("button", { name: "Hide sidebar" });
+    // Out of flow and straddling the panel's inner edge, so the rows' highlight
+    // runs the panel's full width rather than stopping short of the rail.
+    expect(rail.className).toContain("absolute");
+    // Half the rail's width back from the panel's 16rem edge (jsdom folds the
+    // calc down to the same length the browser resolves).
+    expect(rail.style.left).toBe("calc(15.5rem)");
+    // The panel draws the divider now that the rail no longer owns one.
+    expect(screen.getByRole("navigation").className).toContain("border-r");
+  });
+
+  it("puts the collapsed rail on the viewport edge it docks on", () => {
+    renderMenu({ pinned: true, sidebarCollapsed: true });
+    const rail = screen.getByRole("button", { name: "Show sidebar" });
+    expect(rail.style.left).toBe("0px");
+    expect(rail.style.right).toBe("");
+  });
+
+  it("mirrors the rail onto the right edge when the menu docks right", () => {
+    renderMenu({ pinned: true, position: { side: "right", y: 0.5 } });
+    const rail = screen.getByRole("button", { name: "Hide sidebar" });
+    expect(rail.style.right).toBe("calc(15.5rem)");
+    expect(rail.style.left).toBe("");
+    expect(screen.getByRole("navigation").className).toContain("border-l");
+  });
+
+  it("keeps the rail up where the pointer can't hover", () => {
+    // jsdom answers no media query, so `useDesktopPointer` reads false — the
+    // touch case, where a hidden rail would strand a collapsed sidebar with no
+    // way back. Its grip stays drawn and pressable instead.
+    renderMenu({ pinned: true, sidebarCollapsed: true });
+    const grip = screen.getByRole("button", {
+      name: "Show sidebar",
+    }).firstElementChild!;
+    expect(grip.className).toContain("opacity-100");
+    expect(grip.className).toContain("pointer-events-auto");
+  });
+
+  it("leaves the sensor click-through so it can't swallow a row's buttons", () => {
+    renderMenu({ pinned: true });
+    // Only the grip inside it is ever pressable; the full-height band that
+    // notices the pointer approaching never takes a click of its own.
+    const rail = screen.getByRole("button", { name: "Hide sidebar" });
+    expect(rail.className).toContain("pointer-events-none");
+  });
 });
 
 describe("SideMenu — listing every note", () => {

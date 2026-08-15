@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useRef,
   useState,
   type DragEvent as ReactDragEvent,
   type ReactNode,
@@ -23,10 +24,15 @@ import { useT } from "../i18n/index.ts";
 import type { Namespace } from "../storage/namespaces.ts";
 import { useAppearance } from "../theme/useTheme.ts";
 import { APP_VIEWPORT_RECT } from "./appViewportRect.ts";
-import { useNav } from "./nav-context.ts";
+import {
+  SIDEBAR_PANEL_WIDTH,
+  SIDEBAR_RAIL_WIDTH,
+  useNav,
+} from "./nav-context.ts";
 import { useDraggableMenuButton } from "./hooks/useDraggableMenuButton.ts";
 import { useDrawerSwipeClose } from "./hooks/useDrawerSwipeClose.ts";
-import { useMediaQuery } from "./hooks/useMediaQuery.ts";
+import { useEdgeHover } from "./hooks/useEdgeHover.ts";
+import { useDesktopPointer, useMediaQuery } from "./hooks/useMediaQuery.ts";
 import {
   CogIcon,
   EyeIcon,
@@ -457,6 +463,17 @@ export function SideMenu({
 
   const onRight = position.side === "right";
 
+  // The docked sidebar's collapse rail gives its pixels back to the app and
+  // only materialises when the pointer comes to that edge looking for it. A
+  // click-through element can never match `:hover`, so the cursor is tracked
+  // against the rail's own box instead. A device that can't hover would never
+  // see it at all — and, once collapsed, would have no way back — so there the
+  // rail simply stays up.
+  const railRef = useRef<HTMLButtonElement>(null);
+  const hoverCapable = useDesktopPointer();
+  const railHovered = useEdgeHover(railRef, hoverCapable);
+  const railRevealed = !hoverCapable || railHovered;
+
   // A folder can only be dragged somewhere meaningful — onto another namespace
   // row — so the drag affordance is only wired when a second namespace exists.
   const canMoveFolderToNamespace = namespaces.length > 1;
@@ -865,11 +882,13 @@ export function SideMenu({
   // the floating button rests on.
   //
   // On desktop the panel isn't wanted every minute of the day, so a
-  // `SidebarCollapseRail` rides its inner edge and folds it away to just that
-  // rail (the choice persists — see `use-nav.ts`). The rail is a flex sibling
-  // rather than an overlay so it never sits on top of the rows' trailing
-  // buttons, and it owns the border that separates the menu from the notes —
-  // the panel would otherwise draw a second line against it.
+  // `SidebarCollapseRail` rides its inner edge and folds it away entirely (the
+  // choice persists — see `use-nav.ts`). The rail is an overlay straddling that
+  // edge rather than a flex sibling, and it is invisible and click-through
+  // until the pointer comes to the edge looking for it: collapsed, the sidebar
+  // then costs the note nothing at all, and open, the rows' highlight runs the
+  // panel's full width instead of stopping short of a permanent gutter. The
+  // panel owns the border that separates the menu from the notes.
   //
   // The top padding drops the drawer's first section header a touch below the
   // safe-area inset so its small-caps label lines up with the vertically
@@ -880,33 +899,40 @@ export function SideMenu({
   // `max(1.125rem, env(safe-area-inset-top) + 0.375rem)`. Both nav variants
   // (docked and drawer) share the formula.
   if (pinned) {
-    const rail = (
-      <SidebarCollapseRail
-        collapsed={sidebarCollapsed}
-        side={onRight ? "right" : "left"}
-        controls={sidebarCollapsed ? undefined : drawerId}
-        label={sidebarCollapsed ? t("nav.showSidebar") : t("nav.hideSidebar")}
-        onClick={toggleSidebar}
-      />
-    );
-    // The rail always sits on the panel's inner edge, so it renders after the
-    // panel when the menu docks left and before it when it docks right (both
-    // carry `order-last` there, and equal order values fall back to DOM order).
+    // The rail's band. Collapsed it hugs the viewport edge, where a cursor
+    // thrown at the side of the screen lands on it without aiming. Open it
+    // straddles the panel's inner edge (half the rail's width back from
+    // `SIDEBAR_PANEL_WIDTH`), so it reads as a grip on the divider and leaves
+    // the rows' trailing "+" — which stops a few pixels short of that edge —
+    // clear of it.
+    const railOffset = sidebarCollapsed
+      ? "0px"
+      : `calc(${SIDEBAR_PANEL_WIDTH} - ${SIDEBAR_RAIL_WIDTH} / 2)`;
     return (
       <>
-        {onRight && rail}
         {!sidebarCollapsed && (
           <nav
             id={drawerId}
             aria-label={t("nav.label")}
             className={`relative flex h-full w-64 shrink-0 flex-col overflow-hidden bg-surface select-none [padding-top:max(0.375rem,calc(env(safe-area-inset-top)_-_0.375rem))] ${
-              onRight ? "order-last" : ""
+              onRight
+                ? "order-last border-l border-line"
+                : "border-r border-line"
             }`}
           >
             {sections}
           </nav>
         )}
-        {!onRight && rail}
+        <SidebarCollapseRail
+          collapsed={sidebarCollapsed}
+          side={onRight ? "right" : "left"}
+          controls={sidebarCollapsed ? undefined : drawerId}
+          label={sidebarCollapsed ? t("nav.showSidebar") : t("nav.hideSidebar")}
+          offset={railOffset}
+          revealed={railRevealed}
+          elementRef={railRef}
+          onClick={toggleSidebar}
+        />
       </>
     );
   }

@@ -337,8 +337,9 @@ export function HomePage() {
               by what you edited last). You can also fold the side menu's footer
               away to hand its space to the note list, and — on a wide screen,
               where the side menu is docked open beside your notes — collapse
-              the whole menu to a thin rail on its edge and bring it back with a
-              single press; your preferences are remembered on the device.
+              the whole menu so the note takes the full width, bringing it back
+              from a handle that appears when you move the pointer to that edge
+              of the screen; your preferences are remembered on the device.
             </li>
             <li>
               Use the app in <em>English</em> or <em>Swedish</em> — it follows
