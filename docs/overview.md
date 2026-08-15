@@ -3143,34 +3143,55 @@ as a sidebar and the floating button disappears; below that it's a drawer.
 
 The docked sidebar isn't wanted every minute of the day, so it can be folded
 away. `SidebarCollapseRail` (`src/ui/SideMenuRows.tsx`) is the vertical twin of
-the [footer collapse rail](#folders-in-the-side-menu): a full-height, `w-4`
-(16px) button seated on the panel's **inner** edge — the one facing the notes —
-whose chevron points out toward the edge to collapse and back in toward the
-content to restore. Pressing it drops the panel entirely, leaving just the rail
-as the page's edge gutter; hovering that rail brings the chevron back, now
-pointing inward. Everything mirrors when the menu docks right
-(`position.side`), where the rail carries `order-last` so it still lands
-between the panel and the notes.
+the [footer collapse rail](#folders-in-the-side-menu): the control seated on the
+panel's **inner** edge — the one facing the notes — whose chevron points out
+toward the edge to collapse and back in toward the content to restore. Pressing
+it drops the panel entirely and the note takes the whole window. Everything
+mirrors when the menu docks right (`position.side`).
 
-Three decisions in it are load-bearing:
+**The rail is invisible, and free, until you go looking for it.** Collapsed, it
+costs the note nothing at all; open, the rows' highlight runs the panel's full
+`16rem` rather than stopping short of a permanent gutter. Two nested pieces buy
+that:
 
-- **The rail is a flex sibling, not an overlay on the panel's edge.** An
-  absolutely-positioned strip over that edge would sit on top of the section
-  headers' cog and the folder rows' trailing "+", swallowing their presses. It
-  therefore also owns the border that separates the menu from the notes — the
-  panel drops its own `border-r` when docked, or the two would draw a double
-  line against each other.
-- **The chevron is invisible until hover or keyboard focus** (`group-hover` /
-  `group-focus-visible` on opacity, `motion-reduce` honoured), so the resting
-  state is a quiet 1px line rather than a permanent button. `title`,
-  `aria-label`, `aria-expanded` and `aria-controls` carry the meaning that the
-  hover styling doesn't — a screen reader sees a plain toggle button either way.
-  `aria-controls` is dropped while collapsed, since the panel it names is gone.
-- **The choice is per device**, not synced: it rides `localStorage` under
-  `notes/sidebar-collapsed` alongside the floating button's position
-  (`useNavState`, `src/app/use-nav.ts`), because a wide desktop and a small
-  laptop want different answers. Collapsing (not restoring) fires the
-  `clearTheDecks` achievement.
+- The `<button>` is a full-height, never-drawn **sensor** straddling the edge —
+  `absolute`, `w-4` (16px), positioned by an inline `left`/`right` of `0` when
+  collapsed and `calc(16rem - 0.5rem)` when open — and it is
+  `pointer-events-none` for its entire life.
+- The **grip** inside it (`h-16`, rounded, bordered, `bg-surface-3`, a shadow)
+  is the only thing ever painted or pressed, and only when `revealed` turns its
+  opacity and its pointer events back on together. A descendant may take pointer
+  events back from a `none` ancestor, and its press still bubbles to the
+  button's handler.
+
+`revealed` comes from **`useEdgeHover`** (`src/ui/hooks/useEdgeHover.ts`), which
+tracks `pointermove` on the window and compares the cursor against the sensor's
+own `getBoundingClientRect` (coalesced to one measurement per frame, with 8px of
+hysteresis once entered so a cursor on the boundary can't flicker it). A
+click-through element can never match `:hover`, which is exactly why the plain
+CSS pseudo-class won't do here. Three consequences worth keeping:
+
+- **Nothing invisible can swallow a press.** The only pixels the rail can take
+  are the grip's own small box, and only while it is on screen — so a row's
+  trailing "+" and the note underneath keep the whole edge otherwise.
+- **The grip is centred on the divider, not over it**, so revealing it doesn't
+  appear to shift the line the panel draws. The panel owns that border now
+  (`border-r`, or `border-l` docked right) — the rail no longer draws one.
+- **A device that can't hover keeps the grip up permanently.** `useEdgeHover` is
+  gated on `useDesktopPointer()` and ignores `pointerType: "touch"`; without
+  that, a collapsed sidebar on a tablet would have no way back.
+
+Keyboard focus reveals the grip on its own terms (a focused button takes Enter
+without needing pointer events at all). `title`, `aria-label`, `aria-expanded`
+and `aria-controls` carry the meaning the hover styling doesn't — a screen
+reader sees a plain toggle button either way; `aria-controls` is dropped while
+collapsed, since the panel it names is gone.
+
+**The choice is per device**, not synced: it rides `localStorage` under
+`notes/sidebar-collapsed` alongside the floating button's position
+(`useNavState`, `src/app/use-nav.ts`), because a wide desktop and a small laptop
+want different answers. Collapsing (not restoring) fires the `clearTheDecks`
+achievement.
 
 The state reaches the rest of the app as `sidebarCollapsed` / `toggleSidebar` on
 the [nav context](#side-menu). Only the docked layout has any of this — the
@@ -3179,8 +3200,9 @@ the active note's folder open) reads `open || (pinned && !sidebarCollapsed)` so
 a folded-away sidebar counts as not showing. Overlays that inset themselves past
 the menu — the [toast](#toast) and the [update toast](#update-toast) — ask
 `dockedSidebarWidth(nav)` (`src/ui/nav-context.ts`) rather than hard-coding
-`16rem`: it answers `calc(16rem + 1rem)` for the panel plus its rail, `1rem`
-once collapsed, and `undefined` where there is no docked sidebar at all.
+`16rem`: it answers the bare `16rem` panel while docked open, and `undefined`
+both once collapsed (the rail overlays the notes rather than displacing them)
+and where there is no docked sidebar at all.
 
 ### Viewport height
 

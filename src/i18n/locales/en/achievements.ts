@@ -194,7 +194,7 @@ const achievements = {
       name: "Clear the decks",
       condition: "Collapse the docked sidebar to give the note the full width.",
       learnMore:
-        "On a wide screen the side menu is docked open beside your notes, which is handy right up until you want to read or write without it. Hover the thin rail on the menu's inner edge and a chevron appears: press it and the whole panel folds away, leaving only the rail. Hover that rail and the chevron points back the other way to bring the menu in again. The choice is per device and remembered across reloads.",
+        "On a wide screen the side menu is docked open beside your notes, which is handy right up until you want to read or write without it. Move the pointer to the menu's inner edge and a small handle appears: press it and the whole panel folds away, giving the note the full width with no gutter left behind. Move the pointer back to that edge of the screen and the handle returns, now pointing the other way to bring the menu in again. The choice is per device and remembered across reloads.",
     },
     marginalia: {
       name: "Marginalia",

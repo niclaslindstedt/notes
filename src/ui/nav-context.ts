@@ -48,35 +48,37 @@ export type NavContextValue = {
    */
   pinned: boolean;
   /**
-   * Whether the docked sidebar is folded away to its edge rail, handing its
-   * width to the note. Only meaningful while `pinned` — the phone drawer
-   * closes instead of collapsing.
+   * Whether the docked sidebar is folded away, handing every one of its pixels
+   * to the note — all that is left is a collapse rail that stays invisible
+   * until the pointer reaches that edge of the screen. Only meaningful while
+   * `pinned` — the phone drawer closes instead of collapsing.
    */
   sidebarCollapsed: boolean;
-  /** Fold the docked sidebar away to its rail, or bring it back. */
+  /** Fold the docked sidebar away, or bring it back. */
   toggleSidebar: () => void;
 };
 
 /** The docked sidebar panel's own width (`w-64`). */
 export const SIDEBAR_PANEL_WIDTH = "16rem";
 /**
- * The width of the collapse rail that sits on the panel's inner edge — the
- * only thing left of the sidebar once it is folded away (`w-4`). Wide enough
- * to hover and press without a precise aim, narrow enough to read as a gutter
- * rather than a second panel.
+ * The width of the collapse rail that reveals itself on the panel's inner
+ * edge (`w-4`). Wide enough to hover and press without a precise aim, narrow
+ * enough to read as a grip on the divider rather than a second panel. It is an
+ * overlay, so this is never part of the sidebar's footprint — see
+ * `dockedSidebarWidth`.
  */
 export const SIDEBAR_RAIL_WIDTH = "1rem";
 
 /**
  * How much horizontal space the side menu occupies on the edge it docks on,
  * for the overlays that inset themselves past it (the toasts). `undefined`
- * when there is no docked sidebar at all, so a caller can fall back to its
- * own edge gutter.
+ * when there is no docked sidebar at all — including a collapsed one, whose
+ * rail floats over the notes rather than displacing them — so a caller can
+ * fall back to its own edge gutter.
  */
 export function dockedSidebarWidth(nav: NavContextValue): string | undefined {
-  if (!nav.pinned) return undefined;
-  if (nav.sidebarCollapsed) return SIDEBAR_RAIL_WIDTH;
-  return `calc(${SIDEBAR_PANEL_WIDTH} + ${SIDEBAR_RAIL_WIDTH})`;
+  if (!nav.pinned || nav.sidebarCollapsed) return undefined;
+  return SIDEBAR_PANEL_WIDTH;
 }
 
 export const NavContext = createContext<NavContextValue | null>(null);

@@ -37,10 +37,10 @@ export function Toast({
   const { position } = nav;
   const { needRefresh } = usePwaUpdate();
 
-  // Match whatever the side menu occupies on its edge — the docked panel plus
-  // its collapse rail, or just the rail once folded away — so `mx-auto`
-  // centres the pill in the remaining content band; fall back to the 0.75rem
-  // edge gutter when there is no docked sidebar at all.
+  // Match whatever the side menu occupies on its edge so `mx-auto` centres the
+  // pill in the remaining content band; fall back to the 0.75rem edge gutter
+  // when there is no docked sidebar at all — a folded-away one included, since
+  // its collapse rail only overlays the notes rather than displacing them.
   const sidebar = dockedSidebarWidth(nav);
   const gutter = "max(0.75rem,env(safe-area-inset-bottom))";
 
