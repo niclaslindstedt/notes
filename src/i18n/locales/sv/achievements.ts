@@ -192,7 +192,7 @@ const achievements: AchievementsCatalog = {
       condition:
         "Fäll ihop den fastsatta sidomenyn och ge anteckningen hela bredden.",
       learnMore:
-        "På en bred skärm står sidomenyn fastsatt bredvid anteckningarna, vilket är praktiskt ända tills du vill läsa eller skriva utan den. För pekaren till menyns innerkant så dyker ett litet handtag upp: tryck på det och hela panelen fälls ihop, så att anteckningen får hela bredden utan någon list kvar. För pekaren tillbaka till skärmkanten så kommer handtaget fram igen, nu vänt åt andra hållet för att ta tillbaka menyn. Valet gäller per enhet och kommer ihåg mellan omladdningar.",
+        "På en bred skärm står sidomenyn fastsatt bredvid anteckningarna, vilket är praktiskt ända tills du vill läsa eller skriva utan den. För pekaren till menyns innerkant så tonar en smal remsa fram utmed hela dess höjd, med en pil i mitten: tryck på den och hela panelen fälls ihop, så att anteckningen får hela bredden utan någon list kvar. För pekaren tillbaka till skärmkanten så kommer remsan fram igen, med pilen vänd åt andra hållet för att ta tillbaka menyn. Valet gäller per enhet och kommer ihåg mellan omladdningar.",
     },
     marginalia: {
       name: "Marginalanteckningar",
