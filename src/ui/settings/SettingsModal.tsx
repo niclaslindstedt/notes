@@ -195,7 +195,17 @@ export function SettingsModal({ open, onClose, storage, conversion }: Props) {
           id={`settings-tabpanel-${activeTab}`}
           aria-labelledby={`settings-tab-${activeTab}`}
           tabIndex={0}
-          className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4"
+          // `relative` is load-bearing, not decoration. Visually-hidden form
+          // controls (the `sr-only` input inside every Checkbox / ToggleRow)
+          // are `position: absolute`, so they resolve against the nearest
+          // positioned ancestor. Without this that was the Modal card, which
+          // put them outside this panel's clip: they inflated the *card's*
+          // scroll height, and focusing one — which is what tapping a toggle
+          // does — scrolled the card to reveal it. The card is
+          // `overflow: hidden`, so nothing scrolled it back and the dialog
+          // went blank. Containing them here keeps the focus scroll on the
+          // panel that is actually scrollable.
+          className="relative flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4"
         >
           {/* The Section blocks self-space with `mt-3 first:mt-0`, so the
               wrapper adds no gap of its own. */}

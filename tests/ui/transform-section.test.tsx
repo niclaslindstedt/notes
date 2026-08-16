@@ -282,6 +282,22 @@ describe("TransformRuleModal", () => {
       screen.getByRole("combobox", { name: "Mask" }).textContent,
     ).toContain("Keep both ends");
   });
+
+  // The ignore-case Checkbox hides its real `<input>` with `sr-only`, which is
+  // `position: absolute`. Unless the scrolling body establishes a containing
+  // block, that input resolves against the Modal card instead, escaping this
+  // panel's clip — it inflates the card's own scroll height, and focusing it
+  // scrolls the card, which is `overflow: hidden` and never scrolls back, so
+  // the dialog goes blank. jsdom has no layout, so what's pinned here is the
+  // class that prevents it.
+  it("contains the visually-hidden input its checkbox focuses", () => {
+    openBlankDialog();
+    const body = screen
+      .getByRole("checkbox", { name: "Ignore case" })
+      .closest("div.overflow-y-auto");
+    expect(body).not.toBeNull();
+    expect(body?.className).toContain("relative");
+  });
 });
 
 describe("the regex helper", () => {
