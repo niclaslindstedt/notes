@@ -204,7 +204,12 @@ export function TransformRuleModal({
         </button>
       </header>
 
-      <div className="flex flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4">
+      {/* `relative` contains the `sr-only` (absolutely positioned) input inside
+          the ignore-case Checkbox. Without it that input resolves against the
+          Modal card, escaping this panel's clip — it inflates the card's own
+          scroll height, and focusing it scrolls the card, which is
+          `overflow: hidden` and never scrolls back. */}
+      <div className="relative flex flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4">
         <Field label={t("settings.transform.name")}>
           <input
             type="text"

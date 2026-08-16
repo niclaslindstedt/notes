@@ -273,3 +273,30 @@ body {
     animation-duration: 0ms;
   }
 }
+
+/* Native colour inputs are used as swatches — the code-background picker's
+   "Custom" entry sits in a row of plain `<button>` swatches, and the
+   custom-theme editor is a grid of them — so they have to read as the same
+   object as the things beside them. Left alone the UA paints its own inset
+   bezel: a smaller rectangle floating inside the control's border, which made
+   "Custom" visibly unlike every preset next to it. Zeroing the wrapper's
+   padding and the swatch's own border lets the colour fill the control edge to
+   edge, and `border-radius: inherit` carries the caller's rounding down to it
+   so the corners match too. */
+input[type="color"] {
+  overflow: hidden;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: inherit;
+}
+
+input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: inherit;
+}

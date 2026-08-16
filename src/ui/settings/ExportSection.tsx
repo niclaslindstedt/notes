@@ -365,6 +365,10 @@ function CodeBackgroundPicker({
 }) {
   const t = useT();
   const none = value === PDF_CODE_BACKGROUND_NONE;
+  // A colour that isn't one of the presets came from the input itself, so the
+  // input is the selected swatch and wears the same ring the presets do —
+  // otherwise picking a custom colour leaves the whole row looking unselected.
+  const custom = !PDF_CODE_BACKGROUNDS.includes(value);
   return (
     <div className="flex flex-wrap items-center gap-2">
       {PDF_CODE_BACKGROUNDS.map((color) => {
@@ -410,7 +414,13 @@ function CodeBackgroundPicker({
           value={none ? "#f4f4f5" : value}
           onChange={(e) => onChange(e.currentTarget.value)}
           aria-label={t("settings.export.codeBackgroundCustom")}
-          className="h-7 w-9 cursor-pointer rounded border border-line bg-transparent p-0"
+          // Sized and bordered exactly like the preset swatches above — the
+          // UA's own bezel inside the control is flattened in theme.css — so
+          // the row reads as one set of swatches rather than five plus an
+          // odd one out.
+          className={`h-7 w-7 cursor-pointer rounded border bg-transparent p-0 ${
+            custom ? "border-accent ring-2 ring-accent/40" : "border-line"
+          }`}
         />
         <span>{t("settings.export.codeBackgroundCustom")}</span>
       </label>
