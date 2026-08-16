@@ -200,6 +200,33 @@ describe("SideMenu — the docked sidebar's collapse rail", () => {
     expect(grip.className).toContain("pointer-events-auto");
   });
 
+  it("runs the grip the full height of the sidebar", () => {
+    // The grip fills its sensor rather than floating at one spot on the edge,
+    // so the pointer lands on the control wherever along the divider it
+    // arrives.
+    renderMenu({ pinned: true });
+    const grip = screen.getByRole("button", {
+      name: "Hide sidebar",
+    }).firstElementChild!;
+    expect(grip.className).toContain("h-full");
+    expect(grip.className).toContain("w-full");
+  });
+
+  it("keeps the revealed grip quiet until it is hovered", () => {
+    // Running the panel's whole height, it can't shout: no border, no shadow,
+    // no fill of its own — a faint wash that only deepens under the pointer,
+    // which is where it has to read as a button.
+    renderMenu({ pinned: true });
+    const grip = screen.getByRole("button", {
+      name: "Hide sidebar",
+    }).firstElementChild!;
+    expect(grip.className).not.toContain("shadow");
+    expect(grip.className).not.toContain("border");
+    expect(grip.className).toContain("bg-accent/10");
+    expect(grip.className).toContain("hover:bg-accent/25");
+    expect(grip.className).toContain("hover:text-fg-bright");
+  });
+
   it("leaves the sensor click-through so it can't swallow a row's buttons", () => {
     renderMenu({ pinned: true });
     // Only the grip inside it is ever pressable; the full-height band that

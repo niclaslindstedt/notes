@@ -887,7 +887,8 @@ export function SideMenu({
   // edge rather than a flex sibling, and it is invisible and click-through
   // until the pointer comes to the edge looking for it: collapsed, the sidebar
   // then costs the note nothing at all, and open, the rows' highlight runs the
-  // panel's full width instead of stopping short of a permanent gutter. The
+  // panel's full width instead of stopping short of a permanent gutter. Once
+  // revealed it is a quiet full-height strip rather than a floating handle. The
   // panel owns the border that separates the menu from the notes.
   //
   // The top padding drops the drawer's first section header a touch below the
@@ -904,7 +905,8 @@ export function SideMenu({
     // straddles the panel's inner edge (half the rail's width back from
     // `SIDEBAR_PANEL_WIDTH`), so it reads as a grip on the divider and leaves
     // the rows' trailing "+" — which stops a few pixels short of that edge —
-    // clear of it.
+    // clear of it. The grip fills this band top to bottom, so the edge is the
+    // control everywhere along it rather than only at a handle's height.
     const railOffset = sidebarCollapsed
       ? "0px"
       : `calc(${SIDEBAR_PANEL_WIDTH} - ${SIDEBAR_RAIL_WIDTH} / 2)`;

@@ -633,17 +633,26 @@ export function FooterCollapseRail({
 //   descendant may take pointer events back from a `none` ancestor, and the
 //   press still bubbles to the button's handler.
 //
-// So approaching anywhere along the edge summons the grip, but the pixels it
-// can swallow are just its own small box — never a whole edge's worth of the
-// rows' trailing "+" buttons or of the note underneath.
+// The grip fills the sensor: a `w-4` strip running the panel's whole height,
+// so wherever along the edge the pointer arrives it is already on the control
+// rather than hunting up or down for a small handle. That width is the entire
+// budget — the rows' trailing "+" stops 16px short of the panel edge, twice the
+// 8px the strip reaches back over it, so a full-height grip still takes none of
+// their pixels (nor the note's, which the strip only overlaps by its other
+// half).
 //
-// The grip is centred on the divider rather than covering it, so revealing it
-// doesn't appear to shift the line the panel draws. It points the way the panel
-// will move (out toward the edge to collapse, in toward the content to
-// restore). `title` keeps it discoverable for a pointer that pauses there;
-// keyboard focus reveals it on its own terms (a focused button takes Enter
-// without needing pointer events at all), and `aria-expanded` / `aria-controls`
-// keep it legible to a screen reader either way.
+// Running that tall, it has to be quiet: no border, no shadow, no fill of its
+// own — just a faint accent wash over the divider, with the chevron muted at
+// its centre. Hovering it directly deepens the wash and brings the chevron up
+// to full contrast, which is the moment it has to read unmistakably as a
+// button. The wash is translucent and centred on the divider rather than
+// covering it, so revealing the grip doesn't appear to shift or hide the line
+// the panel draws. The chevron points the way the panel will move (out toward
+// the edge to collapse, in toward the content to restore). `title` keeps it
+// discoverable for a pointer that pauses there; keyboard focus reveals it on
+// its own terms (a focused button takes Enter without needing pointer events at
+// all), and `aria-expanded` / `aria-controls` keep it legible to a screen
+// reader either way.
 export function SidebarCollapseRail({
   collapsed,
   side,
@@ -692,9 +701,9 @@ export function SidebarCollapseRail({
       className="group pointer-events-none absolute inset-y-0 z-40 flex w-4 items-center justify-center focus-visible:outline-none"
     >
       <span
-        className={`flex h-16 w-4 items-center justify-center rounded-[var(--radius)] border border-line bg-surface-3 text-fg-bright shadow-md transition-opacity duration-150 group-focus-visible:opacity-100 group-focus-visible:ring-2 group-focus-visible:ring-accent motion-reduce:transition-none ${
+        className={`flex h-full w-full items-center justify-center text-muted transition-[opacity,background-color,color] duration-150 group-focus-visible:bg-accent/25 group-focus-visible:text-fg-bright group-focus-visible:opacity-100 group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-inset motion-reduce:transition-none ${
           revealed
-            ? "pointer-events-auto cursor-pointer opacity-100"
+            ? "pointer-events-auto cursor-pointer bg-accent/10 opacity-100 hover:bg-accent/25 hover:text-fg-bright"
             : "opacity-0"
         }`}
       >

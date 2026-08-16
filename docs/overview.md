@@ -3158,11 +3158,21 @@ that:
   `absolute`, `w-4` (16px), positioned by an inline `left`/`right` of `0` when
   collapsed and `calc(16rem - 0.5rem)` when open — and it is
   `pointer-events-none` for its entire life.
-- The **grip** inside it (`h-16`, rounded, bordered, `bg-surface-3`, a shadow)
-  is the only thing ever painted or pressed, and only when `revealed` turns its
-  opacity and its pointer events back on together. A descendant may take pointer
-  events back from a `none` ancestor, and its press still bubbles to the
-  button's handler.
+- The **grip** inside it is the only thing ever painted or pressed, and only
+  when `revealed` turns its opacity and its pointer events back on together. A
+  descendant may take pointer events back from a `none` ancestor, and its press
+  still bubbles to the button's handler.
+
+**The grip fills the sensor** — `h-full w-full`, so it is a 16px strip running
+the panel's whole height rather than a handle floating at one spot on the edge.
+Wherever along the divider the pointer arrives, it is already on the control; no
+hunting up or down for a small box. Running that tall obliges it to be quiet, so
+it carries no border, no shadow and no fill of its own: revealed, it is a faint
+`bg-accent/10` wash with the chevron `text-muted` at its centre. Hovering the
+strip directly deepens it to `bg-accent/25` and brings the chevron to
+`text-fg-bright` — the one moment it has to read unmistakably as a button. The
+wash is translucent and centred on the divider rather than covering it, so
+revealing the grip neither shifts nor hides the line the panel draws.
 
 `revealed` comes from **`useEdgeHover`** (`src/ui/hooks/useEdgeHover.ts`), which
 tracks `pointermove` on the window and compares the cursor against the sensor's
@@ -3172,8 +3182,10 @@ click-through element can never match `:hover`, which is exactly why the plain
 CSS pseudo-class won't do here. Three consequences worth keeping:
 
 - **Nothing invisible can swallow a press.** The only pixels the rail can take
-  are the grip's own small box, and only while it is on screen — so a row's
-  trailing "+" and the note underneath keep the whole edge otherwise.
+  are the grip's own `w-4` strip, and only while it is on screen — so the note
+  underneath keeps the whole edge otherwise. The rows' trailing "+" is safe even
+  from the revealed strip: it stops 16px short of the panel edge, twice the 8px
+  the strip reaches back over it.
 - **The grip is centred on the divider, not over it**, so revealing it doesn't
   appear to shift the line the panel draws. The panel owns that border now
   (`border-r`, or `border-l` docked right) — the rail no longer draws one.
