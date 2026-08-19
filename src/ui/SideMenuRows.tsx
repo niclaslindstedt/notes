@@ -645,9 +645,11 @@ export function FooterCollapseRail({
 // `surface-3` strip over the divider, with the chevron muted at its centre.
 // The fill is opaque rather than a translucent wash so the strip reads as one
 // solid control at any panel width, over any theme, instead of picking up
-// whatever it happens to sit on. Hovering it directly fills it with the accent
-// and flips the chevron to `page-bg`, which is the moment it has to read
-// unmistakably as a button. The chevron points the way the panel will move
+// whatever it happens to sit on. Hovering it directly fills it with
+// `accent-wash` — the same green the panel's active row resolves to, taken
+// opaque so the strip doesn't read as two tones where it overhangs the note —
+// and brightens the chevron, which is the moment it has to read unmistakably
+// as a button. The chevron points the way the panel will move
 // (out toward the edge to collapse, in toward the content to restore).
 // `title` keeps it discoverable for a pointer that pauses there; keyboard
 // focus reveals it on its own terms (a focused button takes Enter without
@@ -701,9 +703,9 @@ export function SidebarCollapseRail({
       className="group pointer-events-none absolute inset-y-0 z-40 flex w-4 items-center justify-center focus-visible:outline-none"
     >
       <span
-        className={`flex h-full w-full items-center justify-center text-muted transition-[opacity,background-color,color] duration-150 group-focus-visible:bg-accent group-focus-visible:text-page-bg group-focus-visible:opacity-100 group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-inset motion-reduce:transition-none ${
+        className={`flex h-full w-full items-center justify-center text-muted transition-[opacity,background-color,color] duration-150 group-focus-visible:bg-accent-wash group-focus-visible:text-fg-bright group-focus-visible:opacity-100 group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-inset motion-reduce:transition-none ${
           revealed
-            ? "pointer-events-auto cursor-pointer bg-surface-3 opacity-100 hover:bg-accent hover:text-page-bg"
+            ? "pointer-events-auto cursor-pointer bg-surface-3 opacity-100 hover:bg-accent-wash hover:text-fg-bright"
             : "opacity-0"
         }`}
       >

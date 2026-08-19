@@ -214,8 +214,8 @@ describe("SideMenu — the docked sidebar's collapse rail", () => {
 
   it("keeps the revealed grip quiet until it is hovered", () => {
     // Running the panel's whole height, it can't shout: no border, no shadow —
-    // a flat surface fill that only takes the accent under the pointer, which
-    // is where it has to read as a button.
+    // a flat surface fill that only takes the accent wash under the pointer,
+    // which is where it has to read as a button.
     renderMenu({ pinned: true });
     const grip = screen.getByRole("button", {
       name: "Hide sidebar",
@@ -223,19 +223,36 @@ describe("SideMenu — the docked sidebar's collapse rail", () => {
     expect(grip.className).not.toContain("shadow");
     expect(grip.className).not.toContain("border");
     expect(grip.className).toContain("bg-surface-3");
-    expect(grip.className).toContain("hover:bg-accent");
-    expect(grip.className).toContain("hover:text-page-bg");
+    expect(grip.className).toContain("hover:bg-accent-wash");
+    expect(grip.className).toContain("hover:text-fg-bright");
+  });
+
+  it("lights the grip with the same green as the panel's active row", () => {
+    // `--accent-wash` is the accent at 20% over `--surface` — the colour the
+    // active row's `bg-accent/20` resolves to — so the lit strip belongs to the
+    // selected note beside it rather than shouting the raw accent. The raw
+    // accent stays off the fill entirely; it is still the focus ring.
+    renderMenu({ pinned: true });
+    const grip = screen.getByRole("button", {
+      name: "Hide sidebar",
+    }).firstElementChild!;
+    expect(grip.className).toContain("hover:bg-accent-wash");
+    expect(grip.className).toContain("group-focus-visible:bg-accent-wash");
+    expect(grip.className).not.toMatch(
+      /(hover|group-focus-visible):bg-accent(?!-)/,
+    );
   });
 
   it("paints the grip with opaque fills, never a translucent wash", () => {
     // The strip has to read as one solid control over any theme rather than
     // tinting the divider and the note edge it straddles, so neither the
-    // resting nor the hovered fill carries an alpha suffix.
+    // resting nor the hovered fill carries an alpha suffix — the hovered one
+    // gets its tint pre-composited in `--accent-wash` instead.
     renderMenu({ pinned: true });
     const grip = screen.getByRole("button", {
       name: "Hide sidebar",
     }).firstElementChild!;
-    expect(grip.className).not.toMatch(/bg-(accent|surface-3)\/\d/);
+    expect(grip.className).not.toMatch(/bg-(accent|accent-wash|surface-3)\/\d/);
   });
 
   it("leaves the sensor click-through so it can't swallow a row's buttons", () => {
