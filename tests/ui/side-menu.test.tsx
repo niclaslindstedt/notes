@@ -213,18 +213,29 @@ describe("SideMenu — the docked sidebar's collapse rail", () => {
   });
 
   it("keeps the revealed grip quiet until it is hovered", () => {
-    // Running the panel's whole height, it can't shout: no border, no shadow,
-    // no fill of its own — a faint wash that only deepens under the pointer,
-    // which is where it has to read as a button.
+    // Running the panel's whole height, it can't shout: no border, no shadow —
+    // a flat surface fill that only takes the accent under the pointer, which
+    // is where it has to read as a button.
     renderMenu({ pinned: true });
     const grip = screen.getByRole("button", {
       name: "Hide sidebar",
     }).firstElementChild!;
     expect(grip.className).not.toContain("shadow");
     expect(grip.className).not.toContain("border");
-    expect(grip.className).toContain("bg-accent/10");
-    expect(grip.className).toContain("hover:bg-accent/25");
-    expect(grip.className).toContain("hover:text-fg-bright");
+    expect(grip.className).toContain("bg-surface-3");
+    expect(grip.className).toContain("hover:bg-accent");
+    expect(grip.className).toContain("hover:text-page-bg");
+  });
+
+  it("paints the grip with opaque fills, never a translucent wash", () => {
+    // The strip has to read as one solid control over any theme rather than
+    // tinting the divider and the note edge it straddles, so neither the
+    // resting nor the hovered fill carries an alpha suffix.
+    renderMenu({ pinned: true });
+    const grip = screen.getByRole("button", {
+      name: "Hide sidebar",
+    }).firstElementChild!;
+    expect(grip.className).not.toMatch(/bg-(accent|surface-3)\/\d/);
   });
 
   it("leaves the sensor click-through so it can't swallow a row's buttons", () => {
