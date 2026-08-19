@@ -641,18 +641,18 @@ export function FooterCollapseRail({
 // their pixels (nor the note's, which the strip only overlaps by its other
 // half).
 //
-// Running that tall, it has to be quiet: no border, no shadow, no fill of its
-// own — just a faint accent wash over the divider, with the chevron muted at
-// its centre. Hovering it directly deepens the wash and brings the chevron up
-// to full contrast, which is the moment it has to read unmistakably as a
-// button. The wash is translucent and centred on the divider rather than
-// covering it, so revealing the grip doesn't appear to shift or hide the line
-// the panel draws. The chevron points the way the panel will move (out toward
-// the edge to collapse, in toward the content to restore). `title` keeps it
-// discoverable for a pointer that pauses there; keyboard focus reveals it on
-// its own terms (a focused button takes Enter without needing pointer events at
-// all), and `aria-expanded` / `aria-controls` keep it legible to a screen
-// reader either way.
+// Running that tall, it has to be quiet: no border and no shadow — just a flat
+// `surface-3` strip over the divider, with the chevron muted at its centre.
+// The fill is opaque rather than a translucent wash so the strip reads as one
+// solid control at any panel width, over any theme, instead of picking up
+// whatever it happens to sit on. Hovering it directly fills it with the accent
+// and flips the chevron to `page-bg`, which is the moment it has to read
+// unmistakably as a button. The chevron points the way the panel will move
+// (out toward the edge to collapse, in toward the content to restore).
+// `title` keeps it discoverable for a pointer that pauses there; keyboard
+// focus reveals it on its own terms (a focused button takes Enter without
+// needing pointer events at all), and `aria-expanded` / `aria-controls` keep
+// it legible to a screen reader either way.
 export function SidebarCollapseRail({
   collapsed,
   side,
@@ -701,9 +701,9 @@ export function SidebarCollapseRail({
       className="group pointer-events-none absolute inset-y-0 z-40 flex w-4 items-center justify-center focus-visible:outline-none"
     >
       <span
-        className={`flex h-full w-full items-center justify-center text-muted transition-[opacity,background-color,color] duration-150 group-focus-visible:bg-accent/25 group-focus-visible:text-fg-bright group-focus-visible:opacity-100 group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-inset motion-reduce:transition-none ${
+        className={`flex h-full w-full items-center justify-center text-muted transition-[opacity,background-color,color] duration-150 group-focus-visible:bg-accent group-focus-visible:text-page-bg group-focus-visible:opacity-100 group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-inset motion-reduce:transition-none ${
           revealed
-            ? "pointer-events-auto cursor-pointer bg-accent/10 opacity-100 hover:bg-accent/25 hover:text-fg-bright"
+            ? "pointer-events-auto cursor-pointer bg-surface-3 opacity-100 hover:bg-accent hover:text-page-bg"
             : "opacity-0"
         }`}
       >

@@ -3243,12 +3243,12 @@ that:
 the panel's whole height rather than a handle floating at one spot on the edge.
 Wherever along the divider the pointer arrives, it is already on the control; no
 hunting up or down for a small box. Running that tall obliges it to be quiet, so
-it carries no border, no shadow and no fill of its own: revealed, it is a faint
-`bg-accent/10` wash with the chevron `text-muted` at its centre. Hovering the
-strip directly deepens it to `bg-accent/25` and brings the chevron to
-`text-fg-bright` — the one moment it has to read unmistakably as a button. The
-wash is translucent and centred on the divider rather than covering it, so
-revealing the grip neither shifts nor hides the line the panel draws.
+it carries no border and no shadow: revealed, it is a flat `bg-surface-3` strip
+with the chevron `text-muted` at its centre. Hovering the strip directly fills
+it with `bg-accent` and flips the chevron to `text-page-bg` — the one moment it
+has to read unmistakably as a button. Both fills are **opaque**, not translucent
+washes, so the strip reads as one solid control at any panel width and over any
+theme instead of tinting whatever sits beneath it.
 
 `revealed` comes from **`useEdgeHover`** (`src/ui/hooks/useEdgeHover.ts`), which
 tracks `pointermove` on the window and compares the cursor against the sensor's
@@ -3262,9 +3262,11 @@ CSS pseudo-class won't do here. Three consequences worth keeping:
   underneath keeps the whole edge otherwise. The rows' trailing "+" is safe even
   from the revealed strip: it stops 16px short of the panel edge, twice the 8px
   the strip reaches back over it.
-- **The grip is centred on the divider, not over it**, so revealing it doesn't
-  appear to shift the line the panel draws. The panel owns that border now
-  (`border-r`, or `border-l` docked right) — the rail no longer draws one.
+- **The grip is centred on the divider**, straddling it evenly rather than
+  sitting to one side, so revealing it doesn't appear to shift the line the
+  panel draws — the solid fill covers that stretch of it while on screen. The
+  panel owns that border (`border-r`, or `border-l` docked right) — the rail
+  never draws one.
 - **A device that can't hover keeps the grip up permanently.** `useEdgeHover` is
   gated on `useDesktopPointer()` and ignores `pointerType: "touch"`; without
   that, a collapsed sidebar on a tablet would have no way back.
