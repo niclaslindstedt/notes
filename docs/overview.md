@@ -566,6 +566,30 @@ round-trips as the source it was typed as; only the columns at the very start an
 end of the selection are trimmed, interior lines are taken in full. Both are
 pure/DOM-only helpers the editor uses in its `copy` / `cut` handlers.
 
+`snapStartToLineEdge` widens a ranged selection's **start** over the leading
+block marker of the line it begins on. On a formatted line a `# `, `- `, `> ` or
+`1. ` is drawn as a non-selectable glyph (or not drawn at all), so the browser
+can't anchor before it — the earliest an endpoint can land is the line's content
+start, and a range reaching there has visually taken the whole line. Snapping it
+back to column 0 is what makes [cutting](#cut-button) a bulleted line take its
+`- ` too, and what stops a select-and-type over a heading leaving a stray `# `.
+Only the start endpoint needs it (markers are leading), and only for a range — a
+collapsed caret lands after the marker, where editing happens.
+
+**The active raw line is exempt**, and that exemption is the whole point of the
+`rawLine` argument the editor passes (`activeRef.current.index`) from
+`selectionPoints`, `editPoints`, and `selectionSource`. The active line renders
+as verbatim source, so its marker is ordinary text the browser *can* address: a
+range starting at the content start there means the content, not the line. It
+matters because a **phone's autocorrect** is a ranged edit — accepting a
+correction arrives as a `beforeinput` (`insertReplacementText`, or a ranged
+`deleteWordBackward`) whose `getTargetRanges()` scopes exactly the word being
+rewritten. When that word is the first one in a list item, its range starts at
+the content start, and snapping swallowed the marker along with it: typing
+`4. Somethign` and letting the keyboard fix the typo replaced the whole line
+with `Something`, silently un-listing the row. A desktop spellcheck replacement
+takes the same path.
+
 **A selection doesn't outlive the focus that drew it — on a touch device.**
 `dropSelectionOnBlur` (`src/ui/MarkdownEditor.tsx`), run from the surface's blur
 handler once focus has genuinely landed outside it, removes any range still
@@ -1879,9 +1903,11 @@ so both surfaces agree:
 - **A ranged selection** — exactly what is highlighted goes, to the column, and
   the caret lands where the selection started. What you can see is selected is
   what ends up on the clipboard. In the [live-preview
-  editor](#markdown-editor) a selection reaching a line's content start is first
-  snapped over that line's block marker (`snapStartToLineEdge`), so cutting a
-  bulleted line takes its `- ` too.
+  editor](#markdown-editor) a selection reaching a *formatted* line's content
+  start is first snapped over that line's block marker (`snapStartToLineEdge`),
+  so cutting a bulleted line takes its `- ` too — the [active raw
+  line](#selection-mapping) is exempt, its marker being text you can see and
+  select for yourself.
 - **Caret in the middle of a line** — only the text *after* it goes, and the
   caret stays at its column. This is the kill-to-end-of-line every terminal
   binds to Ctrl+K, and it's what makes the button useful for lifting the rest

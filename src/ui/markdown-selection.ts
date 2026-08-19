@@ -150,10 +150,19 @@ function containerPoint(
 // *start* endpoint needs this (markers are leading; a line's end already covers
 // its content), and only for a range — a collapsed caret still lands after the
 // marker, where editing happens.
+//
+// `rawLine` is the active line, which renders as verbatim source: its marker is
+// ordinary text there, so the browser *can* address it and a range that starts
+// at the content start means exactly that. Snapping it would widen a span the
+// browser scoped precisely — which is what a phone's autocorrect hands over
+// when it rewrites the first word of a list item ("4. Somethign" → the word
+// alone), and swallowing the marker turned that into "Something".
 export function snapStartToLineEdge(
   blocks: LineBlock[],
   start: SourcePoint,
+  rawLine: number | null = null,
 ): SourcePoint {
+  if (start.line === rawLine) return start;
   const contentStart = blocks[start.line]?.contentStart ?? 0;
   return start.col <= contentStart ? { line: start.line, col: 0 } : start;
 }

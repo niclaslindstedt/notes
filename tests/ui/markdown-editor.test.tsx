@@ -102,6 +102,40 @@ function beforeInput(inputType: string, data: string | null = null) {
   });
 }
 
+// The same, with the target range the browser scopes an edit to — how a phone's
+// autocorrect (and a desktop spellcheck replacement) says *which* word it is
+// rewriting. jsdom's `InputEvent` takes no `targetRanges`, and the editor only
+// reads the four boundary fields, so the range is stood in for by hand.
+function beforeInputOver(
+  inputType: string,
+  data: string | null,
+  lineEl: HTMLElement,
+  from: number,
+  to: number,
+) {
+  const a = domPointIn(lineEl, from);
+  const b = domPointIn(lineEl, to);
+  const e = new InputEvent("beforeinput", {
+    inputType,
+    data,
+    cancelable: true,
+    bubbles: true,
+  });
+  Object.defineProperty(e, "getTargetRanges", {
+    value: () => [
+      {
+        startContainer: a.node,
+        startOffset: a.offset,
+        endContainer: b.node,
+        endOffset: b.offset,
+      },
+    ],
+  });
+  act(() => {
+    surface().dispatchEvent(e);
+  });
+}
+
 afterEach(() => {
   window.getSelection()?.removeAllRanges();
   resetEditorPositions();
@@ -500,6 +534,54 @@ describe("MarkdownEditor", () => {
   it("shows the start-writing placeholder for an empty note", () => {
     renderEditor("", { focusOnMount: false });
     expect(screen.getByText(/start writing/i)).not.toBeNull();
+  });
+
+  // A phone's autocorrect rewrites the word it just took, handing the editor
+  // the word's own range. On the active line that range starts at the line's
+  // content start whenever the corrected word is the first one — and the
+  // marker-snapping meant for *formatted* lines then widened it over the
+  // leading `4. ` / `- ` / `# `, so accepting a correction ate the bullet:
+  // "4. Somethign" came back as "Something".
+  describe("autocorrect on a marked line", () => {
+    it("keeps the ordinal when the first word is corrected", () => {
+      const { onChange } = renderEditor("4. Somethign");
+      beforeInputOver("insertReplacementText", "Something", rawLine()!, 3, 12);
+      expect(onChange).toHaveBeenLastCalledWith("4. Something");
+    });
+
+    it("keeps the bullet when the first word is corrected", () => {
+      const { onChange } = renderEditor("- Somethign");
+      beforeInputOver("insertReplacementText", "Something", rawLine()!, 2, 11);
+      expect(onChange).toHaveBeenLastCalledWith("- Something");
+    });
+
+    it("keeps the marker when the correction arrives as a selection", () => {
+      // Without `getTargetRanges` the editor falls back to the live selection,
+      // which the keyboard leaves over the word it is replacing.
+      const { onChange } = renderEditor("# Somethign");
+      selectRange(rawLine()!, 2, 11);
+      beforeInput("insertReplacementText", "Something");
+      expect(onChange).toHaveBeenLastCalledWith("# Something");
+    });
+
+    it("keeps the marker when a word delete takes the first word", () => {
+      const { onChange } = renderEditor("- alpha beta");
+      beforeInputOver("deleteWordBackward", null, rawLine()!, 2, 8);
+      expect(onChange).toHaveBeenLastCalledWith("- beta");
+    });
+
+    it("still takes the marker when the row is selected from its content", () => {
+      // The exemption is the raw line's alone: on a formatted line the marker
+      // is a glyph the browser can't anchor before, so a selection reaching the
+      // content start has taken the whole line, markers included.
+      const { onChange } = renderEditor("- alpha\nbeta");
+      const formatted = surface().querySelector<HTMLElement>(
+        '[data-line-index="0"]',
+      )!;
+      selectRange(formatted, 0, formatted.textContent!.length);
+      beforeInput("insertText", "X");
+      expect(onChange).toHaveBeenLastCalledWith("X\nbeta");
+    });
   });
 
   describe("undo / redo reveal", () => {
