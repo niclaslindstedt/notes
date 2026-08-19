@@ -14,6 +14,7 @@
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-accent: var(--accent);
+  --color-accent-wash: var(--accent-wash);
   --color-danger: var(--danger);
   --color-link: var(--link);
 
@@ -56,6 +57,14 @@
   --success: var(--accent);
   --positive: var(--accent);
   --negative: var(--danger);
+  /* The opaque twin of a `bg-accent/20` tint sitting on `--surface`: the
+     exact colour the side menu's active row resolves to, but composited
+     here instead of at paint time. Anything that must carry that same green
+     while overhanging a *different* background — the sidebar collapse rail
+     straddles the divider between the panel and the note — has to be given
+     the resolved colour, or the translucent wash would read as two tones
+     down its length. */
+  --accent-wash: color-mix(in srgb, var(--accent) 20%, var(--surface));
   /* Vertical padding of a navigation / menu row, driven by the density
      preference in the Custom theme (otherwise the comfortable default). */
   --density-row-py: 0.5rem;

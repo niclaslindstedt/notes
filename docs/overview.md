@@ -3284,10 +3284,16 @@ Wherever along the divider the pointer arrives, it is already on the control; no
 hunting up or down for a small box. Running that tall obliges it to be quiet, so
 it carries no border and no shadow: revealed, it is a flat `bg-surface-3` strip
 with the chevron `text-muted` at its centre. Hovering the strip directly fills
-it with `bg-accent` and flips the chevron to `text-page-bg` — the one moment it
-has to read unmistakably as a button. Both fills are **opaque**, not translucent
-washes, so the strip reads as one solid control at any panel width and over any
-theme instead of tinting whatever sits beneath it.
+it with `bg-accent-wash` and brightens the chevron to `text-fg-bright` — the one
+moment it has to read unmistakably as a button. `--accent-wash`
+(`src/styles/theme.css`) is the accent at 20% over `--surface`, composited to an
+opaque colour: the same green the panel's **active row** paints with
+(`bg-accent/20`), so the lit strip and the selected note read as one family
+rather than the strip shouting the raw accent beside them. Composing it in the
+token rather than leaning on the translucent utility is what keeps both fills
+**opaque** — the strip straddles the divider, so a wash would pick up `surface`
+along one half and `page-bg` along the other and read as two tones down its
+length.
 
 `revealed` comes from **`useEdgeHover`** (`src/ui/hooks/useEdgeHover.ts`), which
 tracks `pointermove` on the window and compares the cursor against the sensor's
