@@ -2883,12 +2883,88 @@ moves the view, and the glide respects reduced motion.
 ### Settings sync
 
 `useSettingsSync` (`src/app/use-settings-sync.ts`) reconciles the
-[appearance store](#appearance-store) with the active backend's `settings.json`
-(via `SettingsStore`, `src/storage/settings-store.ts`), so theme/font/editor
-choices travel with a synced or shared folder and land on every device.
+[appearance store](#appearance-store) with the backend files that hold it. Two
+of the three [settings widths](#settings-scopes) live on the backend and one
+deliberately does not:
+
+- **global** → `settings.json` at the app-folder root (`SettingsStore`,
+  `src/storage/settings-store.ts`) — everyone on the account, in every
+  namespace.
+- **namespace** → `namespace-settings.json` inside the active namespace's own
+  folder (`NamespaceSettingsStore`,
+  `src/storage/namespace-settings-store.ts`) — only the people who share that
+  namespace, and it travels with the folder when the folder is shared.
+- **device** → localStorage only. Never uploaded, which is exactly what makes
+  it usable on a login several people share.
+
+Each remote width reconciles the same two ways: on mount / backend / namespace
+switch it adopts the backend's file when one exists and seeds it from this
+device when it doesn't, and on every local edit it writes that layer back. A
+write is compared against what was last seen for that layer first — both layers
+subscribe to the same store, so without the guard a device-layer edit would
+re-upload the global and namespace files untouched, which on a shared login is
+a write race between people over bytes nobody changed.
+
 Best-effort and plaintext (so the [unlock gate](#unlock-gate) can render in the
-user's theme); on the browser backend there is no file store and the hook is a
-no-op.
+user's theme); on the browser backend there are no file stores and the hook is
+a no-op.
+
+### Settings scopes
+
+`src/theme/appearance-scopes.ts` (over the generic algebra in
+`src/domain/settings-layers.ts`) — **how far a setting reaches**. A namespace
+can be shared by several people through one login and one folder, so a single
+settings document per account is not enough: one person switching to a light
+theme would repaint everyone else's app. Three widths solve it, **narrowest
+winning**: `global` → `namespace` → `device`.
+
+Each layer is **sparse** — it holds only the leaves it has an opinion about,
+down to `editor.wordWrap` and `customTheme.colors.accent` rather than whole
+groups. That is what makes the stack work: saving one toggle at the device
+width records that one leaf, and every other setting keeps following the wider
+layers.
+
+**Saving** (`applyScopedSave`) writes only the leaves the user actually moved
+since the settings dialog opened — so saving globally never drags along every
+untouched value and republishes it to everyone. For each moved leaf: it is
+stored in the chosen layer *unless* it already equals what the wider layers
+resolve to, in which case it is dropped from that layer (this is how a setting
+stops being an override); and it is removed from every **narrower** layer,
+because a leaf left behind there would shadow the save and the user would watch
+their choice do nothing.
+
+**Resetting** loads a wider baseline into the draft and persists nothing on its
+own, so the width it lands at is still Save's decision. Reset-to-a-wider-width
+followed by Save is therefore the way to *give up* an override.
+
+Three keys sit outside the scheme entirely (`UNSCOPED_KEYS`): the
+[Transform rules](#transforms) and the two achievement fields. They are
+authored content and earned progress rather than preferences — and the rules
+already carry a namespace of their own — so they stay in the global layer where
+they have always lived.
+
+Quick toggles outside the dialog (the theme switcher, the achievement recorder)
+have no scope picker, so they write through `writeToOwningScope`: the setting
+stays at the width already managing it, falling back to `global` when no layer
+has an opinion yet.
+
+### Settings scope pickers
+
+The settings dialog's footer wears two `SplitButton`s
+(`src/ui/form/SplitButton.tsx`) — one action with a chevron welded to its right
+edge that drops a menu of variants:
+
+- **Save** picks the width the change is written at: **Everyone** /
+  **This namespace** / **This device**.
+- **Reset** picks what the draft falls back to: **This namespace's settings** /
+  **Everyone's settings** / **Defaults**. A width that holds no settings is
+  **left out of the menu** rather than offered — falling back to an empty layer
+  would be indistinguishable from Defaults, and offering it would imply there
+  is something there to find.
+
+Both remember the last choice per device (`src/ui/settings/scope-preference.ts`),
+so the common case is one press with no menu. Saving at anything narrower than
+Everyone unlocks the **Own terms** achievement.
 
 ### Nav state
 
@@ -3473,9 +3549,12 @@ on-screen edit stays put until they pick.
 ### Unlock gate
 
 `UnlockGate` (`src/ui/UnlockGate.tsx`) — the full-screen passphrase form that
-blocks the app on a fresh reload when encryption is on but no passphrase is
-cached (it's session-only by design). The appearance theme stays visible under
-the gate. While the passphrase is being checked the **Unlock** button swaps in a
+blocks the app on a fresh reload when the **active namespace** is encrypted and
+no passphrase is cached for it (it's session-only by design). Encryption is
+[per namespace](#encryption), so the gate names the namespace it is asking
+about and carries the
+[locked-namespace switcher](#locked-namespace-switcher) as a way out. The
+appearance theme stays visible under the gate. While the passphrase is being checked the **Unlock** button swaps in a
 spinner (`BusyLabel`, `src/ui/BusyLabel.tsx`) and a status line beneath it leads
 with the [cipher glyph](#cipher-glyph) and flashes the phase the unlock is in,
 fed by an `onProgress` callback that `storage.unlock` calls as it brackets the
@@ -4076,6 +4155,30 @@ origin+pathname so every deploy slot round-trips to itself.
 
 ### Encryption
 
+**Encryption is per namespace.** A [namespace](#namespaces) is a bucket several
+people can share through one login and one folder, so the decision to seal one
+is a decision about that bucket alone: sealing the namespace you keep your own
+things in must not seal the one you share with four other people, and — the half
+that actually bites — a namespace *they* sealed must not lock you out of yours.
+So every piece of encryption state in `useEncryption`
+(`src/storage/useEncryption.ts`) is keyed by slug: the mode
+(`notes:encryption:<slug>` in localStorage), the session passphrase, the "why am
+I locked" hint, the de-encryption drain flag. `locked` is only ever a statement
+about the namespace currently open, `adoptEncryptedRemote` adopts the *active*
+namespace's discovered encryption, and the salts sidecar already lived inside
+each namespace's own folder. The
+[locked-namespace switcher](#locked-namespace-switcher) on the unlock gate makes
+switching away a way *out* of a lock rather than something the lock prevents,
+and a cross-namespace note/folder move into a namespace this session hasn't
+opened is refused rather than attempted.
+
+The account-wide `notes:encryption` flag written before this was a per-namespace
+choice is still read as the **fallback** for a namespace with no setting of its
+own, rather than migrated on boot: an existing encrypted install reads exactly
+as it did, without needing the namespace list resolved before the encryption
+state can be answered (at boot, it isn't). The first explicit write for a
+namespace takes over for good.
+
 At-rest encryption keys off the passphrase via `src/storage/crypto.ts`
 (PBKDF2-SHA256, 600k iterations). The key derivation is split from the cipher so
 the session key is derived **once** (`deriveSessionKeys` → a content `CryptoKey`
@@ -4092,10 +4195,11 @@ On the file/cloud backends encryption is **per-file**, performed inside the
 [directory adapter](#directory-adapter) (not the `withEncryption` wrapper, which
 now only wraps the browser backend): each note is its own encrypted `<ref>.enc`
 file and each attachment its own encrypted blob, both at opaque keyed-HMAC names
-so titles, filenames, and grouping don't leak. The passphrase rides a
-`passwordRef` so a runtime unlock/enable/disable doesn't rebuild the adapter;
-after reload the store is locked until the [unlock gate](#unlock-gate) takes the
-passphrase (verified against the per-file notes, or the sealed offline cache).
+so titles, filenames, and grouping don't leak. The passphrase rides a per-namespace
+`passwordRef` (`cryptoFor(slug)`, stable per slug) so a runtime
+unlock/enable/disable doesn't rebuild the adapter;
+after reload every encrypted namespace is locked until the
+[unlock gate](#unlock-gate) takes its passphrase (verified against the per-file notes, or the sealed offline cache).
 Toggling the mode converts every note + attachment across representations
 atomically — write the new copy, verify it reads back, then delete the old —
 over distinct deterministic paths, so an interruption can't lose data. See
@@ -4285,7 +4389,7 @@ or save.
 ### Namespaces
 
 `src/storage/namespaces.ts` — named buckets, each holding its own note document.
-A `Namespace` is `{ slug, name, glyph?, color? }`; the `slug` is fixed at
+A `Namespace` is `{ slug, name, glyph?, color?, pin? }`; the `slug` is fixed at
 creation (it drives the storage location), the `name` is a cheap editable label.
 The default namespace always exists and keeps the historical localStorage key /
 root folder. Helpers: `addNamespace`, `renameNamespace`, `removeNamespace`,
@@ -4311,11 +4415,52 @@ lands. The browser store loads synchronously, so it never enters this state.
 ### Namespace registry store
 
 `src/storage/namespace-store.ts` — mirrors the registry (slugs, names,
-appearance) to `namespaces.json` at the file backend's root via
-`fileNamespaceStore`, so it travels with a shared folder and lands on every
-device. Plaintext even when notes are encrypted; the browser backend keeps the
+appearance, [PIN verifiers](#namespace-pin)) to `namespaces.json` at the file
+backend's root via `fileNamespaceStore`, so it travels with a shared folder and
+lands on every device. Plaintext even when notes are encrypted; the browser backend keeps the
 registry in localStorage and has no file store. `mergeNamespaceLists`
 reconciles local and remote on a new-device connect.
+
+### Namespace PIN
+
+`src/storage/namespace-pin.ts` + the PIN verbs on `useNamespaceRegistry` — a
+short code that has to be entered before a namespace opens on this device. It
+exists for the shared arrangement: it stops the namespace you keep to yourself
+from opening because somebody tapped the wrong row, and it stops a
+shoulder-surfer or a borrowed phone from reading it.
+
+What is stored is a PBKDF2-SHA256 verifier (`{ salt, hash, iterations }`) on the
+registry entry — never the code — so it rides `namespaces.json` and every
+device, and everyone sharing the folder, is asked for it. Verification is
+constant-time. Entered codes are remembered in module state for the page's
+lifetime only: a PIN that survived a reload would be gating the first tap of the
+session and nothing else.
+
+**It is deliberately a soft lock, and the UI says so.** The verifier sits in a
+file everyone sharing the account can read, so it can be attacked offline; a
+code short enough to type on a phone has a small keyspace; and the notes behind
+it are still plaintext at rest. [Encryption](#encryption-at-rest) is the real
+protection — it is per namespace too, and the bytes are unreadable without the
+passphrase. The two compose, and Settings → Storage puts them next to each
+other so the comparison is unavoidable. Setting one unlocks the **Door code**
+achievement.
+
+While the gate is up the storage adapter is the same locked placeholder an
+encrypted namespace gets, so the notes are never read into memory behind it.
+`NamespacePinGate` (`src/ui/NamespacePinGate.tsx`) is the screen, and it is
+asked for **before** the encryption passphrase when a namespace carries both.
+
+### Locked-namespace switcher
+
+`LockedNamespaceSwitcher` (`src/ui/LockedNamespaceSwitcher.tsx`) — the way out
+of a locked namespace, carried by both full-screen gates (the
+[unlock gate](#unlock-gate) and the [PIN gate](#namespace-pin)). Both locks are
+per namespace, and a namespace shared through one login is exactly the one
+somebody else may seal with a passphrase you were never given; without this bar
+their lock would take the whole app down with it, including the namespaces that
+are entirely yours. It lists every other namespace with its own lock state
+marked, and a press switches the active one — the gate then either falls away
+or re-asks about that namespace instead.
 
 ### Namespace glyph
 
@@ -4334,6 +4479,27 @@ side menu.
 
 `src/ui/namespace-favicon.ts` — paints the active namespace's glyph and colour
 into the browser tab favicon so each namespace is distinguishable at a glance.
+
+### Namespace settings store
+
+`src/storage/namespace-settings-store.ts` — the middle
+[settings width](#settings-scopes), written as `namespace-settings.json`
+**inside the namespace's own folder** (the app-folder root for the default
+namespace, `<slug>/` for the rest), beside its `notes/` and `attachments/`
+subfolders. Deliberately not called `settings.json`: the default namespace owns
+the app-folder root, where that name is already the account-wide file's.
+
+Putting it in the namespace folder is the point — a namespace folder shared
+wholesale carries the settings its users agreed on along with its notes.
+Plaintext even when the notes are encrypted, and **sparse**: only the settings
+that namespace actually has an opinion about, so everything else keeps falling
+through to the global layer.
+
+The notesd daemon's settings endpoint is a flat root namespace with no
+subfolders to nest a file in, so there the default namespace takes the bare name
+and every other one prefixes its slug (`work.namespace-settings.json`); the
+daemon allows exactly that shape and refuses anything else
+(`is_namespace_settings` in `notesd/src/store.rs`).
 
 ## Folders
 

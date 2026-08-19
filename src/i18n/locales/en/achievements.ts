@@ -435,6 +435,18 @@ const achievements = {
     },
 
     // ── Expert ────────────────────────────────────────────────────────
+    doorCode: {
+      name: "Door code",
+      condition: "Put a PIN on a namespace.",
+      learnMore:
+        "Settings → Storage asks for a short code before that namespace opens. The code travels with the namespace, so every device and everyone you share it with is asked. It's a light gate — encryption is what actually keeps the notes from being read.",
+    },
+    ownTerms: {
+      name: "Own terms",
+      condition: "Save a setting to this namespace or this device only.",
+      learnMore:
+        "The chevron on Save picks how far a setting reaches: everyone, everyone in this namespace, or just this device. Narrower wins, so your own choices stay yours even on a login you share.",
+    },
     paranoidMode: {
       name: "Paranoid mode",
       condition: "Turn on at-rest encryption.",

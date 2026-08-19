@@ -9,8 +9,18 @@
 // streams the draft through `setAppearancePreview`, the projection paints that
 // preview live, and `commitAppearance` / Cancel commit or drop it. Quick
 // toggles outside the dialog (the theme switcher) still persist immediately via
-// `updateAppearance`. The projection runs as four independent effects so a font
-// change doesn't rewrite the colour overrides (and vice versa):
+// `updateAppearance`.
+//
+// **The document is not one document.** It resolves from three sparse layers —
+// global, namespace, device — because a namespace can be shared by several
+// people through one login, and a single account-wide settings file would mean
+// one of them repainting everyone else's app. `./appearance-scopes.ts` owns
+// what each width means; this module holds the layers, resolves them, and is
+// the only place that writes them. Every consumer keeps reading one flat
+// `Appearance`, so nothing downstream had to learn about scopes.
+//
+// The projection runs as four independent effects so a font change doesn't
+// rewrite the colour overrides (and vice versa):
 //
 //   1. `data-theme` on `<html>` from `theme`. CSS owns the preset palettes;
 //      `custom` is a no-op at the CSS layer — effect (4) writes inline
@@ -34,6 +44,21 @@ import {
   isTransformKind,
   type TransformRule,
 } from "../domain/transform.ts";
+import { getActiveNamespaceSlug } from "../storage/namespaces.ts";
+import {
+  isEmptyLayer,
+  jsonEqual,
+  setPath,
+  type Layer,
+} from "../domain/settings-layers.ts";
+import {
+  applyScopedSave,
+  resolveAppearanceLayers,
+  resolveThroughScope,
+  writeToOwningScope,
+  type AppearanceLayers,
+  type SettingsScope,
+} from "./appearance-scopes.ts";
 import { loadFontFamily } from "./fonts.ts";
 import {
   COLOR_KEYS,
@@ -150,7 +175,19 @@ export const DEFAULT_APPEARANCE: Appearance = {
   disableAchievements: false,
 };
 
+// The **global** layer's localStorage home. Historically this key held the
+// whole appearance document, which is exactly what a global layer with an
+// opinion about every leaf looks like — so an existing install reads back
+// unchanged and keeps syncing through `settings.json` as before.
 const STORAGE_KEY = "notes/appearance";
+// The **device** layer: the settings this install keeps to itself. Never
+// uploaded to any backend, which is what makes it safe on a shared login.
+const DEVICE_STORAGE_KEY = "notes/appearance:device";
+// The **namespace** layer's per-slug cache, mirroring the namespace's own
+// `namespace-settings.json`. Suffixed by slug so switching namespaces swaps
+// the layer without a round-trip, and so first paint has it before any
+// network resolves.
+const NAMESPACE_STORAGE_PREFIX = "notes/appearance:ns:";
 // The key the pared-down engine wrote before the appearance store landed:
 // a bare preset string. Read once on boot to carry the old preference over.
 const LEGACY_THEME_KEY = "notes/theme";
@@ -355,41 +392,90 @@ function coerce(raw: unknown): Appearance {
   };
 }
 
-function readStored(): Appearance {
-  if (typeof localStorage === "undefined") return DEFAULT_APPEARANCE;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) {
-    try {
-      return coerce(JSON.parse(raw));
-    } catch {
-      return DEFAULT_APPEARANCE;
-    }
+// -- The layered store ------------------------------------------------------
+//
+// Three sparse layers (global / namespace / device) stack into one resolved
+// `Appearance`. See `./appearance-scopes.ts` for what each width means and why
+// a shared login needs them. Everything below keeps the layers as the source
+// of truth and re-derives `current` from them, so a write at one width can
+// never smear across the others.
+
+function readLayer(key: string): Layer {
+  if (typeof localStorage === "undefined") return {};
+  const raw = localStorage.getItem(key);
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
   }
-  // No appearance document yet — carry over the legacy bare-preset key if
-  // the user had picked a theme under the old engine.
+}
+
+function writeLayer(key: string, layer: Layer): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    if (isEmptyLayer(layer)) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(layer));
+  } catch {
+    // Quota / private-mode failures leave the in-memory layer authoritative.
+  }
+}
+
+/** localStorage key holding one namespace's cached layer. */
+function namespaceLayerKey(slug: string): string {
+  return `${NAMESPACE_STORAGE_PREFIX}${slug}`;
+}
+
+// Which namespace's layer is stacked right now. Seeded from the same
+// per-device cursor the storage backend boots from, so first paint already
+// wears the settings of the namespace that is about to open rather than
+// flashing the default namespace's and swapping a tick later. The app keeps it
+// in step through `setAppearanceNamespace`.
+let activeSlug = getActiveNamespaceSlug();
+
+function readGlobalLayer(): Layer {
+  const stored = readLayer(STORAGE_KEY);
+  if (!isEmptyLayer(stored)) return stored;
+  // No appearance document yet — carry over the legacy bare-preset key if the
+  // user had picked a theme under the old engine. It was an account-wide
+  // choice, so it lands in the global layer.
+  if (typeof localStorage === "undefined") return {};
   const legacy = localStorage.getItem(LEGACY_THEME_KEY);
-  if (legacy && THEME_SET.has(legacy)) {
-    return { ...DEFAULT_APPEARANCE, theme: legacy as ThemePreset };
-  }
-  return DEFAULT_APPEARANCE;
+  return legacy && THEME_SET.has(legacy) ? { theme: legacy } : {};
+}
+
+function readStoredLayers(): AppearanceLayers {
+  return {
+    global: readGlobalLayer(),
+    namespace: readLayer(namespaceLayerKey(activeSlug)),
+    device: readLayer(DEVICE_STORAGE_KEY),
+  };
 }
 
 const listeners = new Set<() => void>();
-let current: Appearance = readStored();
+let layers: AppearanceLayers = readStoredLayers();
+let current: Appearance = resolve(layers);
 // Ephemeral preview override. While the settings dialog is open it streams its
-// unsaved draft here so the theme engine repaints live; the persisted `current`
-// is left untouched until Save commits it (or Cancel/close drops the preview).
-// Only the projection onto `<html>` reads this — every other consumer keeps
-// reading the persisted document, so editor/achievement behaviour doesn't shift
-// mid-edit and reverts cleanly on Cancel.
+// unsaved draft here so the theme engine repaints live; the persisted layers
+// are left untouched until Save commits them (or Cancel/close drops the
+// preview). Only the projection onto `<html>` reads this — every other consumer
+// keeps reading the persisted document, so editor/achievement behaviour doesn't
+// shift mid-edit and reverts cleanly on Cancel.
 let preview: Appearance | null = null;
+
+function resolve(next: AppearanceLayers): Appearance {
+  return coerce(
+    resolveAppearanceLayers(DEFAULT_APPEARANCE as unknown as Layer, next),
+  );
+}
 
 function emit() {
   for (const l of listeners) l();
 }
 
 // The appearance the theme projection should paint: the live preview when one
-// is set, otherwise the persisted document.
+// is set, otherwise the resolved document.
 function effective(): Appearance {
   return preview ?? current;
 }
@@ -399,12 +485,39 @@ function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-function persist(next: Appearance): void {
-  current = next;
-  if (typeof localStorage !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  }
+/**
+ * Adopt a new layer stack: recompute the resolved appearance, mirror each
+ * layer back to its localStorage home, and notify. The single write path —
+ * every mutation below funnels through it.
+ */
+function persistLayers(next: AppearanceLayers): void {
+  layers = next;
+  current = resolve(next);
+  writeLayer(STORAGE_KEY, next.global);
+  writeLayer(namespaceLayerKey(activeSlug), next.namespace);
+  writeLayer(DEVICE_STORAGE_KEY, next.device);
   emit();
+}
+
+/** Patch one leaf in whichever layer already owns it (global when none does). */
+function persistLeaf(path: string, value: unknown): void {
+  persistLayers(writeToOwningScope(layers, path, value));
+}
+
+/**
+ * Point the namespace layer at another namespace. Called when the active
+ * namespace changes, so the settings that namespace's users share come into
+ * effect (and the previous one's stop applying) without a reload.
+ */
+export function setAppearanceNamespace(slug: string): void {
+  if (slug === activeSlug) return;
+  activeSlug = slug;
+  persistLayers({ ...layers, namespace: readLayer(namespaceLayerKey(slug)) });
+}
+
+/** Which namespace's layer is currently stacked. */
+export function getAppearanceNamespace(): string {
+  return activeSlug;
 }
 
 /** Patch one top-level appearance field; the projecting effects apply it. */
@@ -412,12 +525,34 @@ export function updateAppearance<K extends keyof Appearance>(
   key: K,
   value: Appearance[K],
 ): void {
-  persist({ ...current, [key]: value });
+  persistLeaf(key, value);
 }
 
 /** The live appearance, read imperatively (e.g. to seed a backend file). */
 export function getAppearance(): Appearance {
   return current;
+}
+
+/**
+ * The appearance as it would resolve if every layer narrower than `scope` gave
+ * up its opinion — what "Reset → Global settings" loads into the dialog's
+ * draft. The unscoped keys come along unchanged, because they never had a
+ * per-width value to fall back to.
+ */
+export function appearanceThroughScope(scope: SettingsScope): Appearance {
+  return coerce(
+    resolveThroughScope(DEFAULT_APPEARANCE as unknown as Layer, layers, scope),
+  );
+}
+
+/** The whole layer stack, read imperatively (the settings dialog's Reset menu). */
+export function getAppearanceLayers(): AppearanceLayers {
+  return layers;
+}
+
+/** One layer, read imperatively — what the sync hook uploads for its scope. */
+export function getAppearanceLayer(scope: SettingsScope): Layer {
+  return layers[scope];
 }
 
 /**
@@ -432,29 +567,57 @@ export function setAppearancePreview(next: Appearance | null): void {
 }
 
 /**
- * Commit an edited draft from the settings dialog. Persists the owned fields
- * but keeps the live achievement progress (the unlocked map + unseen queue),
- * which the dialog doesn't edit and which may have changed while it was open,
- * then clears any active preview so the committed look takes over without a
- * flash.
+ * Commit an edited draft from the settings dialog at one width. `baseline` is
+ * the appearance the dialog opened on, so only the settings the user actually
+ * moved are written — see `applyScopedSave` for what that does to the narrower
+ * layers. The unscoped keys (Transform rules, achievement progress) are not
+ * part of the draft's scoped diff: the live values are kept, because the
+ * dialog can't edit progress and the rules have a namespace of their own.
  */
-export function commitAppearance(next: Appearance): void {
+export function commitAppearance(
+  draft: Appearance,
+  baseline: Appearance,
+  scope: SettingsScope = "global",
+): void {
   preview = null;
-  persist({
-    ...next,
-    achievements: current.achievements,
-    unseenAchievements: current.unseenAchievements,
-  });
+  const next = applyScopedSave(
+    DEFAULT_APPEARANCE as unknown as Layer,
+    layers,
+    scope,
+    draft as unknown as Layer,
+    baseline as unknown as Layer,
+  );
+  // The Transform rules are authored content the dialog *can* edit, and they
+  // stay unscoped — so they follow the draft, into the global layer where they
+  // have always lived. Only when they actually moved, though: writing them on
+  // every save would leave a global layer that is never empty, and the Reset
+  // menu reads emptiness as "this width has nothing to fall back to".
+  if (!jsonEqual(draft.transforms, baseline.transforms)) {
+    next.global = setPath(next.global, "transforms", draft.transforms);
+  }
+  persistLayers(next);
 }
 
 /**
- * Replace the whole appearance document — the seam the backend settings-store
- * reconciliation writes through when another device's `settings.json` is
+ * Replace one layer wholesale — the seam the backend settings stores write
+ * through when another device's `settings.json` / `namespace-settings.json` is
  * adopted. Coerces defensively so a stale / partial remote file can't crash
- * the boot.
+ * the boot; a non-object reads as "no opinion" rather than throwing.
+ */
+export function replaceAppearanceLayer(
+  scope: SettingsScope,
+  raw: unknown,
+): void {
+  persistLayers({ ...layers, [scope]: isRecord(raw) ? raw : {} });
+}
+
+/**
+ * Replace the **global** layer from a whole appearance document. The shape the
+ * account-wide `settings.json` has always held, so this is the plain "adopt
+ * that file" seam; narrower layers keep whatever they were overriding.
  */
 export function replaceAppearance(raw: unknown): void {
-  persist(coerce(raw));
+  replaceAppearanceLayer("global", raw);
 }
 
 /** Subscribe to appearance changes (used to mirror edits to the backend). */
@@ -473,6 +636,9 @@ export function setTheme(theme: ThemePreset): void {
  * timestamp and is not re-queued as unseen — so the achievement watcher can
  * call this on every transition without drift. New ids land in both the
  * unlocked map (stamped now) and the unseen queue (so the trophy badges).
+ *
+ * Progress is unscoped: it is written to the global layer, so earned trophies
+ * follow the user across devices the way they always have.
  */
 export function unlockAchievements(ids: readonly string[]): string[] {
   const now = Date.now();
@@ -486,14 +652,19 @@ export function unlockAchievements(ids: readonly string[]): string[] {
     newly.push(id);
   }
   if (newly.length === 0) return [];
-  persist({ ...current, achievements, unseenAchievements: unseen });
+  let global = setPath(layers.global, "achievements", achievements);
+  global = setPath(global, "unseenAchievements", unseen);
+  persistLayers({ ...layers, global });
   return newly;
 }
 
 /** Clear the unseen-achievements queue (the trophy badge empties). */
 export function clearUnseenAchievements(): void {
   if (current.unseenAchievements.length === 0) return;
-  persist({ ...current, unseenAchievements: [] });
+  persistLayers({
+    ...layers,
+    global: setPath(layers.global, "unseenAchievements", []),
+  });
 }
 
 /** Switch the achievements system on or off. */

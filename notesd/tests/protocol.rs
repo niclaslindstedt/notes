@@ -458,6 +458,70 @@ async fn blob_cannot_clobber_reserved_settings() {
 }
 
 #[tokio::test]
+async fn per_namespace_settings_round_trip_and_stay_apart() {
+    let (base, key, client, _notes, _state) = boot().await;
+    // The default namespace owns the bare name; every other one prefixes its
+    // slug, because the settings endpoint is a flat root namespace with no
+    // subfolders to nest a file in.
+    for (name, body) in [
+        ("namespace-settings.json", r#"{"theme":"light"}"#),
+        ("work.namespace-settings.json", r#"{"theme":"monokai"}"#),
+    ] {
+        let resp = client
+            .put(format!("{base}/v1/settings/{name}"))
+            .header("authorization", bearer(&key))
+            .body(body)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT, "PUT {name}");
+
+        let got = client
+            .get(format!("{base}/v1/settings/{name}"))
+            .header("authorization", bearer(&key))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(got.status(), StatusCode::OK, "GET {name}");
+        assert_eq!(got.text().await.unwrap(), body);
+    }
+}
+
+#[tokio::test]
+async fn a_settings_name_outside_the_allowed_shape_is_refused() {
+    let (base, key, client, _notes, _state) = boot().await;
+    for name in [
+        "anything.json",
+        // The slug half is validated the way a minted slug is, so a name can't
+        // smuggle anything odd past `safe_component`.
+        "Work.namespace-settings.json",
+        ".namespace-settings.json",
+        "a_b.namespace-settings.json",
+    ] {
+        let resp = client
+            .get(format!("{base}/v1/settings/{name}"))
+            .header("authorization", bearer(&key))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "GET {name}");
+    }
+}
+
+#[tokio::test]
+async fn blob_cannot_clobber_a_namespace_settings_file() {
+    let (base, key, client, _notes, _state) = boot().await;
+    let resp = client
+        .put(format!("{base}/v1/blob/work.namespace-settings.json"))
+        .header("authorization", bearer(&key))
+        .body("{}")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn blob_path_traversal_is_rejected() {
     let (base, key, client, _notes, _state) = boot().await;
     let resp = client

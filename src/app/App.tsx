@@ -50,6 +50,7 @@ import { NoteList } from "../ui/note-list/NoteList.tsx";
 import { SideMenu } from "../ui/SideMenu.tsx";
 import { PullToRefreshIndicator } from "../ui/PullToRefreshIndicator.tsx";
 import { SyncIndicator } from "../ui/SyncIndicator.tsx";
+import { NamespacePinGate } from "../ui/NamespacePinGate.tsx";
 import { UnlockGate } from "../ui/UnlockGate.tsx";
 import { UpdateToast } from "../ui/UpdateToast.tsx";
 import { AchievementsModalHost } from "./modals/AchievementsModalHost.tsx";
@@ -109,7 +110,11 @@ export function App() {
     () => compileTransforms(appearance.transforms, storage.activeNamespace),
     [appearance.transforms, storage.activeNamespace],
   );
-  useSettingsSync(storage.settingsStore);
+  useSettingsSync(
+    storage.settingsStore,
+    storage.namespaceSettingsStore,
+    storage.activeNamespace,
+  );
   // Developer "Fake data" toggle: while active, a fresh ephemeral in-memory
   // seed adapter overrides the real backend for the session (each enable
   // starts from a pristine sample), so fake data can be previewed without
@@ -631,9 +636,18 @@ export function App() {
     go({ kind: "note", ns: storage.activeNamespace, id });
   }
 
+  // Both locks are per namespace, and both block the whole app while the
+  // namespace they gate is the active one. The PIN comes first: it is the
+  // cheaper of the two and covers the common case, and a namespace can carry
+  // both. Either gate still wears the user's theme (appearance settings are
+  // plaintext) and either offers a switch to another namespace, so one
+  // person's lock on a shared namespace never strands anyone.
+  if (storage.pinLocked) {
+    return <NamespacePinGate storage={storage} />;
+  }
+
   // Encryption on, no passphrase held this session — block the app behind the
-  // unlock gate so the encrypted notes never render. The gate still wears the
-  // user's theme (appearance settings are plaintext).
+  // unlock gate so the encrypted notes never render.
   if (storage.locked) {
     return (
       <UnlockGate storage={storage} fromRemote={storage.encryptionFromRemote} />

@@ -81,7 +81,8 @@ function makeDeps(
     ],
     inner: fakeAdapter("browser"),
     isBrowserBackend: true,
-    wrapBrowserForActive: (raw) => raw,
+    wrapBrowserFor: (_slug, raw) => raw,
+    isNamespaceLocked: () => false,
     makeInner,
     ...over,
   };
@@ -203,19 +204,19 @@ describe("useNamespaceMigration", () => {
     });
 
     it("wraps the target with the browser encryption layer on the browser backend", async () => {
-      const wrapBrowserForActive = vi.fn((raw: StorageAdapter) => raw);
-      const deps = makeDeps({ isBrowserBackend: true, wrapBrowserForActive });
+      const wrapBrowserFor = vi.fn((_slug: string, raw: StorageAdapter) => raw);
+      const deps = makeDeps({ isBrowserBackend: true, wrapBrowserFor });
       const { result } = renderHook(() => useNamespaceMigration(deps));
       await result.current.moveNoteToNamespace(note(), "work");
-      expect(wrapBrowserForActive).toHaveBeenCalledOnce();
+      expect(wrapBrowserFor).toHaveBeenCalledOnce();
     });
 
     it("does not wrap on a non-browser backend", async () => {
-      const wrapBrowserForActive = vi.fn((raw: StorageAdapter) => raw);
-      const deps = makeDeps({ isBrowserBackend: false, wrapBrowserForActive });
+      const wrapBrowserFor = vi.fn((_slug: string, raw: StorageAdapter) => raw);
+      const deps = makeDeps({ isBrowserBackend: false, wrapBrowserFor });
       const { result } = renderHook(() => useNamespaceMigration(deps));
       await result.current.moveNoteToNamespace(note(), "work");
-      expect(wrapBrowserForActive).not.toHaveBeenCalled();
+      expect(wrapBrowserFor).not.toHaveBeenCalled();
     });
   });
 

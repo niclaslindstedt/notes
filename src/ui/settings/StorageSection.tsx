@@ -24,6 +24,7 @@ import {
   type EncryptionConversionState,
   type EncryptionLogEntry,
 } from "./EncryptionLogModal.tsx";
+import { NamespacePinSection } from "./NamespacePinSection.tsx";
 import { Section } from "./shared.tsx";
 
 // Storage settings: pick the backend that persists the notes (this device /
@@ -64,7 +65,14 @@ export function StorageSection({ storage, conversion }: Props) {
     disconnectGdrive,
     enableEncryption,
     disableEncryption,
+    namespaces,
+    activeNamespace,
   } = storage;
+
+  // Encryption is a per-namespace decision, so the section names the namespace
+  // it is about rather than talking about "your notes" in general.
+  const activeNamespaceName =
+    namespaces.find((n) => n.slug === activeNamespace)?.name ?? activeNamespace;
 
   const [gdriveError, setGdriveError] = useState<string | null>(null);
   // Opening the notesd panel with no daemon paired reveals the pair form.
@@ -305,8 +313,11 @@ export function StorageSection({ storage, conversion }: Props) {
         )}
       </Section>
 
+      <NamespacePinSection storage={storage} />
+
       <EncryptionSection
         encryption={encryption}
+        namespace={activeNamespaceName}
         conversion={conversion}
         onEnable={enableEncryption}
         onDisable={disableEncryption}
@@ -459,11 +470,19 @@ function PairNotesdForm({
 
 function EncryptionSection({
   encryption,
+  namespace,
   conversion,
   onEnable,
   onDisable,
 }: {
   encryption: "encrypted" | "plaintext";
+  /**
+   * The active namespace's display name. Encryption is a per-namespace
+   * decision, so every line here says *which* namespace is being sealed —
+   * without it, "Encryption is on" reads as a statement about the whole app
+   * and the next namespace you open contradicts it.
+   */
+  namespace: string;
   conversion: EncryptionConversionState;
   onEnable: (
     password: string,
@@ -580,11 +599,11 @@ function EncryptionSection({
         <div className="flex-1">
           <h3 className="text-sm font-bold text-fg-bright">
             {on
-              ? t("settings.storage.encryptionOn")
-              : t("settings.storage.encryptionOff")}
+              ? t("settings.storage.encryptionOn", { namespace })
+              : t("settings.storage.encryptionOff", { namespace })}
           </h3>
           <p className="mt-1 text-xs text-muted">
-            {t("settings.storage.encryptionHint")}
+            {t("settings.storage.encryptionHint", { namespace })}
           </p>
         </div>
       </div>

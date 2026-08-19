@@ -493,9 +493,17 @@ The source tree under `src/` is organized by concern, not by file type:
   which storage location every backend reads/writes (a per-slug
   `localStorage` key, or a per-slug folder; the default keeps the historical
   root). The list mirrors to `namespaces.json` beside `settings.json` so it
-  travels with a synced folder.
+  travels with a synced folder. `namespace-settings-store.ts` is the
+  namespace's own slice of the appearance settings
+  (`namespace-settings.json` inside the namespace folder), and
+  `namespace-pin.ts` is the PBKDF2 verifier behind a namespace's optional
+  **PIN**.
 - `src/theme/` — the theme engine (`useTheme.ts`): projects the chosen
-  preset onto `<html data-theme>`, which the CSS tokens key off.
+  preset onto `<html data-theme>`, which the CSS tokens key off. The
+  persisted appearance resolves from **three sparse layers** — global /
+  namespace / device, narrowest winning (`appearance-scopes.ts` over the
+  pure algebra in `domain/settings-layers.ts`). See "Shared namespaces"
+  below.
 - `src/styles/` — the CSS-variable token system (`theme.css`).
 - `src/pwa/` — service-worker registration and update lifecycle
   (`usePwaUpdate.ts`), standalone/install detection (`standalone.ts`).
@@ -579,6 +587,49 @@ So when a feature request arrives while you are working in a wrapper:
   does not decide anything.
 - **Wanting to add a second file to `electron/`** is the signal to stop and
   re-ask whether the PWA can do it. Usually it can.
+
+### Shared namespaces: settings widths and the two locks
+
+A namespace can be shared by **several people through one login** — the "we all
+sign into the same Dropbox" arrangement. That single fact drives three
+otherwise-odd pieces of design, and a change that ignores it will quietly break
+one of them:
+
+1. **Settings have a width.** The appearance document resolves from three
+   sparse layers, narrowest winning:
+
+   | Width       | Home                                              | Reaches                          |
+   | ----------- | ------------------------------------------------- | -------------------------------- |
+   | `global`    | `settings.json` at the app-folder root            | everyone on the account          |
+   | `namespace` | `namespace-settings.json` in the namespace folder | everyone who uses that namespace |
+   | `device`    | `localStorage` only, never uploaded               | this install                     |
+
+   Each layer holds only the **leaves** it has an opinion about
+   (`editor.wordWrap`, not `editor`), which is what lets one override sit on
+   top of everything else without freezing it. The settings dialog's Save and
+   Reset are split buttons that pick the width; saving a leaf clears it from
+   the narrower layers so the save visibly takes effect, and a leaf that
+   matches the wider resolution is dropped rather than stored. Three keys stay
+   unscoped in the global layer: `transforms`, `achievements`,
+   `unseenAchievements`.
+
+   **Never add a new write path that pushes the whole appearance document to a
+   backend.** That is precisely the bug the widths exist to fix.
+
+2. **Encryption is per namespace.** Mode, passphrase, lock state, and drain
+   flag are all keyed by slug in `useEncryption`. Sealing your own namespace
+   must not seal the shared one, and someone else sealing the shared one must
+   not lock you out of yours.
+
+3. **A namespace can carry a PIN** — a PBKDF2 verifier on the registry entry,
+   so it travels with the shared folder. It is a **soft** gate and the copy
+   says so: the verifier is readable by everyone sharing the account, so
+   encryption is what actually protects a namespace. Don't let new copy imply
+   otherwise.
+
+Both locks are per namespace, so both full-screen gates carry
+`LockedNamespaceSwitcher`: without it, one person's lock on a shared namespace
+would take the whole app down for everyone, including their own namespaces.
 
 ### Where new code goes
 

@@ -36,8 +36,46 @@ use crate::secret::{b32, random_32, sha256_hex};
 /// rejected as note/blob refs so the two namespaces never collide.
 pub const RESERVED: &[&str] = &["settings.json", "namespaces.json"];
 
+/// Suffix of the per-namespace settings files. The default namespace owns the
+/// bare name; every other namespace prefixes its slug (`work.namespace-settings.json`),
+/// because the settings endpoint is a flat root namespace with no subfolders to
+/// nest them in. See the client's `namespace-settings-store.ts`.
+pub const NAMESPACE_SETTINGS: &str = "namespace-settings.json";
+
+/// Whether a root file is a settings file rather than a note — excluded from
+/// listings and rejected as a note/blob ref so the two namespaces never
+/// collide.
+pub fn is_reserved(name: &str) -> bool {
+    RESERVED.contains(&name) || is_namespace_settings(name)
+}
+
+/// Whether a name is a per-namespace settings file: the bare name (the default
+/// namespace) or `<slug>.namespace-settings.json`. The slug half is validated
+/// the same way a namespace slug is minted client-side — lowercase
+/// alphanumerics and hyphens — so the name can never smuggle a path component
+/// through (`safe_component` has already rejected separators, this rejects the
+/// rest).
+pub fn is_namespace_settings(name: &str) -> bool {
+    if name == NAMESPACE_SETTINGS {
+        return true;
+    }
+    let Some(slug) = name.strip_suffix(&format!(".{NAMESPACE_SETTINGS}")) else {
+        return false;
+    };
+    !slug.is_empty()
+        && slug
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
 /// Settings files a client may read/write through `/v1/settings/<name>`.
 pub const ALLOWED_SETTINGS: &[&str] = &["settings.json", "namespaces.json"];
+
+/// Whether a client may read/write this name through `/v1/settings/<name>`:
+/// the two account-wide files plus the per-namespace settings files.
+pub fn is_allowed_settings(name: &str) -> bool {
+    ALLOWED_SETTINGS.contains(&name) || is_namespace_settings(name)
+}
 
 /// Store errors, split so the server can map them to the right HTTP status: a
 /// rejected/invalid name is the client's fault (400), an I/O failure is ours
@@ -121,7 +159,7 @@ impl Store {
     /// file (the v1 whole-document `document.json`).
     fn note_path(&self, reference: &str) -> Result<PathBuf> {
         let rel = self.safe_relpath(reference)?;
-        if RESERVED.contains(&rel.as_str()) {
+        if is_reserved(rel.as_str()) {
             return Err(StoreError::Invalid("reserved name is not a note".into()));
         }
         Ok(self.root.join(rel))
@@ -132,7 +170,7 @@ impl Store {
     /// the reserved root settings files.
     fn blob_path(&self, path: &str) -> Result<PathBuf> {
         let rel = self.safe_relpath(path)?;
-        if RESERVED.contains(&rel.as_str()) {
+        if is_reserved(rel.as_str()) {
             return Err(StoreError::Invalid("reserved name is not a blob".into()));
         }
         Ok(self.root.join(rel))
@@ -260,7 +298,7 @@ impl Store {
                 Ok(rel) => rel.to_string_lossy().replace('\\', "/"),
                 Err(_) => continue,
             };
-            if RESERVED.contains(&rel.as_str()) {
+            if is_reserved(rel.as_str()) {
                 continue;
             }
             let etag = if with_etag {
@@ -280,7 +318,7 @@ impl Store {
 
     fn settings_path(&self, name: &str) -> Result<PathBuf> {
         let name = self.safe_component(name)?;
-        if !ALLOWED_SETTINGS.contains(&name.as_str()) {
+        if !is_allowed_settings(name.as_str()) {
             return Err(StoreError::Invalid("not a settings file".into()));
         }
         Ok(self.root.join(name))

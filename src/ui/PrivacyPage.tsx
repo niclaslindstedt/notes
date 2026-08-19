@@ -90,12 +90,20 @@ export function PrivacyPage() {
             </li>
             <li>
               Your <em>namespaces</em> — the named buckets you group notes into,
-              with each one&apos;s label, icon, and colour.
+              with each one&apos;s label, icon, and colour. If you put a PIN on
+              a namespace, what is stored alongside it is a one-way verifier (a
+              salted PBKDF2 hash) from which the code cannot be read back —
+              never the code itself.
             </li>
             <li>
-              Per-device preferences — your chosen theme and appearance, where
-              the floating menu button rests, and which in-app achievements you
-              have unlocked.
+              Your preferences — chosen theme and appearance, editor and export
+              settings, where the floating menu button rests, and which in-app
+              achievements you have unlocked. Each setting is stored at the
+              width you saved it at: for everyone using the account, for
+              everyone using one namespace, or for this device only. The
+              device-only ones are held in{" "}
+              <code className="text-fg-bright">localStorage</code> and are never
+              uploaded to any backend.
             </li>
             <li>
               If you turn on an optional sync backend, the small amount of
@@ -255,19 +263,26 @@ export function PrivacyPage() {
 
         <Section title="Encryption">
           <p>
-            You may optionally protect a synced note store with a passphrase.
-            When enabled, each note and each attachment is compressed and then
-            encrypted in your browser with AES-GCM before it is written — every
-            note becomes its own encrypted file and every attachment its own
-            encrypted blob, stored under opaque names so the title, filename,
-            and which attachments belong to which note are not visible in the
-            folder or cloud. A small index of note titles and previews is stored
-            the same way — encrypted, under an opaque name — so the app can list
-            your notes quickly without decrypting every one; each note&apos;s
-            body is decrypted only when you open it. The bytes stored remotely,
-            and in the offline mirror, are ciphertext. The passphrase stays on
-            your device and is never sent anywhere; if you lose it, the notes
-            cannot be recovered.
+            You may optionally protect a namespace with a passphrase. Encryption
+            is chosen per namespace, so one namespace can be sealed while
+            another stays readable, and each sealed namespace has its own
+            passphrase. When enabled, each note and each attachment in that
+            namespace is compressed and then encrypted in your browser with
+            AES-GCM before it is written — every note becomes its own encrypted
+            file and every attachment its own encrypted blob, stored under
+            opaque names so the title, filename, and which attachments belong to
+            which note are not visible in the folder or cloud. A small index of
+            note titles and previews is stored the same way — encrypted, under
+            an opaque name — so the app can list your notes quickly without
+            decrypting every one; each note&apos;s body is decrypted only when
+            you open it. The bytes stored remotely, and in the offline mirror,
+            are ciphertext. The passphrase stays on your device and is never
+            sent anywhere; if you lose it, the notes cannot be recovered. A
+            namespace PIN is a separate and much weaker thing: it gates opening
+            a namespace on this device, but its verifier is stored beside the
+            namespace where anyone with access to the account can read it, and
+            the notes behind it are not encrypted. Encryption is what protects a
+            namespace&apos;s contents.
           </p>
         </Section>
 

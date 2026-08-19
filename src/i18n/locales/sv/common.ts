@@ -4,7 +4,7 @@ const common: CommonCatalog = {
   close: "Stäng",
   cancel: "Avbryt",
   save: "Spara",
-  resetToDefaults: "Återställ till standard",
+  reset: "Återställ",
   delete: "Ta bort",
   create: "Skapa",
   confirm: "Bekräfta",

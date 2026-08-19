@@ -111,7 +111,9 @@ describe("useEncryption (browser backend)", () => {
     });
     const inner = fakeAdapter({ initial: { text: doc, revision: "r1" } });
     const innerRef = { current: inner as StorageAdapter };
-    const { result } = renderHook(() => useEncryption(innerRef, "browser"));
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "browser", "default"),
+    );
     expect(result.current.locked).toBe(false);
 
     const steps: string[] = [];
@@ -147,7 +149,9 @@ describe("useEncryption (browser backend)", () => {
   it("enableEncryption rejects an empty passphrase without touching the store", async () => {
     const inner = fakeAdapter({ initial: { text: "doc" } });
     const innerRef = { current: inner as StorageAdapter };
-    const { result } = renderHook(() => useEncryption(innerRef, "browser"));
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "browser", "default"),
+    );
     await expect(result.current.enableEncryption("")).rejects.toThrow(
       /Passphrase is required/,
     );
@@ -162,7 +166,9 @@ describe("useEncryption (browser backend)", () => {
     });
     const inner = fakeAdapter({ initial: { text: doc, revision: "r1" } });
     const innerRef = { current: inner as StorageAdapter };
-    const { result } = renderHook(() => useEncryption(innerRef, "browser"));
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "browser", "default"),
+    );
 
     await act(async () => {
       await result.current.enableEncryption("pw");
@@ -193,7 +199,9 @@ describe("useEncryption (browser backend)", () => {
     localStorage.setItem("notes:encryption", "encrypted");
     const inner = fakeAdapter({ initial: { text: "doc" } });
     const innerRef = { current: inner as StorageAdapter };
-    const { result } = renderHook(() => useEncryption(innerRef, "browser"));
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "browser", "default"),
+    );
     expect(result.current.locked).toBe(true);
     await expect(result.current.disableEncryption()).rejects.toThrow(
       /Unlock before turning encryption off/,
@@ -209,7 +217,9 @@ describe("useEncryption (browser backend)", () => {
       },
     });
     const innerRef = { current: inner as StorageAdapter };
-    const { result } = renderHook(() => useEncryption(innerRef, "browser"));
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "browser", "default"),
+    );
     await expect(result.current.unlock("nope")).rejects.toThrow(
       /Wrong password/,
     );
@@ -224,7 +234,9 @@ describe("useEncryption (browser backend)", () => {
       },
     });
     const innerRef = { current: inner as StorageAdapter };
-    const { result } = renderHook(() => useEncryption(innerRef, "browser"));
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "browser", "default"),
+    );
     await expect(result.current.unlock("pw")).rejects.toBeInstanceOf(
       OfflineUnavailableError,
     );
@@ -235,7 +247,9 @@ describe("useEncryption (browser backend)", () => {
     localStorage.setItem("notes:encryption", "encrypted");
     const inner = fakeAdapter({ initial: { text: "doc" } });
     const innerRef = { current: inner as StorageAdapter };
-    const { result } = renderHook(() => useEncryption(innerRef, "browser"));
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "browser", "default"),
+    );
     expect(result.current.locked).toBe(true);
     await act(async () => {
       await result.current.unlock("pw");
@@ -247,9 +261,15 @@ describe("useEncryption (browser backend)", () => {
   it("seal / unseal pass through untouched while no passphrase is held", async () => {
     const inner = fakeAdapter();
     const innerRef = { current: inner as StorageAdapter };
-    const { result } = renderHook(() => useEncryption(innerRef, "browser"));
-    await expect(result.current.seal("hello")).resolves.toBe("hello");
-    await expect(result.current.unseal("hello")).resolves.toBe("hello");
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "browser", "default"),
+    );
+    await expect(result.current.sealFor("default")("hello")).resolves.toBe(
+      "hello",
+    );
+    await expect(result.current.unsealFor("default")("hello")).resolves.toBe(
+      "hello",
+    );
   });
 });
 
@@ -257,7 +277,9 @@ describe("useEncryption — adopting an encrypted backend from another device", 
   it("adoptEncryptedRemote flips to encrypted+locked and flags the remote reason", () => {
     const inner = fakeAdapter();
     const innerRef = { current: inner as StorageAdapter };
-    const { result } = renderHook(() => useEncryption(innerRef, "dropbox"));
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "dropbox", "default"),
+    );
     // Starts plaintext, unlocked, and not from a remote handoff.
     expect(result.current.encryption).toBe("plaintext");
     expect(result.current.locked).toBe(false);
@@ -270,14 +292,17 @@ describe("useEncryption — adopting an encrypted backend from another device", 
     expect(result.current.encryption).toBe("encrypted");
     expect(result.current.locked).toBe(true);
     expect(result.current.fromRemote).toBe(true);
-    // Persisted so a reload stays locked instead of silently plaintext again.
-    expect(localStorage.getItem("notes:encryption")).toBe("encrypted");
+    // Persisted per namespace, so a reload stays locked on *that* namespace
+    // instead of silently plaintext again — and the others stay unaffected.
+    expect(localStorage.getItem("notes:encryption:default")).toBe("encrypted");
   });
 
   it("clears the remote-reason flag once the passphrase lands", async () => {
     const inner = fakeAdapter({ initial: { text: "doc" } });
     const innerRef = { current: inner as StorageAdapter };
-    const { result } = renderHook(() => useEncryption(innerRef, "dropbox"));
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "dropbox", "default"),
+    );
 
     act(() => result.current.adoptEncryptedRemote());
     expect(result.current.fromRemote).toBe(true);
@@ -293,7 +318,9 @@ describe("useEncryption — adopting an encrypted backend from another device", 
     localStorage.setItem("notes:encryption", "encrypted");
     const inner = fakeAdapter({ initial: { text: "doc" } });
     const innerRef = { current: inner as StorageAdapter };
-    const { result } = renderHook(() => useEncryption(innerRef, "dropbox"));
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "dropbox", "default"),
+    );
     await act(async () => {
       await result.current.unlock("pw");
     });
@@ -301,5 +328,90 @@ describe("useEncryption — adopting an encrypted backend from another device", 
     // Already unlocked — adopting must not re-lock the session.
     act(() => result.current.adoptEncryptedRemote());
     expect(result.current.locked).toBe(false);
+  });
+});
+
+describe("useEncryption — encryption is per namespace", () => {
+  it("sealing one namespace leaves the others plaintext and open", async () => {
+    const inner = fakeAdapter({ initial: { text: "doc" } });
+    const innerRef = { current: inner as StorageAdapter };
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "browser", "private"),
+    );
+
+    await act(async () => {
+      await result.current.enableEncryption("hunter2");
+    });
+
+    expect(result.current.isNamespaceEncrypted("private")).toBe(true);
+    // The whole point of the shared-login arrangement: the namespace four
+    // people use is untouched by one person sealing their own.
+    expect(result.current.isNamespaceEncrypted("shared")).toBe(false);
+    expect(result.current.isNamespaceLocked("shared")).toBe(false);
+    expect(localStorage.getItem("notes:encryption:private")).toBe("encrypted");
+    expect(localStorage.getItem("notes:encryption:shared")).toBeNull();
+  });
+
+  it("holds one passphrase per namespace, so opening one doesn't open another", async () => {
+    const inner = fakeAdapter({ initial: { text: "doc" } });
+    const innerRef = { current: inner as StorageAdapter };
+    localStorage.setItem("notes:encryption:a", "encrypted");
+    localStorage.setItem("notes:encryption:b", "encrypted");
+
+    const { result, rerender } = renderHook(
+      ({ ns }: { ns: string }) => useEncryption(innerRef, "dropbox", ns),
+      { initialProps: { ns: "a" } },
+    );
+    expect(result.current.locked).toBe(true);
+
+    await act(async () => {
+      await result.current.unlock("pw-a");
+    });
+    expect(result.current.locked).toBe(false);
+    // `b` is a different vault with a different passphrase — still sealed.
+    expect(result.current.isNamespaceLocked("b")).toBe(true);
+
+    rerender({ ns: "b" });
+    expect(result.current.locked).toBe(true);
+    expect(result.current.cryptoFor("a").passwordRef.current).toBe("pw-a");
+    expect(result.current.cryptoFor("b").passwordRef.current).toBeNull();
+  });
+
+  it("keeps a stable crypto bundle per namespace so adapters aren't rebuilt", () => {
+    const inner = fakeAdapter();
+    const innerRef = { current: inner as StorageAdapter };
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "dropbox", "default"),
+    );
+    expect(result.current.cryptoFor("work")).toBe(
+      result.current.cryptoFor("work"),
+    );
+    expect(result.current.cryptoFor("work")).not.toBe(
+      result.current.cryptoFor("home"),
+    );
+  });
+
+  it("inherits the pre-namespace account-wide flag until a namespace decides for itself", async () => {
+    // An install that turned encryption on before it was a per-namespace
+    // choice must still read as encrypted, without a boot-time migration that
+    // would need the namespace list before it exists.
+    localStorage.setItem("notes:encryption", "encrypted");
+    const inner = fakeAdapter({ initial: { text: "doc" } });
+    const innerRef = { current: inner as StorageAdapter };
+    const { result } = renderHook(() =>
+      useEncryption(innerRef, "browser", "legacy"),
+    );
+    expect(result.current.encryption).toBe("encrypted");
+    expect(result.current.locked).toBe(true);
+
+    await act(async () => {
+      await result.current.unlock("pw");
+    });
+    await act(async () => {
+      await result.current.disableEncryption();
+    });
+    // The explicit per-namespace setting now wins over the legacy fallback.
+    expect(localStorage.getItem("notes:encryption:legacy")).toBe("plaintext");
+    expect(result.current.encryption).toBe("plaintext");
   });
 });

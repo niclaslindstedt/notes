@@ -345,10 +345,10 @@ const settings: SettingsCatalog = {
       "Ange en ny parkopplingskod från ”{name}” — starta notesd och kopiera koden den visar.",
     notesdTokenPlaceholder: "Parkopplingstoken eller notesd://-kod",
     encryptionTitle: "Kryptering",
-    encryptionOn: "Kryptering är på",
-    encryptionOff: "Kryptering är av",
+    encryptionOn: "”{namespace}” är krypterad",
+    encryptionOff: "”{namespace}” är inte krypterad",
     encryptionHint:
-      "Kryptera dina anteckningar (AES-GCM) med en lösenfras innan de sparas. Lösenfrasen lämnar aldrig den här enheten och kan inte återställas — glöm den och anteckningarna kan inte läsas.",
+      "Kryptera anteckningarna i ”{namespace}” (AES-GCM) med en lösenfras innan de sparas. Kryptering gäller per namnrymd, så dina andra namnrymder lämnas orörda — och alla som delar den här behöver lösenfrasen för att läsa den. Lösenfrasen lämnar aldrig den här enheten och kan inte återskapas: glömmer du den går anteckningarna inte att läsa.",
     enableEncryption: "Aktivera kryptering",
     disableEncryption: "Stäng av kryptering",
     passphrase: "Lösenfras",
@@ -382,11 +382,33 @@ const settings: SettingsCatalog = {
     encryptionLogEmpty: "Inget loggades.",
   },
 
+  scope: {
+    chooseScope: "Välj var det ska sparas",
+    global: "Alla",
+    globalHint: "Alla som använder det här kontot, i alla namnrymder.",
+    namespace: "Den här namnrymden",
+    namespaceHint: "Alla som använder den här namnrymden, och ingen annan.",
+    device: "Den här enheten",
+    deviceHint: "Bara den här enheten. Laddas aldrig upp, delas aldrig.",
+  },
+
+  reset: {
+    chooseTarget: "Välj vad det ska återställas till",
+    defaults: "Standard",
+    defaultsHint: "Inställningarna appen levereras med.",
+    global: "Allas inställningar",
+    globalHint: "Det som kontot har sparat för alla.",
+    namespace: "Namnrymdens inställningar",
+    namespaceHint: "Det som namnrymdens användare har sparat.",
+    device: "Enhetens inställningar",
+    deviceHint: "Det som den här enheten har sparat.",
+  },
+
   unlock: {
-    title: "Anteckningarna är låsta",
-    hint: "Ange din lösenfras för att låsa upp och läsa dina anteckningar på den här enheten.",
+    title: "”{namespace}” är låst",
+    hint: "Ange lösenfrasen för ”{namespace}” för att låsa upp och läsa dess anteckningar på den här enheten.",
     hintRemote:
-      "Kryptering aktiverades från en annan enhet. Ange lösenfrasen du valde där för att låsa upp dina anteckningar på den här enheten.",
+      "Kryptering aktiverades för ”{namespace}” någon annanstans. Ange lösenfrasen som valdes där för att låsa upp dess anteckningar på den här enheten.",
     passphrase: "Lösenfras",
     unlock: "Lås upp",
     statusAria: "Upplåsningsförlopp",

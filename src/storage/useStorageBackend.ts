@@ -32,11 +32,13 @@ import { isDropboxConfigured, isGdriveConfigured } from "./cloud-configured.ts";
 import { withEncryption } from "./encrypting/index.ts";
 import type { NamespaceRegistryStore } from "./namespace-store.ts";
 import type { Namespace, NamespaceAppearance } from "./namespaces.ts";
+import { getActiveNamespaceSlug } from "./namespaces.ts";
 import {
   type NamespaceRegistry,
   useNamespaceRegistry,
 } from "./useNamespaceRegistry.ts";
 import type { SettingsStore } from "./settings-store.ts";
+import type { NamespaceSettingsStore } from "./namespace-settings-store.ts";
 
 import {
   type EncryptionProgress,
@@ -99,6 +101,14 @@ export interface UseStorageBackend {
    * store reconciles against it when present.
    */
   settingsStore: SettingsStore | null;
+  /**
+   * The **active namespace's** settings store — `namespace-settings.json`
+   * inside that namespace's own folder, holding the settings the people who
+   * share the namespace agreed on. Null for the browser backend and while a
+   * folder grant is unresolved; the appearance store stacks it between the
+   * account-wide `settingsStore` and this device's own layer.
+   */
+  namespaceSettingsStore: NamespaceSettingsStore | null;
   /** Which backend is selected. */
   backend: BackendId;
   /**
@@ -121,10 +131,38 @@ export interface UseStorageBackend {
    * until the user clicks Reconnect.
    */
   folderReconnectNeeded: boolean;
-  /** Encryption mode and whether a passphrase is held this session. */
+  /** The **active namespace's** encryption mode. */
   encryption: EncryptionMode;
-  /** True when encryption is on but no passphrase is held yet (needs unlock). */
+  /**
+   * True when the active namespace is encrypted and no passphrase is held for
+   * it yet (needs unlock). Says nothing about any other namespace — switching
+   * to one you *have* opened is a way out of the gate.
+   */
   locked: boolean;
+  /** Whether a namespace is sealed and un-opened this session. */
+  isNamespaceLocked: (namespace: string) => boolean;
+  /** Whether a namespace is encrypted at rest, opened or not. */
+  isNamespaceEncrypted: (namespace: string) => boolean;
+  /** Whether a namespace is gated by a PIN at all. */
+  namespaceHasPin: (slug: string) => boolean;
+  /** Whether a namespace is gated and its PIN hasn't been entered this session. */
+  isNamespacePinLocked: (slug: string) => boolean;
+  /**
+   * True when the active namespace is behind a PIN that hasn't been entered.
+   * Independent of `locked`: a namespace can be gated, encrypted, both, or
+   * neither, and the PIN is asked for first.
+   */
+  pinLocked: boolean;
+  /** Try a PIN for the active namespace; false when it didn't match. */
+  enterNamespacePin: (code: string) => Promise<boolean>;
+  /** Set or change a namespace's PIN, proving the current code where one is set. */
+  setNamespacePin: (
+    slug: string,
+    code: string,
+    current?: string,
+  ) => Promise<boolean>;
+  /** Remove a namespace's PIN, proving the current code first. */
+  clearNamespacePin: (slug: string, current: string) => Promise<boolean>;
   /**
    * True when the locked state was triggered by discovering the backend is
    * encrypted (encryption was turned on from another device) rather than a
@@ -265,6 +303,15 @@ function lockedAdapter(id: BackendId): StorageAdapter {
 
 export function useStorageBackend(): UseStorageBackend {
   const [backend, setBackendState] = useState<BackendId>(getBackend);
+  // The active-namespace cursor lives here rather than inside
+  // `useNamespaceRegistry` because the encryption state machine — which runs
+  // first, since the adapter is built from its crypto — has to know which
+  // namespace is open: its mode, its passphrase, and so `locked` are all
+  // per-namespace. Seeded synchronously from localStorage, and handed down to
+  // the registry, which owns every verb that moves it.
+  const [activeNamespace, setActiveNamespaceState] = useState<string>(
+    getActiveNamespaceSlug,
+  );
   // Dropbox / Drive / folder / notesd are fetched on demand — see
   // `useRemoteBackends`. Null until then, which every consumer below reads
   // as "this backend isn't resolved yet" and answers with the browser store.
@@ -276,21 +323,23 @@ export function useStorageBackend(): UseStorageBackend {
   // `seal` / `unseal` that build the very adapter its verbs need.
   const innerRef = useRef<StorageAdapter | null>(null);
   const {
-    directoryCrypto,
-    seal,
-    unseal,
-    passwordRef,
+    cryptoFor,
+    sealFor,
+    unsealFor,
+    passwordRefFor,
     encryption,
     locked,
+    isNamespaceLocked,
+    isNamespaceEncrypted,
     disabling,
     fromRemote,
-    wrapBrowserForActive,
+    wrapBrowserFor,
     enableEncryption,
     disableEncryption,
     finishDisableEncryption,
     unlock,
     adoptEncryptedRemote,
-  } = useEncryption(innerRef, backend);
+  } = useEncryption(innerRef, backend, activeNamespace);
   // Persist + activate a backend in one call (localStorage preference + the
   // re-render). Handed to the folder hook, whose connect / disconnect verbs
   // switch the active backend.
@@ -327,8 +376,8 @@ export function useStorageBackend(): UseStorageBackend {
     disconnectFolder,
   } = useFolderBackend({
     activeRef: folderActiveRef,
-    directoryCrypto,
-    wrapBrowserForActive,
+    cryptoFor,
+    wrapBrowserFor,
     selectBackend,
   });
 
@@ -399,9 +448,9 @@ export function useStorageBackend(): UseStorageBackend {
     folderHandle,
     folderHandleLoaded,
     markFolderPermissionLost,
-    directoryCrypto,
-    seal,
-    unseal,
+    cryptoFor,
+    sealFor,
+    unsealFor,
   });
 
   // The active backend's root namespace registry — `namespaces.json` beside
@@ -447,7 +496,12 @@ export function useStorageBackend(): UseStorageBackend {
   // key off — so it must run before them.
   const {
     namespaces,
-    activeNamespace,
+    namespaceHasPin,
+    isNamespacePinLocked,
+    pinLocked,
+    enterNamespacePin,
+    setNamespacePin,
+    clearNamespacePin,
     switchNamespace,
     createNamespace,
     renameNamespace,
@@ -460,6 +514,8 @@ export function useStorageBackend(): UseStorageBackend {
     gdriveToken,
     folderHandle,
     notesdConfig,
+    activeNamespace,
+    setActiveNamespace: setActiveNamespaceState,
   });
 
   // The active namespace's adapter — rebuilt when the namespace or backend
@@ -501,20 +557,67 @@ export function useStorageBackend(): UseStorageBackend {
     }
   }, [selection, remote, markFolderPermissionLost]);
 
+  // The active namespace's settings store — the same selection as `inner`,
+  // rooted at the namespace's own folder rather than the app-folder root, so
+  // the settings a shared namespace carries travel with the folder that is
+  // shared. Rebuilt when the namespace changes, like `inner`.
+  const namespaceSettingsStore = useMemo<NamespaceSettingsStore | null>(() => {
+    if (!remote) return null;
+    switch (selection.kind) {
+      case "dropbox":
+        return remote.createDropboxNamespaceSettingsStore(
+          selection.auth,
+          activeNamespace,
+        );
+      case "gdrive":
+        return remote.createGdriveNamespaceSettingsStore(
+          selection.token,
+          activeNamespace,
+        );
+      case "folder":
+        return remote.createFolderNamespaceSettingsStore(
+          selection.handle,
+          activeNamespace,
+          markFolderPermissionLost,
+        );
+      case "notesd":
+        return remote.createNotesdNamespaceSettingsStore(
+          selection.config,
+          createPinnedFetch(selection.config.spkiPin),
+          activeNamespace,
+        );
+      case "browser":
+        return null;
+    }
+  }, [selection, remote, markFolderPermissionLost, activeNamespace]);
+
   // The adapter handed to the app. While locked, a no-op placeholder. The
   // file/cloud backends encrypt per-file *inside* the directory adapter (via
   // `directoryCrypto`), so only the single-document browser backend still needs
   // the whole-document `withEncryption` wrapper.
   const adapter = useMemo<StorageAdapter>(() => {
-    if (locked) return lockedAdapter(backend);
+    // A PIN-gated namespace gets the same placeholder as an encrypted one, so
+    // its notes are never even read into memory behind the gate. The gate is a
+    // soft lock (see `namespace-pin.ts`), but "soft" should still mean the
+    // notes aren't sitting one devtools panel away while it is up.
+    if (locked || pinLocked) return lockedAdapter(backend);
     // Only the single-document browser store seals the whole blob here; the
     // file/cloud backends and notesd encrypt per file inside the directory
     // adapter instead.
     if (encryption === "encrypted" && selection.kind === "browser") {
-      return withEncryption(inner, passwordRef);
+      return withEncryption(inner, passwordRefFor(activeNamespace));
     }
     return inner;
-  }, [inner, encryption, locked, backend, selection.kind, passwordRef]);
+  }, [
+    inner,
+    encryption,
+    locked,
+    pinLocked,
+    backend,
+    selection.kind,
+    passwordRefFor,
+    activeNamespace,
+  ]);
   // Hand the live adapter + namespace to the folder verbs, which read them at
   // call time (always well after this first assignment).
   folderActiveRef.current = { adapter, activeNamespace };
@@ -568,7 +671,8 @@ export function useStorageBackend(): UseStorageBackend {
     namespaces,
     inner,
     isBrowserBackend: selection.kind === "browser",
-    wrapBrowserForActive,
+    wrapBrowserFor,
+    isNamespaceLocked,
     makeInner,
   });
 
@@ -581,6 +685,7 @@ export function useStorageBackend(): UseStorageBackend {
     demigrateNote,
     splitLegacyBlob,
     settingsStore,
+    namespaceSettingsStore,
     backend,
     // Both halves must hold: the key has to be built in, and the surface has
     // to be able to finish a redirect OAuth flow. The desktop shell fails the
@@ -595,6 +700,14 @@ export function useStorageBackend(): UseStorageBackend {
     folderReconnectNeeded,
     encryption,
     locked,
+    isNamespaceLocked,
+    isNamespaceEncrypted,
+    namespaceHasPin,
+    isNamespacePinLocked,
+    pinLocked,
+    enterNamespacePin,
+    setNamespacePin,
+    clearNamespacePin,
     encryptionFromRemote: fromRemote,
     encryptionDisabling: disabling,
     selectBrowser,

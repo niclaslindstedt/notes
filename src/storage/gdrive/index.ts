@@ -30,6 +30,10 @@ import {
   fileNamespaceStore,
   type NamespaceRegistryStore,
 } from "../namespace-store.ts";
+import {
+  fileNamespaceSettingsStore,
+  type NamespaceSettingsStore,
+} from "../namespace-settings-store.ts";
 import { fileSettingsStore, type SettingsStore } from "../settings-store.ts";
 import {
   fileConfigPlaneStore,
@@ -112,6 +116,20 @@ export function createGdriveSettingsStore(
   fetchImpl: FetchImpl = fetch,
 ): SettingsStore {
   return fileSettingsStore(createGdriveFileStore(token, fetchImpl, ""));
+}
+
+// Namespace-scoped settings store for the Google Drive backend:
+// `namespace-settings.json` inside the namespace's own folder (the `notes/`
+// app-folder root for the default namespace, `<slug>/` otherwise), so the
+// settings that namespace's users share travel with the folder they share.
+export function createGdriveNamespaceSettingsStore(
+  token: string,
+  namespace: string = DEFAULT_NAMESPACE_SLUG,
+  fetchImpl: FetchImpl = fetch,
+): NamespaceSettingsStore {
+  return fileNamespaceSettingsStore(
+    createGdriveFileStore(token, fetchImpl, namespaceCloudFolder(namespace)),
+  );
 }
 
 // Root namespace-registry store for the Google Drive backend:

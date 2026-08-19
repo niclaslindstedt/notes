@@ -16,6 +16,19 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+// The gate names the namespace it is asking about and offers a switch to the
+// others, so a stub needs the registry surface as well as `unlock`.
+function stubStorage(unlock: unknown): UseStorageBackend {
+  return {
+    unlock,
+    namespaces: [{ slug: "default", name: "Default" }],
+    activeNamespace: "default",
+    switchNamespace: () => {},
+    isNamespaceLocked: () => false,
+    isNamespacePinLocked: () => false,
+  } as unknown as UseStorageBackend;
+}
+
 describe("unlock gate status feedback", () => {
   it("flashes what's happening and disables the button while unlocking", async () => {
     const gate = deferred<void>();
@@ -26,7 +39,7 @@ describe("unlock gate status feedback", () => {
       onProgress?.("decrypting");
       return gate.promise;
     });
-    const storage = { unlock } as unknown as UseStorageBackend;
+    const storage = stubStorage(unlock);
 
     render(<UnlockGate storage={storage} />);
 
@@ -53,7 +66,7 @@ describe("unlock gate status feedback", () => {
       onProgress?.("derivingKey");
       return gate.promise;
     });
-    const storage = { unlock } as unknown as UseStorageBackend;
+    const storage = stubStorage(unlock);
 
     render(<UnlockGate storage={storage} />);
     fireEvent.input(screen.getByLabelText("Passphrase"), {
@@ -76,7 +89,7 @@ describe("unlock gate status feedback", () => {
       onProgress?.("decrypting", { title: "Groceries", index: 2, total: 5 });
       return gate.promise;
     });
-    const storage = { unlock } as unknown as UseStorageBackend;
+    const storage = stubStorage(unlock);
 
     render(<UnlockGate storage={storage} />);
     fireEvent.input(screen.getByLabelText("Passphrase"), {
@@ -98,7 +111,7 @@ describe("unlock gate status feedback", () => {
       onProgress?.("decrypting", { title: "", index: 1, total: 1 });
       return gate.promise;
     });
-    const storage = { unlock } as unknown as UseStorageBackend;
+    const storage = stubStorage(unlock);
 
     render(<UnlockGate storage={storage} />);
     fireEvent.input(screen.getByLabelText("Passphrase"), {
@@ -114,9 +127,7 @@ describe("unlock gate status feedback", () => {
   });
 
   it("shows no status bar before unlock is pressed", () => {
-    const storage = {
-      unlock: vi.fn(() => Promise.resolve()),
-    } as unknown as UseStorageBackend;
+    const storage = stubStorage(vi.fn(() => Promise.resolve()));
     render(<UnlockGate storage={storage} />);
     expect(screen.queryByRole("status")).toBeNull();
   });

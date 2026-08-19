@@ -18,23 +18,27 @@
 export { localCacheKey, withLocalCache } from "./cache/index.ts";
 export {
   createDropboxAdapter,
+  createDropboxNamespaceSettingsStore,
   createDropboxNamespaceStore,
   createDropboxSettingsStore,
   deleteDropboxNamespace,
 } from "./dropbox/index.ts";
 export {
   createGdriveAdapter,
+  createGdriveNamespaceSettingsStore,
   createGdriveNamespaceStore,
   createGdriveSettingsStore,
   deleteGdriveNamespace,
 } from "./gdrive/index.ts";
 export {
   createFolderAdapter,
+  createFolderNamespaceSettingsStore,
   createFolderNamespaceStore,
   createFolderSettingsStore,
 } from "./folder/index.ts";
 export {
   createNotesdAdapter,
+  createNotesdNamespaceSettingsStore,
   createNotesdNamespaceStore,
   createNotesdSettingsStore,
   deleteNotesdNamespace,

@@ -33,12 +33,17 @@ import type { FileEntry, FileStore } from "../file-store.ts";
 import {
   DEFAULT_NAMESPACE_SLUG,
   namespaceAttachmentsFolder,
+  namespaceCloudFolder,
   namespaceNotesFolder,
 } from "../namespaces.ts";
 import {
   fileNamespaceStore,
   type NamespaceRegistryStore,
 } from "../namespace-store.ts";
+import {
+  fileNamespaceSettingsStore,
+  type NamespaceSettingsStore,
+} from "../namespace-settings-store.ts";
 import { fileSettingsStore, type SettingsStore } from "../settings-store.ts";
 
 const log = createLogger("folder");
@@ -369,6 +374,24 @@ export function createFolderSettingsStore(
 ): SettingsStore {
   return fileSettingsStore(
     new FolderFileStore(directoryHandle, "", onPermissionLost),
+  );
+}
+
+// Namespace-scoped settings store for the folder backend:
+// `namespace-settings.json` inside the namespace's own folder (the picked
+// directory root for the default namespace, `<slug>/` otherwise), so the
+// settings that namespace's users share travel with the folder they share.
+export function createFolderNamespaceSettingsStore(
+  directoryHandle: FileSystemDirectoryHandle,
+  namespace: string = DEFAULT_NAMESPACE_SLUG,
+  onPermissionLost?: () => void,
+): NamespaceSettingsStore {
+  return fileNamespaceSettingsStore(
+    new FolderFileStore(
+      directoryHandle,
+      namespaceCloudFolder(namespace),
+      onPermissionLost,
+    ),
   );
 }
 

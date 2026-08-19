@@ -294,6 +294,18 @@ export function HomePage() {
             <li>
               Group notes into separate <em>namespaces</em> — independent
               buckets you can switch between, each with its own icon and colour.
+              A namespace can be shared with other people by sharing its folder
+              (or the account behind it), and everything that protects or
+              configures one applies to that namespace alone: its own settings,
+              its own optional PIN, its own optional encryption passphrase.
+            </li>
+            <li>
+              Put a <em>PIN</em> on a namespace so it asks for a short code
+              before it opens. The code travels with the namespace, so every
+              device you use — and everyone you share it with — is asked for it.
+              It is a light gate against a mis-tap or a borrowed phone; the
+              notes behind it are still stored as ordinary text, so encryption
+              (below) is what actually keeps a namespace from being read.
             </li>
             <li>
               Organise the notes within a namespace into <em>folders</em> — make
@@ -396,19 +408,35 @@ export function HomePage() {
               never overwrites what you&apos;re writing.
             </li>
             <li>
-              Optionally encrypt everything at rest with a passphrase only you
-              hold. Each note and each attachment is compressed and encrypted in
-              your browser into its own file under an opaque name, so titles,
-              filenames, and your images are unreadable in the folder or cloud.
-              A green lock fills in note-by-note as the app seals them.
-              Unlocking is instant however many notes you have — the list opens
-              from a small encrypted index, and each note&apos;s text is
+              Optionally encrypt a namespace at rest with a passphrase only you
+              hold. Encryption is chosen per namespace, so you can seal the one
+              you keep to yourself and leave the one you share with other people
+              readable — or give the shared one its own passphrase that only the
+              people in it know. Each note and each attachment is compressed and
+              encrypted in your browser into its own file under an opaque name,
+              so titles, filenames, and your images are unreadable in the folder
+              or cloud. A green lock fills in note-by-note as the app seals
+              them. Unlocking is instant however many notes you have — the list
+              opens from a small encrypted index, and each note&apos;s text is
               decrypted the moment you open it, so an opened note downloads only
               its own body and attachments and stays readable offline once
               you&apos;ve opened it. Turn encryption on from one device and
-              every other device syncing the same folder notices, locks itself,
+              every other device syncing that namespace notices, locks itself,
               and asks for the same passphrase before it will show or write your
-              notes — so no device is left holding them in the clear.
+              notes — so no device is left holding them in the clear. Your other
+              namespaces are unaffected, and a locked one always offers to open
+              a different one instead.
+            </li>
+            <li>
+              Choose <em>how far each setting reaches</em>. The chevron beside
+              Save in Settings writes a change for everyone using the account,
+              for everyone using the current namespace, or for this device only
+              — and the narrowest choice wins. Device settings are never
+              uploaded anywhere, so on a namespace shared with other people your
+              own theme, font, and editor preferences stay yours while the notes
+              stay shared. The chevron beside Reset walks the same ladder back:
+              return a setting to what the namespace says, to what the account
+              says, or to the app&apos;s defaults.
             </li>
           </ul>
         </Section>

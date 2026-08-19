@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/preact";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { unlock } from "../../src/achievements/index.ts";
-import { namespaceLocalKey } from "../../src/storage/namespaces.ts";
+import {
+  getActiveNamespaceSlug,
+  namespaceLocalKey,
+} from "../../src/storage/namespaces.ts";
 import type { NamespaceRegistryStore } from "../../src/storage/namespace-store.ts";
 import {
   type NamespaceRegistryDeps,
@@ -53,7 +57,9 @@ function fakeStore(
 
 const browserDeps = (
   over: Partial<NamespaceRegistryDeps> = {},
-): NamespaceRegistryDeps => ({
+): Omit<NamespaceRegistryDeps, "activeNamespace" | "setActiveNamespace"> & {
+  activeNamespace?: string;
+} => ({
   namespaceStore: null,
   backend: "browser",
   dropboxToken: null,
@@ -62,6 +68,24 @@ const browserDeps = (
   notesdConfig: null,
   ...over,
 });
+
+// The active-namespace cursor is owned by the caller (`useStorageBackend`)
+// rather than the registry, because the per-namespace encryption state machine
+// runs first and needs it. So the tests hold it themselves and hand it back on
+// `result.current` for the assertions that read it.
+function renderRegistry(over: Partial<NamespaceRegistryDeps> = {}) {
+  return renderHook(() => {
+    const [activeNamespace, setActiveNamespace] = useState(
+      getActiveNamespaceSlug,
+    );
+    const registry = useNamespaceRegistry({
+      ...browserDeps(over),
+      activeNamespace,
+      setActiveNamespace,
+    } as NamespaceRegistryDeps);
+    return { ...registry, activeNamespace };
+  });
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -73,16 +97,14 @@ afterEach(() => {
 
 describe("useNamespaceRegistry", () => {
   it("seeds from localStorage with just the default namespace active", () => {
-    const { result } = renderHook(() => useNamespaceRegistry(browserDeps()));
+    const { result } = renderRegistry();
     expect(result.current.namespaces.map((n) => n.slug)).toEqual(["default"]);
     expect(result.current.activeNamespace).toBe("default");
   });
 
   it("createNamespace adds, switches to it, mirrors to the store, and unlocks", () => {
     const store = fakeStore();
-    const { result } = renderHook(() =>
-      useNamespaceRegistry(browserDeps({ namespaceStore: store })),
-    );
+    const { result } = renderRegistry({ namespaceStore: store });
     act(() => result.current.createNamespace("Work"));
     expect(result.current.namespaces.map((n) => n.slug)).toEqual([
       "default",
@@ -97,7 +119,7 @@ describe("useNamespaceRegistry", () => {
   });
 
   it("createNamespace applies a chosen appearance", () => {
-    const { result } = renderHook(() => useNamespaceRegistry(browserDeps()));
+    const { result } = renderRegistry();
     act(() =>
       result.current.createNamespace("Travel", {
         glyph: "plane",
@@ -109,7 +131,7 @@ describe("useNamespaceRegistry", () => {
   });
 
   it("renameNamespace changes the display name but keeps the slug", () => {
-    const { result } = renderHook(() => useNamespaceRegistry(browserDeps()));
+    const { result } = renderRegistry();
     act(() => result.current.createNamespace("Work"));
     act(() => result.current.renameNamespace("work", "Office"));
     const ns = result.current.namespaces.find((n) => n.slug === "work");
@@ -117,7 +139,7 @@ describe("useNamespaceRegistry", () => {
   });
 
   it("setNamespaceAppearance applies and clears live", () => {
-    const { result } = renderHook(() => useNamespaceRegistry(browserDeps()));
+    const { result } = renderRegistry();
     act(() => result.current.createNamespace("Work"));
     act(() => result.current.setNamespaceAppearance("work", { color: "#f00" }));
     expect(
@@ -130,26 +152,24 @@ describe("useNamespaceRegistry", () => {
   });
 
   it("switchNamespace flips the active cursor and persists it", () => {
-    const { result } = renderHook(() => useNamespaceRegistry(browserDeps()));
+    const { result } = renderRegistry();
     act(() => result.current.createNamespace("Work"));
     act(() => result.current.switchNamespace("default"));
     expect(result.current.activeNamespace).toBe("default");
     // Re-reading the registry sees the persisted active pointer.
-    const { result: reread } = renderHook(() =>
-      useNamespaceRegistry(browserDeps()),
-    );
+    const { result: reread } = renderRegistry();
     expect(reread.current.activeNamespace).toBe("default");
   });
 
   it("removeNamespace rejects the default namespace", async () => {
-    const { result } = renderHook(() => useNamespaceRegistry(browserDeps()));
+    const { result } = renderRegistry();
     await expect(result.current.removeNamespace("default")).rejects.toThrow(
       /default namespace can't be removed/,
     );
   });
 
   it("removeNamespace drops the entry, resets active, and deletes the local document", async () => {
-    const { result } = renderHook(() => useNamespaceRegistry(browserDeps()));
+    const { result } = renderRegistry();
     act(() => result.current.createNamespace("Work"));
     // Seed a document under the namespace's localStorage key so the delete is observable.
     localStorage.setItem(namespaceLocalKey("work"), '{"notes":[]}');
@@ -165,11 +185,10 @@ describe("useNamespaceRegistry", () => {
   });
 
   it("removeNamespace routes the data-delete to the active cloud backend", async () => {
-    const { result } = renderHook(() =>
-      useNamespaceRegistry(
-        browserDeps({ backend: "dropbox", dropboxToken: "tok" }),
-      ),
-    );
+    const { result } = renderRegistry({
+      backend: "dropbox",
+      dropboxToken: "tok",
+    });
     act(() => result.current.createNamespace("Work"));
     await act(async () => {
       await result.current.removeNamespace("work");
@@ -180,9 +199,7 @@ describe("useNamespaceRegistry", () => {
 
   it("reconcile effect seeds an empty backend with the local registry", async () => {
     const store = fakeStore(null);
-    renderHook(() =>
-      useNamespaceRegistry(browserDeps({ namespaceStore: store })),
-    );
+    renderRegistry({ namespaceStore: store });
     await waitFor(() => expect(store.saves.length).toBe(1));
     expect(store.saves[0]).toContain("default");
   });
@@ -202,9 +219,7 @@ describe("useNamespaceRegistry", () => {
         { slug: "shared", name: "Shared" },
       ]),
     );
-    const { result } = renderHook(() =>
-      useNamespaceRegistry(browserDeps({ namespaceStore: store })),
-    );
+    const { result } = renderRegistry({ namespaceStore: store });
     await waitFor(() =>
       expect(result.current.namespaces.map((n) => n.slug).sort()).toEqual([
         "default",

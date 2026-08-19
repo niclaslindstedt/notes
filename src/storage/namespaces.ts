@@ -34,6 +34,7 @@
 // move.
 
 import { createLogger } from "../dev/logger.ts";
+import { isNamespacePin, type NamespacePin } from "./namespace-pin.ts";
 
 const log = createLogger("namespaces");
 
@@ -62,6 +63,16 @@ export type Namespace = {
    * the default folder icon.
    */
   color?: string;
+  /**
+   * Optional PIN verifier gating this namespace (see `namespace-pin.ts`).
+   * Lives on the registry entry — and so in the shared `namespaces.json` —
+   * because a PIN is a property of the namespace, not of one device: set it
+   * on the laptop and the phone asks for it too, and so does everyone else
+   * sharing the folder. Never contains the code itself. It is a **soft** gate
+   * against a mis-tap or a borrowed phone; encryption is what actually keeps
+   * a namespace's contents from being read.
+   */
+  pin?: NamespacePin;
 };
 
 /** A partial appearance change — set a field to a value, or `null` to clear it. */
@@ -114,9 +125,12 @@ function isNamespace(value: unknown): value is Namespace {
   }
   // Appearance fields are optional; reject only a present-but-wrong type so
   // a corrupt entry can't smuggle a non-string glyph/colour through.
-  const { glyph, color } = value as Namespace;
+  const { glyph, color, pin } = value as Namespace;
   if (glyph !== undefined && typeof glyph !== "string") return false;
   if (color !== undefined && typeof color !== "string") return false;
+  // A malformed verifier is dropped with the whole entry rather than silently
+  // ignored: a namespace that *should* be gated must never read back ungated.
+  if (pin !== undefined && !isNamespacePin(pin)) return false;
   return true;
 }
 
@@ -295,6 +309,23 @@ export function setNamespaceAppearance(
         if (patch.color) next.color = patch.color;
         else delete next.color;
       }
+      return next;
+    }),
+  );
+}
+
+/**
+ * Set or clear a namespace's PIN verifier. Passing `null` removes the gate.
+ * The caller has already checked the current PIN where one existed — this is
+ * the storage half only.
+ */
+export function setNamespacePin(slug: string, pin: NamespacePin | null): void {
+  setNamespaces(
+    getNamespaces().map((n) => {
+      if (n.slug !== slug) return n;
+      const next: Namespace = { ...n };
+      if (pin) next.pin = pin;
+      else delete next.pin;
       return next;
     }),
   );

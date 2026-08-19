@@ -7,7 +7,7 @@
 // here: the verbs are leaf consumers of the resolved selection. They read the
 // active document adapter (`inner`), the ability to build an adapter for *any*
 // namespace on the current selection (`makeInner`), and the browser-only
-// whole-document encryption wrapper (`wrapBrowserForActive`) — all built by the
+// whole-document encryption wrapper (`wrapBrowserFor`) — all built by the
 // orchestrator before this hook runs. So the deps come in as plain arguments
 // and the verbs are directly unit-testable against in-memory adapters.
 
@@ -38,7 +38,14 @@ export interface NamespaceMigrationDeps {
    */
   isBrowserBackend: boolean;
   /** Wrap a browser adapter in the whole-document at-rest encryption layer. */
-  wrapBrowserForActive: (raw: StorageAdapter) => StorageAdapter;
+  wrapBrowserFor: (namespace: string, raw: StorageAdapter) => StorageAdapter;
+  /**
+   * Whether a namespace is sealed and un-opened this session. A move into one
+   * would have to write bytes it can't key, so it is refused rather than
+   * attempted — encryption is per namespace, so the target may well be locked
+   * while the namespace you are moving *from* is wide open.
+   */
+  isNamespaceLocked: (namespace: string) => boolean;
   /** Build the unwrapped adapter for any namespace on the current selection. */
   makeInner: (namespace: string) => StorageAdapter;
 }
@@ -75,7 +82,8 @@ export function useNamespaceMigration(
     namespaces,
     inner,
     isBrowserBackend,
-    wrapBrowserForActive,
+    wrapBrowserFor,
+    isNamespaceLocked,
     makeInner,
   } = deps;
 
@@ -84,6 +92,13 @@ export function useNamespaceMigration(
       if (locked) return false;
       if (targetSlug === activeNamespace) return false;
       if (!namespaces.some((n) => n.slug === targetSlug)) return false;
+      // The target is sealed and hasn't been opened this session, so there is
+      // no key to write its copy with. Refuse rather than write plaintext into
+      // an encrypted namespace.
+      if (isNamespaceLocked(targetSlug)) {
+        log.warn(`move refused: target namespace ${targetSlug} is locked`);
+        return false;
+      }
 
       // Bring the note's attachment bytes in hand (the list loads metadata
       // only) so they travel into the target namespace's store, where the
@@ -111,7 +126,7 @@ export function useNamespaceMigration(
       // The browser store needs the whole-document encryption wrapper; the
       // file/cloud adapters encrypt per-file internally via `directoryCrypto`.
       const target = isBrowserBackend
-        ? wrapBrowserForActive(makeInner(targetSlug))
+        ? wrapBrowserFor(targetSlug, makeInner(targetSlug))
         : makeInner(targetSlug);
       const prev = await target.load().catch(() => null);
       const doc = prev ? parse(prev.text) : parse(null);
@@ -134,7 +149,8 @@ export function useNamespaceMigration(
       namespaces,
       inner,
       isBrowserBackend,
-      wrapBrowserForActive,
+      wrapBrowserFor,
+      isNamespaceLocked,
       makeInner,
     ],
   );
@@ -148,6 +164,13 @@ export function useNamespaceMigration(
       if (locked) return false;
       if (targetSlug === activeNamespace) return false;
       if (!namespaces.some((n) => n.slug === targetSlug)) return false;
+      // The target is sealed and hasn't been opened this session, so there is
+      // no key to write its copy with. Refuse rather than write plaintext into
+      // an encrypted namespace.
+      if (isNamespaceLocked(targetSlug)) {
+        log.warn(`move refused: target namespace ${targetSlug} is locked`);
+        return false;
+      }
 
       // Hydrate each note so the whole folder travels intact: the encrypted
       // file/cloud backends render the list from an index with bodies (and
@@ -177,7 +200,7 @@ export function useNamespaceMigration(
       }
 
       const target = isBrowserBackend
-        ? wrapBrowserForActive(makeInner(targetSlug))
+        ? wrapBrowserFor(targetSlug, makeInner(targetSlug))
         : makeInner(targetSlug);
       const prev = await target.load().catch(() => null);
       const doc = prev ? parse(prev.text) : parse(null);
@@ -209,7 +232,8 @@ export function useNamespaceMigration(
       namespaces,
       inner,
       isBrowserBackend,
-      wrapBrowserForActive,
+      wrapBrowserFor,
+      isNamespaceLocked,
       makeInner,
     ],
   );
