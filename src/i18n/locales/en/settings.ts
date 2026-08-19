@@ -346,10 +346,10 @@ const settings = {
       "Enter a fresh pairing code from “{name}” — start notesd and copy the code it shows.",
     notesdTokenPlaceholder: "Pairing token or notesd:// code",
     encryptionTitle: "Encryption",
-    encryptionOn: "Encryption is on",
-    encryptionOff: "Encryption is off",
+    encryptionOn: "“{namespace}” is encrypted",
+    encryptionOff: "“{namespace}” is not encrypted",
     encryptionHint:
-      "Scramble your notes (AES-GCM) with a passphrase before they're saved. The passphrase never leaves this device and can't be recovered — forget it and the notes can't be read.",
+      "Scramble the notes in “{namespace}” (AES-GCM) with a passphrase before they're saved. Encryption is per namespace, so this leaves your other namespaces alone — and anyone sharing this one needs the passphrase to read it. The passphrase never leaves this device and can't be recovered: forget it and the notes can't be read.",
     enableEncryption: "Turn on encryption",
     disableEncryption: "Turn off encryption",
     passphrase: "Passphrase",
@@ -383,11 +383,33 @@ const settings = {
     encryptionLogEmpty: "Nothing was logged.",
   },
 
+  scope: {
+    chooseScope: "Choose where to save",
+    global: "Everyone",
+    globalHint: "Everyone using this account, in every namespace.",
+    namespace: "This namespace",
+    namespaceHint: "Everyone who uses this namespace, and nobody else.",
+    device: "This device",
+    deviceHint: "Only this device. Never uploaded, never shared.",
+  },
+
+  reset: {
+    chooseTarget: "Choose what to reset to",
+    defaults: "Defaults",
+    defaultsHint: "The settings the app ships with.",
+    global: "Everyone's settings",
+    globalHint: "Whatever this account has saved for everyone.",
+    namespace: "This namespace's settings",
+    namespaceHint: "Whatever this namespace's users have saved.",
+    device: "This device's settings",
+    deviceHint: "Whatever this device has saved.",
+  },
+
   unlock: {
-    title: "Notes are locked",
-    hint: "Enter your passphrase to unlock and read your notes on this device.",
+    title: "“{namespace}” is locked",
+    hint: "Enter the passphrase for “{namespace}” to unlock and read its notes on this device.",
     hintRemote:
-      "Encryption was turned on from another device. Enter the passphrase you set there to unlock your notes on this device.",
+      "Encryption was turned on for “{namespace}” somewhere else. Enter the passphrase set there to unlock its notes on this device.",
     passphrase: "Passphrase",
     unlock: "Unlock",
     statusAria: "Unlock progress",

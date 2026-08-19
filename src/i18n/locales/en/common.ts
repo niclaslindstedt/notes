@@ -8,7 +8,7 @@ const common = {
   close: "Close",
   cancel: "Cancel",
   save: "Save",
-  resetToDefaults: "Reset to defaults",
+  reset: "Reset",
   delete: "Delete",
   create: "Create",
   confirm: "Confirm",

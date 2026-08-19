@@ -24,9 +24,10 @@ export type NotesdConfig = {
   name: string;
 };
 
-// Whether stored bytes are wrapped in the AES-GCM envelope before being
-// handed to the adapter. Defaults to "plaintext" — encryption is an explicit
-// opt-in from Settings, and there are no accounts to inherit a password from.
+// Whether a namespace's stored bytes are wrapped in the AES-GCM envelope
+// before being handed to the adapter. Defaults to "plaintext" — encryption is
+// an explicit opt-in from Settings, and there are no accounts to inherit a
+// password from.
 export type EncryptionMode = "encrypted" | "plaintext";
 
 const BACKEND_KEY = "notes:backend";
@@ -36,7 +37,12 @@ const DROPBOX_TOKEN_KEY = "notes:dropbox:token";
 const DROPBOX_REFRESH_KEY = "notes:dropbox:refresh";
 const GDRIVE_TOKEN_KEY = "notes:gdrive:token";
 const NOTESD_CONFIG_KEY = "notes:notesd:config";
+// The account-wide encryption flag written before encryption became a
+// per-namespace decision. Still read as the fallback for a namespace that has
+// no setting of its own — see `getEncryption`.
 const ENCRYPTION_KEY = "notes:encryption";
+// Per-namespace encryption mode, suffixed by slug.
+const ENCRYPTION_PREFIX = "notes:encryption:";
 
 function read(key: string): string | null {
   try {
@@ -142,10 +148,32 @@ export function clearNotesdConfig(): void {
   clear(NOTESD_CONFIG_KEY);
 }
 
-export function getEncryption(): EncryptionMode {
+/**
+ * Whether a namespace's bytes are encrypted at rest, as far as this device
+ * knows. Encryption is **per namespace**: the whole point of a shared
+ * namespace is that some of them are shared and some are not, so sealing the
+ * one you keep your own things in must not seal — or lock you out of — the one
+ * you share with four other people.
+ *
+ * The legacy account-wide key is the fallback rather than something migrated
+ * on boot: a namespace with no explicit setting inherits it, and the first
+ * explicit write for that namespace takes over for good. That keeps an
+ * existing encrypted install reading exactly as it did without needing the
+ * namespace list to be resolved before the encryption state can be answered
+ * (it isn't, at boot).
+ */
+export function getEncryption(namespace: string): EncryptionMode {
+  const own = read(`${ENCRYPTION_PREFIX}${namespace}`);
+  if (own === "encrypted") return "encrypted";
+  if (own === "plaintext") return "plaintext";
   return read(ENCRYPTION_KEY) === "encrypted" ? "encrypted" : "plaintext";
 }
 
-export function setEncryption(mode: EncryptionMode): void {
-  write(ENCRYPTION_KEY, mode);
+export function setEncryption(namespace: string, mode: EncryptionMode): void {
+  write(`${ENCRYPTION_PREFIX}${namespace}`, mode);
+}
+
+/** Forget a namespace's encryption setting — part of deleting the namespace. */
+export function clearEncryption(namespace: string): void {
+  clear(`${ENCRYPTION_PREFIX}${namespace}`);
 }

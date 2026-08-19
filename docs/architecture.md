@@ -26,6 +26,14 @@ app  ──▶  ui  ──▶  domain
   IndexedDB backend would implement the same load/save pair behind this seam.
 - **`src/theme/`** — `useTheme.ts` is a small external store that projects the
   chosen preset onto `<html data-theme>` and persists it to `localStorage`.
+  The persisted appearance is **not one document**: it resolves from three
+  sparse layers — global, namespace, device — because a namespace can be shared
+  by several people through one login, and a single account-wide settings file
+  would mean one of them repainting everyone else's app. `appearance-scopes.ts`
+  binds the widths to `Appearance` over the pure layer algebra in
+  `src/domain/settings-layers.ts`; `useTheme.ts` holds the layers, resolves
+  them, and is the only place that writes them, so every consumer keeps reading
+  one flat `Appearance`.
 - **`src/styles/`** — `theme.css` defines the CSS-variable token vocabulary
   (`--page-bg`, `--surface`, `--fg`, `--accent`, …) and the dark/light/system
   palettes the tokens resolve to.
@@ -58,6 +66,26 @@ native closure, diverged parser/sync/search surfaces).
 newest-first; the full list (including a freshly created blank note) is exposed
 so the editor can resolve a note that isn't in the visible list yet. A note
 left blank discards itself when its editor closes.
+
+### Where each settings width lives
+
+| Width       | Home                                              | Reaches                              |
+| ----------- | ------------------------------------------------- | ------------------------------------ |
+| `global`    | `settings.json` at the app-folder root            | everyone on the account              |
+| `namespace` | `namespace-settings.json` in the namespace folder | everyone who uses that namespace     |
+| `device`    | `localStorage` only, never uploaded               | this install                         |
+
+Narrowest wins. Each layer is sparse — leaves, not whole groups — so an
+override at one width leaves every other setting following the wider layers.
+The `device` width is what makes a shared login usable: it is the one place a
+person's choices cannot reach anyone else.
+
+Two locks are **per namespace** for the same reason: at-rest encryption (its
+mode, passphrase, and `locked` flag all keyed by slug in `useEncryption`) and
+the namespace PIN (a PBKDF2 verifier on the registry entry). Either can gate
+the active namespace without touching the others, and both full-screen gates
+carry a switcher to another namespace so one person's lock never strands
+anyone.
 
 ## PWA update model
 

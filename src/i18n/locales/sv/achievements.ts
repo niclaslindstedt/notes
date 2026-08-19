@@ -435,6 +435,19 @@ const achievements: AchievementsCatalog = {
     },
 
     // ── Expert ────────────────────────────────────────────────────────
+    doorCode: {
+      name: "Dörrkod",
+      condition: "Sätt en PIN-kod på en namnrymd.",
+      learnMore:
+        "Inställningar → Lagring frågar efter en kort kod innan namnrymden öppnas. Koden följer med namnrymden, så varje enhet och alla du delar den med får frågan. Det är en lätt spärr — kryptering är det som faktiskt hindrar någon från att läsa anteckningarna.",
+    },
+    ownTerms: {
+      name: "Egna villkor",
+      condition:
+        "Spara en inställning bara för den här namnrymden eller enheten.",
+      learnMore:
+        "Pilen på Spara väljer hur långt en inställning når: alla, alla i den här namnrymden, eller bara den här enheten. Smalast vinner, så dina egna val förblir dina även på ett konto du delar.",
+    },
     paranoidMode: {
       name: "Paranoialäge",
       condition: "Slå på kryptering i vila.",

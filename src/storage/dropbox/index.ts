@@ -32,6 +32,10 @@ import {
   fileNamespaceStore,
   type NamespaceRegistryStore,
 } from "../namespace-store.ts";
+import {
+  fileNamespaceSettingsStore,
+  type NamespaceSettingsStore,
+} from "../namespace-settings-store.ts";
 import { fileSettingsStore, type SettingsStore } from "../settings-store.ts";
 import {
   fileConfigPlaneStore,
@@ -179,6 +183,23 @@ export function createDropboxSettingsStore(
 ): SettingsStore {
   return fileSettingsStore(
     createDropboxFileStore(createAuthedFetch(auth, fetchImpl), ""),
+  );
+}
+
+// Namespace-scoped settings store for the Dropbox backend:
+// `namespace-settings.json` inside the namespace's own folder (the app-folder
+// root for the default namespace, `/<slug>` otherwise), so the settings the
+// people sharing that namespace agreed on travel with the folder they share.
+export function createDropboxNamespaceSettingsStore(
+  auth: string | DropboxAuth,
+  namespace: string = DEFAULT_NAMESPACE_SLUG,
+  fetchImpl: FetchImpl = fetch,
+): NamespaceSettingsStore {
+  return fileNamespaceSettingsStore(
+    createDropboxFileStore(
+      createAuthedFetch(auth, fetchImpl),
+      dropboxNamespacePath(namespace),
+    ),
   );
 }
 

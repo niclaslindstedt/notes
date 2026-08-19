@@ -6,7 +6,7 @@
 //
 // Kept as a leaf hook fed plain arguments: it reads the cloud tokens
 // (`useCloudBackend`), the folder handle (`useFolderBackend`), and the
-// encryption crypto / cache seal-unseal (`useEncryption`) the orchestrator has
+// per-namespace crypto / cache seal-unseal (`useEncryption`) the orchestrator has
 // already produced, and returns `selection` + `makeInner`. `makeInner` takes
 // the namespace as an argument (not a closed-over active one) so a move can
 // spin up an adapter for any namespace's storage location without switching to
@@ -55,11 +55,15 @@ export interface BackendSelectionDeps {
   folderHandleLoaded: boolean;
   /** Called when a folder op hits a revoked OS grant, to drop to the browser. */
   markFolderPermissionLost: () => void;
-  /** The at-rest crypto the directory adapters read at call time. */
-  directoryCrypto: DirectoryCrypto;
-  /** Seal / unseal the cloud backends' offline cache envelope. */
-  seal: (plaintext: string) => Promise<string>;
-  unseal: (stored: string) => Promise<string>;
+  /**
+   * The at-rest crypto one namespace's directory adapter reads at call time.
+   * Keyed by namespace because encryption is a per-namespace decision — see
+   * `useEncryption`.
+   */
+  cryptoFor: (namespace: string) => DirectoryCrypto;
+  /** Seal / unseal a namespace's cloud offline-cache envelope. */
+  sealFor: (namespace: string) => (plaintext: string) => Promise<string>;
+  unsealFor: (namespace: string) => (stored: string) => Promise<string>;
 }
 
 export interface BackendSelectionResult {
@@ -88,9 +92,9 @@ export function useBackendSelection(
     folderHandle,
     folderHandleLoaded,
     markFolderPermissionLost,
-    directoryCrypto,
-    seal,
-    unseal,
+    cryptoFor,
+    sealFor,
+    unsealFor,
   } = deps;
 
   // Resolve the active backend once. Both builders below switch on this
@@ -156,13 +160,13 @@ export function useBackendSelection(
               selection.auth,
               fetch,
               namespace,
-              directoryCrypto,
+              cryptoFor(namespace),
             ),
             {
               storage: globalThis.localStorage,
               key: remote.localCacheKey("dropbox", namespace),
-              seal,
-              unseal,
+              seal: sealFor(namespace),
+              unseal: unsealFor(namespace),
             },
           );
         case "gdrive":
@@ -171,13 +175,13 @@ export function useBackendSelection(
               selection.token,
               fetch,
               namespace,
-              directoryCrypto,
+              cryptoFor(namespace),
             ),
             {
               storage: globalThis.localStorage,
               key: remote.localCacheKey("gdrive", namespace),
-              seal,
-              unseal,
+              seal: sealFor(namespace),
+              unseal: unsealFor(namespace),
             },
           );
         case "folder":
@@ -185,7 +189,7 @@ export function useBackendSelection(
             directoryHandle: selection.handle,
             namespace,
             onPermissionLost: markFolderPermissionLost,
-            crypto: directoryCrypto,
+            crypto: cryptoFor(namespace),
           });
         // notesd is a directory backend over an SPKI-pinned fetch: each
         // namespace's notes and attachments live as individual files in their
@@ -198,7 +202,7 @@ export function useBackendSelection(
             selection.config,
             createPinnedFetch(selection.config.spkiPin),
             namespace,
-            directoryCrypto,
+            cryptoFor(namespace),
           );
       }
     },
@@ -206,9 +210,9 @@ export function useBackendSelection(
       selection,
       remote,
       markFolderPermissionLost,
-      directoryCrypto,
-      seal,
-      unseal,
+      cryptoFor,
+      sealFor,
+      unsealFor,
     ],
   );
 

@@ -37,6 +37,7 @@ import {
   FileQuestionGlyph,
   FlaskGlyph,
   FolderGlyph,
+  DoorGlyph,
   FolderTreeGlyph,
   FormatGlyph,
   FullStopGlyph,
@@ -867,6 +868,24 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     learnMore: true,
     // Fired when the background migration finishes sealing every note + all its
     // attachments at rest (the green lock on every note).
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "doorCode",
+    tier: "expert",
+    glyph: DoorGlyph,
+    learnMore: true,
+    // Fired when a namespace PIN is set (or entered for the first time this
+    // session) — the soft gate in front of a shared namespace.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "ownTerms",
+    tier: "expert",
+    glyph: LayersGlyph,
+    learnMore: true,
+    // Fired when a settings save lands at a narrower width than "everyone" —
+    // the moment scoping stops being a menu and starts being a decision.
     trigger: { kind: "manual" },
   },
   {

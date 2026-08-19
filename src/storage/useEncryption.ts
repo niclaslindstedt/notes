@@ -1,20 +1,29 @@
-// The at-rest encryption concern of the storage backend, extracted from
-// `useStorageBackend` into a self-contained state machine: the session
-// passphrase, the encryption mode, the locked / disabling flags, the per-file
-// `directoryCrypto` ref bundle the directory adapters read at call time, the
-// offline-cache `seal` / `unseal`, and the four enable / disable / finish /
-// unlock verbs.
+// The at-rest encryption concern of the storage backend, as a self-contained
+// state machine: the session passphrases, the per-namespace encryption modes,
+// the locked / disabling flags, the per-file `DirectoryCrypto` bundles the
+// directory adapters read at call time, the offline-cache `seal` / `unseal`,
+// and the four enable / disable / finish / unlock verbs.
 //
-// There are no user accounts, so the passphrase isn't derived from a login —
+// **Encryption is per namespace.** A namespace is a bucket several people can
+// share through one login and one folder, so the decision to seal one is a
+// decision about that bucket alone: sealing the namespace you keep your own
+// things in must not seal the one you share with four other people, and — the
+// half that actually bites — a namespace *they* sealed must not lock you out
+// of yours. So every piece of state below is keyed by slug: the mode, the
+// passphrase, the "why am I locked" hint, the drain flag. `locked` is only
+// ever a statement about the namespace currently open, and switching to
+// another namespace is a way *out* of a lock rather than a thing the lock
+// prevents (see the unlock gate).
+//
+// There are no user accounts, so a passphrase isn't derived from a login —
 // it's set explicitly in Settings and held only in memory for the session.
-// After a reload the app is "locked" (encryption is on but no passphrase is
-// held) until the user re-enters it; the `locked` flag drives the unlock gate
-// in `App`.
+// After a reload every encrypted namespace is locked again until its
+// passphrase is re-entered.
 //
-// The verbs need the active document adapter, which is built *from* this hook's
-// `directoryCrypto` / `seal` / `unseal` outputs — a render-order cycle. It is
-// broken by handing in a ref to the adapter (`innerRef`) the verbs read at call
-// time, long after the adapter has been built.
+// The verbs need the active document adapter, which is built *from* this
+// hook's `cryptoFor` / `sealFor` / `unsealFor` outputs — a render-order cycle.
+// It is broken by handing in a ref to the adapter (`innerRef`) the verbs read
+// at call time, long after the adapter has been built.
 
 import { useCallback, useMemo, useRef, useState } from "react";
 
@@ -90,33 +99,42 @@ export async function hydrateForSwitch(
 }
 
 export interface UseEncryption {
-  /** The per-file crypto bundle the directory adapters read at call time. */
-  directoryCrypto: DirectoryCrypto;
-  /** Seal a plaintext for the offline cache when a passphrase is held. */
-  seal: (plaintext: string) => Promise<string>;
-  /** Unseal a cached envelope when a passphrase is held; pass-through otherwise. */
-  unseal: (stored: string) => Promise<string>;
-  /** The session passphrase ref the whole-document `withEncryption` wrapper reads. */
-  passwordRef: PasswordRef;
-  /** Encryption mode and whether a passphrase is held this session. */
+  /**
+   * The per-file crypto bundle a namespace's directory adapter reads at call
+   * time. Stable per slug, so building the adapter for a namespace twice
+   * doesn't invalidate its memo.
+   */
+  cryptoFor: (namespace: string) => DirectoryCrypto;
+  /** Seal a plaintext for a namespace's offline cache when its passphrase is held. */
+  sealFor: (namespace: string) => (plaintext: string) => Promise<string>;
+  /** Unseal a namespace's cache envelope when its passphrase is held. */
+  unsealFor: (namespace: string) => (stored: string) => Promise<string>;
+  /** A namespace's session passphrase ref, for the whole-document wrapper. */
+  passwordRefFor: (namespace: string) => PasswordRef;
+  /** The active namespace's encryption mode. */
   encryption: EncryptionMode;
-  /** True when encryption is on but no passphrase is held yet (needs unlock). */
+  /** True when the **active** namespace is encrypted and holds no passphrase. */
   locked: boolean;
-  /** True while a file/cloud backend's background de-encryption queue drains. */
+  /** Whether a given namespace is sealed and un-opened this session. */
+  isNamespaceLocked: (namespace: string) => boolean;
+  /** Every namespace this device knows to be encrypted, whether opened or not. */
+  isNamespaceEncrypted: (namespace: string) => boolean;
+  /** True while the active namespace's background de-encryption queue drains. */
   disabling: boolean;
   /**
-   * True when this session's locked state was triggered by discovering the
-   * backend is encrypted (another device turned encryption on), rather than a
-   * plain reload of a store this device already knew was encrypted. Lets the
-   * unlock gate explain *why* it appeared. Reset once unlocked.
+   * True when the active namespace's locked state was triggered by discovering
+   * it is encrypted (someone else turned encryption on), rather than a plain
+   * reload of a namespace this device already knew was sealed. Lets the unlock
+   * gate explain *why* it appeared. Reset once unlocked.
    */
   fromRemote: boolean;
   /**
-   * Wrap a single-document adapter (the browser store) in the session's
-   * whole-document encryption envelope so a folder seed / mirror round-trips the
-   * same bytes the steady-state app does. A no-op when encryption is off.
+   * Wrap a single-document adapter (the browser store) for one namespace in
+   * that namespace's whole-document encryption envelope, so a folder seed /
+   * mirror round-trips the same bytes the steady-state app does. A no-op when
+   * that namespace isn't encrypted or holds no passphrase.
    */
-  wrapBrowserForActive: (raw: StorageAdapter) => StorageAdapter;
+  wrapBrowserFor: (namespace: string, raw: StorageAdapter) => StorageAdapter;
   enableEncryption: (
     next: string,
     onProgress?: EncryptionProgress,
@@ -125,11 +143,11 @@ export interface UseEncryption {
   finishDisableEncryption: () => void;
   unlock: (candidate: string, onProgress?: EncryptionProgress) => Promise<void>;
   /**
-   * Adopt an encrypted backend discovered on load: flip the device's mode to
-   * `encrypted` without a passphrase so `locked` goes true and the unlock gate
-   * appears. Idempotent — a no-op once already encrypted. This is how
-   * encryption turned on from one device is enforced on every device that syncs
-   * the same folder.
+   * Adopt an encrypted namespace discovered on load: flip *that namespace's*
+   * mode to `encrypted` without a passphrase so `locked` goes true and the
+   * unlock gate appears. Idempotent — a no-op once already encrypted. This is
+   * how encryption turned on from one device is enforced on every device that
+   * syncs the same namespace folder.
    */
   adoptEncryptedRemote: () => void;
 }
@@ -137,65 +155,151 @@ export interface UseEncryption {
 export function useEncryption(
   innerRef: { readonly current: StorageAdapter | null },
   backend: BackendId,
+  activeNamespace: string,
 ): UseEncryption {
-  const [encryption, setEncryptionState] =
-    useState<EncryptionMode>(getEncryption);
-  // File/cloud only: true while the background de-encryption queue drains. The
-  // mode stays `encrypted` (and the passphrase held) until the last note is
-  // plaintext, then `finishDisableEncryption` flips it.
-  const [disabling, setDisabling] = useState(false);
-  // True when the current locked state came from discovering the backend is
-  // encrypted (another device enabled it) rather than a plain reload of a store
-  // this device already had in `encrypted` mode. Drives the unlock gate's copy;
-  // cleared once the passphrase lands.
-  const [fromRemote, setFromRemote] = useState(false);
-  // Session-only passphrase. Never persisted — lost on reload by design.
-  const [password, setPassword] = useState<string | null>(null);
-  // A stable ref the per-file directory adapters read at call time, so the
-  // adapter never needs rebuilding when the passphrase changes (unlock / enable
-  // / disable). Kept in lockstep with the `password` state via `applyPassword`.
-  const passwordRef = useRef<string | null>(null);
+  // Session-only passphrases, one per namespace. Never persisted — lost on
+  // reload by design. Held in a ref so the directory adapters can read them at
+  // call time without the adapter being rebuilt on every unlock; `epoch` is
+  // what turns a mutation into a re-render.
+  const passwords = useRef(new Map<string, string>());
+  const [passwordEpoch, setPasswordEpoch] = useState(0);
+  // Bumped whenever a namespace's persisted mode changes, so the derived
+  // `encryption` below re-reads it.
+  const [modeEpoch, setModeEpoch] = useState(0);
+  // File/cloud only: the namespace whose background de-encryption queue is
+  // draining. Its mode stays `encrypted` (and its passphrase held) until the
+  // last note is plaintext, then `finishDisableEncryption` flips it.
+  const [disablingSlug, setDisablingSlug] = useState<string | null>(null);
+  // The namespace whose locked state came from discovering it is encrypted
+  // (someone else enabled it) rather than a plain reload. Drives the unlock
+  // gate's copy; cleared once that namespace's passphrase lands.
+  const [fromRemoteSlug, setFromRemoteSlug] = useState<string | null>(null);
+
   // Points at the unlock gate's status callback only while an unlock is in
   // flight, so the directory adapter can report each note as it decrypts it.
-  // Null the rest of the time — a steady-state load reports nothing.
+  // Null the rest of the time — a steady-state load reports nothing. One
+  // shared ref: only one unlock can be in flight at a time.
   const decryptNoteRef = useRef<DecryptNoteReporter | null>(null);
-  const directoryCrypto = useMemo<DirectoryCrypto>(
-    () => ({ passwordRef, onDecryptNote: decryptNoteRef }),
+
+  // One stable `DirectoryCrypto` per namespace. Its `passwordRef` is a live
+  // view onto that slug's entry in the map, so unlocking a namespace does not
+  // rebuild its adapter — and, just as importantly, a namespace whose
+  // passphrase is not held reads `null` and stays sealed.
+  const cryptoBySlug = useRef(new Map<string, DirectoryCrypto>());
+  const cryptoFor = useCallback((namespace: string): DirectoryCrypto => {
+    const existing = cryptoBySlug.current.get(namespace);
+    if (existing) return existing;
+    const made: DirectoryCrypto = {
+      passwordRef: {
+        get current(): string | null {
+          return passwords.current.get(namespace) ?? null;
+        },
+      },
+      onDecryptNote: decryptNoteRef,
+    };
+    cryptoBySlug.current.set(namespace, made);
+    return made;
+  }, []);
+
+  const passwordRefFor = useCallback(
+    (namespace: string): PasswordRef => cryptoFor(namespace).passwordRef,
+    [cryptoFor],
+  );
+
+  // Seal/unseal a namespace's offline cache so localStorage holds one whole-
+  // document envelope (ciphertext) even though the per-file directory adapter
+  // hands the cache plaintext. No passphrase held → pass through. `unseal` is
+  // what an offline unlock verifies the candidate passphrase against. Memoised
+  // per slug so the cache wrapper's identity is stable across renders.
+  const cacheCrypto = useRef(
+    new Map<
+      string,
+      {
+        seal: (plaintext: string) => Promise<string>;
+        unseal: (stored: string) => Promise<string>;
+      }
+    >(),
+  );
+  const cacheCryptoFor = useCallback((namespace: string) => {
+    const existing = cacheCrypto.current.get(namespace);
+    if (existing) return existing;
+    const made = {
+      seal: async (plaintext: string): Promise<string> => {
+        const pw = passwords.current.get(namespace);
+        return pw ? await encryptText(plaintext, pw) : plaintext;
+      },
+      unseal: async (stored: string): Promise<string> => {
+        const pw = passwords.current.get(namespace);
+        return pw && isEncryptedEnvelope(stored)
+          ? await decryptEnvelope(stored, pw)
+          : stored;
+      },
+    };
+    cacheCrypto.current.set(namespace, made);
+    return made;
+  }, []);
+  const sealFor = useCallback(
+    (namespace: string) => cacheCryptoFor(namespace).seal,
+    [cacheCryptoFor],
+  );
+  const unsealFor = useCallback(
+    (namespace: string) => cacheCryptoFor(namespace).unseal,
+    [cacheCryptoFor],
+  );
+
+  // Set or clear one namespace's session passphrase: the imperative map (read
+  // by the adapters) and the epoch (drives `locked` / re-renders).
+  const applyPassword = useCallback(
+    (namespace: string, next: string | null) => {
+      if (next === null) passwords.current.delete(namespace);
+      else passwords.current.set(namespace, next);
+      setPasswordEpoch((n) => n + 1);
+      // A passphrase landing (unlock) clears the "why am I locked" hint for
+      // that namespace — the next lock decides its own reason.
+      if (next !== null) {
+        setFromRemoteSlug((slug) => (slug === namespace ? null : slug));
+      }
+    },
     [],
   );
-  // Set or clear the session passphrase in one place: the imperative ref (read
-  // by the adapters) and the React state (drives `locked` / re-renders).
-  const applyPassword = useCallback((next: string | null) => {
-    passwordRef.current = next;
-    setPassword(next);
-    // A passphrase landing (unlock) or being dropped clears the "why am I
-    // locked" hint — the next lock decides its own reason.
-    if (next !== null) setFromRemote(false);
-  }, []);
 
-  // Seal/unseal the offline cache so localStorage holds one whole-document
-  // envelope (ciphertext) even though the per-file directory adapter hands the
-  // cache plaintext. No passphrase held → pass through. `unseal` is what an
-  // offline unlock verifies the candidate passphrase against.
-  const seal = useCallback(async (plaintext: string): Promise<string> => {
-    const pw = passwordRef.current;
-    return pw ? await encryptText(plaintext, pw) : plaintext;
-  }, []);
-  const unseal = useCallback(async (stored: string): Promise<string> => {
-    const pw = passwordRef.current;
-    return pw && isEncryptedEnvelope(stored)
-      ? await decryptEnvelope(stored, pw)
-      : stored;
-  }, []);
+  const isNamespaceEncrypted = useCallback(
+    (namespace: string): boolean => {
+      void modeEpoch;
+      return getEncryption(namespace) === "encrypted";
+    },
+    [modeEpoch],
+  );
 
-  const locked = encryption === "encrypted" && password === null;
+  const isNamespaceLocked = useCallback(
+    (namespace: string): boolean => {
+      void passwordEpoch;
+      return (
+        isNamespaceEncrypted(namespace) && !passwords.current.has(namespace)
+      );
+    },
+    [isNamespaceEncrypted, passwordEpoch],
+  );
 
-  const wrapBrowserForActive = useCallback(
-    (raw: StorageAdapter): StorageAdapter =>
-      encryption === "encrypted" && password !== null
-        ? withEncryption(raw, passwordRef)
-        : raw,
-    [encryption, password],
+  const encryption = useMemo<EncryptionMode>(() => {
+    void modeEpoch;
+    return getEncryption(activeNamespace);
+  }, [activeNamespace, modeEpoch]);
+
+  const locked = isNamespaceLocked(activeNamespace);
+  const disabling = disablingSlug === activeNamespace;
+  const fromRemote = fromRemoteSlug === activeNamespace;
+
+  const wrapBrowserFor = useCallback(
+    (namespace: string, raw: StorageAdapter): StorageAdapter => {
+      void passwordEpoch;
+      void modeEpoch;
+      return getEncryption(namespace) === "encrypted" &&
+        passwords.current.has(namespace)
+        ? withEncryption(raw, passwordRefFor(namespace))
+        : raw;
+    },
+    [passwordRefFor, passwordEpoch, modeEpoch],
   );
 
   const enableEncryption = useCallback(
@@ -205,7 +309,8 @@ export function useEncryption(
       // mounts after the adapter exists); guarded only for type-safety.
       const inner = innerRef.current;
       if (!inner) return;
-      log.info("enable encryption: start");
+      const namespace = activeNamespace;
+      log.info(`enable encryption: start ns=${namespace}`);
       // The browser backend has no per-note representation: its whole document
       // is one envelope, so the switch is a single re-save through the
       // `withEncryption` wrapper here and now.
@@ -214,7 +319,7 @@ export function useEncryption(
         const snap = await inner.load();
         const hydrated = snap ? await hydrateForSwitch(inner, snap.text) : null;
         onProgress?.("derivingKey");
-        passwordRef.current = next;
+        passwords.current.set(namespace, next);
         if (snap && hydrated !== null) {
           onProgress?.("encrypting");
           onProgress?.("saving");
@@ -222,7 +327,7 @@ export function useEncryption(
           // lands as ciphertext at rest now — a raw `inner.save` here would leave
           // it in plaintext (despite the mode reading "encrypted") until the next
           // edit happened to go through the wrapped app adapter.
-          await withEncryption(inner, passwordRef).save(
+          await withEncryption(inner, passwordRefFor(namespace)).save(
             hydrated,
             snap.revision,
           );
@@ -234,25 +339,26 @@ export function useEncryption(
         // not-yet-sealed plaintext remnant, so the document stays whole). No
         // bulk re-save here — that would burst the cloud API and block the UI.
         onProgress?.("derivingKey");
-        passwordRef.current = next;
+        passwords.current.set(namespace, next);
       }
-      persistEncryption("encrypted");
-      setEncryptionState("encrypted");
-      applyPassword(next);
-      log.info("enable encryption: mode on");
+      persistEncryption(namespace, "encrypted");
+      setModeEpoch((n) => n + 1);
+      applyPassword(namespace, next);
+      log.info(`enable encryption: mode on ns=${namespace}`);
       unlockAchievement("paranoidMode");
     },
-    [backend, applyPassword, innerRef],
+    [backend, applyPassword, innerRef, activeNamespace, passwordRefFor],
   );
 
   const disableEncryption = useCallback(
     async (onProgress?: EncryptionProgress) => {
-      if (passwordRef.current === null) {
+      const namespace = activeNamespace;
+      if (!passwords.current.has(namespace)) {
         throw new Error("Unlock before turning encryption off");
       }
       const inner = innerRef.current;
       if (!inner) return;
-      log.info("disable encryption: start");
+      log.info(`disable encryption: start ns=${namespace}`);
       if (backend === "browser") {
         // Whole-document backend: read + decrypt and re-save as plaintext in one
         // pass, clearing the encrypted bytes only after the plaintext is written.
@@ -264,55 +370,65 @@ export function useEncryption(
         // was on but nothing was encrypted yet) passes straight through.
         onProgress?.("reading");
         onProgress?.("decrypting");
-        const encrypted = withEncryption(inner, passwordRef);
+        const encrypted = withEncryption(inner, passwordRefFor(namespace));
         const snap = await encrypted.load();
         const hydrated = snap
           ? await hydrateForSwitch(encrypted, snap.text)
           : null;
-        passwordRef.current = null;
+        passwords.current.delete(namespace);
         if (snap && hydrated !== null) {
           onProgress?.("saving");
           await inner.save(hydrated, snap.revision);
         }
         onProgress?.("finalizing");
-        persistEncryption("plaintext");
-        setEncryptionState("plaintext");
-        applyPassword(null);
-        log.info("disable encryption: done");
+        persistEncryption(namespace, "plaintext");
+        setModeEpoch((n) => n + 1);
+        applyPassword(namespace, null);
+        log.info(`disable encryption: done ns=${namespace}`);
         return;
       }
       // File/cloud: keep the mode `encrypted` and the passphrase held, and raise
       // the flag so the background queue decrypts note-by-note. It calls
       // `finishDisableEncryption` once the last note is plaintext.
-      setDisabling(true);
+      setDisablingSlug(namespace);
     },
-    [backend, applyPassword, innerRef],
+    [backend, applyPassword, innerRef, activeNamespace, passwordRefFor],
   );
 
   const adoptEncryptedRemote = useCallback(() => {
+    const namespace = activeNamespace;
     // Already encrypted (or unlocked this session) — nothing to adopt.
-    if (getEncryption() === "encrypted" || passwordRef.current !== null) return;
-    log.info("adopt: backend is encrypted — locking for the passphrase");
-    persistEncryption("encrypted");
-    setEncryptionState("encrypted");
-    setFromRemote(true);
-    // `password` stays null → `locked` becomes true → the unlock gate shows.
+    if (
+      getEncryption(namespace) === "encrypted" ||
+      passwords.current.has(namespace)
+    ) {
+      return;
+    }
+    log.info(
+      `adopt: ns=${namespace} is encrypted — locking for the passphrase`,
+    );
+    persistEncryption(namespace, "encrypted");
+    setModeEpoch((n) => n + 1);
+    setFromRemoteSlug(namespace);
+    // No passphrase held → `locked` becomes true → the unlock gate shows.
     unlockAchievement("keyHandoff");
-  }, []);
+  }, [activeNamespace]);
 
   const finishDisableEncryption = useCallback(() => {
-    log.info("disable encryption: queue drained — finalising");
-    persistEncryption("plaintext");
-    setEncryptionState("plaintext");
-    applyPassword(null);
-    setDisabling(false);
-  }, [applyPassword]);
+    const namespace = activeNamespace;
+    log.info(`disable encryption: queue drained ns=${namespace} — finalising`);
+    persistEncryption(namespace, "plaintext");
+    setModeEpoch((n) => n + 1);
+    applyPassword(namespace, null);
+    setDisablingSlug((slug) => (slug === namespace ? null : slug));
+  }, [applyPassword, activeNamespace]);
 
   const unlock = useCallback(
     async (candidate: string, onProgress?: EncryptionProgress) => {
       if (!candidate) throw new Error("Passphrase is required");
       const inner = innerRef.current;
       if (!inner) return;
+      const namespace = activeNamespace;
       // Tentatively activate the candidate so the directory adapter derives keys
       // and decrypts the per-file notes (or the offline cache falls back and
       // unseals against it). A wrong passphrase surfaces as an AES-GCM auth
@@ -322,8 +438,8 @@ export function useEncryption(
       // (derive key → read → decrypt) so the unlock gate can flash what's
       // happening instead of sitting blank.
       onProgress?.("derivingKey");
-      const previous = passwordRef.current;
-      passwordRef.current = candidate;
+      const previous = passwords.current.get(namespace) ?? null;
+      passwords.current.set(namespace, candidate);
       // Forward each note the file/cloud backend unseals to the status line, so
       // a long decrypt names the note it's on. Cleared in `finally` so it never
       // fires for a steady-state load. The browser backend decrypts one whole
@@ -335,7 +451,8 @@ export function useEncryption(
         onProgress?.("decrypting");
         await inner.load();
       } catch (err) {
-        passwordRef.current = previous;
+        if (previous === null) passwords.current.delete(namespace);
+        else passwords.current.set(namespace, previous);
         if (err instanceof Error && /wrong password/i.test(err.message)) {
           throw new Error("Wrong password", { cause: err });
         }
@@ -345,21 +462,23 @@ export function useEncryption(
         decryptNoteRef.current = null;
       }
       onProgress?.("finalizing");
-      applyPassword(candidate);
+      applyPassword(namespace, candidate);
     },
-    [innerRef, applyPassword],
+    [innerRef, applyPassword, activeNamespace],
   );
 
   return {
-    directoryCrypto,
-    seal,
-    unseal,
-    passwordRef,
+    cryptoFor,
+    sealFor,
+    unsealFor,
+    passwordRefFor,
     encryption,
     locked,
+    isNamespaceLocked,
+    isNamespaceEncrypted,
     disabling,
     fromRemote,
-    wrapBrowserForActive,
+    wrapBrowserFor,
     enableEncryption,
     disableEncryption,
     finishDisableEncryption,

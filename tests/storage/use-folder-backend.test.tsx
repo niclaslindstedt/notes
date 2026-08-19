@@ -73,20 +73,20 @@ function makeDeps(over: Partial<FolderBackendDeps> = {}): {
   source: StorageAdapter;
   browserSave: ReturnType<typeof vi.fn>;
   selectBackend: ReturnType<typeof vi.fn>;
-  wrapBrowserForActive: ReturnType<typeof vi.fn>;
+  wrapBrowserFor: ReturnType<typeof vi.fn>;
 } {
   const source = fakeAdapter();
   const browserSave = vi.fn(async (text: string) => ({ text }));
-  const wrapBrowserForActive = vi.fn(() => fakeAdapter({ save: browserSave }));
+  const wrapBrowserFor = vi.fn(() => fakeAdapter({ save: browserSave }));
   const selectBackend = vi.fn();
   const deps: FolderBackendDeps = {
     activeRef: { current: { adapter: source, activeNamespace: "default" } },
-    directoryCrypto: dummyCrypto,
-    wrapBrowserForActive,
+    cryptoFor: () => dummyCrypto,
+    wrapBrowserFor,
     selectBackend,
     ...over,
   };
-  return { deps, source, browserSave, selectBackend, wrapBrowserForActive };
+  return { deps, source, browserSave, selectBackend, wrapBrowserFor };
 }
 
 beforeEach(() => {

@@ -82,20 +82,19 @@ export interface FolderActiveRef {
 export interface FolderBackendDeps {
   activeRef: FolderActiveRef;
   /** The per-file crypto bundle the folder adapter seals with. */
-  directoryCrypto: DirectoryCrypto;
+  cryptoFor: (namespace: string) => DirectoryCrypto;
   /**
    * Wrap a single-document adapter (the browser store) in the session's
    * whole-document encryption envelope, so the disconnect mirror writes the
    * same bytes the steady-state app does. A no-op when encryption is off.
    */
-  wrapBrowserForActive: (raw: StorageAdapter) => StorageAdapter;
+  wrapBrowserFor: (namespace: string, raw: StorageAdapter) => StorageAdapter;
   /** Persist + activate a backend (the orchestrator's persist + setState). */
   selectBackend: (id: BackendId) => void;
 }
 
 export function useFolderBackend(deps: FolderBackendDeps): FolderBackend {
-  const { activeRef, directoryCrypto, wrapBrowserForActive, selectBackend } =
-    deps;
+  const { activeRef, cryptoFor, wrapBrowserFor, selectBackend } = deps;
 
   const [folderHandle, setFolderHandle] =
     useState<FileSystemDirectoryHandle | null>(null);
@@ -166,7 +165,7 @@ export function useFolderBackend(deps: FolderBackendDeps): FolderBackend {
     const folder = createFolderAdapter({
       directoryHandle: handle,
       namespace: active.activeNamespace,
-      crypto: directoryCrypto,
+      crypto: cryptoFor(active.activeNamespace),
     });
     try {
       const [remote, source] = await Promise.all([
@@ -183,7 +182,7 @@ export function useFolderBackend(deps: FolderBackendDeps): FolderBackend {
     setFolderHandleLoaded(true);
     selectBackend("folder");
     unlockAchievement("localVault");
-  }, [activeRef, directoryCrypto, selectBackend]);
+  }, [activeRef, cryptoFor, selectBackend]);
 
   // Re-confirm the OS grant on the already-stored handle. `requestPermission`
   // needs a user gesture, which is why this lives in a click handler.
@@ -214,11 +213,12 @@ export function useFolderBackend(deps: FolderBackendDeps): FolderBackend {
         const folder = createFolderAdapter({
           directoryHandle: folderHandle,
           namespace: active.activeNamespace,
-          crypto: directoryCrypto,
+          crypto: cryptoFor(active.activeNamespace),
         });
         const snap = await folder.load();
         if (snap) {
-          const browser = wrapBrowserForActive(
+          const browser = wrapBrowserFor(
+            active.activeNamespace,
             new BrowserLocalStorageAdapter(
               globalThis.localStorage,
               active.activeNamespace,
@@ -234,13 +234,7 @@ export function useFolderBackend(deps: FolderBackendDeps): FolderBackend {
     setFolderHandle(null);
     setFolderReconnectNeeded(false);
     selectBackend("browser");
-  }, [
-    activeRef,
-    folderHandle,
-    directoryCrypto,
-    wrapBrowserForActive,
-    selectBackend,
-  ]);
+  }, [activeRef, folderHandle, cryptoFor, wrapBrowserFor, selectBackend]);
 
   return {
     folderHandle,

@@ -58,6 +58,10 @@ import {
   type NamespaceRegistryStore,
 } from "../namespace-store.ts";
 import { SETTINGS_FILE_NAME, type SettingsStore } from "../settings-store.ts";
+import {
+  NAMESPACE_SETTINGS_FILE_NAME,
+  type NamespaceSettingsStore,
+} from "../namespace-settings-store.ts";
 import { notesdError } from "./errors.ts";
 
 const log = createLogger("notesd");
@@ -374,6 +378,33 @@ export function createNotesdSettingsStore(
   fetchImpl: FetchImpl,
 ): SettingsStore {
   return createNotesdRootStore(config, fetchImpl, SETTINGS_FILE_NAME);
+}
+
+/**
+ * The notesd backend's per-namespace settings store — the middle width of the
+ * appearance settings (see `namespace-settings-store.ts`). The daemon's
+ * settings endpoint is a flat root namespace with no subfolders to nest a file
+ * in, so the default namespace takes the bare `namespace-settings.json` and
+ * every other one prefixes its slug; the daemon allows exactly that shape
+ * (`is_namespace_settings` in its store).
+ */
+export function createNotesdNamespaceSettingsStore(
+  config: NotesdConfig,
+  fetchImpl: FetchImpl,
+  namespace: string = DEFAULT_NAMESPACE_SLUG,
+): NamespaceSettingsStore {
+  return createNotesdRootStore(
+    config,
+    fetchImpl,
+    notesdNamespaceSettingsName(namespace),
+  );
+}
+
+/** The flat settings name a namespace's settings file is served under. */
+export function notesdNamespaceSettingsName(namespace: string): string {
+  return namespace === DEFAULT_NAMESPACE_SLUG
+    ? NAMESPACE_SETTINGS_FILE_NAME
+    : `${namespace}.${NAMESPACE_SETTINGS_FILE_NAME}`;
 }
 
 /**

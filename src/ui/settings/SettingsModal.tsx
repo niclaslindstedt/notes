@@ -8,18 +8,34 @@ import {
   type ComponentType,
 } from "react";
 
+import { unlock } from "../../achievements/index.ts";
 import { useDevMode } from "../../dev/useDevMode.ts";
 import { useT, type MessageKey, type TFunction } from "../../i18n/index.ts";
 import type { UseStorageBackend } from "../../storage/useStorageBackend.ts";
 import type { EncryptionConversionState } from "./EncryptionLogModal.tsx";
 import {
+  appearanceThroughScope,
   commitAppearance,
   DEFAULT_APPEARANCE,
+  getAppearanceLayers,
   setAppearancePreview,
   useAppearance,
   type Appearance,
 } from "../../theme/useTheme.ts";
+import {
+  scopeHoldsSettings,
+  SETTINGS_SCOPES,
+  type SettingsScope,
+} from "../../theme/appearance-scopes.ts";
 import { Button } from "../form/Button.tsx";
+import { SplitButton, type SplitButtonOption } from "../form/SplitButton.tsx";
+import {
+  getResetTarget,
+  getSaveScope,
+  setResetTarget,
+  setSaveScope,
+  type ResetTarget,
+} from "./scope-preference.ts";
 import {
   CloseIcon,
   CodeIcon,
@@ -114,6 +130,15 @@ export function SettingsModal({ open, onClose, storage, conversion }: Props) {
   // document and re-syncs while the dialog is closed, so the next open starts
   // clean and a cancelled edit never lingers.
   const [draft, setDraft] = useState<Appearance>(persisted);
+  // The appearance the dialog opened on. Save diffs the draft against it and
+  // writes only what actually moved — so saving at the global width doesn't
+  // republish every untouched setting to everyone else on the account.
+  const [baseline, setBaseline] = useState<Appearance>(persisted);
+  // Which width Save writes at, and what Reset falls back to. Remembered per
+  // device, so the common case is one press with no menu.
+  const [saveScope, setSaveScopeState] = useState<SettingsScope>(getSaveScope);
+  const [resetTarget, setResetTargetState] =
+    useState<ResetTarget>(getResetTarget);
 
   // Developer is gated on dev mode; Logs is gated on log capture (which can
   // only be on while dev mode is, so the Logs tab never outlives its data).
@@ -141,6 +166,7 @@ export function SettingsModal({ open, onClose, storage, conversion }: Props) {
   useEffect(() => {
     if (open) return;
     setDraft(persisted);
+    setBaseline(persisted);
   }, [open, persisted]);
 
   // Stream the draft to the theme engine while open so appearance edits
@@ -159,24 +185,65 @@ export function SettingsModal({ open, onClose, storage, conversion }: Props) {
     [],
   );
 
-  const handleSave = useCallback(() => {
-    commitAppearance(draft);
-    onClose();
-  }, [draft, onClose]);
+  const handleSave = useCallback(
+    (scope: SettingsScope) => {
+      setSaveScope(scope);
+      setSaveScopeState(scope);
+      commitAppearance(draft, baseline, scope);
+      // Fired here rather than in the store: the store is reached from the
+      // quick toggles too, and those have no scope picker to have made a
+      // decision with.
+      if (scope !== "global") unlock("ownTerms");
+      onClose();
+    },
+    [draft, baseline, onClose],
+  );
 
-  // Reset only the owned appearance fields; keep the earned achievements and
-  // the unseen queue the dialog can't edit from here — and keep the Transform
-  // rules, which are authored content rather than a preference: a stray press
-  // of "Reset to defaults" must not silently delete regexes someone wrote.
-  // They are deleted one at a time, from their own tab.
-  const handleReset = useCallback(() => {
+  // Reset loads a *wider* baseline into the draft; it persists nothing on its
+  // own, so the width it lands at is still the Save button's decision. Picking
+  // "Namespace settings" and then saving at the device width is how an
+  // override is given up — the leaf now equals what the wider layers resolve
+  // to, so the device layer drops it (see `applyScopedSave`).
+  //
+  // Whichever target is chosen, the earned achievements and the unseen queue
+  // the dialog can't edit are kept — and so are the Transform rules, which are
+  // authored content rather than a preference: a stray press of Reset must not
+  // silently delete regexes someone wrote. They are deleted one at a time,
+  // from their own tab.
+  const handleReset = useCallback((target: ResetTarget) => {
+    setResetTarget(target);
+    setResetTargetState(target);
+    const next =
+      target === "defaults"
+        ? DEFAULT_APPEARANCE
+        : appearanceThroughScope(target);
     setDraft((prev) => ({
-      ...DEFAULT_APPEARANCE,
+      ...next,
       transforms: prev.transforms,
       achievements: prev.achievements,
       unseenAchievements: prev.unseenAchievements,
     }));
   }, []);
+
+  // Which widths Reset can actually fall back to. A width that holds no
+  // settings has nothing to reset *to*, so it is left out of the menu rather
+  // than offered and then quietly behaving like "Defaults". Recomputed on each
+  // open, which is when the layers can have moved under the dialog.
+  const resetTargets = useMemo<ResetTarget[]>(() => {
+    if (!open) return ["defaults"];
+    const layers = getAppearanceLayers();
+    // Narrowest first, so the menu reads as stepping back one width at a time.
+    // `device` is never offered: the draft already shows what this device says,
+    // so resetting to it would do nothing.
+    return [
+      ...[...SETTINGS_SCOPES]
+        .reverse()
+        .filter(
+          (scope) => scope !== "device" && scopeHoldsSettings(layers, scope),
+        ),
+      "defaults" as const,
+    ];
+  }, [open]);
 
   return (
     <Modal open={open} onClose={onClose} labelledBy="settings-title">
@@ -241,6 +308,11 @@ export function SettingsModal({ open, onClose, storage, conversion }: Props) {
 
       <SettingsFooter
         t={t}
+        saveScope={saveScope}
+        resetTarget={
+          resetTargets.includes(resetTarget) ? resetTarget : "defaults"
+        }
+        resetTargets={resetTargets}
         onReset={handleReset}
         onCancel={onClose}
         onSave={handleSave}
@@ -255,29 +327,68 @@ export function SettingsModal({ open, onClose, storage, conversion }: Props) {
 // the footer reserves the home-indicator inset itself — its top padding plus
 // env(safe-area-inset-bottom) — keeping the Save row a comfortable thumb reach
 // above the screen edge instead of sitting right on it.
+//
+// Both actions carry a width, so both are split buttons: Save asks *how far*
+// the change should reach (this device / everyone in this namespace /
+// everyone), and Reset asks *how far back* to fall (to what the namespace
+// says, to what the account says, or to the built-in defaults). Reset only
+// offers a width that actually holds settings — falling back to a layer with
+// nothing in it would be indistinguishable from Defaults, and offering it
+// would imply there is something there to find.
 const SettingsFooter = memo(function SettingsFooter({
   t,
+  saveScope,
+  resetTarget,
+  resetTargets,
   onReset,
   onCancel,
   onSave,
 }: {
   t: TFunction;
-  onReset: () => void;
+  saveScope: SettingsScope;
+  resetTarget: ResetTarget;
+  resetTargets: readonly ResetTarget[];
+  onReset: (target: ResetTarget) => void;
   onCancel: () => void;
-  onSave: () => void;
+  onSave: (scope: SettingsScope) => void;
 }) {
+  const saveOptions: SplitButtonOption<SettingsScope>[] = SETTINGS_SCOPES.map(
+    (scope) => ({
+      value: scope,
+      label: t(`settings.scope.${scope}` as MessageKey),
+      description: t(`settings.scope.${scope}Hint` as MessageKey),
+    }),
+  );
+  const resetOptions: SplitButtonOption<ResetTarget>[] = resetTargets.map(
+    (target) => ({
+      value: target,
+      label: t(`settings.reset.${target}` as MessageKey),
+      description: t(`settings.reset.${target}Hint` as MessageKey),
+    }),
+  );
+
   return (
     <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-line bg-surface-3 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-      <Button variant="secondary" onClick={onReset}>
-        {t("common.resetToDefaults")}
-      </Button>
+      <SplitButton
+        label={t("common.reset")}
+        variant="secondary"
+        value={resetTarget}
+        options={resetOptions}
+        onSelect={onReset}
+        menuLabel={t("settings.reset.chooseTarget")}
+      />
       <div className="flex items-center gap-2">
         <Button variant="secondary" onClick={onCancel}>
           {t("common.cancel")}
         </Button>
-        <Button variant="primary" onClick={onSave}>
-          {t("common.save")}
-        </Button>
+        <SplitButton
+          label={t("common.save")}
+          variant="primary"
+          value={saveScope}
+          options={saveOptions}
+          onSelect={onSave}
+          menuLabel={t("settings.scope.chooseScope")}
+        />
       </div>
     </footer>
   );

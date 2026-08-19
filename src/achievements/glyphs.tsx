@@ -91,6 +91,28 @@ export function ShieldGlyph({ className }: IconProps) {
 
 // A key — the passphrase handed across devices (encryption enabled on one
 // device asking to be unlocked on another).
+// A door with a keypad: the namespace PIN. Distinct from `LockGlyph` (at-rest
+// encryption) and `KeyGlyph` (the passphrase handoff) on purpose — the PIN is a
+// gate you walk through, not a seal on the bytes.
+export function DoorGlyph({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M5 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17" />
+      <path d="M3 21h18" />
+      <circle cx="13" cy="12" r="1" />
+    </svg>
+  );
+}
+
 export function KeyGlyph({ className }: IconProps) {
   return (
     <Svg className={className}>

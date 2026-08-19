@@ -31,9 +31,9 @@ function deps(over: Partial<BackendSelectionDeps> = {}): BackendSelectionDeps {
     folderHandle: null,
     folderHandleLoaded: false,
     markFolderPermissionLost: vi.fn(),
-    directoryCrypto: crypto,
-    seal: async (s) => s,
-    unseal: async (s) => s,
+    cryptoFor: () => crypto,
+    sealFor: () => async (s: string) => s,
+    unsealFor: () => async (s: string) => s,
     ...over,
   };
 }

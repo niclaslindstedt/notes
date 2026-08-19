@@ -29,6 +29,13 @@ function stubStorage(over: Partial<UseStorageBackend> = {}): UseStorageBackend {
     disconnectGdrive: vi.fn(),
     enableEncryption: vi.fn(() => Promise.resolve()),
     disableEncryption: vi.fn(() => Promise.resolve()),
+    // Both protections are per namespace now, so the section names the active
+    // one and offers its PIN controls.
+    namespaces: [{ slug: "default", name: "Default" }],
+    activeNamespace: "default",
+    namespaceHasPin: () => false,
+    setNamespacePin: vi.fn(() => Promise.resolve(true)),
+    clearNamespacePin: vi.fn(() => Promise.resolve(true)),
     ...over,
   } as unknown as UseStorageBackend;
 }
