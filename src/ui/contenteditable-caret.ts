@@ -280,6 +280,40 @@ export function placeRange(
   sel.addRange(range);
 }
 
+/**
+ * Re-assert the collapsed caret exactly where it already sits, so the engine
+ * measures it against the layout as it *now* stands. Answers whether there was
+ * a caret in `lineEl` to re-assert.
+ *
+ * The caret is placed from a layout effect — the instant after React has
+ * rewritten the line's text, and so before the browser has laid the new text
+ * out. Most engines re-measure the caret when that layout lands; WebKit keeps
+ * painting it at the rect it took when the selection was set. Holding the
+ * eraser down is what makes that visible: every repeat re-places the caret
+ * against a layout one edit stale, and the caret is drawn a row or two away
+ * from the text actually being erased while the erasing itself stays exactly
+ * where the source says it is. Re-setting the same selection a frame later —
+ * once layout has settled — makes the engine take the caret's rect again.
+ *
+ * A no-op unless the selection is still a collapsed caret inside `lineEl`: a
+ * user who has since drawn a selection, or moved to another line, owns the
+ * selection and must not have it dragged back. Re-setting is otherwise
+ * invisible — it is the same range, so nothing about the caret's *position*
+ * changes, only when it was last measured.
+ */
+export function resyncCaret(lineEl: HTMLElement): boolean {
+  const sel = lineEl.ownerDocument.defaultView?.getSelection();
+  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return false;
+  const range = sel.getRangeAt(0);
+  if (!lineEl.contains(range.startContainer)) return false;
+  // A clone, because the live range is the selection's own: removing it can
+  // leave the original collapsed to the document start on some engines.
+  const same = range.cloneRange();
+  sel.removeAllRanges();
+  sel.addRange(same);
+  return true;
+}
+
 function lastTextNode(lineEl: HTMLElement): Text | null {
   const walker = lineEl.ownerDocument.createTreeWalker(
     lineEl,

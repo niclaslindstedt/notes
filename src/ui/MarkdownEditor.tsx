@@ -64,6 +64,7 @@ import {
   lineIndexOf,
   placeCaret,
   placeRange,
+  resyncCaret,
   visualRowAt,
 } from "./contenteditable-caret.ts";
 import {
@@ -621,6 +622,35 @@ export function MarkdownEditor({
     pendingScrollLine.current = firstChangedLine(valueRef.current, body);
   }, [undoScrollSeq, body]);
 
+  // Re-take the caret's rect a frame after it is placed, once the browser has
+  // laid the edited line out (see `resyncCaret` for what this is worth on iOS,
+  // where holding the eraser otherwise leaves the caret drawn rows away from
+  // the text being erased).
+  //
+  // One frame in flight at a time: a held key re-places the caret faster than
+  // frames land, and only the last placement is worth correcting. The
+  // correction is guarded like every selection we set ourselves, so the
+  // `selectionchange` it fires doesn't re-enter the handler that watches for
+  // the *user* moving the caret.
+  const caretResync = useRef(0);
+  function scheduleCaretResync(el: HTMLElement) {
+    if (typeof requestAnimationFrame !== "function") return;
+    cancelAnimationFrame(caretResync.current);
+    caretResync.current = requestAnimationFrame(() => {
+      caretResync.current = 0;
+      // The line can be gone by now (a note switch, an undo): there is then no
+      // caret of ours left to re-take, and the surface owns whatever replaced
+      // it.
+      if (!el.isConnected) return;
+      settingSel.current = true;
+      resyncCaret(el);
+      queueMicrotask(() => {
+        settingSel.current = false;
+      });
+    });
+  }
+  useEffect(() => () => cancelAnimationFrame(caretResync.current), []);
+
   // Install the pending caret after the active line (re)renders. React owns the
   // line's DOM — the browser never mutates it (every edit is intercepted below)
   // — so after each edit the caret must be re-placed at the column the edit
@@ -672,6 +702,11 @@ export function MarkdownEditor({
       // the caret against or past an edge.
       scrollCaretLineIntoView(rootRef.current, el);
     }
+    // The caret was just set against a layout the browser hasn't performed yet
+    // — React rewrote this line's text moments ago. Take it again once that
+    // layout has landed, or WebKit goes on painting the caret at the rect the
+    // *previous* text gave it (see `resyncCaret`).
+    scheduleCaretResync(el);
     // Let the selectionchange this fires settle, then re-arm the handler.
     queueMicrotask(() => {
       settingSel.current = false;

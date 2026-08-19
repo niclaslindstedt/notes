@@ -466,6 +466,45 @@ a [link](#rendered-line) opening, an [attachment](#attachments) opening), a
 ranged selection the press ended on (a drag-select, a double-click's word), and
 a keyboard-synthesised click (`detail === 0`) are all left alone.
 
+### Caret paint sync
+
+`resyncCaret` (`src/ui/contenteditable-caret.ts`) + `scheduleCaretResync`
+(`src/ui/MarkdownEditor.tsx`) — the correction that keeps the caret you *see*
+where the editing actually is.
+
+Every edit is intercepted, spliced into the source, and the line re-rendered by
+React, so the caret has to be re-placed afterwards — which the editor does from
+a layout effect, the instant after React rewrites the line's text and so
+*before* the browser has laid that new text out. Most engines re-measure the
+caret when the layout lands. WebKit keeps painting it at the rect it took when
+the selection was set, and on iOS that is exactly what **holding the eraser**
+exposes: each repeat re-places the caret against a layout one edit stale, so
+the caret is drawn a row or two above the text disappearing under it while the
+erasing itself carries on precisely where the source says it should. The DOM
+selection is right the whole time — it is only the painting that lags — which
+is why the note comes out correct and only the caret looks wrong.
+
+`scheduleCaretResync` answers it by taking the caret again one animation frame
+later, once the browser has performed that layout: `resyncCaret` re-sets the
+selection to the identical range (`removeAllRanges` + `addRange`, which is a
+real change and so a real re-measure, where setting an equal selection would
+be skipped), and the engine takes the caret's rect afresh. Nothing about the
+caret's *position* changes — this is a repaint, not a move.
+
+Two guards keep it invisible:
+
+- **Only one frame is ever in flight.** A held key re-places the caret faster
+  than frames land, and only the last placement is worth correcting, so each
+  placement cancels the frame the one before it queued.
+- **It only ever re-takes a collapsed caret still inside the line it was
+  placed in.** A user who has since drawn a selection, moved to another line,
+  or switched notes owns the selection, and `resyncCaret` stands down rather
+  than dragging it back.
+
+The correction is set behind the same `settingSel` guard as every other
+selection the editor places, so the `selectionchange` it fires isn't mistaken
+for the user moving the caret.
+
 ### Goal column
 
 `goalCol` + `dropGoalColumn` (`src/ui/MarkdownEditor.tsx`) — the column a run of

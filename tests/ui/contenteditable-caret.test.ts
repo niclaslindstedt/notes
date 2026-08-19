@@ -2,7 +2,10 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { visualRowAt } from "../../src/ui/contenteditable-caret.ts";
+import {
+  resyncCaret,
+  visualRowAt,
+} from "../../src/ui/contenteditable-caret.ts";
 
 // jsdom lays nothing out, so wrapping is simulated: every range measured over
 // the line reports the row its first character falls in, at `PER_ROW`
@@ -47,8 +50,27 @@ function columnOf(node: Node, offset: number): number {
 
 afterEach(() => {
   Range.prototype.getClientRects = realGetClientRects;
+  window.getSelection()?.removeAllRanges();
   document.body.replaceChildren();
 });
+
+/** A plain line element — no wrapping harness; these tests measure nothing. */
+function line(text: string): HTMLElement {
+  const el = document.createElement("div");
+  el.textContent = text;
+  document.body.append(el);
+  return el;
+}
+
+/** Put a collapsed caret `offset` characters into `el`'s first text node. */
+function caretIn(el: HTMLElement, offset: number): void {
+  const range = document.createRange();
+  range.setStart(el.firstChild!, offset);
+  range.collapse(true);
+  const sel = window.getSelection()!;
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
 
 describe("visualRowAt", () => {
   it("finds the row a column sits in, as source columns", () => {
@@ -101,5 +123,52 @@ describe("visualRowAt", () => {
     }
     expect(visualRowAt(el, 14)).toEqual({ start: 10, end: 20 });
     expect(visualRowAt(el, 35)).toEqual({ start: 30, end: 35 });
+  });
+});
+
+// The correction that keeps a held eraser's caret where the erasing is: the
+// same selection, set again once the edited line has been laid out.
+describe("resyncCaret", () => {
+  it("re-takes the collapsed caret exactly where it already is", () => {
+    const el = line("hello");
+    caretIn(el, 3);
+
+    expect(resyncCaret(el)).toBe(true);
+
+    const sel = window.getSelection()!;
+    expect(sel.isCollapsed).toBe(true);
+    expect(sel.anchorNode).toBe(el.firstChild);
+    expect(sel.anchorOffset).toBe(3);
+  });
+
+  it("stands down on a selection the user has drawn", () => {
+    const el = line("hello");
+    const range = document.createRange();
+    range.setStart(el.firstChild!, 1);
+    range.setEnd(el.firstChild!, 4);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    expect(resyncCaret(el)).toBe(false);
+    expect(window.getSelection()!.toString()).toBe("ell");
+  });
+
+  it("stands down when the caret has moved to another line", () => {
+    const el = line("hello");
+    const other = line("world");
+    caretIn(other, 2);
+
+    expect(resyncCaret(el)).toBe(false);
+
+    const sel = window.getSelection()!;
+    expect(sel.anchorNode).toBe(other.firstChild);
+    expect(sel.anchorOffset).toBe(2);
+  });
+
+  it("stands down when there is no selection at all", () => {
+    const el = line("hello");
+    window.getSelection()!.removeAllRanges();
+    expect(resyncCaret(el)).toBe(false);
   });
 });

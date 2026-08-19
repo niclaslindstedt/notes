@@ -214,6 +214,62 @@ describe("MarkdownEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith("> quoted\nplain\n");
   });
 
+  // Holding the eraser: the caret is placed from a layout effect, the instant
+  // after React has rewritten the line and so before the browser has laid the
+  // new text out. WebKit goes on painting it at the rect the *previous* text
+  // gave it — the caret drawn a row or two from the text being erased, while
+  // the erasing itself stays exactly where the source says it is. The editor
+  // takes the caret again a frame later, once that layout has landed.
+  describe("the caret re-taken a frame after an edit", () => {
+    /** Run the animation frame the editor queued the correction in. */
+    async function nextFrame() {
+      await act(
+        () =>
+          new Promise<void>((resolve) => {
+            requestAnimationFrame(() => resolve());
+          }),
+      );
+    }
+
+    /** The caret's column within the active raw line. */
+    function caretColumn(): number {
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(rawLine()!, 0);
+      range.setEnd(sel.anchorNode!, sel.anchorOffset);
+      return range.toString().length;
+    }
+
+    it("re-asserts the caret the edit left, without moving it", async () => {
+      renderEditor("hello world");
+      caretIn(rawLine()!, 5);
+      const addRange = vi.spyOn(Selection.prototype, "addRange");
+      beforeInput("deleteContentBackward");
+      const placed = addRange.mock.calls.length;
+
+      await nextFrame();
+
+      expect(addRange.mock.calls.length).toBe(placed + 1);
+      addRange.mockRestore();
+      expect(rawLine()?.textContent).toBe("hell world");
+      expect(window.getSelection()!.isCollapsed).toBe(true);
+      expect(caretColumn()).toBe(4);
+    });
+
+    it("leaves a selection drawn since the edit alone", async () => {
+      renderEditor("hello world");
+      caretIn(rawLine()!, 5);
+      beforeInput("deleteContentBackward");
+      selectRange(rawLine()!, 0, 4);
+
+      await nextFrame();
+
+      const sel = window.getSelection()!;
+      expect(sel.isCollapsed).toBe(false);
+      expect(sel.toString()).toBe("hell");
+    });
+  });
+
   it("merges into the previous line on Backspace at column 0", () => {
     const { onChange } = renderEditor("a\nb");
     const raw = rawLine()!;
