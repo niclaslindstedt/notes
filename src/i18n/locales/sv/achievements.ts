@@ -332,6 +332,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Varje stängt kodblock har en liten kopieringsknapp uppe till höger. Ett tryck lägger koden — allt mellan ```-staketen, och inget annat — på urklipp, utan att du behöver placera markören i anteckningen eller markera en enda rad för hand.",
     },
+    manyHands: {
+      name: "Många händer",
+      condition: "Redigera vid fler än en markör samtidigt.",
+      learnMore:
+        "Ctrl/Cmd+D markerar ordet under markören, och varje tryck därefter lägger till ännu en markör vid nästa förekomst av det \u2014 skriv en gång och alla ändras. Ctrl/Cmd+\u2191 / \u2193 bygger i stället en rak kolumn av markörer, en rad i taget, för att skriva samma sak längs kanten av en lista. Piltangenter, backsteg, retur, kopiera och klistra in svarar vid varje markör; Escape tar dig tillbaka till den du började vid.",
+    },
     seeker: {
       name: "Sökare",
       condition: "Sök bland dina anteckningar.",

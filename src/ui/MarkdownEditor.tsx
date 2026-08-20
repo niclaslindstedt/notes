@@ -32,6 +32,24 @@ import {
   type SourcePoint,
 } from "../domain/line-edit.ts";
 import {
+  addCursorVertically,
+  addNextOccurrence,
+  applyAtCursors,
+  collapsedCursor,
+  cursorLines,
+  cursorPoints,
+  cursorSpan,
+  moveCursors,
+  offsetOf,
+  pointAt,
+  wordBoundary,
+  type Cursor,
+  type CursorMove,
+  type OccurrenceSession,
+  type Replacement,
+  type Span,
+} from "../domain/multi-cursor.ts";
+import {
   classifyLines,
   codeBlockCopyAnchors,
   codeBlockEdges,
@@ -67,6 +85,14 @@ import {
   resyncCaret,
   visualRowAt,
 } from "./contenteditable-caret.ts";
+import {
+  isEmptyPaint,
+  measureCursors,
+  samePaint,
+  NO_PAINT,
+  type CursorPaint,
+} from "./multi-cursor-rects.ts";
+import { MultiCursorOverlay } from "./MultiCursorOverlay.tsx";
 import {
   anchoredScrollTop,
   bufferedScrollTop,
@@ -337,14 +363,35 @@ export function MarkdownEditor({
     key: 0,
   }));
 
+  // Every caret in the note, or null when there is only the browser's own —
+  // which is the ordinary state, and the one every path below falls back to.
+  // A one-element list is a *session* with a single cursor: the state a first
+  // Ctrl/Cmd+D leaves behind, where the word is selected but nothing has been
+  // multiplied yet, so the native selection alone still draws it (see
+  // `docs/overview.md#multiple-cursors`).
+  const [cursors, setCursors] = useState<Cursor[] | null>(null);
+  // Where the painted carets and highlights go. Measured from the DOM after
+  // every render that can have moved them, so it is state rather than a memo.
+  const [paint, setPaint] = useState<CursorPaint>(NO_PAINT);
+
   // Refs so the document-level and native listeners below always read current
   // state without re-binding (they capture these, not the render closure).
   const rootRef = useRef<HTMLDivElement>(null);
+  // The zero-sized box the painted cursors are positioned against. It sits at
+  // the scroller's content origin and scrolls with the note, so measuring
+  // against it means the overlay never has to be re-measured on scroll.
+  const overlayRef = useRef<HTMLDivElement>(null);
   const activeElRef = useRef<HTMLDivElement | null>(null);
   const valueRef = useRef(value);
   const linesRef = useRef(lines);
   const blocksRef = useRef(blocks);
   const activeRef = useRef(active);
+  const cursorsRef = useRef(cursors);
+  cursorsRef.current = cursors;
+  // What a run of Ctrl/Cmd+D is looking for, held for the length of the run so
+  // every press after the first searches for the same text under the same
+  // whole-word rule (see `addNextOccurrence`). Cleared whenever the column is.
+  const occurrence = useRef<OccurrenceSession | null>(null);
   // Read by the effects that must see the *current* lock without re-running
   // when it flips (a mount-time position restore, an out-of-band body swap).
   const lockedRef = useRef(locked);
@@ -471,6 +518,17 @@ export function MarkdownEditor({
   const clampedIndex =
     active.index === null ? null : Math.min(active.index, lines.length - 1);
 
+  // Every line a cursor touches is drawn as raw source, not just the active
+  // one. Two reasons, and both are load-bearing: a formatted line's text isn't
+  // its source (a heading drops its `# `, a shortened URL its middle), so a
+  // painted caret measured at a source column would land in the wrong place —
+  // and a column of carets that showed some lines formatted and one raw would
+  // read as the note flickering rather than as one editing surface.
+  const cursorRawLines = useMemo(
+    () => (cursors && cursors.length > 1 ? cursorLines(cursors) : null),
+    [cursors],
+  );
+
   // The ``` delimiters of every closed code block the caret is outside of. They
   // are dropped from the preview the same way a heading's `#` is — the block
   // renders as code, and the fences reappear the moment the caret steps inside
@@ -569,6 +627,135 @@ export function MarkdownEditor({
     }));
   }
 
+  // --- Multiple cursors -----------------------------------------------------
+  //
+  // The VS Code editing model: Ctrl/Cmd+D takes the word under the caret and
+  // then each further press adds a caret over the next occurrence of it;
+  // Ctrl/Cmd+Up / Down grow a column of bare carets; typing, deleting, Enter
+  // and paste happen at every one of them at once; Escape drops back to the
+  // one you started from.
+  //
+  // A browser gives a page exactly one selection, so exactly one cursor — the
+  // **last** in the list, the one a press just added, which is also the one the
+  // view follows — is the browser's, and every other is drawn by the overlay.
+  // The list's *first* entry is the primary: the cursor Escape leaves standing.
+  // Both facts survive an edit because `applyAtCursors` answers in the order it
+  // was asked.
+  //
+  // The pure half of all this — where the cursors are, which occurrence is
+  // next, how one keystroke becomes N edits — is `domain/multi-cursor.ts`. What
+  // is left here is the DOM half: putting the native selection on the focus
+  // cursor, keeping every line a cursor touches rendered as raw source (a
+  // formatted line's text is not its source, so a column measured against one
+  // lands in the wrong place), and knowing when the column is over.
+
+  // End the session: back to the browser's single caret, wherever it now is.
+  // The selection itself is left alone — Escape hands it to `collapseToPrimary`
+  // below, and every other caller (a press, a blur, another writer's text) has
+  // already moved it or is about to.
+  function clearCursors() {
+    occurrence.current = null;
+    cursorsRef.current = null;
+    setCursors((c) => (c === null ? c : null));
+  }
+
+  const clearCursorsRef = useRef(clearCursors);
+  clearCursorsRef.current = clearCursors;
+
+  // Put the browser's one selection on `c`, which makes its line the active raw
+  // one. A single-line span is handed back *selected* (that is what a Ctrl/Cmd+D
+  // occurrence has to look like); a span across lines can only be given a caret,
+  // and the overlay draws its highlight instead.
+  function focusCursor(c: Cursor) {
+    const [start, end] = cursorPoints(c);
+    dropGoalColumn();
+    lastCaret.current = c.head;
+    pendingLineSpan.current = null;
+    if (start.line === end.line && start.col !== end.col) {
+      pendingRange.current = { from: start.col, to: end.col };
+      pendingCaret.current = null;
+      markCaret(start.line, start.col, end.col);
+    } else {
+      pendingRange.current = null;
+      pendingCaret.current = c.head.col;
+      if (start.line === end.line)
+        markCaret(c.head.line, c.head.col, c.head.col);
+      else clearCaretSpan();
+    }
+    setActive((a) => ({ index: c.head.line, key: a.key + 1 }));
+  }
+
+  // Adopt a new set of cursors and follow the last one with the native caret.
+  function applyCursors(next: Cursor[]) {
+    cursorsRef.current = next;
+    setCursors(next);
+    focusCursor(next[next.length - 1]!);
+  }
+
+  // The cursors a command starts from: the column already up, or the browser's
+  // selection promoted to a one-cursor session. Null when there is no caret in
+  // the editor at all (an unopened note), where these commands do nothing.
+  function currentCursors(): Cursor[] | null {
+    if (cursorsRef.current) return cursorsRef.current;
+    const pts = selectionPoints();
+    if (pts)
+      return [
+        pts.collapsed
+          ? collapsedCursor(pts.start)
+          : { anchor: pts.start, head: pts.end },
+      ];
+    const at = lastCaret.current;
+    return at ? [collapsedCursor(at)] : null;
+  }
+
+  // Ctrl/Cmd+D. The first press over a bare caret only *selects* the word it
+  // sits in — the same press then finds the next one — which is why a step that
+  // adds nothing is still applied.
+  function selectNextOccurrence() {
+    if (locked) return;
+    const from = currentCursors();
+    if (!from) return;
+    const step = addNextOccurrence(linesRef.current, from, occurrence.current);
+    if (!step) return;
+    occurrence.current = step.session;
+    applyCursors(step.cursors);
+    if (step.cursors.length > 1) unlock("manyHands");
+  }
+
+  // Ctrl/Cmd+Up / Down: grow the column by a line. Not an occurrence run, so
+  // whatever Ctrl/Cmd+D was searching for is dropped — the next press of it
+  // starts again from the word under the caret.
+  function addCursorLine(direction: -1 | 1) {
+    if (locked) return;
+    const from = currentCursors();
+    if (!from) return;
+    const next = addCursorVertically(linesRef.current, from, direction);
+    if (!next) return;
+    occurrence.current = null;
+    applyCursors(next);
+    unlock("manyHands");
+  }
+
+  // Escape: back to one caret — the *primary*, the cursor the run started from,
+  // still holding whatever it had selected. Landing back where you began is
+  // what makes a Ctrl/Cmd+D one press too far cost nothing.
+  function collapseToPrimary() {
+    const cur = cursorsRef.current;
+    clearCursors();
+    if (cur && cur.length > 0) focusCursor(cur[0]!);
+  }
+
+  // Mutate the source at every cursor at once and keep them all. The
+  // multi-cursor twin of `commit`: same job, but the caret it leaves behind is
+  // a whole column, and every line involved is re-rendered rather than one.
+  function commitCursors(nextLines: string[], nextCursors: Cursor[]) {
+    dropGoalColumn();
+    const next = nextLines.join("\n");
+    setValue(next);
+    onChange(next);
+    applyCursors(nextCursors);
+  }
+
   // Locking the note while it is open (the header's read-only toggle, or
   // another device's lock arriving on a live pull) takes the caret's line back
   // to formatted. The
@@ -578,6 +765,7 @@ export function MarkdownEditor({
   // otherwise rendered note.
   useEffect(() => {
     if (!locked) return;
+    clearCursorsRef.current();
     pendingCaret.current = null;
     pendingRange.current = null;
     pendingLineSpan.current = null;
@@ -589,6 +777,10 @@ export function MarkdownEditor({
   // echo back to the identical string, so a differing `body` is another writer).
   useEffect(() => {
     if (body === valueRef.current) return;
+    // The text the column was standing in has been rewritten under it — by
+    // another writer on a live pull, or by the app's own undo / redo. Column
+    // positions describe a note that no longer exists.
+    clearCursorsRef.current();
     setValue(body);
     const editing = document.activeElement === rootRef.current;
     setActive((a) =>
@@ -712,6 +904,45 @@ export function MarkdownEditor({
       settingSel.current = false;
     });
   }, [active, value]);
+
+  // Measure the painted carets and highlights, once the lines they sit on have
+  // rendered. A layout effect rather than a memo because the answer is in the
+  // DOM (where a column lands depends on the font, the wrap width and the
+  // note's own text), and a `ResizeObserver` because a width change moves every
+  // one of them without changing a single character.
+  //
+  // The cursor holding the native selection is skipped: the browser is already
+  // drawing it, and painting a second caret over its own would double it. Only
+  // when its span sits on one line, though — a selection across lines is handed
+  // the caret alone (see `focusCursor`), so the overlay owes it a highlight.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const origin = overlayRef.current;
+    if (!root || !origin || !cursors || cursors.length < 2) {
+      setPaint((p) => (isEmptyPaint(p) ? p : NO_PAINT));
+      return;
+    }
+    const focus = cursors[cursors.length - 1]!;
+    const [start, end] = cursorPoints(focus);
+    const skip = start.line === end.line ? cursors.length - 1 : null;
+    const measure = () => {
+      const next = measureCursors(
+        root,
+        origin.getBoundingClientRect(),
+        linesRef.current,
+        cursors,
+        skip,
+      );
+      setPaint((p) => (samePaint(p, next) ? p : next));
+    };
+    measure();
+    if (typeof ResizeObserver !== "function") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    return () => {
+      observer.disconnect();
+    };
+  }, [cursors, value, active]);
 
   // Reopen the note where it was left this session. Runs after the caret-
   // placement effect above (so a remembered caret is already placed and the
@@ -896,6 +1127,109 @@ export function MarkdownEditor({
     return soft;
   }
 
+  // What one keystroke does at each cursor of a column, as a replacement over
+  // the flat source (see `applyAtCursors`). The browser scopes a `beforeinput`
+  // to its *one* selection, so the span it hands us is no use to the other
+  // cursors — each one's span has to be derived from the same `inputType`
+  // instead. Null for an input type a column can't answer, which leaves the
+  // source untouched rather than guessing.
+  //
+  // A cursor holding a selection always replaces exactly that, whatever the key
+  // was: Backspace over a selection deletes the selection, at every caret.
+  function multiEditPlan(
+    inputType: string,
+    data: string,
+  ):
+    ((span: Span, source: string, index: number) => Replacement | null) | null {
+    if (inputType === "insertParagraph" || inputType === "insertLineBreak")
+      return (span) => ({ ...span, text: "\n" });
+    if (inputType.startsWith("insert"))
+      return data === "" ? null : (span) => ({ ...span, text: data });
+    if (!inputType.startsWith("delete")) return null;
+    const forward = inputType.includes("Forward");
+    const byWord = inputType.includes("Word");
+    const byLine = inputType.includes("Line");
+    return (span, source) => {
+      if (span.to > span.from) return { ...span, text: "" };
+      const at = span.from;
+      if (forward) {
+        const to = byLine
+          ? lineEndOffset(source, at)
+          : byWord
+            ? wordStepOffset(at, 1)
+            : stepForward(source, at);
+        return to > at ? { from: at, to, text: "" } : null;
+      }
+      const from = byLine
+        ? lineStartOffset(source, at)
+        : byWord
+          ? wordStepOffset(at, -1)
+          : stepBackward(source, at);
+      return from < at ? { from, to: at, text: "" } : null;
+    };
+  }
+
+  // A word-wise delete, in flat-source offsets. Word steps stop at the line's
+  // edge (see `wordBoundary`), so a caret already there falls back to eating the
+  // newline itself — which is what joins the line to its neighbour, exactly as a
+  // plain Backspace at column 0 does.
+  function wordStepOffset(at: number, direction: -1 | 1): number {
+    const cur = linesRef.current;
+    const point = pointAt(cur, at);
+    const col = wordBoundary(cur[point.line] ?? "", point.col, direction);
+    if (col !== point.col) return offsetOf(cur, { line: point.line, col });
+    return at + direction;
+  }
+
+  // One code point back / forward, so a Backspace never leaves half of an emoji
+  // behind.
+  function stepBackward(source: string, at: number): number {
+    if (at <= 0) return at;
+    const before = source.charCodeAt(at - 1);
+    const pair =
+      at >= 2 &&
+      before >= 0xdc00 &&
+      before <= 0xdfff &&
+      source.charCodeAt(at - 2) >= 0xd800 &&
+      source.charCodeAt(at - 2) <= 0xdbff;
+    return at - (pair ? 2 : 1);
+  }
+
+  function stepForward(source: string, at: number): number {
+    if (at >= source.length) return at;
+    const here = source.charCodeAt(at);
+    const pair =
+      at + 2 <= source.length &&
+      here >= 0xd800 &&
+      here <= 0xdbff &&
+      source.charCodeAt(at + 1) >= 0xdc00 &&
+      source.charCodeAt(at + 1) <= 0xdfff;
+    return at + (pair ? 2 : 1);
+  }
+
+  function lineStartOffset(source: string, at: number): number {
+    return source.lastIndexOf("\n", Math.max(0, at - 1)) + 1;
+  }
+
+  function lineEndOffset(source: string, at: number): number {
+    const i = source.indexOf("\n", at);
+    return i === -1 ? source.length : i;
+  }
+
+  // Apply one keystroke at every cursor. Answers whether it was applied, so the
+  // caller can fall through to the single-caret path when a column can't
+  // express the edit.
+  function applyMultiEdit(inputType: string, data: string): boolean {
+    const cur = cursorsRef.current;
+    if (!cur || cur.length < 2) return false;
+    const plan = multiEditPlan(inputType, data);
+    if (!plan) return false;
+    const out = applyAtCursors(linesRef.current, cur, plan);
+    if (!out) return false;
+    commitCursors(out.lines, out.cursors);
+    return true;
+  }
+
   // The single source of edits. Every mutation the browser proposes — typing,
   // autocorrect, delete, word/line delete, Enter — is intercepted here and
   // applied through the pure engine, so React fully owns the DOM and the browser
@@ -923,6 +1257,18 @@ export function MarkdownEditor({
     if (it === "historyUndo" || it === "historyRedo") {
       e.preventDefault();
       return;
+    }
+    // A column of carets answers the keystroke at every one of them, from the
+    // `inputType` alone — the target range the browser hands us describes only
+    // its own selection. Refused first for the same reason every other edit is:
+    // React owns these nodes.
+    if (cursorsRef.current && cursorsRef.current.length > 1) {
+      e.preventDefault();
+      if (applyMultiEdit(it, e.data ?? "")) return;
+      // An input type a column can't express (a formatting command, a
+      // composition commit) ends the column rather than being applied to one
+      // arbitrary caret, and the single-caret path below takes it from there.
+      clearCursors();
     }
     // Refused *before* the mapping is consulted, and whether or not it
     // succeeds: React owns every node in this surface, so an edit we can't
@@ -1186,6 +1532,17 @@ export function MarkdownEditor({
     const lineEl = lineElementOf(root, sel.anchorNode);
     const L = lineIndexOf(lineEl);
     if (L === null) return;
+    // The caret moved out from under a column of carets by some route the
+    // editor doesn't own — every gesture that *should* end a column already
+    // does so at the press, so this is the backstop for the ones that can't be
+    // enumerated (an assistive technology placing the caret, caret browsing).
+    // Our own placements land on the focus cursor's line and are guarded by
+    // `settingSel` besides, so this never fires on them.
+    const column = cursorsRef.current;
+    if (column && column.length > 1) {
+      const focus = column[column.length - 1]!;
+      if (focus.head.line !== L) clearCursors();
+    }
     // Map the caret to a source column. Remember it even for a move *within* the
     // active line (which never re-enters `commit` / `activate`), so an arrow /
     // click that repositions the caret still updates the spot the unmount
@@ -1224,7 +1581,7 @@ export function MarkdownEditor({
   // --- Clipboard: copy/cut verbatim source, paste through the engine --------
   const onCopyRef = useRef<(e: ClipboardEvent) => void>(() => {});
   onCopyRef.current = (e: ClipboardEvent) => {
-    const source = selectionSource();
+    const source = columnSource() ?? selectionSource();
     if (source === null) return;
     e.preventDefault();
     e.clipboardData?.setData("text/plain", source);
@@ -1232,6 +1589,19 @@ export function MarkdownEditor({
 
   const onCutRef = useRef<(e: ClipboardEvent) => void>(() => {});
   onCutRef.current = (e: ClipboardEvent) => {
+    const column = columnSource();
+    if (column !== null) {
+      e.preventDefault();
+      e.clipboardData?.setData("text/plain", column);
+      // Every selection goes; the carets stay, one where each was.
+      const out = applyAtCursors(
+        linesRef.current,
+        cursorsRef.current!,
+        (span) => ({ ...span, text: "" }),
+      );
+      if (out) commitCursors(out.lines, out.cursors);
+      return;
+    }
     const pts = selectionPoints();
     const source = selectionSource();
     if (source === null || !pts || pts.collapsed) return;
@@ -1239,6 +1609,22 @@ export function MarkdownEditor({
     e.clipboardData?.setData("text/plain", source);
     replaceSelection(pts.start, pts.end, "");
   };
+
+  // What a column of carets puts on the clipboard: each selection's source, in
+  // document order, one per line — which is exactly the shape a paste back into
+  // the same column consumes (see `onPaste`). Null when there is no column, or
+  // when it is holding nothing but bare carets.
+  function columnSource(): string | null {
+    const column = cursorsRef.current;
+    if (!column || column.length < 2) return null;
+    const raw = linesRef.current;
+    const spans = column
+      .map((c) => cursorSpan(raw, c))
+      .sort((a, b) => a.from - b.from);
+    if (spans.every((span) => span.to === span.from)) return null;
+    const source = raw.join("\n");
+    return spans.map((span) => source.slice(span.from, span.to)).join("\n");
+  }
 
   // The verbatim source a live-preview selection covers, or null when the
   // selection is empty or outside this editor (leave it to the browser).
@@ -1329,6 +1715,20 @@ export function MarkdownEditor({
     // declared it always present); a paste event without one carries nothing
     // to insert, so an empty string is the right degradation.
     const text = e.clipboardData?.getData("text/plain") ?? "";
+    const column = cursorsRef.current;
+    if (column && column.length > 1) {
+      // A clipboard holding exactly one line per caret is dealt out a line
+      // each — the way a column is copied, so a column round-trips. Anything
+      // else goes in whole at every caret.
+      const parts = text.split("\n");
+      const deal = parts.length === column.length;
+      const out = applyAtCursors(linesRef.current, column, (span, _src, i) => ({
+        ...span,
+        text: deal ? parts[i]! : text,
+      }));
+      if (out) commitCursors(out.lines, out.cursors);
+      return;
+    }
     const pts = selectionPoints();
     if (!pts) return;
     replaceSelection(pts.start, pts.end, text);
@@ -1353,6 +1753,8 @@ export function MarkdownEditor({
   function selectAllLines() {
     const root = rootRef.current;
     if (!root) return;
+    // One selection over the whole note is the opposite of a column of carets.
+    clearCursors();
     const lineEls = root.querySelectorAll("[data-line-index]");
     const first = lineEls[0];
     const last = lineEls[lineEls.length - 1];
@@ -1394,7 +1796,82 @@ export function MarkdownEditor({
     return true;
   }
 
+  // Which caret move an arrow / Home / End press is asking a column of carets
+  // for, or null when the key isn't one. The modifier vocabulary is the
+  // platform's own: Alt (and Ctrl, where it isn't the command key) steps by
+  // word, Cmd runs to the line's edge.
+  function cursorMoveFor(
+    e: ReactKeyboardEvent<HTMLDivElement>,
+  ): CursorMove | null {
+    const byWord = e.altKey || (e.ctrlKey && !e.metaKey);
+    switch (e.key) {
+      case "ArrowLeft":
+        return e.metaKey ? "lineStart" : byWord ? "wordLeft" : "left";
+      case "ArrowRight":
+        return e.metaKey ? "lineEnd" : byWord ? "wordRight" : "right";
+      case "ArrowUp":
+        return "up";
+      case "ArrowDown":
+        return "down";
+      case "Home":
+        return "lineStart";
+      case "End":
+        return "lineEnd";
+      default:
+        return null;
+    }
+  }
+
+  // A press a column of carets has no answer for, and which would move the
+  // browser's one caret out from under them if it were let through. The column
+  // ends and the press is handled as it always was.
+  const COLUMN_ENDING_KEYS = new Set(["PageUp", "PageDown", "Tab"]);
+
+  // Everything a column of carets answers itself, before the ordinary
+  // single-caret handling below gets a look. Answers whether the press was
+  // consumed.
+  function onColumnKeyDown(e: ReactKeyboardEvent<HTMLDivElement>): boolean {
+    const mod = e.metaKey || e.ctrlKey;
+    // Ctrl/Cmd+D — take the word under the caret, then each next occurrence of
+    // it. Taken from the browser (which bookmarks the page) whenever the
+    // editing surface holds focus.
+    if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "d") {
+      e.preventDefault();
+      selectNextOccurrence();
+      return true;
+    }
+    // Ctrl/Cmd+Up / Down — a caret on the line above / below. Alt may ride
+    // along, so VS Code's own Ctrl/Cmd+Alt+Up / Down lands here too.
+    if (mod && !e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      e.preventDefault();
+      addCursorLine(e.key === "ArrowUp" ? -1 : 1);
+      return true;
+    }
+    const cur = cursorsRef.current;
+    if (!cur) return false;
+    // Escape ends the column even when it is a run of one (the state a first
+    // Ctrl/Cmd+D leaves), so the next press starts a fresh search.
+    if (e.key === "Escape") {
+      e.preventDefault();
+      // The editor is inside the app's Escape handling (closing the find bar,
+      // a modal); a press that ended a column has been used up.
+      e.stopPropagation();
+      collapseToPrimary();
+      return true;
+    }
+    if (cur.length < 2) return false;
+    const move = cursorMoveFor(e);
+    if (move) {
+      e.preventDefault();
+      applyCursors(moveCursors(linesRef.current, cur, move, e.shiftKey));
+      return true;
+    }
+    if (COLUMN_ENDING_KEYS.has(e.key)) clearCursors();
+    return false;
+  }
+
   function onKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    if (onColumnKeyDown(e)) return;
     // Read before anything else consumes the press: the `beforeinput` this
     // keydown is about to produce asks for it (see `softBreak`).
     softBreak.current = e.key === "Enter" && e.shiftKey;
@@ -1452,6 +1929,7 @@ export function MarkdownEditor({
     // one — a click in the empty space below the text, the title field handing
     // focus down — simply do nothing rather than focusing an inert surface.
     if (locked) return;
+    clearCursors();
     dropGoalColumn();
     rootRef.current?.focus();
     const cur = linesRef.current;
@@ -1579,6 +2057,9 @@ export function MarkdownEditor({
   // leaves it highlighted and a second press unbolds it, while a result
   // spanning lines settles for a caret at its end.
   function format(action: FormatAction) {
+    // Block and inline formatting are whole-line / whole-selection affairs the
+    // format engine expresses over one span, so a column stands down first.
+    clearCursors();
     if (locked) return;
     // Marks up the source and hands the caret (or the span) back itself, so it
     // picks the column the same way an edit through `commit` does.
@@ -1630,6 +2111,9 @@ export function MarkdownEditor({
   // yet tapped — there is no line to point at, so the press does nothing
   // rather than guess at one.
   function cut() {
+    // The cut engine works from one caret / selection; a column hands the note
+    // back to it.
+    clearCursors();
     if (locked) return;
     const pts = selectionPoints();
     const at = lastCaret.current;
@@ -1760,6 +2244,7 @@ export function MarkdownEditor({
   // reveal brings into view, and the only end of a long wrapped line that says
   // anything about where you are.
   function selectLine(index: number) {
+    clearCursors();
     const len = (linesRef.current[index] ?? "").length;
     // Where the pressed line sits *now*, before anything below re-renders it —
     // the y the view is pinned back to once the selection is drawn.
@@ -1891,6 +2376,9 @@ export function MarkdownEditor({
           // it does so here, before the browser places its caret, so the
           // `selectionchange` that follows reads the cleared goal.
           dropGoalColumn();
+          // It picks a single caret too: a press is how you leave a column of
+          // them, the same way it is in VS Code.
+          clearCursors();
         }}
         onMouseDown={(e) => {
           // A click in the empty space below the text lands the caret at the end
@@ -1927,6 +2415,17 @@ export function MarkdownEditor({
             {t("app.startWriting")}
           </div>
         )}
+        {/* Painted *before* the editing host so a highlight sits behind the
+            text it covers, exactly as the browser's own `::selection` does;
+            each caret lifts itself back above with a `z-index` (see
+            `MultiCursorOverlay`). Empty — and so free — whenever there is only
+            one caret. */}
+        <div
+          ref={overlayRef}
+          className="pointer-events-none absolute top-0 left-0"
+        >
+          <MultiCursorOverlay paint={paint} />
+        </div>
         <div
           ref={rootRef}
           role="textbox"
@@ -1977,13 +2476,20 @@ export function MarkdownEditor({
                 a.index === null ? a : { index: null, key: a.key + 1 },
               );
               // Focus really left: a vertical run cannot span a trip through the
-              // find bar or the title, so its goal column goes with it.
+              // find bar or the title, so its goal column goes with it — and so
+              // does a column of carets, which has no caret left to stand on.
               dropGoalColumn();
+              clearCursorsRef.current();
               dropSelectionOnBlur(root);
             });
           }}
           onCompositionStart={() => {
             composing.current = true;
+            // IME composition runs natively on the one line the browser's
+            // caret is in, so there is no way to compose at N places at once.
+            // The column ends and the composition carries on as an ordinary
+            // single-caret edit.
+            clearCursors();
           }}
           onCompositionEnd={() => {
             composing.current = false;
@@ -2013,6 +2519,30 @@ export function MarkdownEditor({
                     }}
                     className={`cursor-text ${wrapClass} ${lineTextClass(block)} ${edgeClass}`}
                   />
+                </LineRow>
+              );
+            }
+            // A line another cursor of the column sits on renders raw too —
+            // the same verbatim source the active line shows, minus the ref and
+            // the keyed remount, which belong to the one line the browser's
+            // caret is in.
+            if (cursorRawLines?.has(index)) {
+              return (
+                <LineRow
+                  key={index}
+                  index={index}
+                  numbered={lineNumbers}
+                  current
+                  onSelect={selectLine}
+                  label={t("app.selectLine", { n: index + 1 })}
+                >
+                  <div
+                    data-line-index={index}
+                    data-raw=""
+                    className={`cursor-text ${wrapClass} ${lineTextClass(block)} ${edgeClass}`}
+                  >
+                    <RawLine block={block} />
+                  </div>
                 </LineRow>
               );
             }

@@ -1091,11 +1091,13 @@ describe("MarkdownEditor", () => {
     });
 
     it("leaves a modified arrow to land where it lands", async () => {
-      // Cmd/Alt+Up jumps to the start of the document or the paragraph rather
-      // than stepping onto the next line, so it aims at no remembered column.
+      // Alt+Up jumps to the start of the paragraph rather than stepping onto
+      // the next line, so it aims at no remembered column. (Cmd/Ctrl+Up is not
+      // this key any more — it grows a column of carets; see "multiple
+      // cursors" below.)
       await openAtColumn20();
 
-      fireEvent.keyDown(surface(), { key: "ArrowUp", metaKey: true });
+      fireEvent.keyDown(surface(), { key: "ArrowUp", altKey: true });
       await moveCaret(formatted("bb"), 2);
       await arrow("ArrowUp", formatted(TOP), 2);
       expect(caretColumn()).toBe(2);
@@ -1529,6 +1531,141 @@ describe("MarkdownEditor", () => {
       ctrlK();
       // "one" moved up into the gap and is the line now being edited.
       expect(rawLine()?.textContent).toBe("one");
+    });
+  });
+
+  // --- Multiple cursors -----------------------------------------------------
+  //
+  // The VS Code column: Ctrl/Cmd+D takes the word under the caret and then each
+  // occurrence of it after that; Ctrl/Cmd+Up / Down grow a plain column; every
+  // edit lands at all of them; Escape drops back to the one you started from.
+  //
+  // A line a cursor sits on renders raw, so counting `[data-raw]` elements is
+  // how many carets the editor is holding — jsdom lays nothing out, so the
+  // painted overlay itself measures to nothing and can't be asserted on.
+  describe("multiple cursors", () => {
+    function rawLines(): HTMLElement[] {
+      return [...surface().querySelectorAll<HTMLElement>("[data-raw]")];
+    }
+    function press(key: string, extra: Record<string, unknown> = {}) {
+      act(() => {
+        fireEvent.keyDown(surface(), { key, ...extra });
+      });
+    }
+    function selectedText(): string {
+      return window.getSelection()?.toString() ?? "";
+    }
+
+    it("takes the word under the caret on the first Ctrl/Cmd+D", () => {
+      renderEditor("alpha beta");
+      caretIn(rawLine()!, 7);
+      press("d", { metaKey: true });
+      expect(selectedText()).toBe("beta");
+      // Selecting a word is not yet a column.
+      expect(rawLines()).toHaveLength(1);
+    });
+
+    it("adds a caret over the next occurrence on the second press", () => {
+      const { onChange } = renderEditor("one\ntwo\none");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 1);
+      press("d", { metaKey: true });
+      press("d", { metaKey: true });
+      // Both `one` lines are now being edited.
+      expect(
+        rawLines()
+          .map((el) => el.dataset.lineIndex)
+          .sort(),
+      ).toEqual(["0", "2"]);
+      beforeInput("insertText", "X");
+      expect(onChange).toHaveBeenLastCalledWith("X\ntwo\nX");
+    });
+
+    it("skips an occurrence inside a longer word", () => {
+      const { onChange } = renderEditor("id\nwidth\nid");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 1);
+      press("d", { metaKey: true });
+      press("d", { metaKey: true });
+      beforeInput("insertText", "K");
+      expect(onChange).toHaveBeenLastCalledWith("K\nwidth\nK");
+    });
+
+    it("grows a column of bare carets with Ctrl/Cmd+Down", () => {
+      const { onChange } = renderEditor("aa\nbb\ncc");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 0);
+      press("ArrowDown", { metaKey: true });
+      press("ArrowDown", { metaKey: true });
+      expect(rawLines()).toHaveLength(3);
+      // Bare carets, so nothing is selected and nothing is replaced.
+      beforeInput("insertText", "-");
+      expect(onChange).toHaveBeenLastCalledWith("-aa\n-bb\n-cc");
+    });
+
+    it("also answers VS Code's own Ctrl/Cmd+Alt+Down", () => {
+      renderEditor("aa\nbb");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 0);
+      press("ArrowDown", { metaKey: true, altKey: true });
+      expect(rawLines()).toHaveLength(2);
+    });
+
+    it("stops at the note's edge", () => {
+      renderEditor("aa\nbb");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 0);
+      press("ArrowUp", { metaKey: true });
+      expect(rawLines()).toHaveLength(1);
+    });
+
+    it("deletes at every caret", () => {
+      const { onChange } = renderEditor("aXb\ncXd");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 2);
+      press("ArrowDown", { metaKey: true });
+      beforeInput("deleteContentBackward");
+      expect(onChange).toHaveBeenLastCalledWith("ab\ncd");
+    });
+
+    it("splits at every caret on Enter", () => {
+      const { onChange } = renderEditor("ab\ncd");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 1);
+      press("ArrowDown", { metaKey: true });
+      beforeInput("insertParagraph");
+      expect(onChange).toHaveBeenLastCalledWith("a\nb\nc\nd");
+    });
+
+    it("walks every caret with an arrow key", () => {
+      const { onChange } = renderEditor("abc\ndef");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 1);
+      press("ArrowDown", { metaKey: true });
+      press("ArrowRight");
+      beforeInput("insertText", ".");
+      expect(onChange).toHaveBeenLastCalledWith("ab.c\nde.f");
+    });
+
+    it("drops back to the caret it started from on Escape", () => {
+      const { onChange } = renderEditor("aa\nbb");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 0);
+      press("ArrowDown", { metaKey: true });
+      expect(rawLines()).toHaveLength(2);
+      press("Escape");
+      expect(rawLines()).toHaveLength(1);
+      beforeInput("insertText", "!");
+      expect(onChange).toHaveBeenLastCalledWith("!aa\nbb");
+    });
+
+    it("ends the column when the note is pressed", () => {
+      renderEditor("aa\nbb");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 0);
+      press("ArrowDown", { metaKey: true });
+      act(() => {
+        fireEvent.pointerDown(surface().parentElement!, {
+          pointerType: "mouse",
+        });
+      });
+      expect(rawLines()).toHaveLength(1);
+    });
+
+    it("refuses to multiply anything in a locked note", () => {
+      renderEditor("one one", { locked: true });
+      press("d", { metaKey: true });
+      expect(rawLines()).toHaveLength(0);
     });
   });
 

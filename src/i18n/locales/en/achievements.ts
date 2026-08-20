@@ -334,6 +334,12 @@ const achievements = {
       learnMore:
         "Every closed code block wears a small copy button in its top-right corner. One press puts the code — everything between the ``` fences, and nothing else — on your clipboard, without placing the caret in the note or selecting a single line by hand.",
     },
+    manyHands: {
+      name: "Many hands",
+      condition: "Edit at more than one caret at once.",
+      learnMore:
+        "Ctrl/Cmd+D takes the word under the caret, and each press after that adds a second, third, fourth caret over the next occurrence of it \u2014 type once and every one of them changes. Ctrl/Cmd+\u2191 / \u2193 grow a plain column of carets instead, a line at a time, for typing the same thing down the edge of a list. Arrow keys, Backspace, Enter, copy and paste all answer at every caret; Escape drops back to the one you started from.",
+    },
     seeker: {
       name: "Seeker",
       condition: "Search your notes.",
