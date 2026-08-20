@@ -486,6 +486,22 @@ export function TextSearchGlyph({ className }: IconProps) {
   );
 }
 
+// Two text carets, one stepped down and across from the other — the shape a
+// column of cursors makes on the page, and the plainest picture of "the same
+// keystroke lands in more than one place at once".
+export function MultiCaretGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M5 4h4" />
+      <path d="M7 4v9" />
+      <path d="M5 13h4" />
+      <path d="M13 11h4" />
+      <path d="M15 11v9" />
+      <path d="M13 20h4" />
+    </Svg>
+  );
+}
+
 // A dot and an asterisk — the find bar's `.*` switch, which reads the search as
 // a regular expression. The one glyph in the set that is a *quotation* of the
 // feature rather than a picture of it, because the feature's own face is those

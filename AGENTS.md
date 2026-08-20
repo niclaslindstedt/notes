@@ -466,9 +466,10 @@ The source tree under `src/` is organized by concern, not by file type:
   (`main.tsx`), and top-level state hooks (`use-notes.ts`).
 - `src/domain/` — pure functions over the note model (`note.ts`), a
   dependency-free Markdown parser (`markdown.ts`) the live-preview editor
-  renders from, and the PDF typesetter (`pdf-layout.ts`) that paginates a note
-  into pages of drawing operations. No DOM, no I/O, trivially testable. The
-  boundary is enforced by eslint.
+  renders from, the multi-cursor engine (`multi-cursor.ts`) that turns one
+  keystroke into an edit at N carets, and the PDF typesetter (`pdf-layout.ts`)
+  that paginates a note into pages of drawing operations. No DOM, no I/O,
+  trivially testable. The boundary is enforced by eslint.
 - `src/assets/` — binaries the build emits as hashed files rather than bundles.
   Today only `fonts/`: the PDF export's Unicode fallback faces, fetched on
   demand at export time. See its `README.md` for provenance and licence.

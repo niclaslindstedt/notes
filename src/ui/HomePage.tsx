@@ -103,6 +103,20 @@ export function HomePage() {
               from being styled, cut or copied.
             </li>
             <li>
+              On a computer, edit at more than one place at once — the same
+              multiple cursors a code editor gives you. <kbd>⌘</kbd>/
+              <kbd>Ctrl</kbd>+<kbd>D</kbd> selects the word under the cursor,
+              and each press after that adds a cursor over the next occurrence
+              of it, so renaming something that appears six times in a note is
+              one word typed once. <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>↑</kbd> and{" "}
+              <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>↓</kbd> instead build a plain
+              column of cursors a line at a time, for putting the same thing
+              down the edge of a list. Typing, deleting, the arrow keys, copy
+              and paste all answer at every cursor at once, and <kbd>Esc</kbd> —
+              or a click anywhere in the note — drops you back to the single
+              cursor you started from.
+            </li>
+            <li>
               Reach for the formatting button at the top right of a note to open
               a styling toolbar above the text — headings, bold, italic,
               strikethrough, inline code, bullet, numbered and checklist lists

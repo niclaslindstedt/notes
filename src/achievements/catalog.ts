@@ -56,6 +56,7 @@ import {
   MergeGlyph,
   MoreGlyph,
   MousePointerGlyph,
+  MultiCaretGlyph,
   MoveGlyph,
   PaletteGlyph,
   PanelBottomGlyph,
@@ -580,6 +581,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     tier: "intermediate",
     glyph: CodeGlyph,
     learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "manyHands",
+    tier: "pro",
+    glyph: MultiCaretGlyph,
+    learnMore: true,
+    // Fired the moment a second caret appears — by Ctrl/Cmd+D taking the next
+    // occurrence, or Ctrl/Cmd+Up / Down growing the column (see
+    // `src/domain/multi-cursor.ts`).
     trigger: { kind: "manual" },
   },
   {

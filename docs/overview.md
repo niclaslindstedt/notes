@@ -570,6 +570,89 @@ Moving *within* one wrapped line — down from its row 2 to its row 3 — is lef
 entirely to the browser, which already keeps the caret's x across a row step and
 never has its work undone, since no line changes and nothing re-renders.
 
+### Multiple cursors
+
+`src/domain/multi-cursor.ts` (the pure half) + the multi-cursor block in
+`src/ui/MarkdownEditor.tsx` (the DOM half) + `src/ui/multi-cursor-rects.ts` and
+`src/ui/MultiCursorOverlay.tsx` (the paint) — VS Code's column of carets, in
+the [live-preview editor](#markdown-editor).
+
+**The four gestures.**
+
+| Press                                     | Does                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------- |
+| `Ctrl/Cmd+D`                              | Takes the word under the caret; each press after that adds a caret over the next occurrence of it |
+| `Ctrl/Cmd+↑` / `↓` (`Alt` may ride along) | Adds a bare caret on the line above / below, growing a column a line at a time |
+| `Escape`                                  | Back to one caret — the **primary**, the one the run started from, still holding whatever it had selected |
+| A press in the note                       | Ends the column, the same way it does in VS Code                          |
+
+The first `Ctrl/Cmd+D` over a bare caret only *selects*: every collapsed cursor
+takes the word it sits in and the run starts there, so one press is "select this
+word" and two is "and the next one". A run seeded that way matches **whole words
+only** (`Ctrl/Cmd+D` on `id` steps over `width`); a run seeded from a selection
+the user drew themselves matches anywhere, which is the same distinction VS Code
+draws. Either way the search is case-sensitive and wraps through the top of the
+note, and stops once every occurrence is taken — a press too far costs nothing.
+`Ctrl/Cmd+↑` / `↓` is deliberately **not** a selection: it is the shortcut for
+typing the same thing down the edge of a list. Both unlock the **Many hands**
+achievement the moment a second caret appears.
+
+**Everything answers at every caret.** Typing, Backspace / Delete (by character,
+by word, by line), Enter, the arrow keys with and without Shift, Home / End,
+copy, cut and paste. A cursor holding a selection replaces exactly that whatever
+the key was, so Backspace over a column of selections deletes the selections.
+Copy puts each selection's source on the clipboard one per line, and a paste
+holding exactly one line per caret is **dealt out** a line each — so a column
+round-trips through the clipboard; anything else goes in whole at every caret.
+
+**How one keystroke becomes N edits.** `applyAtCursors` works in flat offsets
+into `lines.join("\n")` rather than in `(line, col)` pairs, because an insertion
+on line 3 shifts the *line numbers* of every cursor below it as well as the
+columns of the ones beside it — in one flat coordinate it shifts exactly one
+number, monotonically. Edits are applied left to right in a single pass with a
+running read head (so a cursor that would edit text an earlier one already
+consumed is clipped rather than corrupting the source), and every caret lands
+after the text its own edit inserted. `normalizeCursors` then merges the ones
+that have grown into each other, keeping the lowest-indexed of a merged group so
+the primary stays primary. One `onChange`, so the whole column is one
+[undo](#undo--redo) step.
+
+**Why the lines go raw.** Every line a cursor touches renders as raw source, not
+just the active one. A formatted line's text isn't its source — a heading drops
+its `# `, a [shortened URL](#shorten-links) its middle — so a caret painted at a
+source column over a formatted line would land in the wrong place; and a column
+that showed some lines formatted and one raw would read as the note flickering
+rather than as one editing surface.
+
+**Why some carets are painted.** A browser gives a page exactly one selection,
+so exactly one cursor — the **last** in the list, the one a press just added,
+which is also the one the view follows — gets the native caret and the native
+highlight. Every other one is drawn by `MultiCursorOverlay`, from boxes
+`measureCursors` reads out of the DOM after each render (and again on a
+`ResizeObserver` tick, since a width change moves every one of them without
+changing a character). The overlay is a **sibling** of the editing host, not a
+child of it — the same rule the [empty-note prompt](#markdown-editor) and the
+[attachments block](#attachments-at-the-end) follow, because a
+`contenteditable={false}` island among the lines is a node the browser feels
+entitled to normalise around. It is painted *before* the host so a highlight
+sits behind its text exactly as `::selection` does, with each caret lifting
+itself back above on a `z-index`; the tint is literally the `::selection` tint
+and the blink is the platform's 1s cadence, so a painted cursor and the
+browser's own are indistinguishable. Reduced motion stops the blink rather than
+hiding the caret.
+
+**Where a column ends.** A pointer press, focus leaving the surface, a locked
+note, `Ctrl/Cmd+A`, the [cut](#cut-button) and [styling
+toolbar](#styling-toolbar) verbs (which speak in one span), `Tab`, `PageUp` /
+`PageDown`, an IME composition starting (it runs natively on one line and cannot
+be split), an input type a column can't express, and a [live pull](#live-pull)
+or [undo](#undo--redo) rewriting the body under it. A `selectionchange` that
+lands the caret on a line no cursor is on ends it too — the backstop for the
+routes that can't be enumerated.
+
+There is no touch gesture and no button: this is a hardware-keyboard feature,
+and it simply never comes up on a phone.
+
 ### Selection mapping
 
 `src/ui/markdown-selection.ts` — translates a live-preview DOM selection back

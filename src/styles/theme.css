@@ -257,6 +257,40 @@ body {
   }
 }
 
+/* The extra carets and highlights a multi-cursor column draws
+   (`MultiCursorOverlay`). A browser paints one caret and one selection, so
+   every cursor past the one holding the native selection is painted here — and
+   has to be indistinguishable from the real thing, or the column reads as two
+   different kinds of cursor. The highlight therefore reuses the exact
+   `::selection` tint above, and the caret blinks on the same 1s cadence every
+   platform uses for a text caret. */
+.multi-caret {
+  background: var(--fg-bright);
+  animation: caret-blink 1s step-end infinite;
+}
+
+.multi-selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+@keyframes caret-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* A caret that blinks is motion, and a reader who asked for none gets a caret
+   that simply stays put — visible, which is the part that matters. */
+@media (prefers-reduced-motion: reduce) {
+  .multi-caret {
+    animation: none;
+  }
+}
+
 /* Transient-toast entrance (`Toast`). It mounts on the action it confirms and
    unmounts when the caller's timer runs out, so — like the drawer and the
    styling toolbar — there is no resting state to transition from and a CSS

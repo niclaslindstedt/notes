@@ -229,10 +229,16 @@ function rowEdge(
 }
 
 // The top of the character at `index`, or null when the engine reports no
-// geometry for it. One character rather than a collapsed caret, for the reason
-// `firstCharRect` gives: a range with something in it is what every engine
-// measures, and a single character can only occupy one row.
+// geometry for it.
 function charTop(lineEl: HTMLElement, index: number): number | null {
+  return charRect(lineEl, index)?.top ?? null;
+}
+
+// The rect of the single character at `index`. One character rather than a
+// collapsed caret, for the reason `firstCharRect` gives: a range with something
+// in it is what every engine measures, and a single character can only occupy
+// one row — so its rect says both where the column is and which row it is on.
+function charRect(lineEl: HTMLElement, index: number): DOMRect | null {
   const a = domPointAt(lineEl, index);
   const b = domPointAt(lineEl, index + 1);
   const range = lineEl.ownerDocument.createRange();
@@ -245,7 +251,93 @@ function charTop(lineEl: HTMLElement, index: number): number | null {
   const rects = range.getClientRects?.();
   const rect =
     rects && rects.length > 0 ? rects[0]! : range.getBoundingClientRect?.();
-  return rect && rect.height > 0 ? rect.top : null;
+  return rect && rect.height > 0 ? rect : null;
+}
+
+/** A box in viewport coordinates — what the multi-cursor overlay paints. */
+export type ColumnRect = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+/**
+ * A zero-width box at column `col` of `lineEl`, in viewport coordinates: where
+ * the caret would be drawn if the browser were drawing one there.
+ *
+ * The browser only ever draws *one* caret, so every cursor in a multi-cursor
+ * column beyond the one holding the native selection has to be painted by the
+ * editor — and painting it means knowing this rect (see
+ * `multi-cursor-rects.ts`). Null when the engine reports no geometry for the
+ * line at all, which is the honest answer under jsdom and before first layout.
+ */
+export function caretRectAt(
+  lineEl: HTMLElement,
+  col: number,
+): ColumnRect | null {
+  const len = (lineEl.textContent ?? "").length;
+  if (len === 0) {
+    const box = lineEl.getBoundingClientRect();
+    return box.height > 0
+      ? { left: box.left, top: box.top, width: 0, height: box.height }
+      : null;
+  }
+  const at = Math.max(0, Math.min(col, len));
+  // Past the last character there is no character to measure the *left* edge
+  // of, so the caret is the right edge of the one before it.
+  const trailing = at >= len;
+  const rect = charRect(lineEl, trailing ? len - 1 : at);
+  if (!rect) return null;
+  return {
+    left: trailing ? rect.right : rect.left,
+    top: rect.top,
+    width: 0,
+    height: rect.height,
+  };
+}
+
+// How wide an empty line is painted when a selection runs through it. A line
+// with nothing on it still has to read as selected, and a zero-width box is
+// invisible; roughly a space's worth is what every editor draws there.
+const EMPTY_ROW_WIDTH = 6;
+
+/**
+ * The boxes the source columns `[from, to)` of `lineEl` cover — one per
+ * soft-wrapped row, in viewport coordinates. The painted twin of a native
+ * selection highlight, for the cursors the browser isn't drawing.
+ */
+export function columnRects(
+  lineEl: HTMLElement,
+  from: number,
+  to: number,
+): ColumnRect[] {
+  const len = (lineEl.textContent ?? "").length;
+  const lo = Math.max(0, Math.min(from, len));
+  const hi = Math.max(lo, Math.min(to, len));
+  if (hi === lo) {
+    const caret = caretRectAt(lineEl, lo);
+    return caret ? [{ ...caret, width: EMPTY_ROW_WIDTH }] : [];
+  }
+  const a = domPointAt(lineEl, lo);
+  const b = domPointAt(lineEl, hi);
+  const range = lineEl.ownerDocument.createRange();
+  try {
+    range.setStart(a.node, a.offset);
+    range.setEnd(b.node, b.offset);
+  } catch {
+    return [];
+  }
+  const rects = range.getClientRects?.();
+  if (!rects) return [];
+  return Array.from(rects)
+    .filter((r) => r.height > 0 && r.width > 0)
+    .map((r) => ({
+      left: r.left,
+      top: r.top,
+      width: r.width,
+      height: r.height,
+    }));
 }
 
 /** Place a collapsed caret `col` characters into `lineEl`'s text. */
