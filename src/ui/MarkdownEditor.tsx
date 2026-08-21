@@ -1048,13 +1048,18 @@ export function MarkdownEditor({
     );
     if (!a || !b) return null;
     const [start, end] = orderPoints(a, b);
-    // A ranged selection that reaches a line's content start has visually taken
-    // the whole line, so extend it over any leading block marker (so a copy /
-    // cut / replace covers the `# `, `- `, `> ` too).
+    // A ranged selection that reaches a *formatted* line's content start has
+    // visually taken the whole line, so extend it over any leading block marker
+    // (so a copy / cut / replace covers the `# `, `- `, `> ` too). The active
+    // raw line is exempt: its marker is text the browser can address itself.
     return {
       start: sel.isCollapsed
         ? start
-        : snapStartToLineEdge(blocksRef.current, start),
+        : snapStartToLineEdge(
+            blocksRef.current,
+            start,
+            activeRef.current.index,
+          ),
       end,
       collapsed: sel.isCollapsed,
     };
@@ -1099,7 +1104,11 @@ export function MarkdownEditor({
         return {
           start: pointsEqual(start, end)
             ? start
-            : snapStartToLineEdge(blocksRef.current, start),
+            : snapStartToLineEdge(
+                blocksRef.current,
+                start,
+                activeRef.current.index,
+              ),
           end,
         };
       }
@@ -1653,7 +1662,7 @@ export function MarkdownEditor({
     const [lo, hi] = orderPoints(start, end);
     return extractSourceRange(
       linesRef.current,
-      snapStartToLineEdge(blocksRef.current, lo),
+      snapStartToLineEdge(blocksRef.current, lo, activeRef.current.index),
       hi,
     );
   }

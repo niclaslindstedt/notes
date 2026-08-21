@@ -88,6 +88,19 @@ describe("snapStartToLineEdge", () => {
     expect(snap("# Heading", { line: 0, col: 5 })).toEqual({ line: 0, col: 5 });
   });
 
+  it("leaves the raw active line alone", () => {
+    // The active line renders as verbatim source, so its marker is text the
+    // browser can address — a range it scoped to the first word (a phone's
+    // autocorrect) means the word, not the whole line.
+    expect(
+      snapStartToLineEdge(classifyLines("4. word"), { line: 0, col: 3 }, 0),
+    ).toEqual({ line: 0, col: 3 });
+    // …and a different line still snaps, active line or not.
+    expect(
+      snapStartToLineEdge(classifyLines("- a\n- b"), { line: 1, col: 2 }, 0),
+    ).toEqual({ line: 1, col: 0 });
+  });
+
   it("is a no-op on a marker-less paragraph", () => {
     expect(snap("plain text", { line: 0, col: 0 })).toEqual({
       line: 0,
