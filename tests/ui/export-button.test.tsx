@@ -6,6 +6,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
 } from "@testing-library/preact";
 import type { ReactNode } from "react";
 
@@ -13,11 +14,20 @@ import type { Note } from "../../src/domain/note.ts";
 import { ExportButton } from "../../src/ui/export/ExportButton.tsx";
 import { NavContext, type NavContextValue } from "../../src/ui/nav-context.ts";
 
+// The export work is loaded on the press (`await import("./export-note.ts")`),
+// so the download tests swap the module in with `vi.doMock` *per test* — a
+// hoisted `vi.mock` factory caches its first outcome for the whole file, and
+// one test needs the factory to throw (a stale page asking for a chunk hash
+// the latest deploy replaced) while the others need it to resolve.
+const EXPORT_NOTE = "../../src/ui/export/export-note.ts";
+
 afterEach(() => {
   cleanup();
   Reflect.deleteProperty(navigator, "clipboard");
   Reflect.deleteProperty(document, "execCommand");
   vi.restoreAllMocks();
+  vi.doUnmock(EXPORT_NOTE);
+  vi.resetModules();
 });
 
 const note: Note = {
@@ -111,6 +121,66 @@ describe("ExportButton", () => {
     openMenu();
     await clickCopy();
 
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("raises a failure toast when the export chunk can't be fetched", async () => {
+    // The deployed hashes churn under an open page (every push rebuilds the
+    // /preview/ slot), so the on-press `import()` can 404. That used to escape
+    // as an unhandled rejection — a console error and a button that silently
+    // did nothing. The user must be told, and told the remedy: a reload gets a
+    // fresh page whose chunk URLs match what the server actually has.
+    vi.doMock(EXPORT_NOTE, () => {
+      throw new TypeError(
+        "Failed to fetch dynamically imported module: export-note-C5VSQ-9U.js",
+      );
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    render(withNav(<ExportButton note={note} copyScope="body" />));
+    openMenu();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Export to MD" }));
+    });
+
+    // The chunk resolves through the module runner, i.e. beyond the microtask
+    // queue a single `act` pass flushes — poll for the toast instead.
+    const toast = await screen.findByRole("status");
+    expect(toast.textContent).toContain("Export failed");
+    expect(screen.getByRole("button", { name: "Reload" })).toBeTruthy();
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it("raises the failure toast when the PDF export reports defeat", async () => {
+    // `exportPdf` swallows its own errors into `false` (a jsPDF chunk that
+    // wouldn't load, a write that threw) — the button must not read that as
+    // quiet success.
+    vi.doMock(EXPORT_NOTE, () => ({
+      exportPdf: vi.fn(() => Promise.resolve(false)),
+      downloadMarkdown: vi.fn(),
+    }));
+    render(withNav(<ExportButton note={note} copyScope="body" />));
+    openMenu();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Export to PDF" }));
+    });
+
+    const toast = await screen.findByRole("status");
+    expect(toast.textContent).toContain("Export failed");
+  });
+
+  it("shows no toast when an export succeeds", async () => {
+    const downloadMarkdown = vi.fn();
+    vi.doMock(EXPORT_NOTE, () => ({
+      exportPdf: vi.fn(() => Promise.resolve(true)),
+      downloadMarkdown,
+    }));
+    render(withNav(<ExportButton note={note} copyScope="body" />));
+    openMenu();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Export to MD" }));
+    });
+
+    await waitFor(() => expect(downloadMarkdown).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("status")).toBeNull();
   });
 });

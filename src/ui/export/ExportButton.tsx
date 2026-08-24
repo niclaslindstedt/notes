@@ -13,6 +13,7 @@ import { FloatingPanel } from "../FloatingPanel.tsx";
 import type { FloatingPlacement } from "../hooks/useFloatingPosition.ts";
 import {
   CheckIcon,
+  CloseIcon,
   CopyIcon,
   ExportIcon,
   FileMarkdownIcon,
@@ -44,7 +45,9 @@ import { Toast } from "../Toast.tsx";
 // The export work itself is loaded on the press, not at mount: the Markdown
 // codec, the layout engine and — by far the biggest of them — the PDF writer
 // are not something anyone who never exports should download (see AGENTS.md,
-// "the code-splitting seams").
+// "the code-splitting seams"). When that load fails — or the export itself
+// does — the row raises a failure `Toast` with a Reload action instead of
+// silently doing nothing (see `reportFailed` below).
 
 const MENU_PLACEMENT: FloatingPlacement = {
   width: { kind: "min", minPx: 208 },
@@ -76,9 +79,29 @@ export function ExportButton({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<Busy>(null);
   const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
   const copiedTimer = useRef<number | undefined>(undefined);
+  const failedTimer = useRef<number | undefined>(undefined);
 
-  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+  useEffect(
+    () => () => {
+      window.clearTimeout(copiedTimer.current);
+      window.clearTimeout(failedTimer.current);
+    },
+    [],
+  );
+
+  // A download that never arrives is indistinguishable from a button that
+  // does nothing, so a failed export must say so. It holds longer than the
+  // "Copied" tick because it carries a remedy to read and press: the export
+  // code is fetched on the press, and the usual failure is a page outlived by
+  // a deploy asking for a chunk hash the server has since replaced — which a
+  // reload fixes, since a fresh page references the chunks that exist.
+  function reportFailed() {
+    setFailed(true);
+    window.clearTimeout(failedTimer.current);
+    failedTimer.current = window.setTimeout(() => setFailed(false), 6000);
+  }
 
   async function exportPdf() {
     setBusy("pdf");
@@ -93,7 +116,14 @@ export function ExportButton({
         // and can't reach the catalogue itself.
         t("app.export.pageNumberOf"),
       );
+      // `exportPdf` reports its own failures as `false` (it degrades inside
+      // wherever it can) — quiet success here would leave the user waiting
+      // for a download that never comes.
       if (ok) unlock("printPress");
+      else reportFailed();
+    } catch (err) {
+      console.warn("[export] loading the export module failed", err);
+      reportFailed();
     } finally {
       setBusy(null);
     }
@@ -105,6 +135,9 @@ export function ExportButton({
       const mod = await import("./export-note.ts");
       mod.downloadMarkdown(note);
       unlock("takeaway");
+    } catch (err) {
+      console.warn("[export] loading the export module failed", err);
+      reportFailed();
     } finally {
       setBusy(null);
     }
@@ -214,6 +247,16 @@ export function ExportButton({
         <Toast
           message={t("app.copy.copied")}
           icon={<CheckIcon className="h-4 w-4 shrink-0 text-accent" />}
+        />
+      )}
+      {failed && (
+        <Toast
+          message={t("app.export.failed")}
+          icon={<CloseIcon className="h-4 w-4 shrink-0 text-danger" />}
+          action={{
+            label: t("app.export.reload"),
+            onAction: () => window.location.reload(),
+          }}
         />
       )}
     </>

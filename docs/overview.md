@@ -1868,6 +1868,13 @@ handlers): the Markdown codec, the layout engine and — by far the biggest of
 them — the PDF writer are not something anyone who never exports should
 download. See [code splitting](#code-splitting).
 
+**A failed export says so.** When the on-press chunk can't be fetched — the
+usual cause is a page outlived by a deploy, asking for a hashed chunk URL the
+server has since replaced — or the PDF writer reports failure, the PDF/MD rows
+raise a failure [toast](#toast) with a **Reload** action instead of silently
+doing nothing: a reload gets a fresh page whose chunk URLs match what the
+server actually serves.
+
 #### Why the app writes the PDF itself
 
 The export used to build an HTML page and hand it to `window.print()`, letting
