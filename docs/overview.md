@@ -186,9 +186,14 @@ area rather than the whole viewport. See also [PWA update](#pwa-update).
 ### Toast
 
 `Toast` (`src/ui/Toast.tsx`) — the transient confirmation pill: a message, an
-optional leading glyph, and nothing to press. It says "that worked" for an
-action that would otherwise finish silently; today the [export menu](#export)'s
-**Copy to clipboard** row is its one caller, showing `Copied` for 1.6 seconds.
+optional leading glyph, and — usually — nothing to press. It says "that worked"
+for an action that would otherwise finish silently; the [export
+menu](#export)'s **Copy to clipboard** row shows `Copied` for 1.6 seconds, and
+[ticking off a dropzone note](#dropzone) raises `DropzoneDeletedToast`
+(`src/ui/DropzoneDeletedToast.tsx`) through it. That caller uses the pill's one
+optional interactive part: an `action` prop grows a trailing button (its
+**Undo**), the sole press the pill can carry — the pill itself stays
+`pointer-events-none`, only the button catches taps.
 The **caller owns the timer** and simply stops rendering the toast when it
 expires — the component owns only where it sits and how it announces itself
 (`role="status"` + `aria-live="polite"`, so it is read after the current
@@ -2701,6 +2706,18 @@ the note. Not archives — a hand-off you have collected is not something to kee
 and an archive slowly filling with yesterday's wifi passwords is exactly the
 mess the section exists to avoid. The deletion is an ordinary `remove`, so
 [undo](#undo--redo) brings it back if the press was a mistake.
+
+Because that press also drops the user back on the overview — the note simply
+vanishes — a **toast** confirms it: `DropzoneDeletedToast`
+(`src/ui/DropzoneDeletedToast.tsx`), hosted by `App` beside `UpdateToast`
+(the editor that took the press unmounts in the same gesture), floats "Dropzone
+note deleted" with an **Undo** button for about five seconds. The button is
+plain timeline [undo](#undo--redo) — right after the press the last change *is*
+the deletion — which is also why the window is short: the longer it lingers,
+the more room for another edit to slip in and make the button restore the
+wrong thing. The pill itself is the shared `Toast` (`src/ui/Toast.tsx`), which
+grew an optional trailing `action` button for this; the pill stays
+click-through, only the button catches presses.
 
 **Keeping it.** Sometimes a scrap turns out to be worth keeping, and the gesture
 that says so is naming it: nobody titles something they are about to throw away.

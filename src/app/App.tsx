@@ -56,6 +56,7 @@ import { PullToRefreshIndicator } from "../ui/PullToRefreshIndicator.tsx";
 import { SyncIndicator } from "../ui/SyncIndicator.tsx";
 import { NamespacePinGate } from "../ui/NamespacePinGate.tsx";
 import { UnlockGate } from "../ui/UnlockGate.tsx";
+import { DropzoneDeletedToast } from "../ui/DropzoneDeletedToast.tsx";
 import { UpdateToast } from "../ui/UpdateToast.tsx";
 import { AchievementsModalHost } from "./modals/AchievementsModalHost.tsx";
 import { AchievementsUnlockModalHost } from "./modals/AchievementsUnlockModalHost.tsx";
@@ -622,6 +623,16 @@ export function App() {
     else if (id === readingId) replace(ARCHIVE_ROUTE);
   }
 
+  // The dropzone checkmark deletes the note and leaves the editor in one
+  // press, so a toast (hosted below, next to `UpdateToast` — the editor is
+  // gone by the time it shows) confirms the deletion and offers undo. A
+  // counter rather than a flag, so a second tick-off restarts the toast.
+  const [dropzoneDeletedSeq, setDropzoneDeletedSeq] = useState(0);
+  function dropzoneDone(id: string) {
+    removeNote(id);
+    setDropzoneDeletedSeq((seq) => seq + 1);
+  }
+
   // Archiving a note from the overview leaves the editor too if that note
   // happened to be the one open, so a stale editor never lingers on a note
   // that's no longer in the list.
@@ -808,7 +819,7 @@ export function App() {
                       onTitleSettle={settleTitle}
                       onDropzoneDone={
                         editing.dropzone
-                          ? () => removeNote(editing.id)
+                          ? () => dropzoneDone(editing.id)
                           : undefined
                       }
                       onToggleFavorite={() => toggleFavorite(editing.id)}
@@ -889,6 +900,7 @@ export function App() {
             />
             <DropOverlay visible={drop.dragging} />
             <UpdateToast />
+            <DropzoneDeletedToast seq={dropzoneDeletedSeq} onUndo={undo} />
           </ModalBusProvider>
         </NavContext.Provider>
       </AttachmentFetchContext.Provider>

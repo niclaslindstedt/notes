@@ -41,6 +41,7 @@ const app: AppCatalog = {
     newNote: "Ny släppzonsanteckning",
     hold: "Håll in för en släppzonsanteckning",
     done: "Klar — ta bort den här anteckningen",
+    deleted: "Släppzonsanteckningen togs bort",
     keepTitle: "Spara som en vanlig anteckning?",
     keepBody:
       "”{title}” är en släppzonsanteckning, tänkt att hämtas på en annan enhet och bockas av. Att namnge den betyder oftast att du vill behålla den — spara den så flyttas den till dina anteckningar, låt bli så stannar den i Släppzonen.",

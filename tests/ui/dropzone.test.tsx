@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDropzoneNote, type Note } from "../../src/domain/note.ts";
 import { DEFAULT_EDITOR_SETTINGS } from "../../src/theme/themes.ts";
+import { DropzoneDeletedToast } from "../../src/ui/DropzoneDeletedToast.tsx";
 import { Editor } from "../../src/ui/NoteEditor.tsx";
 import { resetEditorPositions } from "../../src/ui/editor-position.ts";
 import { NoteList } from "../../src/ui/note-list/NoteList.tsx";
@@ -280,5 +281,72 @@ describe("a dropzone note's editor", () => {
       updatedAt: 0,
     });
     expect(screen.queryByLabelText("Done — delete this note")).toBeNull();
+  });
+});
+
+// The confirmation that follows the checkmark. The editor is gone by the time
+// it shows, so `App` hosts it and feeds it a tick-off counter; the toast owns
+// its own clock.
+describe("the deletion toast", () => {
+  const nav: NavContextValue = {
+    open: false,
+    toggle: vi.fn(),
+    close: vi.fn(),
+    setDragging: vi.fn(),
+    position: { side: "left", y: 0.5 },
+    setPosition: vi.fn(),
+    showMenuButton: true,
+    setShowMenuButton: vi.fn(),
+    showButton: true,
+    pinned: false,
+    sidebarCollapsed: false,
+    toggleSidebar: vi.fn(),
+  };
+
+  function renderToast(seq: number, onUndo = vi.fn()) {
+    const view = render(
+      <NavContext.Provider value={nav}>
+        <DropzoneDeletedToast seq={seq} onUndo={onUndo} />
+      </NavContext.Provider>,
+    );
+    const rerender = (next: number) =>
+      view.rerender(
+        <NavContext.Provider value={nav}>
+          <DropzoneDeletedToast seq={next} onUndo={onUndo} />
+        </NavContext.Provider>,
+      );
+    return { onUndo, rerender };
+  }
+
+  it("stays hidden before any tick-off", () => {
+    renderToast(0);
+    expect(screen.queryByText("Dropzone note deleted")).toBeNull();
+  });
+
+  it("shows on a tick-off and expires on its own", () => {
+    const { rerender } = renderToast(0);
+    rerender(1);
+    expect(screen.getByText("Dropzone note deleted")).toBeTruthy();
+    act(() => void vi.advanceTimersByTime(5000));
+    expect(screen.queryByText("Dropzone note deleted")).toBeNull();
+  });
+
+  it("undoes the deletion through its button, once", () => {
+    const { onUndo, rerender } = renderToast(0);
+    rerender(1);
+    fireEvent.click(screen.getByText("Undo"));
+    expect(onUndo).toHaveBeenCalledTimes(1);
+    // The press consumed the toast — there is nothing left to press twice.
+    expect(screen.queryByText("Dropzone note deleted")).toBeNull();
+  });
+
+  it("restarts its clock when a second note is ticked off", () => {
+    const { rerender } = renderToast(0);
+    rerender(1);
+    act(() => void vi.advanceTimersByTime(4000));
+    rerender(2);
+    act(() => void vi.advanceTimersByTime(4000));
+    // 8 seconds after the first press, the second still holds it open.
+    expect(screen.getByText("Dropzone note deleted")).toBeTruthy();
   });
 });

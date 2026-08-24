@@ -89,6 +89,10 @@ const app = {
     // rather than the note.
     hold: "Hold for a dropzone note",
     done: "Done — delete this note",
+    // The toast confirming that press — the checkmark deletes the note and
+    // leaves the editor in one go, so this is the only trace of what happened.
+    // Its Undo button reuses `nav.undo`.
+    deleted: "Dropzone note deleted",
     keepTitle: "Save as a regular note?",
     keepBody:
       "“{title}” is a dropzone note, meant to be picked up on another device and ticked off. Naming it usually means you want to keep it — save it and it moves into your notes; leave it and it stays in the Dropzone.",
