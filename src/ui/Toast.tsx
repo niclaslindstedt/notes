@@ -25,13 +25,21 @@ import { dockedSidebarWidth, useNav } from "./nav-context.ts";
 // `role="status"` + `aria-live="polite"` is deliberate over `alert`: the
 // message confirms something the user just did, so it should be read after the
 // current utterance rather than interrupting it.
+//
+// An optional `action` grows the pill a trailing button — "Undo", and whatever
+// else offers a one-press way back from the thing just confirmed. The pill
+// stays `pointer-events-none` so the message never swallows a tap meant for
+// what's underneath; only the button itself catches presses.
 export function Toast({
   message,
   icon,
+  action,
 }: {
   message: string;
   /** Optional leading glyph, sized by the caller (`h-4 w-4` reads best). */
   icon?: ReactNode;
+  /** Optional trailing button — a one-press way back from the confirmed act. */
+  action?: { label: string; onAction: () => void };
 }) {
   const nav = useNav();
   const { position } = nav;
@@ -58,6 +66,15 @@ export function Toast({
     >
       {icon}
       <span className="min-w-0 truncate">{message}</span>
+      {action && (
+        <button
+          type="button"
+          onClick={action.onAction}
+          className="pointer-events-auto shrink-0 cursor-pointer rounded-[var(--radius)] px-2 py-0.5 font-semibold text-accent hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"
+        >
+          {action.label}
+        </button>
+      )}
     </div>,
     document.body,
   );

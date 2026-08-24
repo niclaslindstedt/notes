@@ -62,6 +62,7 @@ Honour these when naming a new file, key, or string.
 | **Drop overlay** / **drag-and-drop import**                | `DropOverlay` (`src/ui/DropOverlay.tsx`); `useFileDrop` (`src/ui/hooks/useFileDrop.ts`); `importedNote` (`src/domain/import.ts`). [→](overview.md#drag-and-drop-import) |
 | **Update toast** / **"new build ready"** / **reload prompt** | `UpdateToast` (`src/ui/UpdateToast.tsx`); `usePwaUpdate` (`src/pwa/usePwaUpdate.ts`). [→](overview.md#update-toast) |
 | **Toast** / **"Copied" toast** / **confirmation pill** / **the little popup that says it worked** | `Toast` (`src/ui/Toast.tsx`); the `.toast-in` animation (`src/styles/theme.css`); raised by the **Copy to clipboard** row of `ExportButton` (`src/ui/export/ExportButton.tsx`). [→](overview.md#toast) |
+| **Dropzone deleted toast** / **"note deleted" toast** / **undo toast** | `DropzoneDeletedToast` (`src/ui/DropzoneDeletedToast.tsx`), hosted in `App`; the `action` prop of `Toast`; shown by the dropzone checkmark (`dropzoneDone`, `src/app/App.tsx`). [→](overview.md#dropzone) |
 | **Icons** / **glyph** (generic UI icon)                    | `src/ui/icons.tsx`. [→](overview.md#icons)                                                                   |
 | **Button** (primitive)                                     | `Button` (`src/ui/form/Button.tsx`). [→](overview.md#button)                                                 |
 | **Checkbox** / **toggle** (primitive)                      | `Checkbox` (`src/ui/form/Checkbox.tsx`). [→](overview.md#checkbox)                                            |
