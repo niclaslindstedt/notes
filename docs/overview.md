@@ -2635,9 +2635,24 @@ fires after 500ms of holding *still* (more than 8px of movement is a scroll or a
 drag, the same rule the [note drag](#note-drag-touch--pointer) uses, which is
 what lets both live on one screen), taps the haptics, and swallows the click a
 touchscreen delivers behind the hold so the gesture can't also make an ordinary
-note. `App.openDropzone` then does what `openNew` does — drop the throwaway note
-we're leaving, hold the save on a file backend so the note's file is born with
-the right name — and opens the new note in the editor.
+note. `App.openDropzone` then drops the throwaway note we're leaving, the way
+`openNew` does, and opens the new note in the editor.
+
+**It does not hold the save,** and that is load-bearing rather than an omission.
+`openNew` calls [`holdSaves`](#save-hold) so a fresh note's file isn't written
+under a throwaway default title and renamed a moment later; the hold is lifted
+by the title field settling. A dropzone note is born bearing its final name, so
+there is no rename to wait for — and, crucially, its title field never takes the
+mount focus (`titleFirst` keys off `isBlank`, and a note with a title isn't
+blank), so it never blurs and the hold would only lift when the editor
+unmounted. Holding here would keep the note, and every keystroke in it, out of
+the backend for exactly as long as it was open — on a synced backend, precisely
+the window in which it is supposed to be reaching the other device.
+
+For the same reason the editor opens with the caret in the **body**: `bodyFirst`
+(`src/ui/NoteEditor.tsx`) takes the mount focus for a dropzone note with an empty
+body, so the surface whose whole point is speed opens ready to paste, with the
+soft keyboard already up, instead of with nothing focused at all.
 
 **Only where it means something.** The whole feature is gated on
 `isSharedBackend` (`src/storage/backend-preference.ts`): every backend except

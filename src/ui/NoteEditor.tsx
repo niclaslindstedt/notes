@@ -34,7 +34,7 @@ import {
   replaceOne,
   type PreviewLine,
 } from "../domain/note-replace.ts";
-import { isBlank, isLocked, type Note } from "../domain/note.ts";
+import { isBlank, isDropzone, isLocked, type Note } from "../domain/note.ts";
 import type { CompiledTransform } from "../domain/transform.ts";
 import { useT } from "../i18n/index.ts";
 import { haptics } from "../platform/native-bridge.ts";
@@ -207,6 +207,15 @@ export function Editor({
   // stays down until the user taps where they want to type. Captured once for
   // mount — typing the title doesn't re-route focus mid-session.
   const titleFirst = useRef(isBlank(note) && !isLocked(note)).current;
+  // A fresh dropzone note opens with the caret in the *body* instead. It is
+  // born already named, so there is nothing to type in the title — the thing
+  // the user came to do is paste. Without this the editor opens with nothing
+  // focused at all (`titleFirst` is false for a note that has a title), which
+  // on a phone means no keyboard and an extra tap on the one surface whose
+  // whole point is speed. Captured once for mount, like `titleFirst`.
+  const bodyFirst = useRef(
+    isDropzone(note) && (note.body ?? "") === "" && !isLocked(note),
+  ).current;
   const bodyRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   // The header's action cluster (favorite, lock, formatting, cut, export,
@@ -796,7 +805,7 @@ export function Editor({
             disableAutocorrect={editor.disableAutocorrect}
             capitaliseSentences={editor.capitaliseSentences}
             maxWidth={maxWidth}
-            focusOnMount={false}
+            focusOnMount={bodyFirst}
             note={note}
             noteId={note.id}
             attachments={note.attachments}
@@ -830,7 +839,7 @@ export function Editor({
             disableAutocorrect={editor.disableAutocorrect}
             capitaliseSentences={editor.capitaliseSentences}
             maxWidth={maxWidth}
-            focusOnMount={false}
+            focusOnMount={bodyFirst}
             noteId={note.id}
             matches={matches}
             activeMatch={activeMatch}

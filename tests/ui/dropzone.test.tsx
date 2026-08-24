@@ -9,6 +9,9 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDropzoneNote, type Note } from "../../src/domain/note.ts";
+import { DEFAULT_EDITOR_SETTINGS } from "../../src/theme/themes.ts";
+import { Editor } from "../../src/ui/NoteEditor.tsx";
+import { resetEditorPositions } from "../../src/ui/editor-position.ts";
 import { NoteList } from "../../src/ui/note-list/NoteList.tsx";
 import { SideMenu } from "../../src/ui/SideMenu.tsx";
 import { ModalBusContext } from "../../src/ui/modal-bus.ts";
@@ -25,6 +28,8 @@ afterEach(() => {
   vi.runOnlyPendingTimers();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  resetEditorPositions();
   cleanup();
 });
 
@@ -179,5 +184,77 @@ describe("the side menu's Dropzone section", () => {
     const row = screen.getByText("2025-03-04 17:09");
     fireEvent.click(row);
     expect(onSelectNote).toHaveBeenCalledWith(made.id);
+  });
+});
+
+// The editor a dropzone note opens in. Markdown rendering off, so the body is a
+// plain textarea the test can ask about focus directly.
+describe("a dropzone note's editor", () => {
+  const nav: NavContextValue = {
+    open: false,
+    toggle: vi.fn(),
+    close: vi.fn(),
+    setDragging: vi.fn(),
+    position: { side: "right", y: 0.5 },
+    setPosition: vi.fn(),
+    showMenuButton: true,
+    setShowMenuButton: vi.fn(),
+    showButton: true,
+    pinned: false,
+    sidebarCollapsed: false,
+    toggleSidebar: vi.fn(),
+  };
+  const PLAIN = { ...DEFAULT_EDITOR_SETTINGS, renderMarkdown: false };
+
+  function renderEditor(note: Note, onDropzoneDone?: () => void) {
+    render(
+      <NavContext.Provider value={nav}>
+        <Editor
+          note={note}
+          editor={PLAIN}
+          onBack={vi.fn()}
+          onChange={vi.fn()}
+          onTitleChange={vi.fn()}
+          onTitleSettle={vi.fn()}
+          onToggleFavorite={vi.fn()}
+          onToggleLock={vi.fn()}
+          onDropzoneDone={onDropzoneDone}
+          canAttach={false}
+          onAttach={vi.fn()}
+        />
+      </NavContext.Provider>,
+    );
+  }
+
+  it("opens with the caret already in the body, ready to paste", () => {
+    // The note is born named, so the title field never takes the mount focus
+    // the way a blank new note's does — without the body taking it instead the
+    // editor would open with nothing focused at all.
+    renderEditor(createDropzoneNote(Date.now()));
+    expect(document.activeElement?.tagName).toBe("TEXTAREA");
+    expect((document.activeElement as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("does not steal the focus of a dropzone note that already has text", () => {
+    renderEditor({ ...createDropzoneNote(Date.now()), body: "already here" });
+    expect(document.activeElement?.tagName).not.toBe("TEXTAREA");
+  });
+
+  it("ticks off through the floating checkmark", () => {
+    const done = vi.fn();
+    renderEditor(createDropzoneNote(Date.now()), done);
+    fireEvent.click(screen.getByLabelText("Done — delete this note"));
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+
+  it("grows no checkmark for an ordinary note", () => {
+    renderEditor({
+      id: "n1",
+      title: "Groceries",
+      body: "Milk",
+      createdAt: 0,
+      updatedAt: 0,
+    });
+    expect(screen.queryByLabelText("Done — delete this note")).toBeNull();
   });
 });
