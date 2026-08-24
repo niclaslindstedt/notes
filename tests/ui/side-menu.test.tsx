@@ -57,6 +57,7 @@ function renderMenu(
           onShowAll={vi.fn()}
           showAllActive={false}
           onAddNote={vi.fn()}
+          dropzone={[]}
           onRemoveNote={vi.fn()}
           onArchiveNote={vi.fn()}
           archivedCount={0}

@@ -93,6 +93,13 @@ npm --prefix electron run dist    # package an archive for this platform
 ## Usage
 
 - Tap the **+** button to start a new note.
+- **Hold** the **+** (or the side menu's New note) to make a *dropzone*
+  note — a temporary note for handing a link, an address or a code to your
+  other devices. It waits in the side menu's Dropzone section, its
+  checkmark deletes it once you've picked it up, and naming it offers to
+  keep it as a regular note. Offered whenever your notes are stored
+  somewhere your other devices can read (a folder, a cloud, your own
+  server).
 - The first line becomes the note's title in the list.
 - Notes auto-save as you type; the list shows the most recently edited first.
 - Use the theme toggle in the header to switch Dark / Light / System.

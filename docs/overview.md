@@ -2620,6 +2620,97 @@ and `archivedNotes` partition the list. `useNotes().archive` / `restore` are the
 verbs; archived notes leave the overview but stay for the [archive
 view](#archive-view) and undo.
 
+### Dropzone
+
+A **dropzone note** is a deliberately temporary note whose only purpose is
+handing a scrap of text to your *other* devices — a link, an address, a
+confirmation code. You write it here, it syncs, you pick it up there and tick it
+off. It is the one note in the app that is meant to be thrown away.
+
+**Making one.** Press and hold any "new note" button: the overview's floating
+"+" (`NoteList`) or the side menu's **New note** cell (`SideMenuActionBar`). An
+ordinary press still makes an ordinary note; the hold is a second action laid
+over the same button by `useLongPress` (`src/ui/hooks/useLongPress.ts`), which
+fires after 500ms of holding *still* (more than 8px of movement is a scroll or a
+drag, the same rule the [note drag](#note-drag-touch--pointer) uses, which is
+what lets both live on one screen), taps the haptics, and swallows the click a
+touchscreen delivers behind the hold so the gesture can't also make an ordinary
+note. `App.openDropzone` then does what `openNew` does — drop the throwaway note
+we're leaving, hold the save on a file backend so the note's file is born with
+the right name — and opens the new note in the editor.
+
+**Only where it means something.** The whole feature is gated on
+`isSharedBackend` (`src/storage/backend-preference.ts`): every backend except
+the browser store, whose `localStorage` no other device can read. Below that
+gate `onNewDropzone` / `onAddDropzone` are simply `undefined`, so the buttons
+are exactly what they were and nothing can put a note in the section. A picked
+folder counts — the app cannot tell a plain directory from one a desktop sync
+client is watching, and the folder backend is how notes runs over
+Dropbox/iCloud/Syncthing on the desktop.
+
+**The timestamp is the name.** `createDropzoneNote` (`src/domain/note.ts`) names
+the note after the moment it was made — `dropzoneTitle`, the same
+`YYYY-MM-DD HH:mm` local-time form the `dateTime` [default title](#default-title)
+uses. That name is *derived* from `createdAt` rather than remembered anywhere, so
+`isDropzoneNamed` can tell "still the timestamp" from "the user named it" at any
+later moment, on any device, after any reload — which is what both of the
+lifecycle rules below hang on.
+
+**Where it is listed.** In its own **Dropzone** section at the top of the side
+menu, above [Favorites](#favorites) — the most perishable thing in the drawer,
+a hand-off you are on your way to collect. It is fed by `dropzoneNotes`
+(newest-created first) through the store's `dropzone` list, hides itself while
+empty exactly as Favorites does, and its rows (`renderDropzoneRow`,
+`src/ui/SideMenu.tsx`) wear the tray glyph `DropzoneIcon` rather than the
+document one. Unlike Favorites, the notes in it appear *only* there: `useNotes`
+filters dropzone notes out of `notes`, so the overview and the drawer's Notes
+list never fill up with scraps. A row swipes left to delete and right-clicks to
+the same menu, but it cannot be archived (`SwipeToRemove`'s `onArchive` is
+optional for exactly this) and it cannot be dragged — it belongs to no folder,
+and filing it would defeat the point of the section.
+
+**Ticking it off.** A dropzone note's editor grows one extra control: a floating
+checkmark where the overview's "+" sits, the only floating button the editor
+ever renders (`onDropzoneDone`, `src/ui/NoteEditor.tsx`). Pressing it **deletes**
+the note. Not archives — a hand-off you have collected is not something to keep,
+and an archive slowly filling with yesterday's wifi passwords is exactly the
+mess the section exists to avoid. The deletion is an ordinary `remove`, so
+[undo](#undo--redo) brings it back if the press was a mistake.
+
+**Keeping it.** Sometimes a scrap turns out to be worth keeping, and the gesture
+that says so is naming it: nobody titles something they are about to throw away.
+So when the title field settles (`onTitleSettle` now carries the committed
+title, because the document does not yet) on a dropzone note whose name is no
+longer its timestamp, `App` raises `DropzoneKeepModal` — "Save as a regular
+note?". Answering yes runs `useNotes().keepDropzoneNote`, which clears the flag
+(`setDropzone(note, false)`) on the shared `DOC_SCOPE` timeline, through
+`withBody` so a deferred note on an [encrypted backend](#encryption) is loaded
+first and the cleared flag reaches its `.enc` file; the note keeps its id, its
+text and its new name and simply joins the ordinary list. Dismissing is a real
+answer rather than a cancel — the note keeps the new name and stays in the
+Dropzone — and `App` remembers it for that note so a second visit to the title
+field doesn't nag. The prompt resolves its note fresh on every render, so a note
+ticked off (or already promoted) between the rename and the answer takes the
+question away with it.
+
+**Abandoning one.** An empty dropzone note still wearing its timestamp is
+`discardable` (`App`) on exactly the same terms as a never-typed ordinary note,
+so backing out of one leaves nothing behind. It needs no `pristineNew` bookkeeping
+to know that, because the name it was born with is derivable — which means the
+rule survives a reload too.
+
+**Persistence.** `Note.dropzone` is absent rather than `false` on an ordinary
+note, so no migration was needed, and it rides every storage shape on the same
+terms as `favorite`: `dropzone: true` in the markdown frontmatter
+(`storage/markdown/codec.ts`), a field on the encrypted note JSON
+(`enc-note-codec.ts`) and on the [note index](#encryption) row
+(`note-index.ts`), and a defensive `=== true` check in `parse`
+(`storage/serialize.ts`). It has to survive all four: a flag lost in transit
+would resurface the note among the ordinary notes on the other device.
+
+The **Dropzone** achievement (`dropzone`) fires from `createDropzone`; the
+**Finders keepers** achievement (`keeper`) from `keepDropzoneNote`.
+
 ### Favorites
 
 Starring a note lifts it into the side menu's **Favorites** section without

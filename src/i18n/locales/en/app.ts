@@ -76,6 +76,25 @@ const app = {
   // line from a mid-line caret, or the whole line — onto the clipboard on its
   // way out.
   cut: "Cut",
+  // The dropzone: a temporary note for handing text to your other devices.
+  // `newNote` labels the long press on a "new note" button that makes one;
+  // `done` is the floating checkmark in its editor, which DELETES the note (it
+  // is never archived — there is nothing to keep). The `keep*` strings are the
+  // prompt raised when a dropzone note is given a name of its own, which is the
+  // gesture that says it turned out to be worth keeping.
+  dropzone: {
+    newNote: "New dropzone note",
+    // Tooltip on the "new note" buttons wherever the hold is offered — the
+    // only visible hint that the gesture exists, so it names the gesture
+    // rather than the note.
+    hold: "Hold for a dropzone note",
+    done: "Done — delete this note",
+    keepTitle: "Save as a regular note?",
+    keepBody:
+      "“{title}” is a dropzone note, meant to be picked up on another device and ticked off. Naming it usually means you want to keep it — save it and it moves into your notes; leave it and it stays in the Dropzone.",
+    keep: "Save note",
+    discard: "Keep in Dropzone",
+  },
   // The editor header's leading star button, which lifts the open note into
   // (and out of) the side menu's Favorites section. The label states what the
   // press will do, so it flips with the note's current state.

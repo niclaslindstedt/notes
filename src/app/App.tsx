@@ -4,12 +4,15 @@ import { unlock, useAchievementWatcher } from "../achievements/index.ts";
 import { useDevSeed } from "../dev/useDevSeed.ts";
 import {
   defaultNoteTitle,
+  isDropzoneNamed,
+  noteTitle,
   type Note,
   type SaveFormatting,
 } from "../domain/note.ts";
 import { compileTransforms } from "../domain/transform.ts";
 import { isStandaloneMobile } from "../pwa/standalone.ts";
 import type { StorageAdapter } from "../storage/adapter.ts";
+import { isSharedBackend } from "../storage/backend-preference.ts";
 import { useStorageBackend } from "../storage/useStorageBackend.ts";
 import {
   getActiveNote,
@@ -17,6 +20,7 @@ import {
 } from "../storage/active-note-preference.ts";
 import { unlockAchievements, useApplyAppearance } from "../theme/useTheme.ts";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
+import { DropzoneKeepModal } from "../ui/DropzoneKeepModal.tsx";
 import { OrphanFilesModal } from "../ui/OrphanFilesModal.tsx";
 import { DropOverlay } from "../ui/DropOverlay.tsx";
 import { EDGE_ZONE } from "../ui/hooks/edge-gesture.ts";
@@ -223,8 +227,11 @@ export function App() {
     notes,
     allNotes,
     archived,
+    dropzone,
     folders,
     create,
+    createDropzone,
+    keepDropzoneNote,
     importFiles,
     update,
     replaceBody,
@@ -385,6 +392,26 @@ export function App() {
   const reading = readingId
     ? (allNotes.find((n) => n.id === readingId) ?? null)
     : null;
+  // The dropzone only makes sense where a note can actually reach the user's
+  // other devices, so on the browser store the gesture that creates one isn't
+  // offered at all (and the section below never appears, since nothing can put
+  // a note in it).
+  const dropzoneEnabled = isSharedBackend(storage.backend);
+
+  // The dropzone note whose rename raised the "keep it?" prompt, and the notes
+  // that already answered "no" — asking again every time the title field is
+  // touched would be nagging, and the answer is remembered for the session
+  // rather than stored: it is a question about this note right now.
+  const [keepPromptId, setKeepPromptId] = useState<string | null>(null);
+  const keepDeclined = useRef<Set<string>>(new Set());
+
+  // The note the "keep it?" prompt is about, resolved fresh each render: the
+  // note may have been ticked off (deleted) or already promoted between the
+  // rename and now — the editor settles its title on the way out too — and the
+  // prompt has nothing to ask about then.
+  const keepPromptNote = keepPromptId
+    ? (allNotes.find((n) => n.id === keepPromptId && n.dropzone) ?? null)
+    : null;
 
   // Opening a note on a lazy encrypted backend finds its body deferred — decrypt
   // it on demand so the editor / reader shows real text. Until it resolves the
@@ -413,6 +440,12 @@ export function App() {
     if (note.body === undefined) return false;
     if (note.body.trim() !== "") return false;
     if (note.title.trim() === "") return true;
+    // A dropzone note is born named after the moment it was made, so "still
+    // called that" is exactly the untouched case `pristineNew` tracks for an
+    // ordinary note — and it holds across a reload too, since the name it was
+    // born with is derived from `createdAt` rather than remembered in memory.
+    // An empty one abandoned this way leaves nothing behind in the Dropzone.
+    if (note.dropzone) return !isDropzoneNamed(note);
     return (
       pristineNew.current?.id === note.id &&
       pristineNew.current.title === note.title
@@ -476,6 +509,36 @@ export function App() {
       remove(editing.id);
     go(noteRoute(id, storage.activeNamespace));
     if (id !== null) void sync.refresh();
+  }
+
+  // The title settling is where the note's name reaches the document (the field
+  // buffers keystrokes — see `TitleField`), so it is also where a dropzone note
+  // can first be seen to have been *named* rather than left as the timestamp it
+  // was born with. That rename is the "actually, I want to keep this" signal, so
+  // it raises the prompt. Everything else about settling is unchanged: the held
+  // save is released exactly as before.
+  function settleTitle(title: string) {
+    sync.releaseSaves();
+    const note = editing;
+    if (!note || !note.dropzone || keepDeclined.current.has(note.id)) return;
+    // The field hands us the title it has just committed; the document won't
+    // carry it until the next render, so the question is asked of the note as
+    // renamed rather than of the copy we're still holding.
+    if (isDropzoneNamed({ ...note, title })) setKeepPromptId(note.id);
+  }
+
+  // Open a fresh dropzone note — the press-and-hold on any "new note" button.
+  // Same shape as `openNew`: drop the throwaway note we're leaving and hold the
+  // save until the title settles on the file backends, so the note's file is
+  // created already bearing its timestamp name. Nothing is recorded in
+  // `pristineNew`: a dropzone note carries its own born-with name in
+  // `createdAt`, so `discardable` recognises an untouched one without being
+  // told (and still does after a reload).
+  function openDropzone() {
+    if (editing && discardable(editing)) remove(editing.id);
+    if (storage.backend !== "browser") sync.holdSaves();
+    const id = createDropzone();
+    go({ kind: "note", ns: storage.activeNamespace, id });
   }
 
   // Open a fresh note. A `folderId` files it straight into that folder (the
@@ -698,6 +761,8 @@ export function App() {
                   onShowAll={showAll}
                   showAllActive={view === "notes" && !editing && !reading}
                   onAddNote={openNew}
+                  dropzone={dropzone}
+                  onAddDropzone={dropzoneEnabled ? openDropzone : undefined}
                   onRemoveNote={removeNote}
                   onArchiveNote={archiveNote}
                   onCopyNoteLink={copyNoteLink}
@@ -733,7 +798,12 @@ export function App() {
                       onChange={(body) => update(editing.id, body)}
                       onReplace={(body) => replaceBody(editing.id, body)}
                       onTitleChange={(title) => retitle(editing.id, title)}
-                      onTitleSettle={sync.releaseSaves}
+                      onTitleSettle={settleTitle}
+                      onDropzoneDone={
+                        editing.dropzone
+                          ? () => removeNote(editing.id)
+                          : undefined
+                      }
                       onToggleFavorite={() => toggleFavorite(editing.id)}
                       onToggleLock={() => toggleLock(editing.id)}
                       undoScrollSeq={undoScrollSeq}
@@ -770,6 +840,7 @@ export function App() {
                       folders={folders}
                       onOpen={(id) => switchTo(id)}
                       onNew={openNew}
+                      onNewDropzone={dropzoneEnabled ? openDropzone : undefined}
                       onArchive={archiveNote}
                       onDelete={removeNote}
                       onCopyLink={copyNoteLink}
@@ -791,6 +862,19 @@ export function App() {
             <AchievementsModalHost />
             <AchievementsUnlockModalHost />
             <ConflictModal sync={sync} />
+            {keepPromptNote && (
+              <DropzoneKeepModal
+                title={noteTitle(keepPromptNote)}
+                onKeep={() => {
+                  keepDropzoneNote(keepPromptNote.id);
+                  setKeepPromptId(null);
+                }}
+                onDismiss={() => {
+                  keepDeclined.current.add(keepPromptNote.id);
+                  setKeepPromptId(null);
+                }}
+              />
+            )}
             <OrphanFilesModal orphans={orphans} />
             <PullToRefreshIndicator
               state={ptr.state}

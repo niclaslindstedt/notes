@@ -9,6 +9,7 @@ import { noteTitle, type Folder, type Note } from "../../domain/note.ts";
 import { useT } from "../../i18n/index.ts";
 import { useAppearance } from "../../theme/useTheme.ts";
 import { AppTitle } from "../AppTitle.tsx";
+import { useLongPress } from "../hooks/useLongPress.ts";
 import { useMediaQuery } from "../hooks/useMediaQuery.ts";
 import { useSwipeReveal } from "../hooks/useSwipeReveal.ts";
 import {
@@ -43,6 +44,7 @@ export function NoteList({
   folders,
   onOpen,
   onNew,
+  onNewDropzone,
   onArchive,
   onDelete,
   onCopyLink,
@@ -58,6 +60,12 @@ export function NoteList({
   folders: Folder[];
   onOpen: (id: string) => void;
   onNew: (folderId?: string) => void;
+  /**
+   * Make a **dropzone** note — the "+" button's press-and-hold action. Omitted
+   * (the local browser backend, which reaches no other device), holding the
+   * button does nothing and it stays a plain "new note".
+   */
+  onNewDropzone?: () => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
   /** Copy a note's link — desktop right-click menu only. */
@@ -152,6 +160,14 @@ export function NoteList({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [empty, loading, onNew]);
+
+  // The "+" carries a second action: holding it makes a dropzone note instead
+  // of an ordinary one (see `useLongPress`). Only when the active backend can
+  // actually reach another device — otherwise the button is exactly as it was.
+  const newNotePress = useLongPress({
+    onPress: () => onNew(),
+    onLongPress: onNewDropzone,
+  });
 
   const folderIds = new Set(folders.map((f) => f.id));
   const ungrouped = notes.filter(
@@ -288,7 +304,8 @@ export function NoteList({
         )}
       </div>
 
-      {/* The "new note" affordance. On narrow viewports — where the side menu
+      {/* The "new note" affordance, whose press-and-hold makes a dropzone note
+          (see `onNewDropzone`). On narrow viewports — where the side menu
           is a floating drawer — it's a circular floating action button centred
           at the bottom of the screen, thumb-reachable and hard to miss. From
           the `md` breakpoint up, where the side menu docks as a permanent
@@ -297,8 +314,9 @@ export function NoteList({
           puck reads as awkward beside a pinned chrome. */}
       <button
         type="button"
-        onClick={() => onNew()}
+        {...newNotePress}
         aria-label={t("app.newNote")}
+        title={onNewDropzone ? t("app.dropzone.hold") : t("app.newNote")}
         className="
           fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-1/2 z-20
           flex h-14 w-14 -translate-x-1/2 cursor-pointer items-center justify-center gap-0

@@ -1,6 +1,7 @@
 import type { DragEvent as ReactDragEvent, ReactNode } from "react";
 
 import { useT } from "../i18n/index.ts";
+import { useLongPress } from "./hooks/useLongPress.ts";
 import {
   ArchiveIcon,
   FolderIcon,
@@ -12,7 +13,9 @@ import {
 } from "./icons.tsx";
 import { NOTE_DROP_ARCHIVE, NOTE_DROP_ATTR } from "./note-drag-context.ts";
 
-// The button island: New note / New folder / Show all / Archive and
+// The button island: New note (whose press-and-hold makes a
+// [dropzone note](../../docs/overview.md#dropzone)) / New folder / Show all /
+// Archive and
 // Undo / Redo / Search / the sync glyph share one bordered block pinned to the
 // foot of the list (mt-auto), so it falls under the thumb no matter how long
 // the note list is. A top row of create/navigate actions and a bottom row of
@@ -34,6 +37,7 @@ import { NOTE_DROP_ARCHIVE, NOTE_DROP_ATTR } from "./note-drag-context.ts";
 // `archive*` props.
 export function SideMenuActionBar({
   onNewNote,
+  onNewDropzone,
   onNewFolder,
   onSearch,
   syncSlot,
@@ -53,6 +57,12 @@ export function SideMenuActionBar({
 }: {
   /** Start a fresh note and open it (the drawer closes behind it). */
   onNewNote: () => void;
+  /**
+   * Make a **dropzone** note — New note's press-and-hold action, matching the
+   * overview's "+". Omitted on a backend that reaches no other device, and the
+   * cell is then a plain New note.
+   */
+  onNewDropzone?: () => void;
   /** Drop the inline "new folder" name input into the list above. */
   onNewFolder: () => void;
   /** Open the full-text search modal (the drawer closes behind it). */
@@ -92,7 +102,9 @@ export function SideMenuActionBar({
           <BarButton
             icon={<PlusIcon className="h-5 w-5" />}
             label={t("nav.newNote")}
+            hint={onNewDropzone ? t("app.dropzone.hold") : undefined}
             onClick={onNewNote}
+            onLongPress={onNewDropzone}
           />
           <BarButton
             icon={<FolderIcon className="h-5 w-5" />}
@@ -154,10 +166,12 @@ export function SideMenuActionBar({
 function BarButton({
   icon,
   label,
+  hint,
   active = false,
   badge,
   disabled = false,
   onClick,
+  onLongPress,
   dropId,
   isDropTarget = false,
   onDragOver,
@@ -166,25 +180,32 @@ function BarButton({
 }: {
   icon: ReactNode;
   label: string;
+  /** Tooltip, when the cell has more to say than its name — the New note cell's
+   *  press-and-hold. The accessible name stays `label`. */
+  hint?: string;
   active?: boolean;
   badge?: number;
   disabled?: boolean;
   onClick: () => void;
+  /** A press-and-hold action alongside the press. Omitted, the cell is a plain
+   *  button (see `useLongPress`). */
+  onLongPress?: () => void;
   dropId?: string;
   isDropTarget?: boolean;
   onDragOver?: (e: ReactDragEvent<HTMLElement>) => void;
   onDragLeave?: (e: ReactDragEvent<HTMLElement>) => void;
   onDrop?: (e: ReactDragEvent<HTMLElement>) => void;
 }) {
+  const press = useLongPress({ onPress: onClick, onLongPress });
   return (
     <button
       type="button"
       role="menuitem"
       aria-current={active ? "page" : undefined}
       aria-label={label}
-      title={label}
+      title={hint ?? label}
       disabled={disabled}
-      onClick={onClick}
+      {...press}
       {...(dropId !== undefined ? { [NOTE_DROP_ATTR]: dropId } : {})}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}

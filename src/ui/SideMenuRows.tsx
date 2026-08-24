@@ -489,7 +489,14 @@ export function SwipeToRemove({
   /** Label shown on the archive backdrop a right swipe uncovers. */
   archiveLabel: string;
   onRemove: () => void | Promise<void>;
-  onArchive: () => void;
+  /**
+   * Archive this note — the right swipe, and the first entry of the desktop
+   * right-click menu. Omitted for a row where archiving is meaningless (a
+   * [dropzone note](../../docs/overview.md#dropzone), which is ticked off and
+   * deleted rather than filed away): the right swipe is then inert and the
+   * menu drops the entry, exactly as `FolderRow` already does.
+   */
+  onArchive?: () => void;
   /** Copy this note's link — desktop right-click menu only, since the swipe
    * layout has no room for a third outcome. Omitted, the entry isn't shown. */
   onCopyLink?: () => void;
@@ -511,11 +518,15 @@ export function SwipeToRemove({
       <RowActionMenu
         ariaLabel={t("app.noteActions")}
         actions={[
-          {
-            label: archiveLabel,
-            icon: <ArchiveIcon className="h-5 w-5" />,
-            onSelect: onArchive,
-          },
+          ...(onArchive
+            ? [
+                {
+                  label: archiveLabel,
+                  icon: <ArchiveIcon className="h-5 w-5" />,
+                  onSelect: onArchive,
+                },
+              ]
+            : []),
           ...(onCopyLink
             ? [
                 {
@@ -541,16 +552,19 @@ export function SwipeToRemove({
   return (
     <div className="relative overflow-hidden">
       {/* Archive backdrop — uncovered by swiping the row right. Hidden unless
-          the foreground is sliding right so the slide-off never bares it. */}
-      <div
-        aria-hidden={swipe.offset <= 0}
-        className={`absolute inset-0 flex items-center justify-start gap-2 bg-accent/15 pl-5 text-xs font-semibold tracking-wide text-accent uppercase ${
-          swipe.offset > 0 ? "" : "invisible"
-        }`}
-      >
-        <ArchiveIcon className="h-5 w-5" />
-        {archiveLabel}
-      </div>
+          the foreground is sliding right so the slide-off never bares it, and
+          absent entirely on a row that can't be archived. */}
+      {onArchive && (
+        <div
+          aria-hidden={swipe.offset <= 0}
+          className={`absolute inset-0 flex items-center justify-start gap-2 bg-accent/15 pl-5 text-xs font-semibold tracking-wide text-accent uppercase ${
+            swipe.offset > 0 ? "" : "invisible"
+          }`}
+        >
+          <ArchiveIcon className="h-5 w-5" />
+          {archiveLabel}
+        </div>
+      )}
       {/* Delete — the trailing trash button a left swipe latches open. Kept
           hidden while the row slides right so the archive slide-off never
           bares it alongside the archive backdrop. */}

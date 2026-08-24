@@ -52,6 +52,13 @@ export type Note = {
   // guards the *text*, not the note. Absent on an unlocked note rather than
   // written as `false`, so an older document needs no migration.
   locked?: boolean;
+  // A **dropzone note**: a deliberately temporary note whose only purpose is
+  // handing a scrap of text to your other devices (see the dropzone block
+  // below). It is listed in its own side-menu section rather than among the
+  // ordinary notes, and is deleted — not archived — when it is ticked off.
+  // Absent on an ordinary note rather than written as `false`, so an older
+  // document needs no migration.
+  dropzone?: boolean;
   // Images the user pasted or dropped into the note. Each rides in memory as a
   // `data:` URL the editor renders; on the file backends the storage layer
   // externalises it to a real image file under `attachments/<note-name>/` (see
@@ -215,6 +222,79 @@ export function setLocked(note: Note, locked: boolean): Note {
 /** True when the note is locked and its text must not be edited. */
 export function isLocked(note: Note): boolean {
   return note.locked === true;
+}
+
+// -- Dropzone ---------------------------------------------------------
+//
+// A **dropzone note** is a scratch note you write on one device to read on
+// another: paste the link, the address, the confirmation code, let it sync,
+// pick it up elsewhere, tick it off. It is created by holding a "new note"
+// button down (an ordinary press still makes an ordinary note), it is named
+// after the moment it was created rather than by hand, and it lives in its own
+// section at the top of the side menu instead of among the notes — so the list
+// of things you actually wrote never fills up with them.
+//
+// Two gestures end its life, and they are deliberately the two things you'd do
+// with a scrap of paper: tick it (the editor's floating checkmark **deletes**
+// it — a dropzone note is never archived, there is nothing to keep), or give it
+// a name of your own, which is the app's cue to ask whether it should become an
+// ordinary note after all (`isDropzoneNamed`).
+
+/**
+ * The name a dropzone note is born with: the moment it was created, in the same
+ * `YYYY-MM-DD HH:mm` local-time form the `dateTime` default-title scheme uses.
+ * Deriving it from `createdAt` rather than storing it is what lets
+ * `isDropzoneNamed` tell "still the timestamp" from "the user named it" without
+ * a second field on the note.
+ */
+export function dropzoneTitle(now: number = Date.now()): string {
+  return dateTimeTitle(now);
+}
+
+/** Create an empty dropzone note stamped — and named — at `now`. */
+export function createDropzoneNote(now: number = Date.now()): Note {
+  return { ...createNote(now), title: dropzoneTitle(now), dropzone: true };
+}
+
+/** True when the note is a temporary dropzone note. */
+export function isDropzone(note: Note): boolean {
+  return note.dropzone === true;
+}
+
+// Return a copy of `note` marked as a dropzone note, or promoted out of the
+// dropzone into the ordinary list. `updatedAt` is left untouched for the same
+// reason archiving and starring leave it alone: it says where the note is
+// listed, not what it says. The flag is dropped rather than written as `false`
+// when promoting, so a kept note round-trips through storage as minimally as
+// one that was never in the dropzone.
+export function setDropzone(note: Note, dropzone: boolean): Note {
+  if (dropzone) return { ...note, dropzone: true };
+  const next: Note = { ...note };
+  delete next.dropzone;
+  return next;
+}
+
+/**
+ * True when a dropzone note has been given a name of its own — anything other
+ * than the timestamp it was born with. Naming a scrap is the gesture that says
+ * "this one turned out to be worth keeping", so it is what the editor watches
+ * to offer promoting the note into the ordinary list.
+ */
+export function isDropzoneNamed(note: Note): boolean {
+  if (!isDropzone(note)) return false;
+  const title = note.title.trim();
+  return title.length > 0 && title !== dropzoneTitle(note.createdAt);
+}
+
+/**
+ * The notes the side menu's **Dropzone** section lists: every dropzone note
+ * that isn't archived, newest first. Sorted by creation rather than by edit, so
+ * a note stays where you left it in the section while you paste into it.
+ */
+export function dropzoneNotes(notes: readonly Note[]): Note[] {
+  return notes
+    .filter((n) => isDropzone(n) && !n.archived)
+    .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 // The notes the Favorites section lists: everything starred that isn't

@@ -79,6 +79,59 @@ export function EyeIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * An open tray with an arrow dropping into it — the
+ * [dropzone](../../docs/overview.md#dropzone), the section of temporary notes
+ * you write on one device to pick up on another. Deliberately not the note
+ * glyph: a dropzone note is a hand-off rather than something you wrote to keep,
+ * and the side-menu section reads as a different *kind* of row because of it.
+ * Not in the framework set.
+ */
+export function DropzoneIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <path d="M12 3v8" />
+      <path d="m8.5 8.5 3.5 3.5 3.5-3.5" />
+      <path d="M4 14h4l1.5 2.5h5L16 14h4v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />
+    </svg>
+  );
+}
+
+/**
+ * A bookmark with a plus — keeping a
+ * [dropzone note](../../docs/overview.md#dropzone) as an ordinary one. Reads as
+ * "file this away" rather than the checkmark, which in the dropzone means the
+ * opposite (done with it, delete it). Not in the framework set.
+ */
+export function BookmarkPlusIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z" />
+      <path d="M12 7v6M9 10h6" />
+    </svg>
+  );
+}
+
 /** A folder with a plus — create a folder. Not in the framework set. */
 export function FolderPlusIcon({ className }: IconProps) {
   return (

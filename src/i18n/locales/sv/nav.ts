@@ -11,6 +11,8 @@ const nav: NavCatalog = {
   collapseNamespaces: "Fäll ihop namnrymder",
   notes: "Anteckningar",
   favorites: "Favoriter",
+  dropzone: "Släppzon",
+  newDropzone: "Ny släppzonsanteckning",
   newNote: "Ny anteckning",
   newFolder: "Ny mapp",
   folderName: "Mappnamn",

@@ -206,6 +206,10 @@ export function noteToMarkdown(note: Note, depth = 0): string {
     // note's frontmatter stays minimal, and an older file (no flag) round-trips
     // unlocked.
     ...(note.locked ? { locked: "true" } : {}),
+    // Only written when the note is a temporary dropzone note, on the same
+    // terms: an ordinary note's frontmatter stays minimal, and a file written
+    // before the dropzone existed round-trips as an ordinary note.
+    ...(note.dropzone ? { dropzone: "true" } : {}),
     // The folder the note belongs to, by id. Only written when set, so an
     // ungrouped note's frontmatter stays minimal. The folder's display name
     // lives in the `folders.json` sidecar the directory adapter keeps, so this
@@ -334,6 +338,8 @@ export function parseNote(text: string): Note | null {
   if (front.favorite === "true") note.favorite = true;
   // Same for the read-only lock — only a literal `true` locks the note.
   if (front.locked === "true") note.locked = true;
+  // Same for the dropzone flag — only a literal `true` makes it temporary.
+  if (front.dropzone === "true") note.dropzone = true;
   // Carry the folder link only when present, mirroring how it's written.
   if (front.folder) note.folderId = front.folder;
   return note;

@@ -13,13 +13,16 @@ import { unlock } from "../achievements/bus.ts";
 import { type Attachment, withAttachment } from "../domain/attachment.ts";
 import {
   archivedNotes,
+  createDropzoneNote,
   createNote,
   createFolder as createFolderRecord,
+  dropzoneNotes,
   editNote,
   isBlank,
   noteTitle,
   retitleNote,
   setArchived,
+  setDropzone,
   setFavorite,
   setLocked,
   setNoteFolder,
@@ -51,12 +54,29 @@ export type NotesStore = {
   allNotes: Note[];
   // Archived notes, most-recently-edited first — what the archive view lists.
   archived: Note[];
+  // The temporary **dropzone** notes, newest first — what the side menu's
+  // Dropzone section lists. They are deliberately absent from `notes`, so the
+  // overview and the ordinary note list never fill up with hand-offs.
+  dropzone: Note[];
   // The folders defined in the active namespace, in stable creation order.
   // Notes are grouped under these in the side menu and overview.
   folders: Folder[];
   // Open a new note. A `folderId` drops it straight into that folder (used by
   // the per-folder "New note" rows); omitted, it lands ungrouped.
   create: (title?: string, folderId?: string) => string;
+  /**
+   * Open a new **dropzone** note — a temporary note for handing text to your
+   * other devices, named after the moment it was created and listed in its own
+   * side-menu section. Returns its id. Only offered on a backend that reaches
+   * another device (see `isSharedBackend`).
+   */
+  createDropzone: () => string;
+  /**
+   * Promote a dropzone note into an ordinary one — what the user is offered
+   * when they give a dropzone note a name of their own. The note keeps its id,
+   * its text and its place; it simply stops being temporary.
+   */
+  keepDropzoneNote: (id: string) => void;
   // Import dropped markdown files as notes — each file's name (sans extension)
   // becomes the title and its contents the body. Lands them in one undo step
   // and returns how many were added.
@@ -342,6 +362,37 @@ export function useNotes(
       return note.id;
     },
     [commit],
+  );
+
+  // A dropzone note is born named — the timestamp is its whole identity until
+  // the user replaces it — and lands at the head of the document like any other
+  // fresh note. Structural, so it records on the shared undo timeline.
+  const createDropzone = useCallback((): string => {
+    const note = createDropzoneNote();
+    commit((prev) => [note, ...prev], "New dropzone note", DOC_SCOPE);
+    unlock("dropzone");
+    return note.id;
+  }, [commit]);
+
+  // Promote a dropzone note into an ordinary one. Structural like archiving —
+  // it changes where the note is listed, not what it says — so it records on the
+  // shared timeline and, on the encrypted backends, promotes a deferred note
+  // first so the cleared flag reaches its `.enc` file.
+  const keepDropzoneNote = useCallback(
+    (id: string): void => {
+      const target = docRef.current.notes.find((n) => n.id === id);
+      if (!target || !target.dropzone) return;
+      const title = noteTitle(target);
+      withBody(id, () =>
+        commit(
+          (prev) => prev.map((n) => (n.id === id ? setDropzone(n, false) : n)),
+          `Kept note “${title}”`,
+          DOC_SCOPE,
+        ),
+      );
+      unlock("keeper");
+    },
+    [commit, withBody],
   );
 
   // Import a batch of dropped files as new notes in one undo step, newest
@@ -642,13 +693,20 @@ export function useNotes(
   }, [redoTimeline]);
 
   // List view always shows most-recently-edited first, with blank notes
-  // (a freshly created, never-typed note) and archived notes filtered out —
-  // blanks vanish on their own if abandoned; archived notes live in the
-  // archive view instead.
+  // (a freshly created, never-typed note), archived notes and dropzone notes
+  // filtered out — blanks vanish on their own if abandoned; archived notes live
+  // in the archive view, and dropzone notes in their own side-menu section
+  // (they are hand-offs, not part of what you wrote).
   const visible = useMemo(
-    () => sortByUpdated(notes.filter((n) => !isBlank(n) && !n.archived)),
+    () =>
+      sortByUpdated(
+        notes.filter((n) => !isBlank(n) && !n.archived && !n.dropzone),
+      ),
     [notes],
   );
+
+  // The dropzone section's contents, newest first.
+  const dropzone = useMemo(() => dropzoneNotes(notes), [notes]);
 
   // Archived notes for the archive view, newest-edited first.
   const archivedList = useMemo(
@@ -668,8 +726,11 @@ export function useNotes(
     notes: visible,
     allNotes: notes,
     archived: archivedList,
+    dropzone,
     folders,
     create,
+    createDropzone,
+    keepDropzoneNote,
     importFiles,
     update,
     replaceBody,

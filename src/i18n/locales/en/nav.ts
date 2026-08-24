@@ -18,6 +18,12 @@ const nav = {
   // The section above the note list holding the starred notes. It is only
   // rendered once something is starred, so there is no empty-state string.
   favorites: "Favorites",
+  // The section above Favorites listing the temporary dropzone notes. Like
+  // Favorites it is only rendered once one exists, so there is no empty state;
+  // `newDropzone` labels the long press that makes one, on every "new note"
+  // button (and is only offered on a backend your other devices can reach).
+  dropzone: "Dropzone",
+  newDropzone: "New dropzone note",
   newNote: "New note",
   newFolder: "New folder",
   folderName: "Folder name",
