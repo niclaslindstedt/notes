@@ -521,6 +521,20 @@ describe("newlineFor", () => {
     expect(enterAt("- ", 0, 2)).toEqual(inserts("\n"));
   });
 
+  it("keeps a hand-typed `-` a divider even with a list open above it", () => {
+    // The gap after the marker is what Enter writes and what a person typing a
+    // divider never types, so a bare `-` stays a rule wherever it lands — under
+    // a list, under a blank line after one, nested, or under a checklist.
+    // Reading it as an empty bullet would eat the character just typed.
+    expect(enterAt("- a\n-", 1, 1)).toEqual(inserts("\n"));
+    expect(enterAt("- a\n\n-", 2, 1)).toEqual(inserts("\n"));
+    expect(enterAt("1. a\n-", 1, 1)).toEqual(inserts("\n"));
+    expect(enterAt("- a\n  -", 1, 3)).toEqual(inserts("\n"));
+    expect(enterAt("- [ ] a\n-", 1, 1)).toEqual(inserts("\n"));
+    // ...and Shift changes nothing about it.
+    expect(softAt("- a\n-", 1, 1)).toEqual(inserts("\n"));
+  });
+
   it("opens a continuation row inside the item on Shift+Enter", () => {
     expect(softAt("- item", 0, 6)).toEqual(inserts("\n  "));
     expect(softAt("  10. item", 0, 10)).toEqual(inserts("\n      "));

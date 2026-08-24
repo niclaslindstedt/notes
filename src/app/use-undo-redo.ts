@@ -147,6 +147,22 @@ function recordInto(
   // redo timeline. Append, then trim from the front if the past portion would
   // exceed the retention limit.
   const truncated = timeline.entries.slice(0, timeline.cursor + 1);
+  // The structural timeline stores whole documents, but a note's *body* belongs
+  // to that note's own scope — so the entry we are about to append behind can
+  // describe bodies many keystrokes out of date. That is invisible for a note
+  // that survives (`mergeDocSnapshot` keeps the live one), and fatal for one
+  // this action deletes: undo has nowhere left to read it from and hands back
+  // whatever the stale entry said. So rebase the head onto the document as it
+  // stands this instant — the last moment the content still exists — which is
+  // the same "structure from the entry, content from the live doc" rule undo
+  // itself applies. Without it, deleting a note that was created and then typed
+  // into brings it back empty.
+  if (action.scope === DOC_SCOPE && head) {
+    truncated[truncated.length - 1] = {
+      ...head,
+      snapshot: mergeDocSnapshot(action.before, head.snapshot),
+    };
+  }
   const appended = [
     ...truncated,
     {

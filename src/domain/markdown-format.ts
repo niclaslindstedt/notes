@@ -202,19 +202,27 @@ export type NewlineEdit =
 /** A list row as Enter reads it: its marker (indent included) and its text. */
 type ListItem = { prefix: string; content: string; ordered: boolean };
 
-// A row that is nothing but a single bullet character — what Enter on a bullet
-// writes, before anything is typed into it.
-const LONE_BULLET_RE = /^[ \t]*[-*+][ \t]*$/;
+// A row that is nothing but a bullet character *and the gap after it* — what
+// Enter on a bullet writes, before anything is typed into it. The trailing
+// space is the whole tell: it is the one thing a hand-typed `-` (the divider
+// shorthand) never has, so requiring it keeps the two apart.
+const LONE_BULLET_RE = /^[ \t]*[-*+][ \t]+$/;
 
 /**
  * The list item `blocks[index]` is, or null when that line isn't one. Almost
  * always just the classified block — the exception is a row emptied down to a
- * lone `-`, which classifies as a **divider** (`hr`, the shorthand a
- * note-taker reaches for without counting out three dashes) and only really is
- * one when no list is open above it. Directly under a list row it is instead
- * the empty bullet the previous Enter opened, so Enter there ends the list
- * rather than leaving a stray rule behind. A divider under a list is still
- * reachable by typing `---` or pressing the toolbar's rule button.
+ * `- `, which classifies as a **divider** (`hr`, the shorthand a note-taker
+ * reaches for without counting out three dashes) and only really is one when
+ * no list is open above it. Under a list it is instead the empty bullet the
+ * previous Enter opened, so Enter there ends the list rather than leaving a
+ * stray rule behind.
+ *
+ * The trailing space decides it, before the line above is even consulted: Enter
+ * on a bullet writes the marker *with* its gap (`- `), while someone typing a
+ * divider types a bare `-`. So a hand-typed `-` stays a divider wherever it
+ * lands — including straight under a list, which is exactly where a note-taker
+ * wants a rule and where reading it as an empty bullet would silently eat the
+ * character they just typed.
  */
 function listItemAt(
   blocks: readonly LineBlock[],

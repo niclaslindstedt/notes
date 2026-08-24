@@ -240,6 +240,54 @@ describe("useUndoRedo", () => {
     expect(tagsOf(last().snapshot)).toEqual([""]);
   });
 
+  it("brings a deleted note back with the body it had when it was deleted", () => {
+    // The dropzone flow, which is where this shows up: the note is created
+    // (structural), typed into (its own scope), then ticked off (structural).
+    // The structural entry the delete steps back onto was written before a
+    // single character was typed, so undo used to resurrect an empty note.
+    const body = (text: string): Snapshot => ({
+      notes: [
+        { id: "d", title: "Dropzone", body: text, createdAt: 0, updatedAt: 0 },
+      ],
+    });
+    const empty: Snapshot = { notes: [] };
+    const { view, last, rec } = mount(DOC_SCOPE);
+    rec(DOC_SCOPE, empty, body(""), "New dropzone note");
+    rec("d", body(""), body("shopping list"), "Edited note", "d:0");
+    rec(DOC_SCOPE, body("shopping list"), empty, "Deleted note");
+
+    act(() => {
+      view.result.current.undo();
+    });
+    expect(last().snapshot.notes.map((n) => n.body)).toEqual(["shopping list"]);
+  });
+
+  it("keeps a surviving note's live body out of a structural undo", () => {
+    // The other half of the same rule: refreshing the entry must not resurrect
+    // structure. Archiving is reverted; the body typed since is left alone.
+    const doc = (text: string, archived?: boolean): Snapshot => ({
+      notes: [
+        {
+          id: "d",
+          title: "",
+          body: text,
+          createdAt: 0,
+          updatedAt: 0,
+          archived,
+        },
+      ],
+    });
+    const { view, last, rec } = mount(DOC_SCOPE);
+    rec(DOC_SCOPE, doc("one"), doc("one", true), "Archived note");
+    rec("d", doc("one", true), doc("one two", true), "Edited note", "d:0");
+    rec(DOC_SCOPE, doc("one two", true), doc("one two"), "Restored note");
+
+    act(() => {
+      view.result.current.undo();
+    });
+    expect(last().snapshot.notes[0]?.archived).toBe(true);
+  });
+
   it("has nothing to undo in a note that hasn't been edited this session", () => {
     const { view, rec } = mount("a");
     rec("a", snap("a0"), snap("a1"), "Edited note");
