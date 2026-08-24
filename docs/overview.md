@@ -454,7 +454,7 @@ explicit `touch` / `pen` snaps: an engine reporting no `pointerType` is treated
 as a mouse, so a desktop click is never snapped.
 
 **A press on a line the browser can't put a caret in lands at the end of that
-line.** A [horizontal rule](#markdown-parser) renders as a lone `<hr>` with no
+line.** A [horizontal rule](#divider) renders as a lone `<hr>` with no
 text to anchor in, so the browser drops the caret at the line's start or onto a
 neighbour — leaving nothing to Backspace, and a phone has no forward-delete key,
 so the rule could not be removed at all. Pressing one now takes the end of its
@@ -1439,12 +1439,14 @@ splicing at the caret — and it is a bare-caret answer only; with a range to
 delete, Enter splits like any other press.
 
 Spotting that empty row takes a second look, because a row emptied down to a
-lone `-` classifies as a **divider** (`hr` — the shorthand a note-taker reaches
-for without counting out three dashes). `listItemAt(blocks, index)` resolves the
-ambiguity from the line above: directly under a list row, a lone bullet
-character is the empty item the last Enter opened; anywhere else it stays the
-divider it looks like. (A divider *inside* a list is still reachable by typing
-`---` or pressing the toolbar's rule button.)
+`- ` classifies as a **divider** (`hr` — the shorthand a note-taker reaches for
+without counting out three dashes). `listItemAt(blocks, index)` resolves the
+ambiguity from **the gap after the marker**: Enter on a bullet writes the marker
+with its trailing space (`- `), and someone typing a divider types a bare `-`.
+So `- ` under an open list is the empty item the last Enter opened, while a
+hand-typed `-` stays the rule it looks like *wherever* it lands — including
+straight under a list, which is exactly where a note-taker wants one and where
+reading it as an empty bullet would silently eat the character they just typed.
 
 **Shift+Enter** opens a continuation row instead of a new item: a plain line
 padded out to the item's text column, keeping the row's own leading whitespace
@@ -1594,6 +1596,29 @@ whether to ask for it.
 The first capital the editor writes fires the **Capital idea** achievement
 through the manual bus — like the full stop's dot, the letter is
 indistinguishable from one typed with Shift held.
+
+### Divider
+
+A **divider** — a horizontal rule, an `hr` — is written by putting a line on its
+own that is nothing but dashes. Markdown proper wants three (`---`, or `***` /
+`___`), and `HR_RE` in `classifyLine` (`src/domain/markdown.ts`) takes those;
+notes also takes a **single `-`**, the shorthand a note-taker reaches for
+without counting out three dashes. The [live preview](#markdown-editor) draws it
+as a real `<hr>` rule spanning the line, and the [styling
+toolbar](#styling-toolbar)'s Insert menu writes one for you.
+
+That shorthand overlaps with the empty bullet [list
+continuation](#list-continuation) opens, and the **trailing space** is what
+tells the two apart: Enter on a bullet writes the marker with its gap (`- `),
+while a person typing a divider types a bare `-`. `listItemAt` reads a `- ` row
+under an open list as that empty item, and leaves a bare `-` a divider wherever
+it lands — so typing `-` and pressing Enter draws a rule and opens the next
+line, even directly under a list.
+
+Deleting one is [caret placement on press](#caret-placement-on-press)'s
+problem, not this section's: a rule renders as a lone `<hr>` with no text to
+anchor a caret in, so a press on it takes the end of its **source** line and
+Backspace works back from there.
 
 ### Bullet characters
 
@@ -3130,6 +3155,18 @@ another scope since: a note scope splices just that note's content (body / title
 every surviving note's **current** body. `reset` drops every timeline (and the
 run bookkeeping) whenever the document arrives from outside the edit path (load,
 reload, conflict-adopt); scopes reseed on their next edit.
+
+The one note that rule can't keep current is the note the step **deletes**: it
+is gone from the live document, so undo has nowhere to read its body from but
+the entry itself — and that entry was written by whichever structural action
+came *before*, potentially long before anything was typed. So the structural
+timeline **rebases its head on every record**: the entry about to be appended
+behind is re-merged against the document as it stands at that instant (the same
+`mergeDocSnapshot` rule, structure from the entry, content from the live doc),
+which is the last moment the content still exists. Without it the sequence that
+makes up the whole [dropzone](#dropzone) flow — create a note, type into it,
+tick it off — brings the note back **empty**, because the entry undo lands on is
+the one the *create* wrote.
 
 `useUndoRedoShortcuts` (`src/ui/hooks/useUndoRedoShortcuts.ts`) binds ⌘/Ctrl+Z
 (undo) and ⌘/Ctrl+Shift+Z / Ctrl+Y (redo); the side menu also exposes undo/redo
