@@ -85,6 +85,23 @@ export function setBackend(backend: BackendId): void {
   write(BACKEND_KEY, backend);
 }
 
+/**
+ * Whether the selected backend can carry a note to the user's **other
+ * devices** — everything except the browser store, which never leaves this
+ * install's `localStorage`. The [dropzone](../../docs/overview.md#dropzone) is
+ * gated on this: a note whose only purpose is being picked up elsewhere is
+ * meaningless when nothing else can read it, so the gesture that creates one
+ * isn't offered at all on the local store.
+ *
+ * A picked folder counts. The app can't tell a plain directory from one a
+ * desktop sync client is watching, and the folder backend is exactly how
+ * people run notes over Dropbox/iCloud/Syncthing on the desktop — the same
+ * reasoning that has pull-to-refresh armed on every non-browser backend.
+ */
+export function isSharedBackend(backend: BackendId): boolean {
+  return backend !== "browser";
+}
+
 export function getDropboxToken(): string | null {
   return read(DROPBOX_TOKEN_KEY);
 }

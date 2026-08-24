@@ -38,7 +38,9 @@ import {
   FlaskGlyph,
   FolderGlyph,
   DoorGlyph,
+  DropzoneGlyph,
   FolderTreeGlyph,
+  KeepGlyph,
   FormatGlyph,
   FullStopGlyph,
   FunnelGlyph,
@@ -525,6 +527,24 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     tier: "intermediate",
     glyph: BoxesGlyph,
     learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "dropzone",
+    tier: "intermediate",
+    glyph: DropzoneGlyph,
+    learnMore: true,
+    // Fired by `createDropzone` in the notes store — the gesture is a long
+    // press on a "new note" button, which no document transition can see.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "keeper",
+    tier: "pro",
+    glyph: KeepGlyph,
+    learnMore: true,
+    // Fired by `keepDropzoneNote` when the user answers "keep it" to the
+    // prompt a renamed dropzone note raises.
     trigger: { kind: "manual" },
   },
   {

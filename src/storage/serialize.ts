@@ -143,6 +143,14 @@ export function parse(text: string | null | undefined): Snapshot {
         } else {
           delete note.locked;
         }
+        // And the dropzone flag, which decides whether the note is listed as a
+        // temporary hand-off rather than among the ordinary notes — junk drops
+        // it, so a note can never go missing from the list on a bad value.
+        if ((n as { dropzone?: unknown }).dropzone === true) {
+          note.dropzone = true;
+        } else {
+          delete note.dropzone;
+        }
         return note;
       })
     : [];

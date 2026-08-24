@@ -56,7 +56,7 @@ import { LockButton } from "./LockButton.tsx";
 import { useFindShortcut } from "./hooks/useFindShortcuts.ts";
 import { useDesktopPointer, useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
-import { ArrowLeftIcon, MoreIcon, SpinnerIcon } from "./icons.tsx";
+import { ArrowLeftIcon, CheckIcon, MoreIcon, SpinnerIcon } from "./icons.tsx";
 import {
   MarkdownEditor,
   type MarkdownEditorHandle,
@@ -139,6 +139,7 @@ export function Editor({
   onTitleSettle,
   onToggleFavorite,
   onToggleLock,
+  onDropzoneDone,
   undoScrollSeq = 0,
   uploading = false,
   loading = false,
@@ -161,13 +162,27 @@ export function Editor({
    */
   onReplace?: (body: string) => void;
   onTitleChange: (title: string) => void;
-  onTitleSettle: () => void;
+  /**
+   * The title has settled — the field has just committed it (see `TitleField`),
+   * so the held save may drain. Carries the committed title, because the
+   * document doesn't yet: the dropzone's "keep it?" prompt hangs on whether the
+   * note was just given a name of its own, and it has to ask of the new name
+   * rather than the one still in the snapshot.
+   */
+  onTitleSettle: (title: string) => void;
   /** Star / unstar the note — the header's leading star button. */
   onToggleFavorite: () => void;
   /** Lock / unlock the note — the header's read-only (eye) button. A locked
    *  note is
    *  read-only: see `docs/overview.md#lock-a-note`. */
   onToggleLock: () => void;
+  /**
+   * Tick a [dropzone note](../../docs/overview.md#dropzone) off — the floating
+   * checkmark this editor grows for one. It **deletes** the note: a dropzone
+   * note is a hand-off you've now collected, and there is nothing to archive.
+   * Only passed for a dropzone note, so the button appears for those alone.
+   */
+  onDropzoneDone?: () => void;
   /** Ticks when undo / redo swaps the body — cues the editor to scroll the
    *  reverted / re-applied region back into view. */
   undoScrollSeq?: number;
@@ -822,6 +837,34 @@ export function Editor({
           />
         )}
       </div>
+
+      {/* A dropzone note's one extra control: the counterpart of the overview's
+          floating "+", wearing a checkmark instead. Pressing it says "I've got
+          this now" and the note is deleted — never archived, since a hand-off
+          you've collected is not something to keep. It sits where the "+" sits
+          so the two read as the same affordance at either end of the note's
+          short life, and it is the only floating control the editor ever
+          renders. Positioned against the main column (`<main>` is the nearest
+          positioned ancestor) rather than the window, so it centres on the note
+          rather than the whole screen beside a docked sidebar — and so it rides
+          up with the shell when the iOS keyboard shrinks the visual viewport
+          instead of hiding behind it. */}
+      {onDropzoneDone && (
+        <button
+          type="button"
+          onClick={onDropzoneDone}
+          aria-label={t("app.dropzone.done")}
+          title={t("app.dropzone.done")}
+          className="
+            absolute bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-1/2 z-20
+            flex h-14 w-14 -translate-x-1/2 cursor-pointer items-center justify-center
+            rounded-full bg-accent text-page-bg shadow-lg transition-all duration-200
+            active:scale-95
+          "
+        >
+          <CheckIcon className="h-7 w-7" />
+        </button>
+      )}
     </div>
   );
 }
@@ -855,7 +898,8 @@ function TitleField({
   fieldRef: RefObject<HTMLTextAreaElement>;
   value: string;
   onChange: (title: string) => void;
-  onSettle: () => void;
+  /** Fired with the committed (trimmed) title once the field settles. */
+  onSettle: (title: string) => void;
   /** Leave the title for the note body — Enter, Arrow-Down, or Tab. */
   onFocusBody: () => void;
   focusOnMount: boolean;
@@ -943,7 +987,7 @@ function TitleField({
   onSettleRef.current = onSettle;
   const settle = useCallback(() => {
     flush();
-    onSettleRef.current();
+    onSettleRef.current(latest.current);
   }, [flush]);
 
   // Focus the title on mount for a fresh note (without the a11y-flagged

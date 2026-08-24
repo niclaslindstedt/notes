@@ -286,6 +286,18 @@ const achievements = {
       learnMore:
         "Namespaces are separate, self-contained sets of notes — work and home, say. Switch between them from the side menu; each can sync to its own folder.",
     },
+    dropzone: {
+      name: "Dropzone",
+      condition: "Hold a “new note” button to make a dropzone note.",
+      learnMore:
+        "A dropzone note is a scrap you write on one device to read on another — a link, an address, a code. Press and hold a “new note” button (the + on the overview, or New note in the side menu) and you get one, already named after the moment you made it. It waits in the Dropzone section at the top of the side menu instead of cluttering your notes, and the checkmark in its editor deletes it once you've picked it up. It is only offered when your notes sync somewhere your other devices can reach.",
+    },
+    keeper: {
+      name: "Finders keepers",
+      condition: "Keep a dropzone note as a regular note.",
+      learnMore:
+        "Sometimes a scrap turns out to be worth keeping. Give a dropzone note a name of your own instead of the timestamp it was born with, and the app asks whether to save it as a regular note — say yes and it leaves the Dropzone for your ordinary list, text, title and all.",
+    },
     organizer: {
       name: "Filing system",
       condition: "Create a folder to group notes.",

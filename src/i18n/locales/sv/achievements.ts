@@ -284,6 +284,19 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Namnrymder är separata, fristående uppsättningar anteckningar — jobb och hem, till exempel. Växla mellan dem från sidomenyn; var och en kan synka till sin egen mapp.",
     },
+    dropzone: {
+      name: "Släppzon",
+      condition:
+        "Håll in en ”ny anteckning”-knapp för att skapa en släppzonsanteckning.",
+      learnMore:
+        "En släppzonsanteckning är en lapp du skriver på en enhet för att läsa på en annan — en länk, en adress, en kod. Håll in en ”ny anteckning”-knapp (+ i översikten, eller Ny anteckning i sidomenyn) så får du en, redan namngiven efter ögonblicket du skapade den. Den väntar i Släppzon-avsnittet högst upp i sidomenyn i stället för att skräpa bland anteckningarna, och bocken i dess redigerare raderar den när du har hämtat den. Den erbjuds bara när dina anteckningar synkas någonstans dina andra enheter når.",
+    },
+    keeper: {
+      name: "Behållaren",
+      condition: "Behåll en släppzonsanteckning som en vanlig anteckning.",
+      learnMore:
+        "Ibland visar sig en lapp vara värd att spara. Ge släppzonsanteckningen ett eget namn i stället för tidsstämpeln den föddes med, så frågar appen om den ska sparas som en vanlig anteckning — svara ja och den lämnar Släppzonen för din vanliga lista, med text, titel och allt.",
+    },
     organizer: {
       name: "Arkiveringssystem",
       condition: "Skapa en mapp för att gruppera anteckningar.",

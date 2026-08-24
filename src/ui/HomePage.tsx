@@ -328,6 +328,21 @@ export function HomePage() {
               move it there with everything in it.
             </li>
             <li>
+              Hand a scrap of text to your other devices with the{" "}
+              <em>dropzone</em>. Press and hold any “new note” button and you
+              get a temporary note, already named after the moment you made it,
+              waiting in a Dropzone section at the top of the side menu instead
+              of among your notes. Write the link, the address or the code on
+              one device, pick it up on another, and tick the checkmark in its
+              editor to delete it — dropzone notes are meant to be thrown away,
+              so they are deleted rather than archived. Give one a name of your
+              own instead and the app offers to keep it as a regular note. The
+              dropzone is only offered when your notes are stored somewhere your
+              other devices can read — a synced folder, a cloud, or your own
+              server — since it has nothing to do otherwise; it uses the storage
+              you have already connected and sends nothing anywhere new.
+            </li>
+            <li>
               Mark the notes you keep coming back to as <em>favorites</em> — the
               star in a note's header lifts it into a Favorites section at the
               top of the side menu, so it is one tap away wherever it is filed.

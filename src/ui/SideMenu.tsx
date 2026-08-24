@@ -35,6 +35,7 @@ import { useEdgeHover } from "./hooks/useEdgeHover.ts";
 import { useDesktopPointer, useMediaQuery } from "./hooks/useMediaQuery.ts";
 import {
   CogIcon,
+  DropzoneIcon,
   EyeIcon,
   LockIcon,
   MenuIcon,
@@ -83,6 +84,11 @@ import {
 // notes. A "+" pinned to the far right of a folder row starts a new note filed
 // into that folder. A note can be dragged onto a folder (or onto the ungrouped
 // zone to leave one) to file it.
+//
+// Above Favorites sits **Dropzone** — the temporary notes made by holding a
+// "new note" button down, written on one device to be read on another. Like
+// Favorites the section hides itself while it is empty; unlike Favorites its
+// notes are listed *only* there, never among the ordinary notes below.
 //
 // Above the note list sits **Favorites** — the notes starred from the editor
 // header's star button, listed flat so a favorite is one tap away regardless of
@@ -146,6 +152,17 @@ type Props = {
   showAllActive: boolean;
   /** Start a fresh note and open it. A `folderId` files it into that folder. */
   onAddNote: (folderId?: string) => void;
+  /**
+   * The temporary **dropzone** notes, newest first — listed in their own
+   * section above Favorites. Empty (or on a backend that reaches no other
+   * device) the section isn't rendered at all.
+   */
+  dropzone: Note[];
+  /**
+   * Make a dropzone note — the New note cell's press-and-hold action. Omitted
+   * on a backend that reaches no other device.
+   */
+  onAddDropzone?: () => void;
   /** Delete a note permanently. */
   onRemoveNote: (id: string) => void;
   /** Archive a note (a right swipe files it into the Archive view). */
@@ -203,6 +220,8 @@ export function SideMenu({
   onShowAll,
   showAllActive,
   onAddNote,
+  dropzone,
+  onAddDropzone,
   onRemoveNote,
   onArchiveNote,
   onCopyNoteLink,
@@ -575,6 +594,45 @@ export function SideMenu({
     );
   }
 
+  // One dropzone row: the same swipe/right-click wrapper as a note row, minus
+  // everything that would be nonsense on a hand-off. It carries no archive
+  // (ticking a dropzone note off deletes it — there is nothing to file away),
+  // no drag (it belongs to no folder and moving it somewhere would defeat the
+  // point of the section), and it wears the tray glyph rather than the document
+  // one so the section reads as a different *kind* of row at a glance. The
+  // label is the note's title, which for an untouched dropzone note is the
+  // timestamp it was born with.
+  function renderDropzoneRow(note: Note) {
+    return (
+      <SwipeToRemove
+        key={note.id}
+        actionLabel={t("nav.deleteNote")}
+        archiveLabel={t("nav.archive")}
+        onRemove={() => onRemoveNote(note.id)}
+        onCopyLink={onCopyNoteLink ? () => onCopyNoteLink(note.id) : undefined}
+      >
+        <NavItem
+          icon={<DropzoneIcon className="h-5 w-5" />}
+          label={noteTitle(note)}
+          active={note.id === activeNoteId}
+          trailing={
+            uploadingIds?.has(note.id) ? (
+              <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" />
+            ) : encStatus?.get(note.id) === "encrypted" ? (
+              <LockIcon
+                className={`h-3.5 w-3.5 shrink-0 ${note.body !== undefined ? "text-accent" : "text-muted"}`}
+              />
+            ) : undefined
+          }
+          onClick={() => {
+            onSelectNote(note.id);
+            close();
+          }}
+        />
+      </SwipeToRemove>
+    );
+  }
+
   // One folder: its header row (a drop target for filing a dragged note) plus,
   // when expanded, the notes filed inside it — sorted by the active key. The
   // header carries a far-right "+" that starts a new note inside the folder.
@@ -725,6 +783,18 @@ export function SideMenu({
             />
           );
         })}
+        {/* Dropzone: the temporary notes written on one device to be picked up
+          on another, above Favorites because they are the most perishable thing
+          in the drawer — a hand-off you are on your way to collect. Like
+          Favorites the section only exists once there is something in it, and
+          like Favorites the notes in it are *not* repeated in the Notes list
+          below: a dropzone note is a scrap, not part of what you wrote. */}
+        {dropzone.length > 0 && (
+          <>
+            <SectionHeader label={t("nav.dropzone")} border />
+            {dropzone.map(renderDropzoneRow)}
+          </>
+        )}
         {/* Favorites: the notes starred with the editor header's star button,
           lifted above the ordinary list so they're one tap away wherever they
           are filed. The section only exists once something is starred — an
@@ -823,6 +893,14 @@ export function SideMenu({
           onAddNote();
           close();
         }}
+        onNewDropzone={
+          onAddDropzone
+            ? () => {
+                onAddDropzone();
+                close();
+              }
+            : undefined
+        }
         onNewFolder={() => setCreatingFolder(true)}
         onSearch={() => {
           // Open synchronously *inside this tap* via flushSync, so the search
