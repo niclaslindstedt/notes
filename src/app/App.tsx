@@ -528,15 +528,22 @@ export function App() {
   }
 
   // Open a fresh dropzone note — the press-and-hold on any "new note" button.
-  // Same shape as `openNew`: drop the throwaway note we're leaving and hold the
-  // save until the title settles on the file backends, so the note's file is
-  // created already bearing its timestamp name. Nothing is recorded in
-  // `pristineNew`: a dropzone note carries its own born-with name in
-  // `createdAt`, so `discardable` recognises an untouched one without being
-  // told (and still does after a reload).
+  // Drops the throwaway note we're leaving, like `openNew`.
+  //
+  // Deliberately **not** `holdSaves()`, which `openNew` uses to keep a fresh
+  // note's file from being written under a throwaway default title. Two reasons
+  // it would be wrong here, and the second one is a bug: a dropzone note is born
+  // bearing its final name, so there is no rename to wait for — and the hold is
+  // lifted by the title field settling, which for a pre-named note only happens
+  // when the editor unmounts (the field isn't focused on mount, so it never
+  // blurs). Holding here would therefore keep the note — and every keystroke in
+  // it — out of the backend for as long as it was open, which on a synced
+  // backend is precisely the moment it is supposed to be reaching the other
+  // device. Nothing is recorded in `pristineNew` either: a dropzone note carries
+  // its born-with name in `createdAt`, so `discardable` recognises an untouched
+  // one without being told (and still does after a reload).
   function openDropzone() {
     if (editing && discardable(editing)) remove(editing.id);
-    if (storage.backend !== "browser") sync.holdSaves();
     const id = createDropzone();
     go({ kind: "note", ns: storage.activeNamespace, id });
   }
