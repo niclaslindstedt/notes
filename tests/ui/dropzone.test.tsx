@@ -130,7 +130,7 @@ describe("the side menu's Dropzone section", () => {
     toggleSidebar: vi.fn(),
   };
 
-  function renderMenu(dropzone: Note[]) {
+  function renderMenu(dropzone: Note[], notes: Note[] = []) {
     const onSelectNote = vi.fn();
     render(
       <ModalBusContext.Provider
@@ -138,7 +138,7 @@ describe("the side menu's Dropzone section", () => {
       >
         <NavContext.Provider value={nav}>
           <SideMenu
-            notes={[]}
+            notes={notes}
             activeNoteId={null}
             onSelectNote={onSelectNote}
             onShowAll={vi.fn()}
@@ -175,6 +175,30 @@ describe("the side menu's Dropzone section", () => {
   it("is absent while the dropzone is empty", () => {
     renderMenu([]);
     expect(screen.queryByText("Dropzone")).toBeNull();
+  });
+
+  it("keeps a dropzone row's box identical to an ordinary note row's", () => {
+    // Every row in the drawer renders through the same wrapper, archivable or
+    // not: the archive backdrop is drawn even where nothing can uncover it, so
+    // one row shape is the only shape there is. A row that diverged here would
+    // be exactly the kind that renders everywhere except the one place it is
+    // needed.
+    const dz = createDropzoneNote(new Date(2025, 2, 4, 17, 9).getTime());
+    const ordinary: Note = {
+      id: "n1",
+      title: "Groceries",
+      body: "Milk",
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    renderMenu([dz], [ordinary]);
+    // Up from the row button to the swipe wrapper, and count what it draws.
+    const parts = (label: string) => {
+      const row = screen.getByText(label).closest('[role="menuitem"]');
+      return row?.parentElement?.parentElement?.children.length;
+    };
+    expect(parts("2025-03-04 17:09")).toBe(parts("Groceries"));
+    expect(parts("Groceries")).toBeGreaterThan(0);
   });
 
   it("lists each note under its timestamp, and opens it on tap", () => {

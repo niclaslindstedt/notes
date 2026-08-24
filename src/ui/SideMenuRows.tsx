@@ -552,19 +552,20 @@ export function SwipeToRemove({
   return (
     <div className="relative overflow-hidden">
       {/* Archive backdrop — uncovered by swiping the row right. Hidden unless
-          the foreground is sliding right so the slide-off never bares it, and
-          absent entirely on a row that can't be archived. */}
-      {onArchive && (
-        <div
-          aria-hidden={swipe.offset <= 0}
-          className={`absolute inset-0 flex items-center justify-start gap-2 bg-accent/15 pl-5 text-xs font-semibold tracking-wide text-accent uppercase ${
-            swipe.offset > 0 ? "" : "invisible"
-          }`}
-        >
-          <ArchiveIcon className="h-5 w-5" />
-          {archiveLabel}
-        </div>
-      )}
+          the foreground is sliding right so the slide-off never bares it.
+          Rendered even on a row that can't be archived: `useSwipeReveal` clamps
+          a right swipe to 0 without an `onArchive`, so it can never be
+          uncovered there, and keeping it means every row — archivable or not —
+          has the identical box. */}
+      <div
+        aria-hidden={swipe.offset <= 0}
+        className={`absolute inset-0 flex items-center justify-start gap-2 bg-accent/15 pl-5 text-xs font-semibold tracking-wide text-accent uppercase ${
+          swipe.offset > 0 ? "" : "invisible"
+        }`}
+      >
+        <ArchiveIcon className="h-5 w-5" />
+        {archiveLabel}
+      </div>
       {/* Delete — the trailing trash button a left swipe latches open. Kept
           hidden while the row slides right so the archive slide-off never
           bares it alongside the archive backdrop. */}
