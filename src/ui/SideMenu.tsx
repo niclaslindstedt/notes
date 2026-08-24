@@ -518,6 +518,11 @@ export function SideMenu({
   // would defeat the point. Flat by default — a favorite is a shortcut, so
   // where it is filed is exactly what the section sets aside — with the folder
   // structure reproduced when `favoritesShowFolders` is on.
+  // The Dropzone section's rows, built up front so the heading is rendered from
+  // the same thing the list is: a section that has a heading but nothing under
+  // it is then not a state this component can reach.
+  const dropzoneRows = dropzone.map((note) => renderNoteRow(note, false, true));
+
   const favorites = favoriteNotes(notes);
   const favoriteGroups = favoritesShowFolders
     ? groupFavoritesByFolder(favorites, folders, noteSortKey)
@@ -529,7 +534,7 @@ export function SideMenu({
   // One note row: the swipe/right-click wrapper around a NavItem, made
   // draggable so it can be dropped onto a folder to file it — HTML5 drag on
   // desktop, a press-and-hold gesture on touch (see `note-drag.tsx`).
-  function renderNoteRow(note: Note, indent = false) {
+  function renderNoteRow(note: Note, indent = false, dropzoneRow = false) {
     const row = (
       <NavItem
         icon={
@@ -539,8 +544,11 @@ export function SideMenu({
           // gone. The leading glyph rather than the trailing slot, because that
           // slot is already spoken for by the upload spinner and the encryption
           // lock — and a locked note is a different *kind* of note, which is
-          // exactly what the leading glyph says on the folder rows too.
-          note.locked ? (
+          // exactly what the leading glyph says on the folder rows too. A
+          // dropzone row says the same thing with the tray.
+          dropzoneRow ? (
+            <DropzoneIcon className="h-5 w-5" />
+          ) : note.locked ? (
             <EyeIcon className="h-5 w-5" />
           ) : (
             <NoteIcon className="h-5 w-5" />
@@ -568,22 +576,31 @@ export function SideMenu({
         }}
       />
     );
+    // A dropzone row is not draggable and cannot be archived — it belongs to no
+    // folder, and ticking a hand-off off deletes it rather than filing it away.
+    // It still goes through the very same wrappers, so there is exactly one row
+    // shape in this drawer rather than a second one that has to be kept working
+    // on its own.
     return (
       <NoteDragItem
         key={note.id}
         noteId={note.id}
         title={noteTitle(note)}
-        enabled={!isDesktop}
-        draggable={isDesktop}
+        enabled={!isDesktop && !dropzoneRow}
+        draggable={isDesktop && !dropzoneRow}
         dragging={dragItem?.kind === "note" && dragItem.id === note.id}
-        onDragStart={isDesktop ? (e) => startNoteDrag(e, note.id) : undefined}
-        onDragEnd={isDesktop ? endDrag : undefined}
+        onDragStart={
+          isDesktop && !dropzoneRow
+            ? (e) => startNoteDrag(e, note.id)
+            : undefined
+        }
+        onDragEnd={isDesktop && !dropzoneRow ? endDrag : undefined}
       >
         <SwipeToRemove
           actionLabel={t("nav.deleteNote")}
           archiveLabel={t("nav.archive")}
           onRemove={() => onRemoveNote(note.id)}
-          onArchive={() => onArchiveNote(note.id)}
+          onArchive={dropzoneRow ? undefined : () => onArchiveNote(note.id)}
           onCopyLink={
             onCopyNoteLink ? () => onCopyNoteLink(note.id) : undefined
           }
@@ -591,45 +608,6 @@ export function SideMenu({
           {row}
         </SwipeToRemove>
       </NoteDragItem>
-    );
-  }
-
-  // One dropzone row: the same swipe/right-click wrapper as a note row, minus
-  // everything that would be nonsense on a hand-off. It carries no archive
-  // (ticking a dropzone note off deletes it — there is nothing to file away),
-  // no drag (it belongs to no folder and moving it somewhere would defeat the
-  // point of the section), and it wears the tray glyph rather than the document
-  // one so the section reads as a different *kind* of row at a glance. The
-  // label is the note's title, which for an untouched dropzone note is the
-  // timestamp it was born with.
-  function renderDropzoneRow(note: Note) {
-    return (
-      <SwipeToRemove
-        key={note.id}
-        actionLabel={t("nav.deleteNote")}
-        archiveLabel={t("nav.archive")}
-        onRemove={() => onRemoveNote(note.id)}
-        onCopyLink={onCopyNoteLink ? () => onCopyNoteLink(note.id) : undefined}
-      >
-        <NavItem
-          icon={<DropzoneIcon className="h-5 w-5" />}
-          label={noteTitle(note)}
-          active={note.id === activeNoteId}
-          trailing={
-            uploadingIds?.has(note.id) ? (
-              <SpinnerIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" />
-            ) : encStatus?.get(note.id) === "encrypted" ? (
-              <LockIcon
-                className={`h-3.5 w-3.5 shrink-0 ${note.body !== undefined ? "text-accent" : "text-muted"}`}
-              />
-            ) : undefined
-          }
-          onClick={() => {
-            onSelectNote(note.id);
-            close();
-          }}
-        />
-      </SwipeToRemove>
     );
   }
 
@@ -789,10 +767,10 @@ export function SideMenu({
           Favorites the section only exists once there is something in it, and
           like Favorites the notes in it are *not* repeated in the Notes list
           below: a dropzone note is a scrap, not part of what you wrote. */}
-        {dropzone.length > 0 && (
+        {dropzoneRows.length > 0 && (
           <>
             <SectionHeader label={t("nav.dropzone")} border />
-            {dropzone.map(renderDropzoneRow)}
+            {dropzoneRows}
           </>
         )}
         {/* Favorites: the notes starred with the editor header's star button,

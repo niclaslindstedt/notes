@@ -2674,15 +2674,25 @@ lifecycle rules below hang on.
 **Where it is listed.** In its own **Dropzone** section at the top of the side
 menu, above [Favorites](#favorites) — the most perishable thing in the drawer,
 a hand-off you are on your way to collect. It is fed by `dropzoneNotes`
-(newest-created first) through the store's `dropzone` list, hides itself while
-empty exactly as Favorites does, and its rows (`renderDropzoneRow`,
-`src/ui/SideMenu.tsx`) wear the tray glyph `DropzoneIcon` rather than the
-document one. Unlike Favorites, the notes in it appear *only* there: `useNotes`
-filters dropzone notes out of `notes`, so the overview and the drawer's Notes
-list never fill up with scraps. A row swipes left to delete and right-clicks to
-the same menu, but it cannot be archived (`SwipeToRemove`'s `onArchive` is
-optional for exactly this) and it cannot be dragged — it belongs to no folder,
-and filing it would defeat the point of the section.
+(newest-created first) through the store's `dropzone` list. Unlike Favorites,
+the notes in it appear *only* there: `useNotes` filters dropzone notes out of
+`notes`, so the overview and the drawer's Notes list never fill up with scraps.
+
+The rows are the **same rows as everywhere else** — `renderNoteRow`
+(`src/ui/SideMenu.tsx`) takes a `dropzoneRow` flag that swaps the leading glyph
+for the tray (`DropzoneIcon`), drops the archive action (ticking a hand-off off
+deletes it; there is nothing to file away) and drops the drag (it belongs to no
+folder, and filing it would defeat the point of the section). Deliberately not a
+second row component: one shape means one thing to keep working, and a row that
+renders everywhere else renders here. `SwipeToRemove` takes `onArchive` as
+optional for it and still draws the archive backdrop it can never uncover —
+`useSwipeReveal` clamps a right swipe to 0 without a handler — so an
+un-archivable row's box is identical to an archivable one's.
+
+`SideMenu` builds those rows *before* the section and renders the heading from
+`dropzoneRows.length`, so "a heading with nothing under it" is not a state the
+component can reach: the thing that decides the heading is the thing that is
+listed.
 
 **Ticking it off.** A dropzone note's editor grows one extra control: a floating
 checkmark where the overview's "+" sits, the only floating button the editor
