@@ -28,6 +28,8 @@ const app: AppCatalog = {
     markdown: "Exportera till MD",
     clipboard: "Kopiera till urklipp",
     pageNumberOf: "av",
+    failed: "Exporten misslyckades",
+    reload: "Ladda om",
   },
   copyCode: "Kopiera kod",
   copyLink: "Kopiera länk",

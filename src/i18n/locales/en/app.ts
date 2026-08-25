@@ -55,6 +55,13 @@ const app = {
     // the settings catalogue because it is *printed content*, not a label —
     // the export hands it to the pure typesetter, which holds no catalogue.
     pageNumberOf: "of",
+    // The failure toast the PDF/MD rows raise when the export couldn't
+    // produce a file. The export code is fetched on the press, so the usual
+    // cause is a page outlived by a deploy asking for a chunk the server no
+    // longer has — which is why the toast's action is a reload: a fresh page
+    // references the chunks that actually exist.
+    failed: "Export failed",
+    reload: "Reload",
   },
   // The copy button in a fenced code block's top-right corner. It confirms
   // with the same "Copied" as the export menu's clipboard row above.
