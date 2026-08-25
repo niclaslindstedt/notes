@@ -227,7 +227,7 @@ export function Editor({
   // order can point at it while the cluster itself is away.
   const moreRef = useRef<HTMLButtonElement>(null);
   // The buttons that pin themselves outside the ⋯ because they are *reporting*
-  // rather than offering — see `pinFavorite`. Held for the same reason: while
+  // rather than offering — see `pinFavorite` / `pinSelectMode`. Held for the same reason: while
   // the cluster is folded away these are the header's real first actions.
   const pinnedRef = useRef<HTMLDivElement>(null);
   // Handle on the live-preview editor so the title can hand focus down into the
@@ -297,16 +297,18 @@ export function Editor({
     setSelectMode(false);
   }, [note.id, renderMarkdown]);
 
-  // Two of those seven buttons don't only *do* something, they *say* something
-  // about the note that is open: a filled star means this note is in Favorites,
-  // and a lit eye means it is read-only. Folding those behind the ⋯ turns a
+  // Three of those seven buttons don't only *do* something, they *say*
+  // something about the state you are in: a filled star means this note is in
+  // Favorites, a lit eye means it is read-only, and a lit select-mode toggle
+  // means the note is taking line presses rather than a caret. Folding those behind the ⋯ turns a
   // fact about the open document into something you have to go looking for —
   // and the eye especially, because "why is my typing not landing" is exactly
   // the question the glyph is there to answer. So while either is *on*, that
   // button steps out of the cluster and pins to the row beside the ⋯, where the
-  // narrow header shows it the whole time. Off, it has nothing to report and
-  // folds away with the rest — the moment it is switched off, including from
-  // the pinned row itself. The glyph is a readout of the note's state and
+  // narrow header shows it the whole time (select mode does the same, one
+  // paragraph down). Off, it has nothing to report and folds away with the
+  // rest — the moment it is switched off, including from the pinned row
+  // itself. The glyph is a readout of the note's state and
   // nothing else, so an unstarred note carries no star: turning it back on is
   // one ⋯ away, and the row stays honest about what is actually set.
   const favorite = note.favorite === true;
@@ -315,6 +317,18 @@ export function Editor({
   // cluster.
   const pinFavorite = narrow && favorite;
   const pinLocked = narrow && locked;
+
+  // Select mode is the third button that *says* something rather than only
+  // doing something, and the one it is worst to lose: while it is on, the note
+  // stops taking a caret at all, and the lit toggle is the only way back out of
+  // it on a phone (Escape is a keyboard the touch user doesn't have). Folded
+  // behind the ⋯ that is a mode you can enter in one tap and only leave in two
+  // — and the ⋯ itself is easy to read as "the buttons are gone" rather than
+  // "the buttons are in here". So while the mode is on it pins beside the star
+  // and the eye, where the narrow header shows it the whole time; off, it folds
+  // back into the cluster with the rest. Same live readout, same lack of a
+  // grace period: the press that leaves the mode is the press that unpins it.
+  const pinSelectMode = narrow && renderMarkdown && selectMode;
 
   // The cut button is a touch affordance and only a touch affordance: with a
   // mouse and a keyboard the same edit is already two other presses away
@@ -567,7 +581,8 @@ export function Editor({
   function firstAction(): HTMLElement | null {
     // Folded away, the cluster's buttons are `visibility: hidden` — nothing in
     // there is a tab stop, so the first action is whatever pinned itself
-    // outside the fold (the star / the eye), and the ⋯ toggle when nothing did.
+    // outside the fold (the star, the eye, the select-mode toggle), and the ⋯
+    // toggle when nothing did.
     if (collapsed) {
       return (
         pinnedRef.current?.querySelector<HTMLElement>(FOCUSABLE) ??
@@ -677,9 +692,9 @@ export function Editor({
                 : undefined
             }
           >
-            {/* Either of these may have pinned itself outside the box, where a
-                narrow header shows it even folded — it is then rendered once,
-                out there, rather than twice. */}
+            {/* Any of the three readouts may have pinned itself outside the
+                box, where a narrow header shows it even folded — it is then
+                rendered once, out there, rather than twice. */}
             {!selecting && !pinFavorite && (
               <FavoriteButton favorite={favorite} onToggle={onToggleFavorite} />
             )}
@@ -711,7 +726,7 @@ export function Editor({
                   copyScope={editor.copyScope}
                   transforms={transforms}
                 />
-                {renderMarkdown && (
+                {renderMarkdown && !pinSelectMode && (
                   <SelectModeButton
                     on={selectMode}
                     onToggle={() => setSelectMode((on) => !on)}
@@ -722,13 +737,14 @@ export function Editor({
             )}
           </div>
           {/* Outside the sliding box, so these never fold: whatever the ⋯ is
-              doing, the star and the eye keep reporting the open note's state.
+              doing, the star, the eye and the select-mode toggle keep
+              reporting the state you are in.
               They sit between the cluster and the ⋯ — right where they end up
               when the row unfolds past them, so unfolding never shuffles them.
               The `pr-2` is there for the same reason the cluster carries one:
               the row's own `gap-2` is off on a narrow header, so that the
               closed cluster can collapse to nothing at all. */}
-          {(pinFavorite || pinLocked) && (
+          {(pinFavorite || pinLocked || pinSelectMode) && (
             <div
               ref={pinnedRef}
               className="flex shrink-0 items-center gap-2 pr-2"
@@ -741,6 +757,15 @@ export function Editor({
               )}
               {pinLocked && (
                 <LockButton locked={locked} onToggle={onToggleLock} />
+              )}
+              {/* Last, nearest the ⋯: that is where it already sits in the
+                  unfolded row (past the actions that operate on the note), so
+                  pinning it doesn't move it either. */}
+              {pinSelectMode && (
+                <SelectModeButton
+                  on={selectMode}
+                  onToggle={() => setSelectMode((on) => !on)}
+                />
               )}
             </div>
           )}

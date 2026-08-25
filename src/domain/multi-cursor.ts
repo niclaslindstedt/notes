@@ -507,6 +507,69 @@ export function wordBoundary(
   return at;
 }
 
+/**
+ * The lines a column of **bare carets** sits on — in document order, one entry
+ * per line however many carets share it. Null the moment any cursor is holding
+ * a selection: *that* is what the clipboard takes then, and a column of
+ * selections is the ordinary case (`Ctrl/Cmd+D`).
+ *
+ * This is the shape of VS Code's rule that copy and cut with nothing selected
+ * act on the whole line, extended to a column: a bare column of N carets copies
+ * or cuts N whole lines.
+ */
+export function bareCursorLines(cursors: readonly Cursor[]): number[] | null {
+  if (cursors.length === 0 || !cursors.every(isCollapsed)) return null;
+  return [...new Set(cursors.map((c) => c.head.line))].sort((a, b) => a - b);
+}
+
+/**
+ * What a bare column puts on the clipboard: each of its lines whole and
+ * **newline-terminated**, so a paste back is a paste of lines rather than of
+ * fragments — the same shape a single caret's line cut writes
+ * (`domain/line-edit.ts`), and the shape `applyAtCursors` deals back out one
+ * line per caret.
+ */
+export function bareCursorLineText(
+  lines: readonly string[],
+  cursors: readonly Cursor[],
+): string | null {
+  const targets = bareCursorLines(cursors);
+  if (!targets) return null;
+  return targets.map((i) => `${lines[i] ?? ""}\n`).join("");
+}
+
+/**
+ * Cut those whole lines out, and answer where the carets end up: each one on
+ * the line that moved up into the gap its own line left, at the column it was
+ * already in (clamped to what that line can reach) — which is where VS Code
+ * leaves them. The lines are removed in line space rather than through
+ * `applyAtCursors`, because a whole-line span is the one edit whose newline
+ * sits *outside* it on the last line of the note; taking the lines out of the
+ * array sidesteps that asymmetry instead of special-casing it.
+ *
+ * A note whose every line was cut keeps one empty line, because the editor's
+ * source is always at least one line.
+ */
+export function cutBareCursorLines(
+  lines: readonly string[],
+  cursors: readonly Cursor[],
+): { lines: string[]; cursors: Cursor[] } | null {
+  const targets = bareCursorLines(cursors);
+  if (!targets) return null;
+  const gone = new Set(targets);
+  const next = lines.filter((_, i) => !gone.has(i));
+  if (next.length === 0) next.push("");
+  const moved = cursors.map((c) => {
+    const above = targets.filter((t) => t < c.head.line).length;
+    const line = clamp(c.head.line - above, 0, next.length - 1);
+    return collapsedCursor({
+      line,
+      col: clamp(c.head.col, 0, (next[line] ?? "").length),
+    });
+  });
+  return { lines: next, cursors: normalizeCursors(next, moved) };
+}
+
 /** The set of source lines any cursor touches — the ones drawn as raw source. */
 export function cursorLines(cursors: readonly Cursor[]): Set<number> {
   const lines = new Set<number>();

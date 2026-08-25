@@ -606,9 +606,26 @@ achievement the moment a second caret appears.
 by word, by line), Enter, the arrow keys with and without Shift, Home / End,
 copy, cut and paste. A cursor holding a selection replaces exactly that whatever
 the key was, so Backspace over a column of selections deletes the selections.
-Copy puts each selection's source on the clipboard one per line, and a paste
-holding exactly one line per caret is **dealt out** a line each — so a column
+Copy puts each selection's source on the clipboard one per line, cut takes those
+selections away and leaves a caret where each one was, and a paste holding
+exactly one line per caret is **dealt out** a line each — so a column
 round-trips through the clipboard; anything else goes in whole at every caret.
+
+**A bare column speaks in whole lines.** With nothing selected there is no
+per-cursor text to take, and VS Code's answer — copy and cut with an empty
+selection act on the *line* — is the one this follows: `Ctrl/Cmd+C` puts the
+whole line each caret sits on on the clipboard (in document order, a shared line
+counted once, each **newline-terminated** like a single caret's [line
+cut](#cut-button)), and `Ctrl/Cmd+X` takes those lines out and rides each caret
+down onto whatever moved up into its place, in the column it was already in.
+Whole lines **deal out** on the way back too — a caret takes a line rather than
+a fragment of one — so a column of carets down the edge of a list round-trips
+through cut and paste. The two readings of a clipboard can never both fit:
+dropping the terminator leaves one part fewer, so a clipboard that deals as N
+fragments cannot also deal as N lines. The pure half is `bareCursorLines` /
+`bareCursorLineText` / `cutBareCursorLines`; a column that **mixes** selections
+with bare carets is read as a column of selections, and the bare carets
+contribute nothing.
 
 **How one keystroke becomes N edits.** `applyAtCursors` works in flat offsets
 into `lines.join("\n")` rather than in `(line, col)` pairs, because an insertion
@@ -1059,7 +1076,11 @@ the only thing on screen still saying the mode is up. It is offered only on the
 browser's own selection and no per-line elements to paint. The flag itself lives
 in `Editor` (`src/ui/NoteEditor.tsx`) and is dropped on a note switch and on
 turning Markdown off — the mode is a detour from writing, so every note opens
-ready to be written in.
+ready to be written in. On a narrow header the lit toggle **pins itself out of
+the ⋯** while the mode is on, exactly the way the star and the eye do — see
+[pinned header state](#pinned-header-state) — because the mode has no other
+exit on a phone: the note takes no caret while it is up, and Escape is a
+keyboard a touch user doesn't have.
 
 **What is taken is a set, not a range.** A press takes the line it lands on; a
 second press on the same line gives that line back; pressing a *different* line
@@ -2651,7 +2672,7 @@ Three things close it again:
   own, so the held-open flag is dropped.
 
 A **selection** opens the same box on its own — see
-[selection actions](#selection-actions) below. Two of the six buttons can also
+[selection actions](#selection-actions) below. Three of the buttons can also
 stay out of the fold on their own account — see
 [pinned header state](#pinned-header-state).
 
@@ -2662,23 +2683,39 @@ its own `mousedown` the way the rest of the cluster does, so unfolding the row
 never costs the caret the buttons behind it are about to act on. While the
 cluster is folded away the editor's [tab order](#editor-tab-order) treats
 whatever is actually on the row as the header's first action (`firstAction`) —
-a [pinned](#pinned-header-state) star or eye, and the ⋯ when nothing is pinned
+a [pinned](#pinned-header-state) star, eye or select-mode toggle, and the ⋯ when
+nothing is pinned
 — so Tab out of the body lands on a control that is really there. Unfolding it
 the first time is the **Elbow room** achievement.
 
 ### Pinned header state
 
-`Editor` (`src/ui/NoteEditor.tsx`) — `pinFavorite` / `pinLocked`, `pinnedRef`.
-Two of the cluster's buttons don't only *do* something, they **say** something
-about the note that is open: a lit star means this note is in
-[Favorites](#favorites), and a lit eye means it is
-[read-only](#lock-a-note) — both filled to the edges with the accent, so the
-row's two readouts look like one another. Folding those behind the ⋯ turned a fact about the
+`Editor` (`src/ui/NoteEditor.tsx`) — `pinFavorite` / `pinLocked` /
+`pinSelectMode`, `pinnedRef`.
+Three of the cluster's buttons don't only *do* something, they **say** something
+about the state the user is in: a lit star means this note is in
+[Favorites](#favorites), a lit eye means it is
+[read-only](#lock-a-note), and a lit [select-mode](#select-mode) toggle means
+the note is taking line presses rather than a caret — all three filled to the
+edges with the accent, so the row's readouts look like one another. Folding
+those behind the ⋯ turned a fact about the
 open document into something the user had to go looking for — and the eye
 especially, because "why is my typing not landing" is the exact question the
 glyph exists to answer.
 
-So on a narrow header each of those two, **while it is on**, steps out of the
+Select mode is the one where folding it away is worse than merely inconvenient:
+while the mode is up the note takes no caret at all, so the lit toggle is the
+**only** way back out of it on a phone (the editor's other exits are Escape and
+a press that consumes the run — a keyboard, and a gesture that is itself part of
+the mode). Behind the ⋯ that is a state entered in one tap and left in two, on a
+button the ⋯ gives no hint is still in there. It pins **last**, nearest the ⋯:
+that is where it already sits in the unfolded row, past the actions that operate
+on the note, so pinning never moves it either. Like the other two it is a live
+readout — the press that leaves the mode is the press that unpins it — and it is
+never pinned on the Markdown-off plain textarea, where the toggle isn't offered
+at all.
+
+So on a narrow header each of those, **while it is on**, steps out of the
 sliding box and pins to the row between the cluster and the ⋯, in its own
 small flex box (`pinnedRef`, carrying the same `pr-2` the cluster does because
 the row's own `gap-2` is off at this width). It is rendered *once* — pinned out

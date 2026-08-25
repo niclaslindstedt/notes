@@ -635,9 +635,10 @@ describe("Editor (narrow header)", () => {
   });
 });
 
-// Two of the cluster's buttons report the open note's state rather than merely
-// acting on it — a filled star for a favorite, a lit eye for a read-only note —
-// so while either is on it steps out of the fold and stays on the row.
+// Three of the cluster's buttons report a state rather than merely acting on
+// the note — a filled star for a favorite, a lit eye for a read-only note, and
+// a lit select-mode toggle — so while any of them is on it steps out of the
+// fold and stays on the row.
 describe("Editor (pinned header state)", () => {
   function stubNarrow(matches: boolean) {
     vi.stubGlobal(
@@ -747,6 +748,43 @@ describe("Editor (pinned header state)", () => {
 
     expect(pinned("Remove from favorites")).toBe(false);
     expect(pinned("Unlock note")).toBe(false);
+  });
+
+  // Select mode is the third readout, and the one there is no way back out of
+  // on a phone once it folds away: the note takes no caret while it is on, so
+  // the lit toggle is the only exit.
+  it("keeps the select-mode toggle on the row while the mode is on", () => {
+    stubNarrow(true);
+    renderEditor({ editor: DEFAULT_EDITOR_SETTINGS });
+
+    // Off, it has nothing to report and folds away with the rest.
+    expect(pinned("Select lines")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select lines" }));
+
+    expect(pinned("Leave select mode")).toBe(true);
+    expect(
+      screen.getAllByRole("button", { name: "Leave select mode" }),
+    ).toHaveLength(1);
+  });
+
+  it("folds the select-mode toggle away again once the mode is left", () => {
+    stubNarrow(true);
+    renderEditor({ editor: DEFAULT_EDITOR_SETTINGS });
+    fireEvent.click(screen.getByRole("button", { name: "Select lines" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave select mode" }));
+
+    expect(pinned("Select lines")).toBe(false);
+  });
+
+  it("pins no select-mode toggle on a wide header", () => {
+    stubNarrow(false);
+    renderEditor({ editor: DEFAULT_EDITOR_SETTINGS });
+
+    fireEvent.click(screen.getByRole("button", { name: "Select lines" }));
+
+    expect(pinned("Leave select mode")).toBe(false);
   });
 });
 

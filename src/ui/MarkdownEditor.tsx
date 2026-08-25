@@ -37,8 +37,10 @@ import {
   addCursorVertically,
   addNextOccurrence,
   applyAtCursors,
+  bareCursorLineText,
   collapsedCursor,
   cursorLines,
+  cutBareCursorLines,
   cursorPoints,
   cursorSpan,
   moveCursors,
@@ -2230,7 +2232,7 @@ export function MarkdownEditor({
   // --- Clipboard: copy/cut verbatim source, paste through the engine --------
   const onCopyRef = useRef<(e: ClipboardEvent) => void>(() => {});
   onCopyRef.current = (e: ClipboardEvent) => {
-    const source = columnSource() ?? selectionSource();
+    const source = columnSource() ?? columnLineSource() ?? selectionSource();
     if (source === null) return;
     e.preventDefault();
     e.clipboardData?.setData("text/plain", source);
@@ -2259,6 +2261,17 @@ export function MarkdownEditor({
       if (out) commitCursors(out.lines, out.cursors);
       return;
     }
+    // The same column with nothing selected takes whole lines, the way
+    // Ctrl/Cmd+X on a bare caret does in VS Code — the lines the carets are on
+    // go, and each caret rides down onto whatever moved up into its place.
+    const columnLines = columnLineSource();
+    if (columnLines !== null) {
+      e.preventDefault();
+      e.clipboardData?.setData("text/plain", columnLines);
+      const out = cutBareCursorLines(linesRef.current, cursorsRef.current!);
+      if (out) commitCursors(out.lines, out.cursors);
+      return;
+    }
     const pts = selectionPoints();
     const source = selectionSource();
     if (source === null || !pts || pts.collapsed) return;
@@ -2281,6 +2294,19 @@ export function MarkdownEditor({
     if (spans.every((span) => span.to === span.from)) return null;
     const source = raw.join("\n");
     return spans.map((span) => source.slice(span.from, span.to)).join("\n");
+  }
+
+  // What a column holding nothing but bare carets puts there instead: the whole
+  // line each caret sits on, newline-terminated. A column of carets down the
+  // edge of a list is the shape this feature exists for, and a copy or cut that
+  // did nothing at all because none of them had selected anything is the one
+  // answer VS Code never gives. Null unless this really is a bare column — a
+  // column holding selections copies those (`columnSource`), and a lone caret
+  // is the browser's business.
+  function columnLineSource(): string | null {
+    const column = cursorsRef.current;
+    if (!column || column.length < 2) return null;
+    return bareCursorLineText(linesRef.current, column);
   }
 
   // The verbatim source a live-preview selection covers, or null when the
@@ -2389,11 +2415,29 @@ export function MarkdownEditor({
       // A clipboard holding exactly one line per caret is dealt out a line
       // each — the way a column is copied, so a column round-trips. Anything
       // else goes in whole at every caret.
+      //
+      // Whole lines are the second shape a column copies (a bare column takes
+      // the lines it sits on, newline-terminated), and they deal out too, each
+      // caret taking a whole line rather than a fragment of one. The two
+      // readings can never both fit: dropping the terminator leaves one part
+      // fewer, so a clipboard that deals as N fragments cannot also deal as N
+      // lines.
       const parts = text.split("\n");
-      const deal = parts.length === column.length;
+      const whole = text.endsWith("\n")
+        ? text
+            .slice(0, -1)
+            .split("\n")
+            .map((line) => `${line}\n`)
+        : null;
+      const deal =
+        parts.length === column.length
+          ? parts
+          : whole?.length === column.length
+            ? whole
+            : null;
       const out = applyAtCursors(linesRef.current, column, (span, _src, i) => ({
         ...span,
-        text: deal ? parts[i]! : text,
+        text: deal ? deal[i]! : text,
       }));
       if (out) commitCursors(out.lines, out.cursors);
       return;
