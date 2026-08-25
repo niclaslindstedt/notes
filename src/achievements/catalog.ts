@@ -58,6 +58,7 @@ import {
   MergeGlyph,
   MoreGlyph,
   MousePointerGlyph,
+  LineSweepGlyph,
   MultiCaretGlyph,
   MoveGlyph,
   PaletteGlyph,
@@ -601,6 +602,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     tier: "intermediate",
     glyph: CodeGlyph,
     learnMore: true,
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "sweepingStatement",
+    tier: "intermediate",
+    glyph: LineSweepGlyph,
+    learnMore: true,
+    // Fired when a line selection first covers more than one line — the
+    // gesture the mode exists for. A selection is a paint over the note, not
+    // part of it, so there is nothing in the document to derive it from.
     trigger: { kind: "manual" },
   },
   {

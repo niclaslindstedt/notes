@@ -346,6 +346,12 @@ const achievements = {
       learnMore:
         "Every closed code block wears a small copy button in its top-right corner. One press puts the code — everything between the ``` fences, and nothing else — on your clipboard, without placing the caret in the note or selecting a single line by hand.",
     },
+    sweepingStatement: {
+      name: "Sweeping statement",
+      condition: "Sweep a run of lines in select mode.",
+      learnMore:
+        "The header's select-mode button turns the note into a list you pick from: one press takes a whole line, and holding and dragging walks the far end of the run up or down it, a line at a time \u2014 no handles to aim at a character with. The lines you have taken are tinted along with their line numbers rather than wearing the ordinary selection colour, so you can tell the two apart at a glance. From there, type over the run, delete it, copy or cut it, or style every line at once. Escape \u2014 or a press on the lines you already took \u2014 hands the run over as an ordinary selection and leaves the mode.",
+    },
     manyHands: {
       name: "Many hands",
       condition: "Edit at more than one caret at once.",

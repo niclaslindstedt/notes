@@ -345,6 +345,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Varje stängt kodblock har en liten kopieringsknapp uppe till höger. Ett tryck lägger koden — allt mellan ```-staketen, och inget annat — på urklipp, utan att du behöver placera markören i anteckningen eller markera en enda rad för hand.",
     },
+    sweepingStatement: {
+      name: "Svepande formulering",
+      condition: "Svep över en följd rader i markeringsläge.",
+      learnMore:
+        "Knappen för markeringsläge i sidhuvudet gör anteckningen till en lista du plockar ur: ett tryck tar en hel rad, och att hålla kvar och dra flyttar den bortre änden av följden uppåt eller nedåt, en rad i taget \u2014 inga handtag att sikta mot ett enskilt tecken med. Raderna du tagit tonas tillsammans med sina radnummer i stället för att bära den vanliga markeringsfärgen, så du ser skillnaden direkt. Därifrån kan du skriva över följden, radera den, kopiera eller klippa ut den, eller formatera varje rad på en gång. Escape \u2014 eller ett tryck på raderna du redan tagit \u2014 lämnar över följden som en vanlig markering och avslutar läget.",
+    },
     manyHands: {
       name: "Många händer",
       condition: "Redigera vid fler än en markör samtidigt.",

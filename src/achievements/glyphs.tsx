@@ -488,6 +488,21 @@ export function TextSearchGlyph({ className }: IconProps) {
   );
 }
 
+// A run of lines swept up whole: three rows boxed together, one row left plain
+// above and below them. The picture of select mode — the selection has no
+// columns in it, so the glyph shows none either.
+export function LineSweepGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M4 3.5h12" />
+      <rect x="2" y="7" width="20" height="10" rx="2" />
+      <path d="M5.5 10.5h13" />
+      <path d="M5.5 13.5h8" />
+      <path d="M4 20.5h12" />
+    </Svg>
+  );
+}
+
 // Two text carets, one stepped down and across from the other — the shape a
 // column of cursors makes on the page, and the plainest picture of "the same
 // keystroke lands in more than one place at once".

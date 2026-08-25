@@ -62,6 +62,7 @@ import {
   type MarkdownEditorHandle,
 } from "./MarkdownEditor.tsx";
 import { NoteFindBar, NoteFindButton } from "./NoteFindBar.tsx";
+import { SelectModeButton } from "./SelectModeButton.tsx";
 
 // What counts as a tab stop inside the header's action cluster — enough to find
 // the leftmost one, which is where the body hands focus to (and takes it back
@@ -81,7 +82,7 @@ function readToolbarOpen(): boolean {
 }
 
 // Below this width the header stops trying to carry the note's name *and* the
-// six action buttons at once and folds the cluster behind a single ⋯ toggle
+// seven action buttons at once and folds the cluster behind a single ⋯ toggle
 // (see `MoreButton`). It is Tailwind's `sm` breakpoint from the other side: at
 // 640px and up the row fits, and under it the title was being squeezed to a
 // couple of words. A media query rather than the pane's own width because the
@@ -92,14 +93,14 @@ const COLLAPSE_QUERY = "(max-width: 639px)";
 // How wide the folded-out cluster is allowed to grow. Only the animation reads
 // it: the buttons size the box, and this cap is what the max-width transition
 // travels to (a width of `auto` can't be transitioned). Kept a little above the
-// real ~16.5rem — six 2.25rem buttons, five 0.5rem gaps and the box's own
+// real ~19.25rem — seven 2.25rem buttons, six 0.5rem gaps and the box's own
 // `pr-2` — so no button is ever clipped at rest; the cost is that the slide
 // finishes a hair before the timer does. **Raise this whenever a button joins
 // the cluster**: the box clips what doesn't fit, so a cap left behind simply
 // swallows the last glyph on a phone. (A star or eye that has pinned itself out
 // of the box — see `pinFavorite` / `pinLocked` — leaves it *narrower* than the
 // cap, which is an upper bound, so there is nothing to adjust there.)
-const ACTIONS_MAX_WIDTH = "17rem";
+const ACTIONS_MAX_WIDTH = "20rem";
 
 // The same cap for the three selection actions (formatting, cut, copy), which
 // unfold out of the ⋯ on their own when text is selected — real width ~8.25rem.
@@ -219,7 +220,7 @@ export function Editor({
   const bodyRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   // The header's action cluster (favorite, lock, formatting, cut, export,
-  // find),
+  // select mode, find),
   // which the body hands focus on to — see `firstAction`.
   const actionsRef = useRef<HTMLDivElement>(null);
   // The ⋯ toggle the cluster folds into on a narrow screen; held so the tab
@@ -243,6 +244,13 @@ export function Editor({
   // open toolbar reads to light the buttons already in effect. The editing
   // surface only reports that state while the toolbar is open, so a closed
   // toolbar costs nothing.
+  // Select mode: the note becomes a list of lines you pick from rather than a
+  // surface you put a caret in (see `docs/overview.md#select-mode`). Held here
+  // because the header's toggle reports it and the live-preview editor asks to
+  // leave it (Escape, a press on the run, an edit that consumed it). It is not
+  // remembered the way the styling toolbar is — the mode is a detour from
+  // writing, so every note opens ready to be written in.
+  const [selectMode, setSelectMode] = useState(false);
   const [toolbarOpen, setToolbarOpen] = useState(readToolbarOpen);
   // Remembered across notes and reloads, so a locked note opened by someone who
   // writes in Markdown would otherwise carry a toolbar whose every button is a
@@ -269,7 +277,7 @@ export function Editor({
   const [regex, setRegex] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  // The header's action cluster on a narrow screen: six buttons and a note
+  // The header's action cluster on a narrow screen: seven buttons and a note
   // title don't both fit, and the title is what you need to see while reading,
   // so the buttons fold behind a ⋯ toggle and slide back out on a press —
   // taking the title's place while they are out (it is the thing they cover,
@@ -281,7 +289,15 @@ export function Editor({
   const narrow = useMediaQuery(COLLAPSE_QUERY);
   const [actionsOpen, setActionsOpen] = useState(false);
 
-  // Two of those six buttons don't only *do* something, they *say* something
+  // The mode belongs to the live-preview editor and to the note that was open
+  // when it was entered: switching notes, or dropping to the plain textarea
+  // (which has the browser's own selection and needs none of this), leaves it.
+  const renderMarkdown = editor.renderMarkdown;
+  useEffect(() => {
+    setSelectMode(false);
+  }, [note.id, renderMarkdown]);
+
+  // Two of those seven buttons don't only *do* something, they *say* something
   // about the note that is open: a filled star means this note is in Favorites,
   // and a lit eye means it is read-only. Folding those behind the ⋯ turns a
   // fact about the open document into something you have to go looking for —
@@ -310,7 +326,7 @@ export function Editor({
 
   // Selecting text is the moment the actions that operate on a selection are
   // wanted, so on a narrow screen the cluster unfolds *itself* then — carrying
-  // just those three (formatting, cut, copy) rather than all five, because
+  // just those three (formatting, cut, copy) rather than all of them, because
   // reaching them through the ⋯ is two taps for something you asked for by
   // highlighting it. The editing surfaces report the selection (they own the
   // mapping back to the note's source); a selection in the find field is the
@@ -538,7 +554,8 @@ export function Editor({
   }
 
   // The editor's tab order is spelled out by hand as back → title → body →
-  // favorite / formatting / cut / export / find, because that's the order you
+  // favorite / formatting / cut / export / select mode / find, because that's the
+  // order you
   // work in: name
   // the note, write it, and only then reach for the toolbar. Document order
   // can't say that — the header (and its buttons) precede the body — so the
@@ -694,6 +711,12 @@ export function Editor({
                   copyScope={editor.copyScope}
                   transforms={transforms}
                 />
+                {renderMarkdown && (
+                  <SelectModeButton
+                    on={selectMode}
+                    onToggle={() => setSelectMode((on) => !on)}
+                  />
+                )}
                 <NoteFindButton open={findOpen} onToggle={toggleFind} />
               </>
             )}
@@ -818,6 +841,8 @@ export function Editor({
             shortenLinkChars={editor.shortenLinkChars}
             transforms={transforms}
             lineNumbers={editor.lineNumbers}
+            selectMode={selectMode}
+            onSelectModeChange={setSelectMode}
             onTabOut={onBodyTab}
             onLineFormat={toolbarUp ? setLineFormat : undefined}
             onSelectionChange={setHasSelection}
@@ -1065,8 +1090,8 @@ function TitleField({
 }
 
 // The narrow header's ⋯ toggle: the editor's whole action cluster folded into
-// one control, so a phone-width header can show the note's name instead of five
-// glyphs. Pressed, it unfolds the cluster over the title; pressed again — or
+// one control, so a phone-width header can show the note's name instead of a
+// row of glyphs. Pressed, it unfolds the cluster over the title; pressed again — or
 // touched anywhere in the note — it folds back.
 //
 // It wears the same lit-when-open treatment as the formatting and find toggles,
