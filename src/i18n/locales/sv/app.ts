@@ -9,6 +9,10 @@ const app: AppCatalog = {
   back: "Tillbaka",
   startWriting: "Börja skriva…",
   selectLine: "Markera rad {n}",
+  selectMode: {
+    enter: "Markera rader",
+    exit: "Lämna markeringsläget",
+  },
   titlePlaceholder: "Titel",
   attachments: "Bilagor",
   dropTitle: "Släpp för att importera",

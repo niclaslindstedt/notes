@@ -9,6 +9,7 @@ import {
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type Ref,
 } from "react";
@@ -50,6 +51,19 @@ import {
   type Span,
 } from "../domain/multi-cursor.ts";
 import {
+  allLines,
+  clampLineSelection,
+  inLineSelection,
+  lineSelectionRange,
+  lineSelectionSource,
+  lineSpan,
+  lineSpanSize,
+  moveLineSelection,
+  removeLineSelection,
+  sameLineSelection,
+  type LineSelection,
+} from "../domain/line-selection.ts";
+import {
   classifyLines,
   codeBlockCopyAnchors,
   codeBlockEdges,
@@ -69,6 +83,7 @@ import type { Note } from "../domain/note.ts";
 import { doubleSpacePeriod, sentenceCapital } from "../domain/sentence.ts";
 import type { CompiledTransform } from "../domain/transform.ts";
 import { useT } from "../i18n/index.ts";
+import { haptics } from "../platform/native-bridge.ts";
 import { writeClipboard } from "./clipboard.ts";
 import { getEditorPosition, setEditorPosition } from "./editor-position.ts";
 import { AttachmentsEndBlock } from "./attachments/AttachmentsEndBlock.tsx";
@@ -198,6 +213,20 @@ type Props = {
   /** Number every line in a gutter down the left edge, code-editor style, each
    *  number a press target that selects its whole line. */
   lineNumbers?: boolean;
+  /**
+   * **Select mode** is on (the header's toggle, left of Find). The note stops
+   * being something you put a caret in and becomes a list you pick lines from:
+   * a press takes the line it lands on, a hold and drag walks the far end of
+   * the run, and the taken lines are tinted by the editor itself rather than
+   * by the browser's selection. See `docs/overview.md#select-mode`.
+   */
+  selectMode?: boolean;
+  /**
+   * Turn select mode off from inside the editor — Escape, a press on the lines
+   * already taken, or an edit that consumed them. The host owns the flag (its
+   * header button reports it), so the editor asks rather than sets.
+   */
+  onSelectModeChange?: (on: boolean) => void;
   /** The open note's id, keying its session-remembered caret / scroll position
    *  so switching away and back reopens where you left off. */
   noteId?: string;
@@ -266,6 +295,31 @@ const VERTICAL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown"]);
 // releasing Cmd after a shortcut must not wipe the run that follows.
 const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock"]);
 
+// --- Select mode's gesture constants -------------------------------------
+//
+// A finger has to be able to do two different things on the same pixels while
+// the mode is on: scroll the note, and sweep a run of lines. The split is the
+// platform's own — hold still and the press becomes a drag, move first and it
+// was a scroll — so these are the same numbers `useLongPress` and the note-card
+// drag use, and a screen carrying both gestures stays predictable.
+
+/** How long a finger must rest on a line before the drag takes over from the
+ *  scroller. A mouse never waits: it has a button to hold instead. */
+const SWEEP_HOLD_MS = 300;
+
+/** Movement before the hold elapses that says this was a scroll, not a sweep. */
+const SWEEP_SLOP = 8;
+
+/** The tick of feedback that says the sweep took — inert where unsupported. */
+const SWEEP_FEEDBACK_MS = 12;
+
+/** How close to the scroller's edge a sweep has to reach before the note
+ *  starts scrolling under it, and the fastest it then travels (px per frame).
+ *  The band is a little over a fingertip so the auto-scroll is reachable
+ *  without pushing the finger off the screen. */
+const SWEEP_EDGE_PX = 56;
+const SWEEP_SCROLL_MAX = 18;
+
 /** What the editor exposes to its parent: a way to start editing from outside. */
 export type MarkdownEditorHandle = {
   /** Place the caret at the end of the note and start editing there. */
@@ -305,6 +359,8 @@ export function MarkdownEditor({
   shortenLinkChars = 0,
   transforms = NO_TRANSFORMS,
   lineNumbers = false,
+  selectMode = false,
+  onSelectModeChange,
   noteId,
   onTabOut,
   onLineFormat,
@@ -374,6 +430,11 @@ export function MarkdownEditor({
   // every render that can have moved them, so it is state rather than a memo.
   const [paint, setPaint] = useState<CursorPaint>(NO_PAINT);
 
+  // The run of whole lines select mode has taken, or null when the mode is on
+  // but nothing has been pressed yet. Meaningless while the mode is off, and
+  // cleared with it — every reader below checks the mode first.
+  const [lineSel, setLineSel] = useState<LineSelection | null>(null);
+
   // Refs so the document-level and native listeners below always read current
   // state without re-binding (they capture these, not the render closure).
   const rootRef = useRef<HTMLDivElement>(null);
@@ -392,6 +453,12 @@ export function MarkdownEditor({
   // every press after the first searches for the same text under the same
   // whole-word rule (see `addNextOccurrence`). Cleared whenever the column is.
   const occurrence = useRef<OccurrenceSession | null>(null);
+  // The mode and its selection, for the document-level listeners and the
+  // pointer handlers, which run outside the render closure.
+  const selectModeRef = useRef(selectMode);
+  selectModeRef.current = selectMode;
+  const lineSelRef = useRef(lineSel);
+  lineSelRef.current = lineSel;
   // Read by the effects that must see the *current* lock without re-running
   // when it flips (a mount-time position restore, an out-of-band body swap).
   const lockedRef = useRef(locked);
@@ -755,6 +822,471 @@ export function MarkdownEditor({
     onChange(next);
     applyCursors(nextCursors);
   }
+
+  // --- Select mode ---------------------------------------------------------
+  //
+  // Taking a run of lines with the ordinary selection means dragging two
+  // handles onto two exact characters, which is fiddly with a mouse and close
+  // to impossible with a fingertip. Select mode drops the columns: the note
+  // becomes a list you pick from. A press takes the line it lands on; holding
+  // and dragging walks the far end of the run up or down it, one line at a
+  // time; the run is tinted — line number and text alike — by the editor
+  // itself, not by the browser (`.line-selected`).
+  //
+  // The mode's whole state is two line indices (`domain/line-selection.ts`).
+  // Everything the run can then be used for is expressed as a source span and
+  // handed to the same pure engine every other edit uses: type over it, delete
+  // it, cut or copy it, style every line of it at once.
+  //
+  // Two things are deliberately *not* the browser's here. There is no native
+  // range while the mode is on — a range would drag the platform's own handles
+  // and callout bar onto a screen that is already saying what is taken — and
+  // there is no visible caret. What the surface does keep is a **collapsed**
+  // caret at the head of the run, hidden by `.line-select-mode`, because that
+  // is what makes it go on receiving `beforeinput`: without one, typing over
+  // the run would silently do nothing on a phone.
+  //
+  // Leaving the mode is the one place the two selections meet. Escape — or a
+  // press on the lines already taken, which is Escape's stand-in on a
+  // touchscreen — hands the run over as an ordinary browser selection, drawn
+  // in the ordinary selection colour. That handover is the whole reason the
+  // two look different in the first place.
+
+  function setLineSelection(next: LineSelection | null) {
+    lineSelRef.current = next;
+    setLineSel((cur) => (sameLineSelection(cur, next) ? cur : next));
+    // The trophy is for the *sweep*, not for the mode: one line is what a
+    // press already gives you, and a run is the thing the gesture is for.
+    if (next && lineSpanSize(next) > 1) unlock("sweepingStatement");
+  }
+  const setLineSelectionRef = useRef(setLineSelection);
+  setLineSelectionRef.current = setLineSelection;
+
+  // The verbatim source of the run, or null when the mode isn't holding one —
+  // the single question every clipboard path asks before falling back to the
+  // browser's own selection.
+  function lineSelectionClipboard(): string | null {
+    const sel = lineSelRef.current;
+    if (!selectModeRef.current || !sel) return null;
+    return lineSelectionSource(linesRef.current, sel);
+  }
+
+  // The run the mode opens with: whatever the user was already pointing at, so
+  // turning the mode on over a selection (or over the caret) starts with those
+  // lines taken rather than with a note that looks untouched.
+  function seedLineSelection(): LineSelection | null {
+    const pts = selectionPoints();
+    if (pts) return { anchor: pts.start.line, head: pts.end.line };
+    const at = lastCaret.current;
+    return at ? { anchor: at.line, head: at.line } : null;
+  }
+
+  // Leave the mode. `keepAsSelection` is the handover: the same lines, drawn
+  // the ordinary way. The span is *queued* rather than drawn here because
+  // leaving the mode unwraps every line's row — the nodes a range set now
+  // pointed at would be thrown away before the browser painted it — so the
+  // layout effect that owns `pendingLineSpan` draws it once the DOM is final.
+  function exitSelectMode(keepAsSelection: boolean) {
+    const sel = lineSelRef.current;
+    endSweep();
+    setLineSelection(null);
+    if (keepAsSelection && sel) {
+      const { from, to } = lineSpan(sel);
+      pendingCaret.current = null;
+      pendingRange.current = null;
+      pendingLineSpan.current = { from, to };
+      lastCaret.current = {
+        line: to,
+        col: (linesRef.current[to] ?? "").length,
+      };
+    }
+    // The selection we hand over is set by us, so the `selectionchange` it
+    // fires is swallowed (`settingSel`) and never reaches the reporter — say
+    // it here instead, or the header drops the actions the run just earned.
+    reportSelection(keepAsSelection && sel !== null);
+    onSelectModeChange?.(false);
+  }
+
+  // Take the run out of the note entirely (Backspace / Delete / a cut), then
+  // leave the mode: the lines it named are gone, so there is nothing left to
+  // hold, and the caret the edit lands is where writing carries on.
+  function deleteLineSelection() {
+    const sel = lineSelRef.current;
+    if (!sel || locked) return;
+    const r = removeLineSelection(linesRef.current, sel);
+    setLineSelection(null);
+    reportSelection(false);
+    onSelectModeChange?.(false);
+    commit(r.lines, r.caret);
+  }
+
+  // Type over the run: everything it covers becomes `text`. Same exit as a
+  // delete — you are writing again, and the run described the note as it was.
+  function replaceLineSelection(text: string) {
+    const sel = lineSelRef.current;
+    if (!sel || locked) return;
+    const { start, end } = lineSelectionRange(linesRef.current, sel);
+    setLineSelection(null);
+    reportSelection(false);
+    onSelectModeChange?.(false);
+    replaceSelection(start, end, text);
+  }
+
+  // A styling-toolbar press with a run taken applies to every line of it at
+  // once — and, unlike an edit, *keeps* the mode: bulleting five lines and
+  // then indenting the same five is one gesture with a second press, which is
+  // exactly what the run is for. The run travels with the result, so a format
+  // that changes the line count leaves the same lines taken.
+  function formatLineSelection(action: FormatAction) {
+    const sel = lineSelRef.current;
+    if (!sel || locked) return;
+    const range = lineSelectionRange(linesRef.current, sel);
+    const r = applyFormat(linesRef.current, range, action);
+    const next = r.lines.join("\n");
+    setValue(next);
+    onChange(next);
+    lastCaret.current = r.end;
+    setLineSelection({ anchor: r.start.line, head: r.end.line });
+  }
+
+  // --- Select mode: the sweep ----------------------------------------------
+  //
+  // One finger has to do two things on the same pixels while the mode is on:
+  // scroll the note, and sweep a run of lines. The split is the platform's own
+  // — hold still and the press becomes a drag, move first and it was a scroll
+  // — which is the same rule the note-card drag and `useLongPress` follow, so
+  // a screen carrying more than one of them stays predictable. A mouse never
+  // waits: it has a button to hold instead.
+  const sweep = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    /** The end of the run that stays put while the other follows the pointer. */
+    anchor: number;
+    /** The press landed inside the run already taken — a tap there leaves the
+     *  mode, which is why this press can't simply re-anchor. */
+    onSelection: boolean;
+    dragging: boolean;
+    moved: boolean;
+    hold: ReturnType<typeof setTimeout> | null;
+  } | null>(null);
+  // The live pointer position, read by the edge auto-scroll between moves.
+  const sweepAt = useRef({ x: 0, y: 0 });
+  const sweepScroll = useRef(0);
+
+  function endSweep() {
+    const s = sweep.current;
+    if (s?.hold) clearTimeout(s.hold);
+    sweep.current = null;
+    if (sweepScroll.current !== 0) cancelAnimationFrame(sweepScroll.current);
+    sweepScroll.current = 0;
+  }
+  const endSweepRef = useRef(endSweep);
+  endSweepRef.current = endSweep;
+  useEffect(() => () => endSweepRef.current(), []);
+
+  // Which line a point is over. The hit test answers directly nearly every
+  // time; the scan behind it is for the points that are over no row at all —
+  // past the last line, out in the gutter's outer inset, or dragged clean off
+  // the top of the note — where the nearest row is what the gesture means.
+  function lineRowAt(x: number, y: number): number | null {
+    const root = rootRef.current;
+    if (!root) return null;
+    // Feature-detected rather than assumed: the hit test is a rendering API,
+    // and the non-browser environments this component is exercised in (jsdom)
+    // don't lay anything out — there, and wherever a point is over no row at
+    // all, the geometry scan below is the answer.
+    const hit =
+      typeof document.elementFromPoint === "function"
+        ? document.elementFromPoint(x, y)
+        : null;
+    const row = hit?.closest?.("[data-line-row]");
+    if (row instanceof HTMLElement && root.contains(row)) {
+      const n = Number(row.dataset.lineRow);
+      if (Number.isInteger(n)) return n;
+    }
+    let best: number | null = null;
+    let nearest = Infinity;
+    for (const el of Array.from(
+      root.querySelectorAll<HTMLElement>("[data-line-row]"),
+    )) {
+      const r = el.getBoundingClientRect();
+      const away = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+      if (away < nearest) {
+        nearest = away;
+        best = Number(el.dataset.lineRow);
+      }
+      if (away === 0) break;
+    }
+    return best;
+  }
+
+  function extendSweep(x: number, y: number) {
+    const s = sweep.current;
+    if (!s) return;
+    const line = lineRowAt(x, y);
+    if (line === null) return;
+    setLineSelection({ anchor: s.anchor, head: line });
+  }
+
+  // Scroll the note while the sweep is held against the top or bottom of the
+  // viewport, so a run can be longer than the screen without the finger having
+  // anywhere left to go. Speed rises with how far into the edge band the
+  // pointer is, and the loop stops itself the moment it leaves — every move
+  // re-arms it, so there is never a frame timer running over an idle finger.
+  function startSweepScroll() {
+    if (sweepScroll.current !== 0) return;
+    const step = () => {
+      sweepScroll.current = 0;
+      const s = sweep.current;
+      const scroller = rootRef.current?.parentElement;
+      if (!s?.dragging || !scroller) return;
+      const rect = scroller.getBoundingClientRect();
+      const { x, y } = sweepAt.current;
+      const above = rect.top + SWEEP_EDGE_PX - y;
+      const below = y - (rect.bottom - SWEEP_EDGE_PX);
+      const depth = above > 0 ? above : below > 0 ? below : 0;
+      if (depth === 0) return;
+      const speed = Math.ceil(
+        (Math.min(depth, SWEEP_EDGE_PX) / SWEEP_EDGE_PX) * SWEEP_SCROLL_MAX,
+      );
+      setScrollTop(scroller, scroller.scrollTop + (above > 0 ? -speed : speed));
+      extendSweep(x, y);
+      sweepScroll.current = requestAnimationFrame(step);
+    };
+    sweepScroll.current = requestAnimationFrame(step);
+  }
+
+  function onSweepDown(e: ReactPointerEvent<HTMLDivElement>) {
+    // The press is ours end to end: no caret is placed, no focus moves, and
+    // the browser starts no selection of its own under the sweep.
+    e.preventDefault();
+    const line = lineRowAt(e.clientX, e.clientY);
+    if (line === null) return;
+    const sel = lineSelRef.current;
+    const onSelection = inLineSelection(sel, line);
+    const mouse = e.pointerType === "mouse";
+    // A press outside the run starts a new one; a press inside it keeps the
+    // run's own anchor, so dragging on from there grows what is already taken
+    // instead of throwing it away.
+    if (!onSelection) setLineSelection({ anchor: line, head: line });
+    sweep.current = {
+      pointerId: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      anchor: onSelection && sel ? sel.anchor : line,
+      onSelection,
+      dragging: mouse,
+      moved: false,
+      hold: null,
+    };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    if (mouse) return;
+    sweep.current.hold = setTimeout(() => {
+      const s = sweep.current;
+      if (!s) return;
+      s.hold = null;
+      s.dragging = true;
+      // Confirm the hold took before anything moves, so the finger can start
+      // travelling the moment it is felt rather than after a guess.
+      haptics.vibrate(SWEEP_FEEDBACK_MS);
+    }, SWEEP_HOLD_MS);
+  }
+
+  function onSweepMove(e: ReactPointerEvent<HTMLDivElement>) {
+    const s = sweep.current;
+    if (!s || s.pointerId !== e.pointerId) return;
+    const far =
+      Math.abs(e.clientX - s.x) > SWEEP_SLOP ||
+      Math.abs(e.clientY - s.y) > SWEEP_SLOP;
+    if (far) s.moved = true;
+    if (!s.dragging) {
+      // Travelling before the hold elapsed means this was a scroll. The line
+      // the press already took stays taken — a scroll must not undo it — but
+      // the drag never opens.
+      if (far && s.hold) {
+        clearTimeout(s.hold);
+        s.hold = null;
+      }
+      return;
+    }
+    sweepAt.current = { x: e.clientX, y: e.clientY };
+    extendSweep(e.clientX, e.clientY);
+    startSweepScroll();
+  }
+
+  function onSweepUp(e: ReactPointerEvent<HTMLDivElement>) {
+    const s = sweep.current;
+    if (!s || s.pointerId !== e.pointerId) return;
+    const tapped = s.onSelection && !s.moved;
+    endSweep();
+    // A press on the lines already taken hands them over as an ordinary
+    // selection and leaves the mode — Escape's stand-in on a touchscreen.
+    if (tapped) exitSelectMode(true);
+  }
+
+  // Everything the mode answers from the keyboard, bound to the document
+  // rather than to the surface: the mode is entered from a header button, so
+  // on a desktop the surface may not hold focus at all, and Escape has to work
+  // either way. Chrome that owns its own keys (the title field, the find bar)
+  // is left alone.
+  const selectModeKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  selectModeKeyRef.current = (e: KeyboardEvent) => {
+    if (!selectModeRef.current) return;
+    const root = rootRef.current;
+    const el = document.activeElement;
+    if (el && el !== root && !root?.contains(el)) {
+      const tag = el.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        (el as HTMLElement).isContentEditable
+      )
+        return;
+    }
+    const sel = lineSelRef.current;
+    const mod = e.metaKey || e.ctrlKey;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      // The editor sits inside the app's own Escape handling (a modal, the
+      // find bar); a press that left the mode has been used up.
+      e.stopPropagation();
+      exitSelectMode(sel !== null);
+      return;
+    }
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const count = linesRef.current.length;
+      const next = sel
+        ? moveLineSelection(
+            sel,
+            e.key === "ArrowUp" ? -1 : 1,
+            e.shiftKey,
+            count,
+          )
+        : { anchor: 0, head: 0 };
+      setLineSelection(next);
+      scrollLineIntoView(root, next.head);
+      return;
+    }
+    if (mod && !e.altKey && e.key.toLowerCase() === "a") {
+      e.preventDefault();
+      setLineSelection(allLines(linesRef.current.length));
+      return;
+    }
+    if (!sel) return;
+    if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "c") {
+      e.preventDefault();
+      void writeClipboard(lineSelectionSource(linesRef.current, sel));
+      return;
+    }
+    if (
+      mod &&
+      !e.altKey &&
+      !e.shiftKey &&
+      (e.key.toLowerCase() === "x" || e.key.toLowerCase() === "k")
+    ) {
+      e.preventDefault();
+      cut();
+      return;
+    }
+    if ((e.key === "Backspace" || e.key === "Delete") && !locked) {
+      e.preventDefault();
+      deleteLineSelection();
+    }
+  };
+
+  // Entering and leaving the mode. Entering drops every other way of pointing
+  // at the note — a column of carets, a vertical run's goal column, the active
+  // raw line — so the tint is the only mark on it and every line reads as the
+  // formatted line it is.
+  const desktopPointerRef = useRef(desktopPointer);
+  desktopPointerRef.current = desktopPointer;
+  const seedLineSelectionRef = useRef(seedLineSelection);
+  seedLineSelectionRef.current = seedLineSelection;
+  useEffect(() => {
+    if (!selectMode) {
+      setLineSelectionRef.current(null);
+      return;
+    }
+    clearCursorsRef.current();
+    setLineSelectionRef.current(seedLineSelectionRef.current());
+    pendingCaret.current = null;
+    pendingRange.current = null;
+    pendingLineSpan.current = null;
+    setActive((a) => (a.index === null ? a : { index: null, key: a.key + 1 }));
+    // Focus is what makes typing over the run possible (`beforeinput` only
+    // reaches a focused host), and on a desktop it costs nothing — so take it
+    // there. On a phone it would raise the soft keyboard over the very lines
+    // being picked, so the mode settles for whatever focus it inherited: still
+    // typeable when the keyboard was already up, and otherwise a mode for
+    // picking, copying and deleting, which is what a phone came here for.
+    const root = rootRef.current;
+    if (
+      root &&
+      desktopPointerRef.current &&
+      !root.contains(document.activeElement)
+    )
+      root.focus({ preventScroll: true });
+  }, [selectMode]);
+
+  // The run reported out to the host, so the header offers the actions a
+  // selection earns (copy, cut) while the mode holds one. The ordinary
+  // reporter stands down while the mode is on — there is no browser selection
+  // for it to read.
+  useEffect(() => {
+    if (!selectMode) return;
+    reportSelectionRef.current(lineSel !== null);
+  }, [selectMode, lineSel]);
+
+  // Keep the collapsed caret at the head of the run: it is what keeps the
+  // surface receiving `beforeinput`, and `.line-select-mode` is what keeps it
+  // invisible. Never *takes* focus — see the mode effect above — so on a phone
+  // with the keyboard down this is simply a no-op.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!selectMode || !lineSel || !root) return;
+    if (!root.contains(document.activeElement)) return;
+    const { from } = lineSpan(lineSel);
+    const el = root.querySelector<HTMLElement>(`[data-line-index="${from}"]`);
+    const sel = window.getSelection();
+    if (!el || !sel) return;
+    settingSel.current = true;
+    const range = document.createRange();
+    range.setStart(el, 0);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    queueMicrotask(() => {
+      settingSel.current = false;
+    });
+  }, [selectMode, lineSel, value]);
+
+  // The note was rewritten under the run — another writer on a live pull, the
+  // app's own undo, an edit of our own that changed the line count. Fold the
+  // run into the note as it now stands rather than leaving it naming lines
+  // that no longer exist.
+  useEffect(() => {
+    const sel = lineSelRef.current;
+    if (!selectModeRef.current || !sel) return;
+    const next = clampLineSelection(sel, lines.length);
+    if (!sameLineSelection(sel, next)) setLineSelectionRef.current(next);
+  }, [lines]);
+
+  // While a sweep is dragging, the finger belongs to the selection rather than
+  // to the scroller. A non-passive listener is the only thing that can say so
+  // — `touch-action` can't be changed mid-gesture — and it is bound only while
+  // the mode is on, so ordinary scrolling keeps its fast path everywhere else.
+  useEffect(() => {
+    if (!selectMode) return;
+    const el = rootRef.current?.parentElement;
+    if (!el) return;
+    const block = (e: TouchEvent) => {
+      if (sweep.current?.dragging) e.preventDefault();
+    };
+    el.addEventListener("touchmove", block, { passive: false });
+    return () => el.removeEventListener("touchmove", block);
+  }, [selectMode]);
 
   // Locking the note while it is open (the header's read-only toggle, or
   // another device's lock arriving on a live pull) takes the caret's line back
@@ -1257,6 +1789,26 @@ export function MarkdownEditor({
       return;
     }
     const it = e.inputType;
+    // Select mode owns whole lines, so the collapsed caret the surface keeps
+    // (only so this event fires at all) says nothing about what the keystroke
+    // is aimed at — the run does. Composition is the exception it always is:
+    // it can't be `preventDefault`ed, so the run is simply dropped and the
+    // composed text lands as an ordinary edit at the caret.
+    if (selectModeRef.current && lineSelRef.current) {
+      if (composing.current || it === "insertCompositionText") {
+        exitSelectMode(false);
+      } else {
+        e.preventDefault();
+        if (it.startsWith("delete")) deleteLineSelection();
+        else if (it === "insertParagraph" || it === "insertLineBreak")
+          replaceLineSelection("");
+        else if (it.startsWith("insert"))
+          replaceLineSelection(
+            e.data ?? e.dataTransfer?.getData("text/plain") ?? "",
+          );
+        return;
+      }
+    }
     // Let the composition run; `onCompositionEnd` reads the result back.
     if (composing.current || it === "insertCompositionText") return;
     // Files are handled at the `paste` / `drop` events (which `preventDefault`),
@@ -1511,6 +2063,9 @@ export function MarkdownEditor({
   const selChangeRef = useRef<() => void>(() => {});
   selChangeRef.current = () => {
     if (settingSel.current || composing.current) return;
+    // Select mode paints its own run and keeps only a hidden collapsed caret;
+    // there is nothing here for the browser's selection to say.
+    if (selectModeRef.current) return;
     const root = rootRef.current;
     const sel = window.getSelection();
     if (!root || !sel || sel.rangeCount === 0) return reportSelection(false);
@@ -1598,6 +2153,14 @@ export function MarkdownEditor({
 
   const onCutRef = useRef<(e: ClipboardEvent) => void>(() => {});
   onCutRef.current = (e: ClipboardEvent) => {
+    const run = lineSelectionClipboard();
+    if (run !== null) {
+      e.preventDefault();
+      e.clipboardData?.setData("text/plain", run);
+      unlock("guillotine");
+      deleteLineSelection();
+      return;
+    }
     const column = columnSource();
     if (column !== null) {
       e.preventDefault();
@@ -1638,6 +2201,10 @@ export function MarkdownEditor({
   // The verbatim source a live-preview selection covers, or null when the
   // selection is empty or outside this editor (leave it to the browser).
   function selectionSource(): string | null {
+    // The mode's run is this editor's selection while it is on — what the
+    // header's copy button takes, and what a copy event puts on the clipboard.
+    const run = lineSelectionClipboard();
+    if (run !== null) return run;
     const root = rootRef.current;
     const sel = window.getSelection();
     if (!root || !sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
@@ -1671,13 +2238,16 @@ export function MarkdownEditor({
     const copy = (e: ClipboardEvent) => onCopyRef.current(e);
     const cut = (e: ClipboardEvent) => onCutRef.current(e);
     const selChange = () => selChangeRef.current();
+    const keydown = (e: KeyboardEvent) => selectModeKeyRef.current(e);
     document.addEventListener("copy", copy);
     document.addEventListener("cut", cut);
     document.addEventListener("selectionchange", selChange);
+    document.addEventListener("keydown", keydown);
     return () => {
       document.removeEventListener("copy", copy);
       document.removeEventListener("cut", cut);
       document.removeEventListener("selectionchange", selChange);
+      document.removeEventListener("keydown", keydown);
     };
   }, []);
 
@@ -1724,6 +2294,11 @@ export function MarkdownEditor({
     // declared it always present); a paste event without one carries nothing
     // to insert, so an empty string is the right degradation.
     const text = e.clipboardData?.getData("text/plain") ?? "";
+    // A paste with a run taken lands over the whole of it, the same as typing.
+    if (selectModeRef.current && lineSelRef.current) {
+      replaceLineSelection(text);
+      return;
+    }
     const column = cursorsRef.current;
     if (column && column.length > 1) {
       // A clipboard holding exactly one line per caret is dealt out a line
@@ -1880,6 +2455,10 @@ export function MarkdownEditor({
   }
 
   function onKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    // Select mode answers the keyboard from the document (it is entered from a
+    // header button, so the surface may not even hold focus); handling a press
+    // here too would answer it twice.
+    if (selectMode) return;
     if (onColumnKeyDown(e)) return;
     // Read before anything else consumes the press: the `beforeinput` this
     // keydown is about to produce asks for it (see `softBreak`).
@@ -2004,6 +2583,8 @@ export function MarkdownEditor({
   // not move the caret — dragging a selection handle, a long-press selection —
   // never produce one.
   function onSurfaceClick(e: ReactMouseEvent<HTMLElement>) {
+    // Select mode takes its presses at `pointerdown` and lands no caret.
+    if (selectModeRef.current) return;
     // A press on a task item's checkbox ticks it off instead of landing a
     // caret. Checked before the `defaultPrevented` bail below because the
     // checkbox itself cancels the press (that is what keeps the caret — and
@@ -2070,6 +2651,12 @@ export function MarkdownEditor({
     // format engine expresses over one span, so a column stands down first.
     clearCursors();
     if (locked) return;
+    // A run taken by select mode is styled line by line and stays taken — see
+    // `formatLineSelection`.
+    if (selectModeRef.current && lineSelRef.current) {
+      formatLineSelection(action);
+      return;
+    }
     // Marks up the source and hands the caret (or the span) back itself, so it
     // picks the column the same way an edit through `commit` does.
     dropGoalColumn();
@@ -2120,6 +2707,15 @@ export function MarkdownEditor({
   // yet tapped — there is no line to point at, so the press does nothing
   // rather than guess at one.
   function cut() {
+    // A run taken by select mode is what the button cuts, whole lines and all.
+    const run = lineSelectionClipboard();
+    if (run !== null) {
+      if (locked) return;
+      void writeClipboard(run);
+      unlock("guillotine");
+      deleteLineSelection();
+      return;
+    }
     // The cut engine works from one caret / selection; a column hands the note
     // back to it.
     clearCursors();
@@ -2253,6 +2849,9 @@ export function MarkdownEditor({
   // reveal brings into view, and the only end of a long wrapped line that says
   // anything about where you are.
   function selectLine(index: number) {
+    // Select mode owns every press on a line while it is on, gutter included
+    // (see `onSweepDown`); this is the ordinary gutter press.
+    if (selectModeRef.current) return;
     clearCursors();
     const len = (linesRef.current[index] ?? "").length;
     // Where the pressed line sits *now*, before anything below re-renders it —
@@ -2374,6 +2973,11 @@ export function MarkdownEditor({
           lastScrollTop.current = e.currentTarget.scrollTop;
         }}
         onPointerDown={(e) => {
+          // Select mode takes the press whole: it picks lines, not carets.
+          if (selectMode) {
+            onSweepDown(e);
+            return;
+          }
           // A touch (or pen) tap anywhere in the editor arms the reveal so the
           // line the caret lands on is scrolled clear of the soft keyboard; a
           // mouse never needs it (no keyboard steals the caret's space).
@@ -2389,9 +2993,19 @@ export function MarkdownEditor({
           // them, the same way it is in VS Code.
           clearCursors();
         }}
+        onPointerMove={(e) => {
+          if (selectMode) onSweepMove(e);
+        }}
+        onPointerUp={(e) => {
+          if (selectMode) onSweepUp(e);
+        }}
+        onPointerCancel={() => {
+          if (selectMode) endSweep();
+        }}
         onMouseDown={(e) => {
           // A click in the empty space below the text lands the caret at the end
           // of the note rather than doing nothing.
+          if (selectMode) return;
           if (e.target === e.currentTarget) {
             e.preventDefault();
             placeCaretAtEnd();
@@ -2504,7 +3118,7 @@ export function MarkdownEditor({
             composing.current = false;
             readBackComposition();
           }}
-          className={`relative px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"}`}
+          className={`relative px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-fg outline-none ${wordWrap ? "" : "w-max min-w-full"} ${selectMode ? "line-select-mode" : ""}`}
           style={surfaceStyle}
         >
           {blocks.map((block, index) => {
@@ -2516,6 +3130,8 @@ export function MarkdownEditor({
                   index={index}
                   numbered={lineNumbers}
                   current
+                  selectable={selectMode}
+                  selected={false}
                   onSelect={selectLine}
                   label={t("app.selectLine", { n: index + 1 })}
                 >
@@ -2542,6 +3158,8 @@ export function MarkdownEditor({
                   index={index}
                   numbered={lineNumbers}
                   current
+                  selectable={selectMode}
+                  selected={false}
                   onSelect={selectLine}
                   label={t("app.selectLine", { n: index + 1 })}
                 >
@@ -2568,6 +3186,8 @@ export function MarkdownEditor({
                 index={index}
                 numbered={lineNumbers}
                 current={false}
+                selectable={selectMode}
+                selected={selectMode && inLineSelection(lineSel, index)}
                 onSelect={selectLine}
                 label={t("app.selectLine", { n: index + 1 })}
               >
@@ -2655,6 +3275,8 @@ function LineRow({
   index,
   numbered,
   current,
+  selectable,
+  selected,
   label,
   onSelect,
   children,
@@ -2663,40 +3285,55 @@ function LineRow({
   numbered: boolean;
   /** This is the line the caret sits on — lit the way a code editor lights it. */
   current: boolean;
+  /** Select mode is on, so every line needs the box a press is resolved
+   *  against (`data-line-row`) whether or not it is numbered. */
+  selectable: boolean;
+  /** This line is part of the run select mode has taken. */
+  selected: boolean;
   label: string;
   onSelect: (index: number) => void;
   children: ReactNode;
 }) {
-  if (!numbered) return children;
+  if (!numbered && !selectable) return children;
+  // The tint goes on *both* boxes — the number's and the text's — because they
+  // are siblings, not one inside the other: the number hangs out in the
+  // surface's left padding (`right-full`), so a background on the row alone
+  // would stop dead at the first character. Together they tile edge to edge
+  // into one band across the page, which is what a taken line has to look like.
+  const tint = selected ? " line-selected" : "";
   return (
-    <div className="relative">
-      <button
-        type="button"
-        // Out of the tab order for the same reason the surface itself is: the
-        // editor hands focus on via `onTabOut`, and one tab stop per line would
-        // make tabbing out of a long note impossible.
-        tabIndex={-1}
-        contentEditable={false}
-        aria-label={label}
-        onMouseDown={(e) => {
-          // Take the press before the browser moves the caret / focus with it,
-          // so the selection we draw is the only one. A tap on a touch screen
-          // arrives here as a synthesized mousedown, so this covers both.
-          e.preventDefault();
-          onSelect(index);
-        }}
-        className={`absolute inset-y-0 right-full flex cursor-pointer items-start justify-end pl-4 select-none ${
-          current ? "text-fg-bright" : "text-muted/50 hover:text-muted"
-        }`}
-        style={{ paddingRight: GUTTER_GAP }}
-      >
-        {/* One text row tall at the surface's font — not the smaller one the
+    <div data-line-row={index} className={`relative${tint}`}>
+      {numbered && (
+        <button
+          type="button"
+          // Out of the tab order for the same reason the surface itself is: the
+          // editor hands focus on via `onTabOut`, and one tab stop per line would
+          // make tabbing out of a long note impossible.
+          tabIndex={-1}
+          contentEditable={false}
+          aria-label={label}
+          onMouseDown={(e) => {
+            // Take the press before the browser moves the caret / focus with it,
+            // so the selection we draw is the only one. A tap on a touch screen
+            // arrives here as a synthesized mousedown, so this covers both.
+            e.preventDefault();
+            onSelect(index);
+          }}
+          className={`absolute inset-y-0 right-full flex cursor-pointer items-start justify-end pl-4 select-none${tint} ${
+            current || selected
+              ? "text-fg-bright"
+              : "text-muted/50 hover:text-muted"
+          }`}
+          style={{ paddingRight: GUTTER_GAP }}
+        >
+          {/* One text row tall at the surface's font — not the smaller one the
             digit is drawn at — so the number centres against the line's first
             row wherever that row's own text sits. */}
-        <span className="flex h-[1lh] items-center">
-          <span className="text-[0.75em] tabular-nums">{index + 1}</span>
-        </span>
-      </button>
+          <span className="flex h-[1lh] items-center">
+            <span className="text-[0.75em] tabular-nums">{index + 1}</span>
+          </span>
+        </button>
+      )}
       {children}
     </div>
   );

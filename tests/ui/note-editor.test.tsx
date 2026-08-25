@@ -610,7 +610,7 @@ describe("Editor (narrow header)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
 
-    expect(cluster().style.maxWidth).toBe("17rem");
+    expect(cluster().style.maxWidth).toBe("20rem");
     expect(
       screen
         .getByRole("button", { name: "Hide note actions" })
@@ -623,7 +623,7 @@ describe("Editor (narrow header)", () => {
     stubNarrow(true);
     renderEditor();
     fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
-    expect(cluster().style.maxWidth).toBe("17rem");
+    expect(cluster().style.maxWidth).toBe("20rem");
 
     // Tapping into the body is the end of the detour — the title comes back
     // without a second press on the toggle.
@@ -833,7 +833,7 @@ describe("Editor (selection actions)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
 
-    expect(cluster().style.maxWidth).toBe("17rem");
+    expect(cluster().style.maxWidth).toBe("20rem");
     expect(
       screen.getByRole("button", { name: "Add to favorites" }),
     ).toBeTruthy();

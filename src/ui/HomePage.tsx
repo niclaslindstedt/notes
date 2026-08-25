@@ -103,6 +103,19 @@ export function HomePage() {
               from being styled, cut or copied.
             </li>
             <li>
+              Picking out a run of lines is a mode of its own. The button left
+              of the magnifier turns the note into a list you choose from: one
+              press takes a whole line, and holding and dragging walks the
+              selection up or down it a line at a time — no handles to aim at a
+              single character with, which is what makes taking eight lines on a
+              phone awkward otherwise. The lines you have taken are tinted along
+              with their line numbers rather than wearing the ordinary selection
+              colour, so the two are never confused. From there you can type
+              over the run, delete it, copy or cut it, or style every line of it
+              at once. <kbd>Esc</kbd> — or a press on the lines you already took
+              — hands the run over as an ordinary selection and leaves the mode.
+            </li>
+            <li>
               On a computer, edit at more than one place at once — the same
               multiple cursors a code editor gives you. <kbd>⌘</kbd>/
               <kbd>Ctrl</kbd>+<kbd>D</kbd> selects the word under the cursor,

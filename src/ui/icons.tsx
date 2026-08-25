@@ -348,6 +348,37 @@ export function CutIcon({ className }: IconProps) {
 }
 
 /**
+ * Three rows of text with the middle one boxed — the editor's
+ * [select mode](../../docs/overview.md#select-mode) toggle.
+ *
+ * Deliberately *not* a pointer or an I-beam: the mode is not about where the
+ * caret goes, it is about taking whole lines, so the glyph shows a line
+ * enclosed and the lines above and below it left alone. The band is drawn at
+ * the same 2px radius the app's other rounded boxes use, and the enclosed row
+ * is inset from it so the box reads as a highlight rather than as a button.
+ */
+export function LineSelectIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <path d="M4 4h13" />
+      <rect x="2" y="8" width="20" height="8" rx="2" />
+      <path d="M5.5 12h11" />
+      <path d="M4 20h13" />
+    </svg>
+  );
+}
+
+/**
  * A solid play triangle — the inline YouTube player's press-to-play affordance.
  * Filled rather than stroked like the rest of the set: it sits at 28px on top
  * of a video poster frame, where an outlined triangle disappears into the

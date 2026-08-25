@@ -1041,6 +1041,105 @@ a gap the way a folded region does. The Markdown-off
 [plain textarea](#markdown-editor) has no per-line elements to hang a gutter on
 and ignores the setting, which the toggle's hint says outright.
 
+### Select mode
+
+Taking a run of lines with the ordinary selection means dragging two handles
+onto two exact characters. With a mouse that is fiddly; with a fingertip it is
+close to impossible, which is what makes "select these eight lines and delete
+them" one of the hardest things to do in the editor on a phone. **Select mode**
+drops the columns entirely: the note stops being a surface you put a caret in
+and becomes a list you pick lines from.
+
+The toggle is the header button immediately **left of Find**
+(`SelectModeButton`, `src/ui/SelectModeButton.tsx`), lit while the mode is on
+the way the [formatting](#styling-toolbar) and find toggles are — the state is
+the thing it reports, and once a run has been handed over the lit button is the
+only thing on screen still saying the mode is up. It is offered only on the
+[live-preview editor](#markdown-editor): the Markdown-off plain textarea has the
+browser's own selection and no per-line elements to paint. The flag itself lives
+in `Editor` (`src/ui/NoteEditor.tsx`) and is dropped on a note switch and on
+turning Markdown off — the mode is a detour from writing, so every note opens
+ready to be written in.
+
+**The gestures.** A press takes the line it lands on. Holding and dragging walks
+the far end of the run up or down it, one whole line at a time — no handles, and
+nothing to aim at within a line. Pressing a line already in the run leaves the
+mode; pressing any other line starts a new run there. On a **mouse** the drag
+opens on the button press; on a **finger** it opens after a short hold
+(`SWEEP_HOLD_MS`, with a haptic tick to say it took), because the same pixels
+have to go on scrolling the note — moving before the hold elapses is a scroll,
+and the line the press already took stays taken. Held against the top or bottom
+of the viewport, the note scrolls under the sweep (`startSweepScroll`) at a
+speed that rises with how far into the edge band the pointer is, so a run can be
+longer than the screen. While a sweep is actually dragging, a non-passive
+`touchmove` listener refuses the scroll — `touch-action` can't be changed
+mid-gesture — and it is bound only while the mode is on, so ordinary scrolling
+keeps its fast path everywhere else.
+
+**The paint is the editor's, not the browser's.** A taken line is tinted with
+`.line-selected` (`src/styles/theme.css`) across *both* of the boxes it is drawn
+in: the number in the gutter and the text beside it. They are siblings rather
+than one inside the other — the number hangs out in the surface's left padding
+(see [line numbers](#line-numbers)) — so a background on the row alone would
+stop dead at the first character; together they tile edge to edge into one band
+across the page. Deliberately **not** `::selection`: while the mode is on there
+is no browser range to style, and the whole point is that "taken by select mode"
+and "selected the ordinary way" look different, because leaving the mode turns
+one into the other and the change of colour is how you see it happen. What the
+surface does keep is a **collapsed** caret at the head of the run, hidden by
+`.line-select-mode`'s transparent `caret-color`, because that is what keeps it
+receiving `beforeinput` — without one, typing over the run would silently do
+nothing on a phone. The same class blanks `::selection` inside the surface, so
+nothing left over from before the mode was entered can show through.
+
+**Leaving the mode is the handover.** Escape — or a press on the lines already
+taken, which is Escape's stand-in on a touchscreen — turns the run into an
+ordinary browser selection over the same lines, drawn in the ordinary selection
+colour, and the mode goes off. The range is *queued* in `pendingLineSpan` rather
+than drawn on the spot: leaving the mode unwraps every line's row, so nodes a
+range pointed at now would be thrown away before the browser painted it, and the
+layout effect that already owns `pendingLineSpan` (the same one a
+[gutter press](#line-numbers) uses) draws it once the DOM is final.
+
+**What the run can then be used for**, all of it expressed as a source span and
+handed to the same pure engine every other edit uses:
+
+| Gesture                        | What happens                                        |
+| ------------------------------ | --------------------------------------------------- |
+| Typing, or a paste             | Replaces the whole run; the mode goes off            |
+| Backspace / Delete             | Takes the lines out entirely — no blanks left behind |
+| Ctrl/Cmd+C                     | The verbatim source of the lines, newlines and all   |
+| Ctrl/Cmd+X, Ctrl/Cmd+K, ✂      | The same, and the lines go                           |
+| A [styling toolbar](#styling-toolbar) press | Styles every line at once and **keeps** the run |
+| ↑ / ↓, Shift+↑ / ↓             | Steps the run, or walks its head alone               |
+| Ctrl/Cmd+A                     | The whole note                                       |
+
+A format keeps the run because bulleting five lines and then indenting the same
+five is one gesture with a second press; an edit drops it because the lines it
+named are gone and you are writing again. The run is reported out through
+`onSelectionChange` like any other selection, so the header offers copy and cut
+on it — which is how a phone, with no keyboard shortcuts, gets at either.
+
+The pure half is `src/domain/line-selection.ts`: a `LineSelection` is two line
+indices (`anchor` stays put, `head` follows the finger), and the module turns it
+into the source range (`lineSelectionRange`), the clipboard text
+(`lineSelectionSource`), the whole-line removal (`removeLineSelection` — the one
+place a line selection reaches outside its own span, to swallow the newline that
+joined it to its neighbour) and the arrow-key steps (`moveLineSelection`).
+`clampLineSelection` folds a run back into a note another writer — or an undo —
+has rewritten under it. The DOM half lives in `MarkdownEditor`: the sweep
+(`onSweepDown` / `onSweepMove` / `onSweepUp`, `lineRowAt`), the document-level
+keyboard (the mode is entered from a header button, so on a desktop the surface
+may not hold focus at all and Escape has to work either way), and `LineRow`'s
+`data-line-row` box, which is what a press is resolved against and which the
+mode renders for every line whether or not the note is numbered.
+
+A locked note keeps the mode: taking a run and copying it is reading, which is
+exactly what a locked note is for. Every path that would rewrite it stands down.
+Unlocking the mode's trophy is **Sweeping statement**, fired the first time a
+run covers more than one line — one line is what a press already gives you, and
+the sweep is the thing the gesture is for.
+
 ### Shorten links
 
 `shortenUrl` (`src/domain/markdown.ts`) trims a long **bare URL** for *display*

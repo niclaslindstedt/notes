@@ -269,6 +269,37 @@ body {
   animation: caret-blink 1s step-end infinite;
 }
 
+/* Select mode's own highlight (`docs/overview.md#select-mode`). A line that has
+   been taken is tinted across both of the boxes it is drawn in — the number in
+   the gutter and the text beside it — which is what makes the run read as one
+   band running the full width of the page rather than as a highlighted
+   paragraph with a number floating outside it.
+
+   Deliberately *not* `::selection`: while the mode is on there is no browser
+   selection to style (see `.line-select-mode` below), and the whole point of
+   the mode is that "taken by select mode" and "selected the ordinary way" look
+   different — leaving the mode converts one into the other, and the change of
+   colour is how you can tell it happened. The tint is a shade lighter than the
+   selection's so a formatted line's text stays readable under it; the boxes
+   tile edge to edge, so no radius (a rounded number band would leave a notch
+   against the text band). */
+.line-selected {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* While select mode is on, the editing surface keeps a collapsed caret so it
+   can still receive typing — but neither that caret nor any range left over
+   from before the mode was entered may be drawn: the tint above is the only
+   thing marking what is taken. */
+.line-select-mode {
+  caret-color: transparent;
+}
+
+.line-select-mode ::selection {
+  background: transparent;
+  color: inherit;
+}
+
 .multi-selection {
   background: color-mix(in srgb, var(--accent) 30%, transparent);
 }

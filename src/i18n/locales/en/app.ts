@@ -17,6 +17,12 @@ const app = {
   // Label of one line-number press target in the editor's gutter (line numbers
   // are opt-in); pressing it selects that whole line.
   selectLine: "Select line {n}",
+  // The header's select-mode toggle, left of Find, and the mode it turns on:
+  // a press takes a whole line, a hold and drag takes a run of them.
+  selectMode: {
+    enter: "Select lines",
+    exit: "Leave select mode",
+  },
   titlePlaceholder: "Title",
   // Heading of the collected attachments block at the foot of a note, shown
   // when images / files are set to render at the end rather than inline.
