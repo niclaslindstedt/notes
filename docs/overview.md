@@ -606,9 +606,26 @@ achievement the moment a second caret appears.
 by word, by line), Enter, the arrow keys with and without Shift, Home / End,
 copy, cut and paste. A cursor holding a selection replaces exactly that whatever
 the key was, so Backspace over a column of selections deletes the selections.
-Copy puts each selection's source on the clipboard one per line, and a paste
-holding exactly one line per caret is **dealt out** a line each — so a column
+Copy puts each selection's source on the clipboard one per line, cut takes those
+selections away and leaves a caret where each one was, and a paste holding
+exactly one line per caret is **dealt out** a line each — so a column
 round-trips through the clipboard; anything else goes in whole at every caret.
+
+**A bare column speaks in whole lines.** With nothing selected there is no
+per-cursor text to take, and VS Code's answer — copy and cut with an empty
+selection act on the *line* — is the one this follows: `Ctrl/Cmd+C` puts the
+whole line each caret sits on on the clipboard (in document order, a shared line
+counted once, each **newline-terminated** like a single caret's [line
+cut](#cut-button)), and `Ctrl/Cmd+X` takes those lines out and rides each caret
+down onto whatever moved up into its place, in the column it was already in.
+Whole lines **deal out** on the way back too — a caret takes a line rather than
+a fragment of one — so a column of carets down the edge of a list round-trips
+through cut and paste. The two readings of a clipboard can never both fit:
+dropping the terminator leaves one part fewer, so a clipboard that deals as N
+fragments cannot also deal as N lines. The pure half is `bareCursorLines` /
+`bareCursorLineText` / `cutBareCursorLines`; a column that **mixes** selections
+with bare carets is read as a column of selections, and the bare carets
+contribute nothing.
 
 **How one keystroke becomes N edits.** `applyAtCursors` works in flat offsets
 into `lines.join("\n")` rather than in `(line, col)` pairs, because an insertion

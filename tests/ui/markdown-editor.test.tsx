@@ -1749,6 +1749,159 @@ describe("MarkdownEditor", () => {
       press("d", { metaKey: true });
       expect(rawLines()).toHaveLength(0);
     });
+
+    it("deletes forwards at every caret too", () => {
+      const { onChange } = renderEditor("aXb\ncXd");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 1);
+      press("ArrowDown", { metaKey: true });
+      beforeInput("deleteContentForward");
+      expect(onChange).toHaveBeenLastCalledWith("ab\ncd");
+    });
+
+    it("deletes the word behind every caret", () => {
+      const { onChange } = renderEditor("one two\nsix four");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 4);
+      press("ArrowDown", { metaKey: true });
+      beforeInput("deleteWordBackward");
+      expect(onChange).toHaveBeenLastCalledWith("two\nfour");
+    });
+
+    // The clipboard at N carets, which is where a column stops being a party
+    // trick: copy takes what each cursor holds, cut takes it away, and a paste
+    // of what a column copied is dealt back out one piece per caret.
+    describe("the clipboard", () => {
+      // jsdom's clipboard events carry no `clipboardData`, so the editor is
+      // handed one that records what it was given — which is the assertion.
+      function clipboard(initial = "") {
+        const held: Record<string, string> = { "text/plain": initial };
+        return {
+          setData: (type: string, value: string) => {
+            held[type] = value;
+          },
+          getData: (type: string) => held[type] ?? "",
+          get text() {
+            return held["text/plain"] ?? "";
+          },
+          types: ["text/plain"],
+          files: [],
+          items: [],
+        };
+      }
+
+      // Copy and cut are listened for on the document (they arrive there
+      // whatever inside the surface is focused), so that is where they go.
+      function clip(type: "copy" | "cut", data: ReturnType<typeof clipboard>) {
+        const e = new Event(type, { bubbles: true, cancelable: true });
+        Object.defineProperty(e, "clipboardData", { value: data });
+        act(() => {
+          document.dispatchEvent(e);
+        });
+        return e;
+      }
+
+      function paste(text: string) {
+        act(() => {
+          fireEvent.paste(surface(), { clipboardData: clipboard(text) });
+        });
+      }
+
+      // Two carets over the two `one`s, each holding the word.
+      function twoSelections(body = "one\ntwo\none") {
+        const rendered = renderEditor(body);
+        caretIn(surface().querySelector('[data-line-index="0"]')!, 1);
+        press("d", { metaKey: true });
+        press("d", { metaKey: true });
+        return rendered;
+      }
+
+      // A bare column down the note, nothing selected.
+      function twoCarets(body: string, col = 0) {
+        const rendered = renderEditor(body);
+        caretIn(surface().querySelector('[data-line-index="0"]')!, col);
+        press("ArrowDown", { metaKey: true });
+        return rendered;
+      }
+
+      it("copies each selection, one per line", () => {
+        twoSelections();
+        const data = clipboard();
+        const e = clip("copy", data);
+        expect(data.text).toBe("one\none");
+        // Taken from the browser: what it would have copied is one selection.
+        expect(e.defaultPrevented).toBe(true);
+      });
+
+      it("cuts every selection, leaving a caret where each was", () => {
+        const { onChange } = twoSelections();
+        const data = clipboard();
+        clip("cut", data);
+        expect(data.text).toBe("one\none");
+        expect(onChange).toHaveBeenLastCalledWith("\ntwo\n");
+        expect(rawLines()).toHaveLength(2);
+      });
+
+      it("copies the whole line each bare caret sits on", () => {
+        twoCarets("aa\nbb\ncc");
+        const data = clipboard();
+        clip("copy", data);
+        // Newline-terminated, so pasting them back makes lines again.
+        expect(data.text).toBe("aa\nbb\n");
+      });
+
+      it("cuts those whole lines, riding each caret onto what moved up", () => {
+        const { onChange } = twoCarets("aa\nbb\ncc\ndd");
+        const data = clipboard();
+        clip("cut", data);
+        expect(data.text).toBe("aa\nbb\n");
+        expect(onChange).toHaveBeenLastCalledWith("cc\ndd");
+        // Both carets rode down onto the same spot — the head of the line that
+        // moved up — and two carets at one spot are one caret.
+        expect(rawLines()).toHaveLength(1);
+      });
+
+      it("deals a clipboard of one line per caret out a line each", () => {
+        const { onChange } = twoCarets("aa\nbb", 1);
+        paste("X\nY");
+        expect(onChange).toHaveBeenLastCalledWith("aXa\nbYb");
+      });
+
+      it("deals whole lines out too, a line to each caret", () => {
+        const { onChange } = twoCarets("aa\nbb");
+        // What a bare column copies: two whole lines, newline-terminated.
+        paste("X\nY\n");
+        expect(onChange).toHaveBeenLastCalledWith("X\naa\nY\nbb");
+      });
+
+      it("round-trips a bare column through cut and paste", () => {
+        const { onChange } = twoCarets("aa\nbb\ncc");
+        const data = clipboard();
+        clip("cut", data);
+        expect(onChange).toHaveBeenLastCalledWith("cc");
+        // One line left, so the column is one caret now — the lines go in
+        // whole at it rather than being dealt out.
+        paste(data.text);
+        expect(onChange).toHaveBeenLastCalledWith("aa\nbb\ncc");
+      });
+
+      it("pastes over what each cursor has selected", () => {
+        const { onChange } = twoSelections();
+        paste("Z");
+        expect(onChange).toHaveBeenLastCalledWith("Z\ntwo\nZ");
+      });
+
+      it("pastes anything else in whole at every caret", () => {
+        const { onChange } = twoCarets("aa\nbb", 1);
+        paste("ZZ");
+        expect(onChange).toHaveBeenLastCalledWith("aZZa\nbZZb");
+      });
+
+      it("leaves the clipboard to the browser with a single caret", () => {
+        renderEditor("one\ntwo");
+        caretIn(rawLine()!, 1);
+        const e = clip("copy", clipboard());
+        expect(e.defaultPrevented).toBe(false);
+      });
+    });
   });
 
   // Every edit is refused at `beforeinput` whether or not it can be mapped —

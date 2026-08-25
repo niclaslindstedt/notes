@@ -5,8 +5,11 @@ import {
   addNextOccurrence,
   applyAtCursors,
   collapsedCursor,
+  bareCursorLineText,
+  bareCursorLines,
   cursorLines,
   cursorSpan,
+  cutBareCursorLines,
   findOccurrence,
   isCollapsed,
   moveCursors,
@@ -268,5 +271,62 @@ describe("cursorLines / cursorSpan", () => {
       from: 1,
       to: 3,
     });
+  });
+});
+
+// A column of bare carets has nothing selected, so — as in VS Code — copy and
+// cut speak in whole lines rather than doing nothing at all.
+describe("bareCursorLines / bareCursorLineText", () => {
+  const lines = ["one", "two", "three"];
+
+  it("lists the lines a bare column sits on, in document order", () => {
+    expect(bareCursorLines([C(2, 1), C(0, 3)])).toEqual([0, 2]);
+  });
+
+  it("counts a line once however many carets share it", () => {
+    expect(bareCursorLines([C(1, 0), C(1, 2)])).toEqual([1]);
+  });
+
+  it("declines a column holding a selection — that is what is copied", () => {
+    expect(bareCursorLines([C(0, 0), R(1, 0, 2)])).toBeNull();
+  });
+
+  it("takes each line whole and newline-terminated", () => {
+    expect(bareCursorLineText(lines, [C(0, 1), C(2, 0)])).toBe("one\nthree\n");
+  });
+
+  it("terminates the note's last line too, so a paste back makes a line", () => {
+    expect(bareCursorLineText(lines, [C(2, 0), C(2, 4)])).toBe("three\n");
+  });
+});
+
+describe("cutBareCursorLines", () => {
+  it("takes the lines out and rides each caret onto what moved up", () => {
+    const out = cutBareCursorLines(["one", "two", "three"], [C(0, 1), C(1, 2)]);
+    expect(out?.lines).toEqual(["three"]);
+    // Both carets land on the line that took their place — the same one here,
+    // each still in its own column, so the column survives the cut.
+    expect(out?.cursors).toEqual([C(0, 1), C(0, 2)]);
+  });
+
+  it("keeps each caret's column, clamped to the line it lands on", () => {
+    const out = cutBareCursorLines(
+      ["aaaa", "bb", "cc", "dddd"],
+      [C(0, 3), C(2, 1)],
+    );
+    expect(out?.lines).toEqual(["bb", "dddd"]);
+    expect(out?.cursors).toEqual([C(0, 2), C(1, 1)]);
+  });
+
+  it("parks the caret on the last line when its own line was the last", () => {
+    const out = cutBareCursorLines(["one", "two"], [C(0, 0), C(1, 0)]);
+    expect(out?.lines).toEqual([""]);
+    expect(out?.cursors).toEqual([C(0, 0)]);
+  });
+
+  it("declines a column holding a selection", () => {
+    expect(
+      cutBareCursorLines(["one", "two"], [C(0, 0), R(1, 0, 2)]),
+    ).toBeNull();
   });
 });
