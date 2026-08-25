@@ -25,6 +25,7 @@ import {
   BoldGlyph,
   BroomGlyph,
   CardsGlyph,
+  ActionPillGlyph,
   CapitalGlyph,
   CheckSquareGlyph,
   CloudGlyph,
@@ -609,9 +610,20 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     tier: "intermediate",
     glyph: LineSweepGlyph,
     learnMore: true,
-    // Fired when a line selection first covers more than one line — the
-    // gesture the mode exists for. A selection is a paint over the note, not
-    // part of it, so there is nothing in the document to derive it from.
+    // Fired when a line selection first holds more than one line — the thing
+    // the mode exists for, whether it was swept along the rail or picked out a
+    // press at a time. A selection is a paint over the note, not part of it, so
+    // there is nothing in the document to derive it from.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "offTheTop",
+    tier: "intermediate",
+    glyph: ActionPillGlyph,
+    learnMore: true,
+    // Fired by the floating bar's own cut or delete, not by the edit — the
+    // keyboard and the header reach the same two verbs, and this trophy is for
+    // finding the bar that brings them to the selection on a touchscreen.
     trigger: { kind: "manual" },
   },
   {

@@ -503,6 +503,20 @@ export function LineSweepGlyph({ className }: IconProps) {
   );
 }
 
+// Two picked lines with a split pill hovering under them — the floating bar
+// select mode raises on a touchscreen, and the seam down its middle that makes
+// it two actions rather than one button.
+export function ActionPillGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M4 3.5h16" />
+      <path d="M4 6.5h10" />
+      <rect x="2" y="10" width="20" height="9" rx="4.5" />
+      <path d="M12 10v9" />
+    </Svg>
+  );
+}
+
 // Two text carets, one stepped down and across from the other — the shape a
 // column of cursors makes on the page, and the plainest picture of "the same
 // keystroke lands in more than one place at once".

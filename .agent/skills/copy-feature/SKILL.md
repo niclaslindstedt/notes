@@ -341,6 +341,20 @@ reuse them rather than re-porting:
   "Confirm" button rather than a `ConfirmDialog`. The namespace modal's
   appearance edits apply live (no draft/Save) — that's the namespace registry,
   separate from the settings dialog's drafted appearance store.
+- **Floating action pill** — `src/ui/SelectActionPill.tsx`, ported from the
+  bulk-action row `AddItemButton` (`src/ui/AddItemButton.tsx`) fans out on a
+  long-press. The reusable shape is the pill itself: one `rounded-full` bar,
+  `overflow-hidden` with a `gap-px` seam over a `bg-page-bg/40` backdrop so two
+  tinted halves read as a single control, portalled to `document.body` (a
+  scroller clips it otherwise, and a nested bar loses the tap to whatever the
+  view's own pointer handler does), and positioned on the **measured** box of
+  its anchor rather than `left: 50%` — checklist learned that the hard way when
+  the pinned sidebar drifted the row sideways. notes' version drops checklist's
+  `pointerup`/`click` dance (`openingPointerId`, `pointerHandled`): that exists
+  only because checklist's buttons appear *mid-gesture*, under the finger still
+  holding the (+). A bar raised by a completed selection is tapped by a fresh
+  gesture, so a plain `onClick` is right. Reach for this whenever an action has
+  to come to the content on a touchscreen.
 - **Cloud sync status** — `src/ui/SyncStatus.tsx` (the morphing cloud glyph
   button) and `src/ui/SyncDetailsModal.tsx` (the info dialog), the two
   presentational pieces of checklist's header sync affordance, plus the cloud

@@ -348,9 +348,15 @@ const achievements = {
     },
     sweepingStatement: {
       name: "Sweeping statement",
-      condition: "Sweep a run of lines in select mode.",
+      condition: "Take more than one line at once in select mode.",
       learnMore:
-        "The header's select-mode button turns the note into a list you pick from: one press takes a whole line, and holding and dragging walks the far end of the run up or down it, a line at a time \u2014 no handles to aim at a character with. The lines you have taken are tinted along with their line numbers rather than wearing the ordinary selection colour, so you can tell the two apart at a glance. From there, type over the run, delete it, copy or cut it, or style every line at once. Escape \u2014 or a press on the lines you already took \u2014 hands the run over as an ordinary selection and leaves the mode.",
+        "The header's select-mode button turns the note into a list you pick from: one press takes a whole line and a second press on it gives that line back, so picking one line never gives up the last one \u2014 no handles to aim at a character with. For a run of them, drag down the rail at the left edge of the note; everywhere to the right of it the note goes on scrolling as usual. The lines you have taken are tinted along with their line numbers rather than wearing the ordinary selection colour, so you can tell the two apart at a glance. From there, type over them, delete them, copy or cut them, or style every one at once. Escape leaves the mode, handing an unbroken run over as an ordinary selection.",
+    },
+    offTheTop: {
+      name: "Off the top",
+      condition: "Cut or delete picked lines with the floating bar.",
+      learnMore:
+        "Pick a line on a phone and a bar rises at the top of the note with two halves: cut, and delete. They are the two things you most want to do with a run of lines and the two that were furthest away \u2014 on a narrow screen the header folds its buttons behind a \u22ef, and delete had no button at all, only a Backspace on the keyboard select mode deliberately keeps down. So the actions come to the selection instead. Cut takes the lines out onto the clipboard; delete just takes them out, with no confirm step \u2014 Undo puts either back. The bar is there for touch: on a computer Ctrl/Cmd+X, Backspace and an unfolded header already reach both, so nothing hovers over the text.",
     },
     manyHands: {
       name: "Many hands",
