@@ -72,31 +72,42 @@ function yOf(index: number): number {
   return index * 20 + 10;
 }
 
-function press(index: number, pointerType = "mouse") {
+// The scroller measures at the origin in jsdom, so an x inside `SWEEP_RAIL_PX`
+// is on the sweep rail and anything past it is the note's own scrolling body.
+const RAIL_X = 8;
+const BODY_X = 200;
+
+function press(index: number, pointerType = "mouse", clientX = BODY_X) {
   fireEvent.pointerDown(surface().parentElement!, {
     pointerId: 1,
     pointerType,
-    clientX: 40,
+    clientX,
     clientY: yOf(index),
   });
 }
 
-function moveTo(index: number, pointerType = "mouse") {
+function moveTo(index: number, pointerType = "mouse", clientX = BODY_X) {
   fireEvent.pointerMove(surface().parentElement!, {
     pointerId: 1,
     pointerType,
-    clientX: 40,
+    clientX,
     clientY: yOf(index),
   });
 }
 
-function release(index: number, pointerType = "mouse") {
+function release(index: number, pointerType = "mouse", clientX = BODY_X) {
   fireEvent.pointerUp(surface().parentElement!, {
     pointerId: 1,
     pointerType,
-    clientX: 40,
+    clientX,
     clientY: yOf(index),
   });
+}
+
+/** A whole press-and-release on one line, which is how a line is toggled. */
+function tap(index: number, pointerType = "mouse", clientX = BODY_X) {
+  press(index, pointerType, clientX);
+  release(index, pointerType, clientX);
 }
 
 function beforeInput(inputType: string, data: string | null = null) {
@@ -121,8 +132,31 @@ describe("select mode", () => {
   it("takes the whole line a press lands on", () => {
     renderEditor();
     layOutRows();
-    press(2);
+    tap(2);
     expect(tinted()).toEqual([2]);
+  });
+
+  it("keeps what is already taken when another line is pressed", () => {
+    const { onSelectModeChange } = renderEditor();
+    layOutRows();
+    tap(1);
+    tap(3);
+    expect(tinted()).toEqual([1, 3]);
+    expect(onSelectModeChange).not.toHaveBeenCalled();
+  });
+
+  it("gives a line back when it is pressed a second time", () => {
+    const { onSelectModeChange } = renderEditor();
+    layOutRows();
+    tap(1);
+    tap(3);
+    tap(1);
+    expect(tinted()).toEqual([3]);
+    // Dropping the last line leaves the mode standing, ready to pick again —
+    // pressing a line is never the way out.
+    tap(3);
+    expect(tinted()).toEqual([]);
+    expect(onSelectModeChange).not.toHaveBeenCalled();
   });
 
   it("walks the run a line at a time as the press drags down", () => {
@@ -146,10 +180,34 @@ describe("select mode", () => {
     expect(tinted()).toEqual([1, 2, 3]);
   });
 
+  it("adds a dragged run to the lines already taken", () => {
+    renderEditor();
+    layOutRows();
+    tap(0);
+    press(2);
+    moveTo(3);
+    release(3);
+    expect(tinted()).toEqual([0, 2, 3]);
+  });
+
+  it("erases with a stroke that starts on a line already taken", () => {
+    renderEditor();
+    layOutRows();
+    press(0);
+    moveTo(3);
+    release(3);
+    expect(tinted()).toEqual([0, 1, 2, 3]);
+    // Starting on a taken line makes the same stroke give lines back.
+    press(1);
+    moveTo(2);
+    release(2);
+    expect(tinted()).toEqual([0, 3]);
+  });
+
   it("tints the line number along with the text", () => {
     renderEditor({ lineNumbers: true });
     layOutRows();
-    press(1);
+    tap(1);
     const number = screen.getByRole("button", { name: "Select line 2" });
     expect(number.className).toContain("line-selected");
     expect(number.closest("[data-line-row]")?.className).toContain(
@@ -157,26 +215,47 @@ describe("select mode", () => {
     );
   });
 
-  it("waits for the hold before a finger starts sweeping", () => {
-    vi.useFakeTimers();
-    try {
-      renderEditor();
-      layOutRows();
-      press(1, "touch");
-      // Straight into a scroll: the line pressed stays taken, but the drag
-      // never opens, so the note is free to scroll under the finger.
-      moveTo(3, "touch");
-      expect(tinted()).toEqual([1]);
+  it("leaves a touch outside the rail to the scroller", () => {
+    renderEditor();
+    layOutRows();
+    press(1, "touch");
+    // Nothing is taken on the way down: until the finger lifts there is no
+    // telling a tap from the start of a scroll.
+    expect(tinted()).toEqual([]);
+    moveTo(3, "touch");
+    release(3, "touch");
+    // It travelled, so it was a scroll — and a scroll must not take a line.
+    expect(tinted()).toEqual([]);
+  });
 
-      press(1, "touch");
-      act(() => {
-        vi.advanceTimersByTime(400);
-      });
-      moveTo(3, "touch");
-      expect(tinted()).toEqual([1, 2, 3]);
-    } finally {
-      vi.useRealTimers();
-    }
+  it("toggles the line a touch that never travelled lifts off", () => {
+    renderEditor();
+    layOutRows();
+    press(1, "touch");
+    release(1, "touch");
+    expect(tinted()).toEqual([1]);
+  });
+
+  it("sweeps straight away when the touch starts on the rail", () => {
+    renderEditor();
+    layOutRows();
+    press(1, "touch", RAIL_X);
+    expect(tinted()).toEqual([1]);
+    moveTo(3, "touch", RAIL_X);
+    expect(tinted()).toEqual([1, 2, 3]);
+  });
+
+  it("draws a rail segment for every line, lit for the taken ones", () => {
+    renderEditor();
+    layOutRows();
+    tap(1);
+    const rails = rows().map((row) =>
+      row.querySelector(".sweep-rail-on, .sweep-rail"),
+    );
+    expect(rails.every(Boolean)).toBe(true);
+    expect(
+      rails.map((rail) => rail?.classList.contains("sweep-rail-on")),
+    ).toEqual([false, true, false, false]);
   });
 
   it("hands the run over as an ordinary selection on Escape", () => {
@@ -195,27 +274,16 @@ describe("select mode", () => {
     expect(sel.toString()).toContain("charlie");
   });
 
-  it("leaves the mode when the run itself is pressed", () => {
+  it("hands nothing over when the lines taken aren't one run", () => {
     const { onSelectModeChange } = renderEditor();
     layOutRows();
-    press(1);
-    release(1);
-    expect(onSelectModeChange).not.toHaveBeenCalled();
+    tap(0);
+    tap(2);
 
-    press(1);
-    release(1);
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(onSelectModeChange).toHaveBeenCalledWith(false);
-  });
-
-  it("re-anchors instead of leaving when a different line is pressed", () => {
-    const { onSelectModeChange } = renderEditor();
-    layOutRows();
-    press(1);
-    release(1);
-    press(3);
-    release(3);
-    expect(onSelectModeChange).not.toHaveBeenCalled();
-    expect(tinted()).toEqual([3]);
+    // A browser range over 0–2 would quietly take the line between them.
+    expect(window.getSelection()?.toString() ?? "").not.toContain("bravo");
   });
 
   it("types over the run and leaves the mode", () => {
@@ -228,6 +296,15 @@ describe("select mode", () => {
     expect(onSelectModeChange).toHaveBeenCalledWith(false);
   });
 
+  it("types over scattered lines without swallowing the ones it skipped", () => {
+    const { onChange } = renderEditor();
+    layOutRows();
+    tap(0);
+    tap(2);
+    beforeInput("insertText", "X");
+    expect(onChange).toHaveBeenCalledWith("X\nbravo\ndelta");
+  });
+
   it("deletes the run's lines outright, leaving no blanks", () => {
     const { onChange, onSelectModeChange } = renderEditor();
     layOutRows();
@@ -238,10 +315,19 @@ describe("select mode", () => {
     expect(onSelectModeChange).toHaveBeenCalledWith(false);
   });
 
+  it("deletes scattered lines and closes every gap they leave", () => {
+    const { onChange } = renderEditor();
+    layOutRows();
+    tap(1);
+    tap(3);
+    fireEvent.keyDown(document, { key: "Backspace" });
+    expect(onChange).toHaveBeenCalledWith("alpha\ncharlie");
+  });
+
   it("walks the run with the arrow keys, extending on Shift", () => {
     renderEditor();
     layOutRows();
-    press(1);
+    tap(1);
     fireEvent.keyDown(document, { key: "ArrowDown" });
     expect(tinted()).toEqual([2]);
     fireEvent.keyDown(document, { key: "ArrowDown", shiftKey: true });
@@ -251,7 +337,7 @@ describe("select mode", () => {
   it("takes the whole note on Ctrl+A", () => {
     renderEditor();
     layOutRows();
-    press(1);
+    tap(1);
     fireEvent.keyDown(document, { key: "a", ctrlKey: true });
     expect(tinted()).toEqual([0, 1, 2, 3]);
   });
@@ -260,14 +346,14 @@ describe("select mode", () => {
     const onSelectionChange = vi.fn();
     renderEditor({ onSelectionChange });
     layOutRows();
-    press(2);
+    tap(2);
     expect(onSelectionChange).toHaveBeenCalledWith(true);
   });
 
   it("refuses to rewrite a locked note, but still lets the run be taken", () => {
     const { onChange } = renderEditor({ locked: true });
     layOutRows();
-    press(1);
+    tap(1);
     expect(tinted()).toEqual([1]);
     fireEvent.keyDown(document, { key: "Backspace" });
     expect(onChange).not.toHaveBeenCalled();
@@ -276,7 +362,117 @@ describe("select mode", () => {
   it("paints nothing while the mode is off", () => {
     renderEditor({ selectMode: false });
     layOutRows();
-    press(2);
+    tap(2);
     expect(tinted()).toEqual([]);
+  });
+});
+
+describe("select mode's floating action bar", () => {
+  // The framework's `useDesktopPointer` reads `window.matchMedia`, which jsdom
+  // answers "no" to for every query — so the editor renders as it does on a
+  // touchscreen unless a test says otherwise.
+  function stubDesktopPointer() {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((media: string) => ({
+        matches: media.includes("pointer: fine"),
+        media,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      })),
+    );
+  }
+
+  // The bar is `aria-hidden` while it holds nothing, which takes it out of the
+  // accessibility tree `*ByRole` walks — so it is queried by its label, which
+  // is there either way.
+  function bar(): HTMLElement | null {
+    return document.body.querySelector<HTMLElement>('[role="group"]');
+  }
+
+  function action(name: string): HTMLButtonElement {
+    return screen.getByLabelText(name) as HTMLButtonElement;
+  }
+
+  it("is folded away until a line is taken, then offers cut and delete", () => {
+    renderEditor();
+    layOutRows();
+    expect(bar()?.getAttribute("aria-hidden")).toBe("true");
+    expect(action("Cut selected lines").disabled).toBe(true);
+
+    tap(1);
+    expect(bar()?.getAttribute("aria-hidden")).toBe("false");
+    expect(action("Cut selected lines").disabled).toBe(false);
+    expect(action("Delete selected lines").disabled).toBe(false);
+  });
+
+  it("cuts the taken lines onto the clipboard and out of the note", () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    const { onChange, onSelectModeChange } = renderEditor();
+    layOutRows();
+    tap(1);
+    tap(3);
+    fireEvent.click(action("Cut selected lines"));
+    expect(writeText).toHaveBeenCalledWith("bravo\ndelta");
+    expect(onChange).toHaveBeenCalledWith("alpha\ncharlie");
+    expect(onSelectModeChange).toHaveBeenCalledWith(false);
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  it("deletes the taken lines without touching the clipboard", () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    const { onChange } = renderEditor();
+    layOutRows();
+    press(1);
+    moveTo(2);
+    release(2);
+    fireEvent.click(action("Delete selected lines"));
+    expect(onChange).toHaveBeenCalledWith("alpha\ndelta");
+    expect(writeText).not.toHaveBeenCalled();
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  it("stays away on a desktop pointer, where the keyboard already has both", () => {
+    stubDesktopPointer();
+    renderEditor();
+    layOutRows();
+    tap(1);
+    expect(bar()).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("stays away on a locked note, which refuses both edits anyway", () => {
+    renderEditor({ locked: true });
+    layOutRows();
+    tap(1);
+    expect(bar()).toBeNull();
+  });
+
+  it("folds away again when the last line is given back", () => {
+    renderEditor();
+    layOutRows();
+    tap(1);
+    expect(bar()?.getAttribute("aria-hidden")).toBe("false");
+    tap(1);
+    expect(bar()?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("isn't rendered at all while the mode is off", () => {
+    renderEditor({ selectMode: false });
+    layOutRows();
+    tap(1);
+    expect(bar()).toBeNull();
   });
 });

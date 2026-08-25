@@ -18,10 +18,16 @@ const app = {
   // are opt-in); pressing it selects that whole line.
   selectLine: "Select line {n}",
   // The header's select-mode toggle, left of Find, and the mode it turns on:
-  // a press takes a whole line, a hold and drag takes a run of them.
+  // a press takes a whole line, a second press gives it back, and a drag down
+  // the rail at the note's left edge takes a run of them. `actions` / `cut` /
+  // `delete` name the floating bar the mode raises on a touchscreen once
+  // something is taken.
   selectMode: {
     enter: "Select lines",
     exit: "Leave select mode",
+    actions: "Actions for the selected lines",
+    cut: "Cut selected lines",
+    delete: "Delete selected lines",
   },
   titlePlaceholder: "Title",
   // Heading of the collected attachments block at the foot of a note, shown

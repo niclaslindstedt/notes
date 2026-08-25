@@ -347,9 +347,16 @@ const achievements: AchievementsCatalog = {
     },
     sweepingStatement: {
       name: "Svepande formulering",
-      condition: "Svep över en följd rader i markeringsläge.",
+      condition: "Ta fler än en rad samtidigt i markeringsläge.",
       learnMore:
-        "Knappen för markeringsläge i sidhuvudet gör anteckningen till en lista du plockar ur: ett tryck tar en hel rad, och att hålla kvar och dra flyttar den bortre änden av följden uppåt eller nedåt, en rad i taget \u2014 inga handtag att sikta mot ett enskilt tecken med. Raderna du tagit tonas tillsammans med sina radnummer i stället för att bära den vanliga markeringsfärgen, så du ser skillnaden direkt. Därifrån kan du skriva över följden, radera den, kopiera eller klippa ut den, eller formatera varje rad på en gång. Escape \u2014 eller ett tryck på raderna du redan tagit \u2014 lämnar över följden som en vanlig markering och avslutar läget.",
+        "Knappen för markeringsläge i sidhuvudet gör anteckningen till en lista du plockar ur: ett tryck tar en hel rad och ett andra tryck på samma rad lämnar tillbaka den, så att plocka en rad ger aldrig upp den förra \u2014 inga handtag att sikta mot ett enskilt tecken med. Vill du ha en följd drar du längs listen i anteckningens vänsterkant; överallt till höger om den rullar anteckningen som vanligt. Raderna du tagit tonas tillsammans med sina radnummer i stället för att bära den vanliga markeringsfärgen, så du ser skillnaden direkt. Därifrån kan du skriva över dem, radera dem, kopiera eller klippa ut dem, eller formatera varje rad på en gång. Escape avslutar läget och lämnar över en obruten följd som en vanlig markering.",
+    },
+    offTheTop: {
+      name: "Uppifr\u00e5n och ned",
+      condition:
+        "Klipp ut eller radera plockade rader med den flytande listen.",
+      learnMore:
+        "Plocka en rad p\u00e5 en telefon s\u00e5 reser sig en list h\u00f6gst upp i anteckningen med tv\u00e5 halvor: klipp ut och radera. Det \u00e4r de tv\u00e5 sakerna du oftast vill g\u00f6ra med en f\u00f6ljd rader och de tv\u00e5 som l\u00e5g l\u00e4ngst bort \u2014 p\u00e5 en smal sk\u00e4rm viker sidhuvudet in sina knappar bakom ett \u22ef, och radera hade ingen knapp alls, bara ett Backsteg p\u00e5 tangentbordet som markeringsl\u00e4get med flit h\u00e5ller nere. Allts\u00e5 kommer \u00e5tg\u00e4rderna till markeringen i st\u00e4llet. Klipp ut tar raderna till urklipp; radera tar bara bort dem, utan bekr\u00e4ftelsesteg \u2014 \u00c5ngra l\u00e4gger tillbaka b\u00e5da. Listen finns f\u00f6r pekning: p\u00e5 en dator n\u00e5r Ctrl/Cmd+X, Backsteg och ett utf\u00e4llt sidhuvud redan b\u00e5da, s\u00e5 ingenting sv\u00e4var \u00f6ver texten.",
     },
     manyHands: {
       name: "Många händer",

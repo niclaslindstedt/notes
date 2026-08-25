@@ -287,6 +287,22 @@ body {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
+/* Select mode's **sweep rail**: the band down the left edge of the note that a
+   finger drags along to take a run of lines, while everywhere to the right of
+   it goes on scrolling. A touchscreen has no second button to hold, so the two
+   gestures are split by *place* rather than by time — which only works if the
+   place is visible, hence a track drawn for every line rather than a mark that
+   appears once something is already taken. The lit segments are the same accent
+   the tint is, so the rail reads as the left edge of the selection rather than
+   as a separate control. */
+.sweep-rail {
+  background: color-mix(in srgb, var(--fg) 12%, transparent);
+}
+
+.sweep-rail-on {
+  background: var(--accent);
+}
+
 /* While select mode is on, the editing surface keeps a collapsed caret so it
    can still receive typing — but neither that caret nor any range left over
    from before the mode was entered may be drawn: the tint above is the only
