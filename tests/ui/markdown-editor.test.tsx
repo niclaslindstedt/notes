@@ -1977,8 +1977,8 @@ describe("MarkdownEditor", () => {
       renderEditor("alpha beta\ngamma alpha", {
         focusOnMount: false,
         matches: [
-          { line: 0, from: 0, to: 5 },
-          { line: 1, from: 6, to: 11 },
+          { line: 0, from: 0, endLine: 0, to: 5 },
+          { line: 1, from: 6, endLine: 1, to: 11 },
         ],
         activeMatch: 1,
       });
@@ -1994,7 +1994,7 @@ describe("MarkdownEditor", () => {
     it("stamps each segment with its own source column", () => {
       renderEditor("alpha beta", {
         focusOnMount: false,
-        matches: [{ line: 0, from: 6, to: 10 }],
+        matches: [{ line: 0, from: 6, endLine: 0, to: 10 }],
         activeMatch: 0,
       });
       // The mark and the text before it are siblings, each carrying the column
@@ -2002,6 +2002,18 @@ describe("MarkdownEditor", () => {
       const mark = surface().querySelector("mark")!;
       expect(mark.getAttribute("data-src")).toBe("6");
       expect(mark.previousElementSibling?.getAttribute("data-src")).toBe("0");
+    });
+
+    it("paints a hit that spans a line break on every line it covers", () => {
+      renderEditor("alpha beta\ngamma alpha", {
+        focusOnMount: false,
+        // "beta\ngamma" — one hit, ending on the line below the one it starts
+        // on, so the highlight has to be cut into a piece per line.
+        matches: [{ line: 0, from: 6, endLine: 1, to: 5 }],
+        activeMatch: 0,
+      });
+      const marks = surface().querySelectorAll("mark");
+      expect([...marks].map((m) => m.textContent)).toEqual(["beta", "gamma"]);
     });
 
     it("renders no extra nodes when nothing matches", () => {

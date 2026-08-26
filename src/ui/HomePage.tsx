@@ -290,7 +290,11 @@ export function HomePage() {
               typed as a <em>regular expression</em> instead of literal text, so
               a pattern can find what a plain search can&apos;t and its capture
               groups can be pasted into the replacement as{" "}
-              <code className="text-fg-bright">$1</code>. Before you commit to
+              <code className="text-fg-bright">$1</code>. With it on,{" "}
+              <code className="text-fg-bright">\n</code> means a real{" "}
+              <em>line break</em> on both sides — so a pattern can match across
+              one, and a replacement can write one, which is how a run-on list
+              becomes a checklist in a single press. Before you commit to
               anything, <em>preview</em> lists every line that would change —
               what goes, and what arrives in its place — while writing nothing;
               and once you do, the whole replacement is a single undo away. All

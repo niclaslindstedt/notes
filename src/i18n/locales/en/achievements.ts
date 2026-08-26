@@ -395,7 +395,13 @@ const achievements = {
       name: "Pattern seeker",
       condition: "Search a note with a regular expression.",
       learnMore:
-        "The `.*` switch inside the find field stops reading your search as literal characters and hands it to a regular expression instead — so `^#{1,3} ` finds every heading, and `\\d{4}-\\d{2}-\\d{2}` finds every date. Each line is matched on its own, so `^` and `$` mean the start and end of a line and no match ever spans a line break. It is what makes the replace field's `$1` mean anything: a pattern's capture groups can be pasted straight into what replaces it. A half-typed pattern says so where the match count usually is, rather than pretending the note has nothing in it.",
+        "The `.*` switch inside the find field stops reading your search as literal characters and hands it to a regular expression instead — so `^#{1,3} ` finds every heading, and `\\d{4}-\\d{2}-\\d{2}` finds every date. `^` and `$` still mean the start and end of a *line* rather than of the note, and `.` never swallows a line break — but `\\n` matches one, so a pattern can reach across it (see **Line breaker**). It is what makes the replace field's `$1` mean anything: a pattern's capture groups can be pasted straight into what replaces it. A half-typed pattern says so where the match count usually is, rather than pretending the note has nothing in it.",
+    },
+    lineBreaker: {
+      name: "Line breaker",
+      condition: "Match or write a line break from the find bar.",
+      learnMore:
+        "With the `.*` switch on, the find bar reads the note as one piece of text rather than a stack of separate lines: `\\n` in the search matches a real line break, so a pattern can span one — `\\n\\n` finds every blank line between paragraphs, and `,\\s*\\n` finds a comma left hanging at the end of one. The replace field understands the same escapes, so `\\n` there *writes* a line break (and `\\t` a tab, `\\\\` a backslash) — which is the only way to ask for one from a field you can't press Enter in. Replacing every `·` with `\\n- [ ] ` turns a run-on list into a checklist in a single press. None of it applies to a plain literal search: there `\\n` is a backslash and an n, exactly as typed.",
     },
     shapeshifter: {
       name: "Shapeshifter",

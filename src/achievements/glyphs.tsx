@@ -548,6 +548,19 @@ export function RegexGlyph({ className }: IconProps) {
   );
 }
 
+// A line of text stopped short by a return arrow — the line break a pattern can
+// match and a replacement can write, drawn the way a keyboard draws its Enter
+// key.
+export function LineBreakGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M4 6h16" />
+      <path d="M20 10v3a2 2 0 0 1-2 2H6" />
+      <path d="m9 12-3 3 3 3" />
+    </Svg>
+  );
+}
+
 // One box turning into another across an arrow — a Transform rule, which
 // takes the text it matches and shows something else in its place.
 export function ReplaceGlyph({ className }: IconProps) {

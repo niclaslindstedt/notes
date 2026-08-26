@@ -274,10 +274,20 @@ body {
    has to be indistinguishable from the real thing, or the column reads as two
    different kinds of cursor. The highlight therefore reuses the exact
    `::selection` tint above, and the caret blinks on the same 1s cadence every
-   platform uses for a text caret. */
+   platform uses for a text caret.
+
+   The blink belongs to the *layer* holding the carets rather than to each
+   caret: an animation starts when its element is inserted, so a caret added as
+   the column grows would blink against whatever was already on screen and the
+   column would shimmer instead of pulsing as one. One animation over all of
+   them cannot drift (`MultiCursorOverlay`, which also restarts it on every
+   paint so a caret that just moved reads solid). */
+.multi-caret-layer {
+  animation: caret-blink 1s step-end infinite;
+}
+
 .multi-caret {
   background: var(--fg-bright);
-  animation: caret-blink 1s step-end infinite;
 }
 
 /* Select mode's own highlight (`docs/overview.md#select-mode`). A line that has
@@ -344,7 +354,7 @@ body {
 /* A caret that blinks is motion, and a reader who asked for none gets a caret
    that simply stays put — visible, which is the part that matters. */
 @media (prefers-reduced-motion: reduce) {
-  .multi-caret {
+  .multi-caret-layer {
     animation: none;
   }
 }

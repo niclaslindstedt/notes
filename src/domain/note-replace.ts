@@ -13,19 +13,36 @@
 //     as an inline diff.
 //
 // A replacement is inserted **verbatim** in literal mode: replacing with `$1`
-// writes the characters `$1`, because a literal search is a promise that what
-// you typed is what you get on both sides of it. In regex mode — the bar's
-// `.*` toggle — the template expands `$&`, `$1`…`$99`, `$<name>` and `$$` the
-// way `String.replace` does, since that is the whole reason to reach for a
-// pattern. That expansion is **not** reimplemented here: `expandReplacement`
-// (`domain/transform.ts`) already speaks the grammar for the Transform rules,
-// and one grammar deserves one implementation.
+// writes the characters `$1` and `\n` writes a backslash and an n, because a
+// literal search is a promise that what you typed is what you get on both sides
+// of it. In regex mode — the bar's `.*` toggle — the template expands `$&`,
+// `$1`…`$99`, `$<name>` and `$$` the way `String.replace` does, since that is
+// the whole reason to reach for a pattern. That expansion is **not**
+// reimplemented here: `expandReplacement` (`domain/transform.ts`) already
+// speaks the grammar for the Transform rules, and one grammar deserves one
+// implementation.
+//
+// Regex mode also resolves the **backslash escapes** a single-line field can't
+// otherwise carry — `\n`, `\r`, `\t`, `\\` — so a replacement can write a line
+// break, which is the only way to write one from a text input. Escapes are
+// resolved *before* the `$` grammar runs, so a capture pasted in by `$1` is
+// inserted as it stood in the note rather than being re-read for escapes of
+// its own.
+//
+// Everything works in **flat body offsets** rather than per line, because a
+// regex hit may span a line break (`note-find.ts`): the note is one string, and
+// a replacement crossing a break is an ordinary splice in it.
 //
 // Nothing here re-scans what it just wrote: every operation plans its edits
 // against the body it was handed, so replacing `a` with `aa` terminates
 // instead of feeding itself.
 
-import { findHits, type FindOptions, type NoteHit } from "./note-find.ts";
+import {
+  findHits,
+  lineStarts,
+  type FindOptions,
+  type NoteHit,
+} from "./note-find.ts";
 import { expandReplacement } from "./transform.ts";
 
 /** One run of a previewed line: text that stays, goes, or arrives. */
@@ -34,10 +51,16 @@ export type PreviewSegment = {
   text: string;
 };
 
-/** One line the replacement would touch, as an inline diff. */
+/**
+ * One stretch of the note the replacement would touch, as an inline diff.
+ * Normally that is a single line; a hit that spans a line break pulls the lines
+ * it crosses into one entry, whose `removed` run carries the break itself.
+ */
 export type PreviewLine = {
   /** 0-based source line, so the bar can label it the way the gutter does. */
   line: number;
+  /** Last source line the entry covers — `line` unless a hit spans a break. */
+  endLine: number;
   segments: readonly PreviewSegment[];
 };
 
@@ -53,9 +76,31 @@ export type ReplaceOneResult = {
 };
 
 /**
+ * The template's backslash escapes resolved: `\n`, `\r`, `\t` and `\\`. Only
+ * regex mode does this — a literal search promises that what you typed is what
+ * you get on both sides of it, so there `\n` stays a backslash and an n.
+ *
+ * It exists because the replace field is a single-line `<input>`: there is no
+ * keystroke that puts a line break into it, so an escape is the only way to ask
+ * for one. Exported because the editor reads it to tell whether a replacement
+ * is about to cross a line break.
+ */
+export function expandTemplateEscapes(
+  template: string,
+  { regex = false }: FindOptions = {},
+): string {
+  if (!regex || !template.includes("\\")) return template;
+  return template.replace(/\\([\\nrt])/g, (_, char: string) =>
+    char === "n" ? "\n" : char === "r" ? "\r" : char === "t" ? "\t" : "\\",
+  );
+}
+
+/**
  * What one hit becomes. Literal mode inserts the template exactly as typed —
  * `$1` is two characters there, not a capture — so the only mode that expands
- * anything is the one where capture groups exist to be expanded.
+ * anything is the one where capture groups exist to be expanded. `template` has
+ * already been through `expandTemplateEscapes`, once for the whole operation
+ * rather than once per hit.
  */
 function insertionFor(
   template: string,
@@ -65,22 +110,11 @@ function insertionFor(
   return regex ? expandReplacement(template, hit.match) : template;
 }
 
-/** Group hits by the line they sit on, keeping each line's hits in order. */
-function byLine(hits: readonly NoteHit[]): Map<number, NoteHit[]> {
-  const lines = new Map<number, NoteHit[]>();
-  for (const hit of hits) {
-    const existing = lines.get(hit.line);
-    if (existing) existing.push(hit);
-    else lines.set(hit.line, [hit]);
-  }
-  return lines;
-}
-
 /**
- * `body` with every hit rewritten, in one pass. Hits never overlap and each
- * line is rebuilt left to right from the *original* line, so inserted text is
- * never itself matched and the columns stay in step as the line's length
- * changes underneath.
+ * `body` with every hit rewritten, in one pass. Hits never overlap and the body
+ * is rebuilt left to right from the *original* text, so inserted text is never
+ * itself matched (`a` → `aa` terminates rather than feeding on its own output)
+ * and the offsets stay in step as the note's length changes underneath.
  */
 export function replaceAll(
   body: string,
@@ -90,19 +124,15 @@ export function replaceAll(
 ): string {
   const hits = findHits(body, query, options);
   if (hits.length === 0) return body;
-  const lines = body.split("\n");
-  for (const [line, lineHits] of byLine(hits)) {
-    const source = lines[line] ?? "";
-    let out = "";
-    let cursor = 0;
-    for (const hit of lineHits) {
-      out += source.slice(cursor, hit.from);
-      out += insertionFor(replacement, hit, options);
-      cursor = hit.to;
-    }
-    lines[line] = out + source.slice(cursor);
+  const template = expandTemplateEscapes(replacement, options);
+  let out = "";
+  let cursor = 0;
+  for (const hit of hits) {
+    out += body.slice(cursor, hit.start);
+    out += insertionFor(template, hit, options);
+    cursor = hit.end;
   }
-  return lines.join("\n");
+  return out + body.slice(cursor);
 }
 
 /**
@@ -124,20 +154,36 @@ export function replaceOne(
 ): ReplaceOneResult | null {
   const hit = findHits(body, query, options)[index];
   if (!hit) return null;
-  const lines = body.split("\n");
-  const source = lines[hit.line] ?? "";
-  const insert = insertionFor(replacement, hit, options);
-  lines[hit.line] = source.slice(0, hit.from) + insert + source.slice(hit.to);
-  const next = lines.join("\n");
-  const resumeAt = hit.from + insert.length;
-  const remaining = findHits(next, query, options);
-  const found = remaining.findIndex(
-    (h) => h.line > hit.line || (h.line === hit.line && h.from >= resumeAt),
+  const insert = insertionFor(
+    expandTemplateEscapes(replacement, options),
+    hit,
+    options,
   );
+  const next = body.slice(0, hit.start) + insert + body.slice(hit.end);
+  const resumeAt = hit.start + insert.length;
+  const remaining = findHits(next, query, options);
+  const found = remaining.findIndex((h) => h.start >= resumeAt);
   return {
     body: next,
     index: found >= 0 ? found : remaining.length > 0 ? 0 : -1,
   };
+}
+
+/**
+ * Hits gathered into the stretches of the note a preview draws as one row: the
+ * hits on a line, plus — when one of them spans a line break — the lines it
+ * runs into, so the diff is never cut in half at a boundary the hit crosses.
+ */
+function byStretch(hits: readonly NoteHit[]): NoteHit[][] {
+  const stretches: NoteHit[][] = [];
+  let endLine = -1;
+  for (const hit of hits) {
+    if (stretches.length > 0 && hit.line <= endLine)
+      stretches[stretches.length - 1]!.push(hit);
+    else stretches.push([hit]);
+    endLine = Math.max(endLine, hit.endLine);
+  }
+  return stretches;
 }
 
 /**
@@ -147,7 +193,10 @@ export function replaceOne(
  *
  * Untouched lines are left out entirely (a long note changed in two places is
  * two rows, not a wall of context), and an empty run is never emitted, so
- * replacing with nothing yields a `removed` with no `added` beside it.
+ * replacing with nothing yields a `removed` with no `added` beside it. A hit
+ * that spans a line break makes its lines **one** entry rather than two halves:
+ * the break it swallows sits inside the `removed` run, where the panel draws it
+ * struck through like the rest of what goes.
  */
 export function previewReplacements(
   body: string,
@@ -157,23 +206,29 @@ export function previewReplacements(
 ): PreviewLine[] {
   const hits = findHits(body, query, options);
   if (hits.length === 0) return [];
-  const lines = body.split("\n");
+  const template = expandTemplateEscapes(replacement, options);
+  const starts = lineStarts(body);
+  // The offset just past a line's last character — the next line's start minus
+  // its break, or the end of the note for the last line.
+  const lineEnd = (line: number) =>
+    line + 1 < starts.length ? starts[line + 1]! - 1 : body.length;
   const preview: PreviewLine[] = [];
-  for (const [line, lineHits] of byLine(hits)) {
-    const source = lines[line] ?? "";
+  for (const stretch of byStretch(hits)) {
+    const line = stretch[0]!.line;
+    const endLine = Math.max(...stretch.map((hit) => hit.endLine));
     const segments: PreviewSegment[] = [];
-    let cursor = 0;
+    let cursor = starts[line]!;
     const push = (kind: PreviewSegment["kind"], text: string) => {
       if (text !== "") segments.push({ kind, text });
     };
-    for (const hit of lineHits) {
-      push("kept", source.slice(cursor, hit.from));
+    for (const hit of stretch) {
+      push("kept", body.slice(cursor, hit.start));
       push("removed", hit.match[0]);
-      push("added", insertionFor(replacement, hit, options));
-      cursor = hit.to;
+      push("added", insertionFor(template, hit, options));
+      cursor = hit.end;
     }
-    push("kept", source.slice(cursor));
-    preview.push({ line, segments });
+    push("kept", body.slice(cursor, lineEnd(endLine)));
+    preview.push({ line, endLine, segments });
   }
   return preview;
 }

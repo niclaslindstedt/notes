@@ -87,7 +87,7 @@ import {
   type FormatAction,
   type LineFormat,
 } from "../domain/markdown-format.ts";
-import type { NoteMatch } from "../domain/note-find.ts";
+import { matchLineSpans, type NoteMatch } from "../domain/note-find.ts";
 import type { Note } from "../domain/note.ts";
 import { doubleSpacePeriod, sentenceCapital } from "../domain/sentence.ts";
 import type { CompiledTransform } from "../domain/transform.ts";
@@ -1677,13 +1677,17 @@ export function MarkdownEditor({
   const highlightsByLine = useMemo(() => {
     const byLine = new Map<number, LineHighlight[]>();
     for (const [i, m] of matches.entries()) {
-      const hit = { from: m.from, to: m.to, active: i === activeMatch };
-      const list = byLine.get(m.line);
-      if (list) list.push(hit);
-      else byLine.set(m.line, [hit]);
+      // A regex hit can span a line break, so each one is cut into the per-line
+      // pieces a rendered line can actually paint (`matchLineSpans`).
+      for (const span of matchLineSpans(m, lines)) {
+        const hit = { from: span.from, to: span.to, active: i === activeMatch };
+        const list = byLine.get(span.line);
+        if (list) list.push(hit);
+        else byLine.set(span.line, [hit]);
+      }
     }
     return byLine;
-  }, [matches, activeMatch]);
+  }, [matches, activeMatch, lines]);
 
   // Reveal the hit the bar just stepped onto. `scrollLineIntoView` leaves an
   // already-visible line alone, so walking matches within the viewport doesn't
