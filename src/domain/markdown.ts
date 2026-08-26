@@ -42,8 +42,9 @@ export type LineBlock = {
    */
   depth?: number;
   /**
-   * The display marker for an `ol` item, computed sequentially across the list
-   * so `1.`/`1.` shows as `1.`/`2.`; the style rotates by `depth`
+   * The display marker for an `ol` item, computed sequentially from 1 across
+   * the list so `1.`/`1.` shows as `1.`/`2.` — and a list typed `3.`/`4.`
+   * shows as `1.`/`2.`; the style rotates by `depth`
    * (numeric → alpha → roman). Falls back to `ordinal` when unset.
    */
   marker?: string;
@@ -421,9 +422,9 @@ function numberLists(blocks: LineBlock[]): void {
     }
     const top = stack[stack.length - 1];
     if (!top || indent > top.indent) {
-      // A new (possibly nested) list: an `ol` starts at its own first number,
-      // so `3.` opens the list at three; a `ul` start value is irrelevant.
-      stack.push({ indent, count: startNumber(block.ordinal) });
+      // A new (possibly nested) list always opens at 1, whatever number was
+      // typed — `3.` still displays as `1.`; a `ul` start value is irrelevant.
+      stack.push({ indent, count: 1 });
     } else {
       top.count += 1;
     }
@@ -447,14 +448,6 @@ function leadingIndent(raw: string): number {
     else break;
   }
   return cols;
-}
-
-// The number an `ol` item opens its list at: the digits of its typed marker
-// (`"3."` → 3), or 1 when absent or unparseable.
-function startNumber(ordinal?: string): number {
-  const m = ordinal ? /\d+/.exec(ordinal) : null;
-  const n = m ? Number.parseInt(m[0], 10) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
 // The display marker for an ordered item at `n` and nesting `depth`. The style
