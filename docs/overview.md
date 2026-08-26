@@ -2704,6 +2704,18 @@ while it plays and still leaves the folded-away buttons out of the tab order
 and off screen readers the rest of the time. Reduced motion drops all of it to
 a jump through the global rule in `src/styles/theme.css`.
 
+When even the unfolded row is wider than the screen — a touch pointer's cut
+button plus a [pinned](#pinned-header-state) readout can push it past a small
+phone — the box shrinks to what fits instead of shoving the ⋯ off the right
+edge, and becomes a sideways **scroller**: the excess hangs off its *left*
+edge, next to the back arrow, and is reached by swiping the row. The left
+anchor is the box's `dir="rtl"` — an RTL scroll container starts scrolled to
+its inline start, the right, and lets overflow extend leftwards, which a plain
+LTR flex row cannot (start-side overflow is unscrollable) — with an inner
+`dir="ltr"` row keeping the buttons in reading order. The scroller draws no
+scrollbar (`.no-scrollbar`, `src/styles/theme.css`), like any horizontal strip
+on a phone.
+
 Three things close it again:
 
 - **Pressing ⋯ a second time** — it carries `aria-expanded` and the same

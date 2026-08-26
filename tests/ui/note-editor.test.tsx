@@ -571,11 +571,13 @@ describe("Editor (narrow header)", () => {
     );
   }
 
-  // The box that carries the five buttons — the star's parent, which is what
-  // the open / closed transition animates.
+  // The box that carries the five buttons — the scroller the open / closed
+  // transition animates (the star sits one level deeper, in the LTR row the
+  // sideways-scrollable box wraps around its buttons).
   function cluster() {
-    return screen.getByRole("button", { name: "Add to favorites" })
-      .parentElement as HTMLElement;
+    return screen
+      .getByRole("button", { name: "Add to favorites" })
+      .closest("[data-cluster]") as HTMLElement;
   }
 
   // Whether the title field is out of the row. Matched as a whole class rather
