@@ -678,7 +678,7 @@ export function Editor({
         <div
           ref={actionsRef}
           onKeyDown={onActionsKeyDown}
-          className={`ml-auto flex shrink-0 items-center ${narrow ? "" : "gap-2"}`}
+          className={`ml-auto flex items-center ${narrow ? "min-w-0" : "shrink-0 gap-2"}`}
         >
           {/* The star leads the cluster — it says something about the note
               itself, so it sits closest to the title — and Find is pinned to
@@ -694,16 +694,26 @@ export function Editor({
               readers: it flips to hidden only at the *end* of the transition,
               so the closing slide is still visible while it plays.
 
+              When even the unfolded row is wider than the screen, the box
+              shrinks to what fits (never pushing the ⋯ off the right edge) and
+              becomes a sideways scroller: the excess hangs off its *left* edge,
+              reachable by swiping. That left anchor is the `dir="rtl"` on the
+              box — an RTL scroll container starts scrolled to its inline start,
+              the right, and lets the overflow extend leftwards, which a plain
+              LTR flex row cannot do (start-side overflow is unscrollable). The
+              inner `dir="ltr"` row puts the buttons back in reading order.
+
               A selection unfolds the same box on the same slide, carrying the
               three actions that operate on one — one box rather than two, so
               pressing ⋯ with text selected simply widens what is already out
               into the full row instead of swapping one panel for another. */}
           <div
             data-cluster={clusterOpen ? "open" : "closed"}
+            dir={narrow ? "rtl" : undefined}
             className={
               narrow
-                ? `flex min-w-0 items-center gap-2 overflow-hidden pr-2 transition-[max-width,opacity,visibility] duration-200 ease-out ${clusterOpen ? "opacity-100" : "invisible opacity-0"}`
-                : "flex items-center gap-2"
+                ? `no-scrollbar flex min-w-0 items-center overflow-x-auto overscroll-x-contain transition-[max-width,opacity,visibility] duration-200 ease-out ${clusterOpen ? "opacity-100" : "invisible opacity-0"}`
+                : "flex items-center"
             }
             style={
               narrow
@@ -717,71 +727,82 @@ export function Editor({
                 : undefined
             }
           >
-            {/* Any of the three readouts may have pinned itself outside the
+            {/* The `pr-2` stands in for the row's `gap-2`, which is off on a
+                narrow header so the closed cluster can collapse to nothing —
+                and on a wide one the row's own gap already provides it. */}
+            <div
+              dir="ltr"
+              className={`flex shrink-0 items-center gap-2 ${narrow ? "pr-2" : ""}`}
+            >
+              {/* Any of the three readouts may have pinned itself outside the
                 box, where a narrow header shows it even folded — it is then
                 rendered once, out there, rather than twice. */}
-            {!selecting && !picking && !pinFavorite && (
-              <FavoriteButton favorite={favorite} onToggle={onToggleFavorite} />
-            )}
-            {!selecting && !picking && !pinLocked && (
-              <LockButton locked={locked} onToggle={onToggleLock} />
-            )}
-            {/* The two actions that rewrite the note aren't offered on a locked
+              {!selecting && !picking && !pinFavorite && (
+                <FavoriteButton
+                  favorite={favorite}
+                  onToggle={onToggleFavorite}
+                />
+              )}
+              {!selecting && !picking && !pinLocked && (
+                <LockButton locked={locked} onToggle={onToggleLock} />
+              )}
+              {/* The two actions that rewrite the note aren't offered on a locked
                 one — including in the selection cluster, where copy is then the
                 only thing a selection can be used for. They *slide* away rather
                 than disappearing, so pressing the eye reads as the row folding
                 the writing tools up (see `WriteAction`). */}
-            <WriteAction shown={!locked}>
-              <FormatToolbarButton
-                open={toolbarOpen}
-                onToggle={toggleToolbar}
-              />
-            </WriteAction>
-            {/* The cut button is a touch affordance everywhere else (see
+              <WriteAction shown={!locked}>
+                <FormatToolbarButton
+                  open={toolbarOpen}
+                  onToggle={toggleToolbar}
+                />
+              </WriteAction>
+              {/* The cut button is a touch affordance everywhere else (see
                 `desktopPointer`) — but in select mode it is one of the four
                 verbs the mode exists for, in a row that has just dropped four
                 buttons to make room, so it is offered whatever is pointing. */}
-            {(!desktopPointer || picking) && (
-              <WriteAction shown={!locked && !loading}>
-                <CutButton onCut={runCut} />
-              </WriteAction>
-            )}
-            {selecting || picking ? (
-              <>
-                <CopyButton onCopy={runCopy} />
-                {/* Only select mode has a *run of lines* to delete — an
+              {(!desktopPointer || picking) && (
+                <WriteAction shown={!locked && !loading}>
+                  <CutButton onCut={runCut} />
+                </WriteAction>
+              )}
+              {selecting || picking ? (
+                <>
+                  <CopyButton onCopy={runCopy} />
+                  {/* Only select mode has a *run of lines* to delete — an
                     ordinary text selection is served by cut, and Backspace. */}
-                {picking && (
-                  <WriteAction shown={!locked && !loading}>
-                    <DeleteLinesButton onDelete={runDeleteLines} />
-                  </WriteAction>
-                )}
-                {/* The way out. On a narrow header it has pinned itself
+                  {picking && (
+                    <WriteAction shown={!locked && !loading}>
+                      <DeleteLinesButton onDelete={runDeleteLines} />
+                    </WriteAction>
+                  )}
+                  {/* The way out. On a narrow header it has pinned itself
                     outside the box already, so it is rendered once, out
                     there. */}
-                {picking && !pinSelectMode && (
-                  <SelectModeButton
-                    on={selectMode}
-                    onToggle={() => setSelectMode((on) => !on)}
+                  {picking && !pinSelectMode && (
+                    <SelectModeButton
+                      on={selectMode}
+                      onToggle={() => setSelectMode((on) => !on)}
+                    />
+                  )}
+                </>
+              ) : (
+                <>
+                  <ExportButton
+                    note={note}
+                    copyScope={editor.copyScope}
+                    transforms={transforms}
                   />
-                )}
-              </>
-            ) : (
-              <>
-                <ExportButton
-                  note={note}
-                  copyScope={editor.copyScope}
-                  transforms={transforms}
-                />
-                {renderMarkdown && !pinSelectMode && (
-                  <SelectModeButton
-                    on={selectMode}
-                    onToggle={() => setSelectMode((on) => !on)}
-                  />
-                )}
-                <NoteFindButton open={findOpen} onToggle={toggleFind} />
-              </>
-            )}
+                  {renderMarkdown && !pinSelectMode && (
+                    <SelectModeButton
+                      on={selectMode}
+                      onToggle={() => setSelectMode((on) => !on)}
+                    />
+                  )}
+                  <NoteFindButton open={findOpen} onToggle={toggleFind} />
+                </>
+              )}
+            </div>
           </div>
           {/* Outside the sliding box, so these never fold: whatever the ⋯ is
               doing, the star, the eye and the select-mode toggle keep

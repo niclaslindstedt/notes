@@ -194,6 +194,17 @@ body {
   transition-duration: 0.001ms !important;
 }
 
+/* A scroller that draws no scrollbar. The editor header's action cluster
+   scrolls sideways when it overflows a narrow screen; a scrollbar under a
+   row of 36px buttons would double the header's height for a control nobody
+   drags — the row is swiped, like any horizontal strip on a phone. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* PWA download-progress fill for the header "Notes" wordmark. While a new
    build's service worker downloads, the name fills with the accent colour
    from the bottom — a vertical power bar — and `UpdateToast` surfaces once
