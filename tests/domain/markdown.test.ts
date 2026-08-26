@@ -262,9 +262,11 @@ describe("classifyLines — list numbering", () => {
     expect(blocks.map((b) => b.ordinal)).toEqual(["1.", "1.", "1."]);
   });
 
-  it("honours the first item's number as the list's start value", () => {
+  it("rewrites a list that doesn't start at 1 to count from 1", () => {
     const blocks = classifyLines("5. a\n1. b");
-    expect(blocks.map((b) => b.marker)).toEqual(["5.", "6."]);
+    expect(blocks.map((b) => b.marker)).toEqual(["1.", "2."]);
+    const midway = classifyLines("3. a\n4. b\n5. c");
+    expect(midway.map((b) => b.marker)).toEqual(["1.", "2.", "3."]);
   });
 
   it("keeps numbering across a blank line but restarts after other content", () => {

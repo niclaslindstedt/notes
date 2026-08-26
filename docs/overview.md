@@ -854,9 +854,9 @@ two list fields the classifier can't decide line-by-line: a `depth` from each
 `ul`/`ol` item's indentation (a stack of `{ indent, count }` frames opens a
 child list on a deeper indent, closes back on a shallower one, and treats an
 equal indent as the next sibling), and a sequential `marker` for every `ol` item
-so `1.`/`1.` displays as `1.` then `2.` — honouring the first item's number as
-the start value and rotating the style by depth (decimal → lower-alpha →
-lower-roman, `1.` → `a.` → `i.`). Blank lines are skipped so a gap between items
+so `1.`/`1.` displays as `1.` then `2.` — always counting from 1, so a list
+typed `3.`/`4.` is rewritten to display `1.`/`2.`, and rotating the style by
+depth (decimal → lower-alpha → lower-roman, `1.` → `a.` → `i.`). Blank lines are skipped so a gap between items
 keeps a list going; any other non-list line ends it. A line that is just a
 single `-` (as well as `---`/`***`/`___`) classifies as an `hr`, a quick divider
 without counting out three dashes. An unordered item whose text opens with a
