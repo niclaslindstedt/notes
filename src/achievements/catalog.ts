@@ -621,9 +621,11 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     tier: "intermediate",
     glyph: ActionPillGlyph,
     learnMore: true,
-    // Fired by the floating bar's own cut or delete, not by the edit — the
-    // keyboard and the header reach the same two verbs, and this trophy is for
-    // finding the bar that brings them to the selection on a touchscreen.
+    // Fired by the header's delete button, not by the edit — Backspace reaches
+    // the same delete from a keyboard, and this trophy is for the one verb
+    // select mode had no button for until it joined cut and copy in the header.
+    // (The id predates that move, when the button was a bar hovering off the
+    // top of the note; ids are write-once, so it stays.)
     trigger: { kind: "manual" },
   },
   {

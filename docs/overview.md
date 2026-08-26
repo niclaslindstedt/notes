@@ -1130,29 +1130,25 @@ affordance arriving rather than a glitch. Both the numbers and the rail hang
 *outside* the line's own box, so the reservation is published as a `--gutter`
 custom property on the surface for them to measure against.
 
-**The actions come to the selection.** On a touchscreen, the moment a line is
-taken a bar rises at the top of the note (`SelectActionPill`,
-`src/ui/SelectActionPill.tsx`): one rounded pill split by a hairline seam into a
-**cut** half and a **delete** half. Those are the two things you most want to do
-with a run of lines and the two that were furthest away — the editor's header
-folds its whole cluster behind a ⋯ on a narrow screen, so cutting what you just
-picked cost a press to unfold and a press to cut, and *delete* had no button at
-all: it was Backspace on a keyboard select mode deliberately keeps down. Neither
-carries a confirm step, because both are one Undo away.
+**The actions are in the header, all four of them.** The moment a line is taken
+the run is reported out like any other selection, so the narrow header unfolds
+its [selection actions](#selection-actions) on its own — formatting, cut and
+copy — and select mode adds the one verb they were missing: a **delete**
+(`DeleteLinesButton`, `src/ui/DeleteLinesButton.tsx`), immediately right of
+copy. Delete is the verb the mode had no button for at all: it was Backspace, on
+a keyboard select mode deliberately keeps down. It wears the danger tone rather
+than the accent every other header button carries — it is the only one that
+destroys something, and it sits next to a copy button it must not be mistaken
+for at thumb speed. No confirm step, because it is one Undo away. Its trophy is
+**Off the top**.
 
-It is **touch only** (`useDesktopPointer`, the same gate the header's own cut
-button uses): Ctrl/Cmd+X, Backspace and an unfolded header already reach both
-verbs on a desktop, so a bar hovering over the text there would be a permanent
-obstruction paying for nothing. It is also not offered on a locked note, which
-refuses both edits anyway. The bar is **portalled to `document.body`** rather
-than left in the editor — the note's scroller clips its own overflow, so a bar
-nested inside it would be cut off at the top edge, the one place this one has to
-sit; being out of the tree is also what stops a press on it reaching the sweep
-handler underneath and taking a line out from under the thumb aiming at Cut. It
-centres on the **measured** box of the scroller rather than on `left: 50%`,
-because a pinned sidebar offsets the note's column sideways from the layout
-viewport, and re-measures on a `ResizeObserver` so the find bar opening above it
-doesn't leave it stranded. Its trophy is **Off the top**.
+Being in the header rather than in a bar over the note is the point: one row,
+four verbs, in the same place every other action on the note already lives, and
+nothing hovering over the lines being picked. The delete is **touch only**
+(`useDesktopPointer`, the same gate the header's own cut button uses) — a
+keyboard reaches the same edit on Backspace — and folds to nothing on a locked
+note the way every other write-only action in the row does (`WriteAction`),
+which leaves copy as the one thing a locked note's run can still be used for.
 
 **The paint is the editor's, not the browser's.** A taken line is tinted with
 `.line-selected` (`src/styles/theme.css`) across *both* of the boxes it is drawn
@@ -1170,9 +1166,15 @@ receiving `beforeinput` — without one, typing over the selection would silentl
 do nothing on a phone. The same class blanks `::selection` inside the surface, so
 nothing left over from before the mode was entered can show through.
 
-**Leaving the mode is the handover.** Escape, or the header toggle, turns the
-taken lines into an ordinary browser selection over the same lines, drawn in the
-ordinary selection colour, and the mode goes off. The range is *queued* in
+**Leaving the mode by Escape is the handover.** It turns the taken lines into an
+ordinary browser selection over the same lines, drawn in the ordinary selection
+colour, and the mode goes off. The **header toggle** is the other exit and is
+deliberately *not* a handover: it is the way out on a phone, where a browser
+selection left behind would raise the platform's own Cut / Copy callout over the
+note instead of giving the caret back (the same thing
+[`dropSelectionOnBlur`](#selection-mapping) exists to prevent). It drops the run
+and leaves nothing selected — as does a note switch, which resets the host's
+flag the same way. The range is *queued* in
 `pendingLineSpan` rather than drawn on the spot: leaving the mode unwraps every
 line's row, so nodes a range pointed at now would be thrown away before the
 browser painted it, and the layout effect that already owns `pendingLineSpan`
@@ -1187,7 +1189,7 @@ engine every other edit uses:
 
 | Gesture                        | What happens                                        |
 | ------------------------------ | --------------------------------------------------- |
-| The floating bar's ✂ / 🗑 (touch) | Cuts, or deletes, every taken line                |
+| The header's ✂ / 🗑 (touch)      | Cuts, or deletes, every taken line                |
 | Typing, or a paste             | Replaces every taken line, landing where the first was; the mode goes off |
 | Backspace / Delete             | Takes the lines out entirely — no blanks left behind |
 | Ctrl/Cmd+C                     | The verbatim source of the lines, newlines and all — gaps closed, not copied |
@@ -1203,7 +1205,13 @@ at a time, **from the bottom of the note upwards**, so a format that adds lines
 (a fence, a rule) can't shift a group out from under the next pass. The selection
 is reported out through `onSelectionChange` like any other selection, so the
 header offers copy and cut on it — which is how a phone, with no keyboard
-shortcuts, gets at either.
+shortcuts, gets at either. **Every** way out of the mode takes that report back
+down again, including the two the editor is never asked about (the header toggle
+and a note switch): the mode leaves the caret collapsed and hidden, so no
+`selectionchange` is coming to correct a stale one, and the header would keep
+cut / copy / formatting pinned out over a note with nothing in hand. The one
+exception is Escape's handover, which reports the selection it just set. See
+[selection actions](#selection-actions).
 
 The pure half is `src/domain/line-selection.ts`: a `LineSelection` is the list of
 taken lines plus the two ends of the stroke that drew last (`anchor` stays put,
@@ -2739,10 +2747,13 @@ answers it wrong. Turning the setting back on is one ⋯ away.
 `Editor` (`src/ui/NoteEditor.tsx`) — highlighting text on a phone is the moment
 the actions that operate on a selection are wanted, so under
 `COLLAPSE_QUERY` the [collapsed cluster](#collapsed-header-actions) unfolds
-**itself** then, carrying just the three that act on one: the
+**itself** then, carrying just the ones that act on one: the
 [formatting](#styling-toolbar) toggle, [cut](#cut-button) (on a touch pointer —
-see the cut button), and a
-[copy](#copy-scope) button that takes the highlighted text and nothing else.
+see the cut button), a
+[copy](#copy-scope) button that takes the highlighted text and nothing else,
+and — while [select mode](#select-mode) is the thing holding the selection — a
+`DeleteLinesButton` that takes the picked lines out of the note, the one verb
+an ordinary text selection has no use for.
 Reaching them through the ⋯ was two taps for something the user had already
 asked for by highlighting it.
 
@@ -2769,6 +2780,17 @@ ran out of the note can't be mapped back to source (see
 `trackCaret`. Each takes its report back down (`false`) when it unmounts — a
 note switch, or Markdown being turned off — and after a cut, whose collapsed
 caret is one the surface sets itself and therefore ignores.
+
+[Select mode](#select-mode) reports the same way while it is on — its run of
+taken lines is a selection as far as the header is concerned, which is what puts
+cut and copy on a phone's header — and, because the ordinary reporter stands
+down while the mode is up, it also owns saying so when the mode ends. That
+matters most for the exits the editor is never asked about: the header's own
+toggle and a note switch are the host flipping its `selectMode` flag, not a
+gesture the editor sees, and the mode leaves the caret collapsed and hidden so
+no `selectionchange` follows to correct the record. Reported false there, or
+these three buttons stay pinned out over a note with nothing selected, and the
+dedupe ref latches them there until something reports a selection again.
 
 **What copy copies.** `runCopy` asks the mounted surface for its selection
 (`selection()` on either handle) and puts *that* on the clipboard — the note's

@@ -117,7 +117,6 @@ import {
   type CursorPaint,
 } from "./multi-cursor-rects.ts";
 import { MultiCursorOverlay } from "./MultiCursorOverlay.tsx";
-import { SelectActionPill } from "./SelectActionPill.tsx";
 import {
   anchoredScrollTop,
   bufferedScrollTop,
@@ -353,6 +352,9 @@ export type MarkdownEditorHandle = {
   /** The verbatim source the current selection covers, or null when there is
    *  no selection in this editor. */
   selection: () => string | null;
+  /** Take the lines select mode has picked out of the note entirely. A no-op
+   *  unless the mode is holding a run — the header only offers it then. */
+  deleteSelection: () => void;
 };
 
 // The active line's identity: which source line is being edited as raw text, and
@@ -919,6 +921,11 @@ export function MarkdownEditor({
     return at ? singleLine(at.line) : null;
   }
 
+  // Set by the handover exit below, read once by the effect that reports the
+  // mode's state: "the selection that outlives this mode is one I just set, so
+  // don't report it away".
+  const handedOver = useRef(false);
+
   // Leave the mode. `keepAsSelection` is the handover: the same lines, drawn
   // the ordinary way. The span is *queued* rather than drawn here because
   // leaving the mode unwraps every line's row — the nodes a range set now
@@ -947,6 +954,9 @@ export function MarkdownEditor({
     // The selection we hand over is set by us, so the `selectionchange` it
     // fires is swallowed (`settingSel`) and never reaches the reporter — say
     // it here instead, or the header drops the actions the run just earned.
+    // Flagged for the effect that reports the mode's own state, which is about
+    // to see the mode go off and would otherwise call this handover a nothing.
+    handedOver.current = handover;
     reportSelection(handover);
     onSelectModeChange?.(false);
   }
@@ -963,6 +973,8 @@ export function MarkdownEditor({
     onSelectModeChange?.(false);
     commit(r.lines, r.caret);
   }
+  const deleteLineSelectionRef = useRef(deleteLineSelection);
+  deleteLineSelectionRef.current = deleteLineSelection;
 
   // Type over the selection: every taken line goes and `text` lands where the
   // first of them was. Same exit as a delete — you are writing again, and the
@@ -1321,9 +1333,26 @@ export function MarkdownEditor({
   // selection earns (copy, cut) while the mode holds one. The ordinary
   // reporter stands down while the mode is on — there is no browser selection
   // for it to read.
+  //
+  // Leaving the mode has to be reported too, and this is the only place that
+  // sees *every* way out of it: the host owns the flag, so its own toggle (and
+  // a note switch, which resets it) turns the mode off without passing through
+  // `exitSelectMode` at all. Nothing else would ever say so — the ordinary
+  // reporter only speaks when the browser's selection changes, and the mode
+  // left it collapsed and hidden, so no `selectionchange` is coming. Without
+  // this the header keeps the cut / copy / format cluster pinned out over a
+  // note with nothing selected, and `reportSelection`'s dedupe latches it
+  // there.
+  //
+  // The one exit that already knows better is the handover, which sets a real
+  // selection of its own and reports it before the mode goes off.
   useEffect(() => {
-    if (!selectMode) return;
-    reportSelectionRef.current(lineSel !== null);
+    if (selectMode) {
+      reportSelectionRef.current(lineSel !== null);
+      return;
+    }
+    if (!handedOver.current) reportSelectionRef.current(false);
+    handedOver.current = false;
   }, [selectMode, lineSel]);
 
   // Keep the collapsed caret at the head of the run: it is what keeps the
@@ -3056,6 +3085,7 @@ export function MarkdownEditor({
       format: (action: FormatAction) => formatRef.current(action),
       cut: () => cutRef.current(),
       selection: () => selectionSourceRef.current(),
+      deleteSelection: () => deleteLineSelectionRef.current(),
     }),
     [],
   );
@@ -3373,27 +3403,6 @@ export function MarkdownEditor({
         >
           <AttachmentsEndBlock />
         </div>
-        {/* Select mode's floating cut / delete bar. Touch only — a keyboard
-            already has both verbs, and an unfolded header has room for the
-            buttons — and never on a locked note, where both of them are
-            refused anyway. It renders nothing in place: the bar portals
-            itself out to `document.body` (see `SelectActionPill`). */}
-        {selectMode && !desktopPointer && !locked && (
-          <SelectActionPill
-            open={lineSel !== null}
-            anchorRef={scrollerRef}
-            onCut={() => {
-              // The trophy is for the bar, not for the edit — `cut` fires its
-              // own, and Backspace reaches the same delete from a keyboard.
-              unlock("offTheTop");
-              cut();
-            }}
-            onDelete={() => {
-              unlock("offTheTop");
-              deleteLineSelection();
-            }}
-          />
-        )}
       </div>
     </AttachmentsProvider>
   );

@@ -354,9 +354,9 @@ const achievements = {
     },
     offTheTop: {
       name: "Off the top",
-      condition: "Cut or delete picked lines with the floating bar.",
+      condition: "Delete picked lines from the header.",
       learnMore:
-        "Pick a line on a phone and a bar rises at the top of the note with two halves: cut, and delete. They are the two things you most want to do with a run of lines and the two that were furthest away \u2014 on a narrow screen the header folds its buttons behind a \u22ef, and delete had no button at all, only a Backspace on the keyboard select mode deliberately keeps down. So the actions come to the selection instead. Cut takes the lines out onto the clipboard; delete just takes them out, with no confirm step \u2014 Undo puts either back. The bar is there for touch: on a computer Ctrl/Cmd+X, Backspace and an unfolded header already reach both, so nothing hovers over the text.",
+        "Pick a line on a phone and the header unfolds the four things you can do with a run of them: format, cut, copy, and a red delete. Delete is the one select mode had no button for \u2014 it was Backspace, on the keyboard the mode deliberately keeps down \u2014 so it joins the other three at the top of the screen rather than hovering over the note in a bar of its own. Cut takes the lines out onto the clipboard; delete just takes them out, with no confirm step \u2014 Undo puts either back. The delete button is there for touch: on a computer Backspace already reaches it, so the row stays as short as it can.",
     },
     manyHands: {
       name: "Many hands",
