@@ -519,6 +519,14 @@ export function MarkdownEditor({
   // `**`, or dropping the caret onto a fresh link's `url` placeholder so the
   // address can be typed straight over it. Takes precedence when set.
   const pendingRange = useRef<{ from: number; to: number } | null>(null);
+  // An edit that must not pull focus back into the note. Select mode's cut and
+  // delete are pressed on a *header button* with the soft keyboard deliberately
+  // down (see `docs/overview.md#select-mode`) — nothing about picking a run of
+  // lines with a finger asks for a caret — so re-taking focus to install the
+  // caret the edit left behind is exactly what would raise the keyboard over
+  // the note the press just shortened. The caret is simply not installed then:
+  // there is none on screen to move, and the next tap places one.
+  const quietCommit = useRef(false);
   // A whole-line span to re-select after the value changes, by source line
   // index. Block formatting (heading, list, quote, indent) is a whole-line
   // affair, so when it spans several lines the selection is restored at line
@@ -670,8 +678,26 @@ export function MarkdownEditor({
     const next = nextLines.join("\n");
     setValue(next);
     onChange(next);
-    pendingCaret.current = caret.col;
     lastCaret.current = caret;
+    // An edit the surface never held focus for — select mode's cut and delete,
+    // pressed on a header button over a note with the keyboard down (see
+    // `quietCommit`). Installing the caret means taking focus, which raises
+    // the keyboard; and an active line with no caret in it would sit there
+    // showing its raw markdown. So the note stays fully formatted and
+    // caret-less, and `lastCaret` above remembers where writing would resume.
+    if (quietCommit.current) {
+      quietCommit.current = false;
+      const root = rootRef.current;
+      if (!root || document.activeElement !== root) {
+        pendingCaret.current = null;
+        pendingRange.current = null;
+        setActive((a) =>
+          a.index === null ? a : { index: null, key: a.key + 1 },
+        );
+        return;
+      }
+    }
+    pendingCaret.current = caret.col;
     markCaret(caret.line, caret.col, caret.col);
     setActive((a) => ({
       index: caret.line,
@@ -971,6 +997,9 @@ export function MarkdownEditor({
     setLineSelection(null);
     reportSelection(false);
     onSelectModeChange?.(false);
+    // The run may have been taken with a finger and deleted from the header,
+    // with no caret in the note at all — see `quietCommit`.
+    quietCommit.current = true;
     commit(r.lines, r.caret);
   }
   const deleteLineSelectionRef = useRef(deleteLineSelection);
@@ -2874,6 +2903,10 @@ export function MarkdownEditor({
       deleteLineSelection();
       return;
     }
+    // While the mode is on, the run *is* what the verbs act on: with no line
+    // taken there is no caret on screen either, so the invisible one the last
+    // press left behind is not a line to cut instead.
+    if (selectModeRef.current) return;
     // The cut engine works from one caret / selection; a column hands the note
     // back to it.
     clearCursors();
@@ -3174,9 +3207,23 @@ export function MarkdownEditor({
           if (selectMode) endSweep();
         }}
         onMouseDown={(e) => {
+          // Select mode lands no caret anywhere, so it cancels the press that
+          // would place one — and this is the event that has to do it. The
+          // press itself is answered at `pointerdown`, but a pointer event
+          // born of a touch can't cancel the tap's default action (see
+          // `onSweepDown`), so on a phone the browser would go on to focus the
+          // editing host and raise the soft keyboard over the very lines being
+          // picked. The compatibility `mousedown` the tap also produces *is*
+          // cancellable on every pointer type, and cancelling it is what keeps
+          // the caret — and with it the keyboard — away while the mode is on.
+          // Focus the mode inherited (the keyboard was already up, or a
+          // desktop took it on the way in) is left exactly where it is.
+          if (selectMode) {
+            e.preventDefault();
+            return;
+          }
           // A click in the empty space below the text lands the caret at the end
           // of the note rather than doing nothing.
-          if (selectMode) return;
           if (e.target === e.currentTarget) {
             e.preventDefault();
             placeCaretAtEnd();

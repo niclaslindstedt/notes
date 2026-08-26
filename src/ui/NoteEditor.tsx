@@ -104,8 +104,9 @@ const COLLAPSE_QUERY = "(max-width: 639px)";
 const ACTIONS_MAX_WIDTH = "20rem";
 
 // The same cap for the selection actions (formatting, cut, copy — and delete,
-// once select mode is holding a run), which unfold out of the ⋯ on their own
-// when text is selected — real width ~8.25rem, or ~11rem with the delete.
+// for the whole of select mode), which unfold out of the ⋯ on their own when
+// text is selected, or when the mode is entered — real width ~8.25rem, or
+// ~11rem with the delete.
 // Both caps are upper bounds, so a row carrying fewer than the full set — a
 // desktop pointer gets no cut button (see `desktopPointer`), and a locked note
 // folds its cut and formatting buttons to zero width (see `WriteAction`) —
@@ -332,6 +333,17 @@ export function Editor({
   // grace period: the press that leaves the mode is the press that unpins it.
   const pinSelectMode = narrow && renderMarkdown && selectMode;
 
+  // While the mode is on the header stops being the note's action row and
+  // becomes the mode's own: the note is a list being picked from, so a star, an
+  // export, a read-only toggle and a find bar are all answers to questions
+  // nobody in the middle of picking lines is asking — and every one of them is
+  // a press that would throw the run away. What is left is the four verbs the
+  // run is *for* — format, cut, copy, delete — and the lit toggle that is the
+  // way back out. They are offered for the whole mode rather than only once a
+  // line is taken, so the row a press lands in doesn't shuffle underneath the
+  // finger between one pick and the next.
+  const picking = renderMarkdown && selectMode;
+
   // The cut button is a touch affordance and only a touch affordance: with a
   // mouse and a keyboard the same edit is already two other presses away
   // (Ctrl/Cmd+K, and the browser's own right-click Cut over a selection), so on
@@ -350,8 +362,10 @@ export function Editor({
   const [hasSelection, setHasSelection] = useState(false);
   const selecting = narrow && hasSelection && !findOpen && !actionsOpen;
   // Which set the cluster carries, and whether it is out at all. The ⋯ always
-  // wins: pressing it unfolds the whole row, the way it always has.
-  const clusterOpen = !narrow || actionsOpen || selecting;
+  // wins: pressing it unfolds the whole row, the way it always has — except in
+  // select mode, where the row it would unfold is already out and there is
+  // nothing else in it (see `picking`), so the ⋯ isn't offered at all.
+  const clusterOpen = !narrow || actionsOpen || selecting || picking;
   // Folded away: narrow, with neither the ⋯ nor a selection holding it out. The
   // wide header never folds, so it is never "collapsed".
   const collapsed = !clusterOpen;
@@ -696,7 +710,7 @@ export function Editor({
                 ? {
                     maxWidth: !clusterOpen
                       ? "0px"
-                      : selecting
+                      : selecting || picking
                         ? SELECTION_MAX_WIDTH
                         : ACTIONS_MAX_WIDTH,
                   }
@@ -706,10 +720,10 @@ export function Editor({
             {/* Any of the three readouts may have pinned itself outside the
                 box, where a narrow header shows it even folded — it is then
                 rendered once, out there, rather than twice. */}
-            {!selecting && !pinFavorite && (
+            {!selecting && !picking && !pinFavorite && (
               <FavoriteButton favorite={favorite} onToggle={onToggleFavorite} />
             )}
-            {!selecting && !pinLocked && (
+            {!selecting && !picking && !pinLocked && (
               <LockButton locked={locked} onToggle={onToggleLock} />
             )}
             {/* The two actions that rewrite the note aren't offered on a locked
@@ -723,22 +737,33 @@ export function Editor({
                 onToggle={toggleToolbar}
               />
             </WriteAction>
-            {!desktopPointer && (
+            {/* The cut button is a touch affordance everywhere else (see
+                `desktopPointer`) — but in select mode it is one of the four
+                verbs the mode exists for, in a row that has just dropped four
+                buttons to make room, so it is offered whatever is pointing. */}
+            {(!desktopPointer || picking) && (
               <WriteAction shown={!locked && !loading}>
                 <CutButton onCut={runCut} />
               </WriteAction>
             )}
-            {selecting ? (
+            {selecting || picking ? (
               <>
                 <CopyButton onCopy={runCopy} />
                 {/* Only select mode has a *run of lines* to delete — an
-                    ordinary text selection is served by cut, and Backspace.
-                    Same touch-only gate as the cut button beside it: a
-                    keyboard already reaches this edit. */}
-                {selectMode && !desktopPointer && (
+                    ordinary text selection is served by cut, and Backspace. */}
+                {picking && (
                   <WriteAction shown={!locked && !loading}>
                     <DeleteLinesButton onDelete={runDeleteLines} />
                   </WriteAction>
+                )}
+                {/* The way out. On a narrow header it has pinned itself
+                    outside the box already, so it is rendered once, out
+                    there. */}
+                {picking && !pinSelectMode && (
+                  <SelectModeButton
+                    on={selectMode}
+                    onToggle={() => setSelectMode((on) => !on)}
+                  />
                 )}
               </>
             ) : (
@@ -791,7 +816,9 @@ export function Editor({
               )}
             </div>
           )}
-          {narrow && (
+          {/* Nothing to unfold while the mode's own row is out — see
+              `picking`. */}
+          {narrow && !picking && (
             <MoreButton
               buttonRef={moreRef}
               open={actionsOpen}
