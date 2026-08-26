@@ -25,8 +25,6 @@ const app = {
   selectMode: {
     enter: "Select lines",
     exit: "Leave select mode",
-    actions: "Actions for the selected lines",
-    cut: "Cut selected lines",
     delete: "Delete selected lines",
   },
   titlePlaceholder: "Title",

@@ -3,7 +3,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/preact";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MarkdownEditor } from "../../src/ui/MarkdownEditor.tsx";
+import {
+  MarkdownEditor,
+  type MarkdownEditorHandle,
+} from "../../src/ui/MarkdownEditor.tsx";
 import { resetEditorPositions } from "../../src/ui/editor-position.ts";
 
 const editorProps = {
@@ -20,17 +23,21 @@ const BODY = "alpha\nbravo\ncharlie\ndelta";
 function renderEditor(extra?: Record<string, unknown>) {
   const onChange = vi.fn();
   const onSelectModeChange = vi.fn();
-  const utils = render(
+  const element = (on: boolean) => (
     <MarkdownEditor
       body={BODY}
       onChange={onChange}
-      selectMode
+      selectMode={on}
       onSelectModeChange={onSelectModeChange}
       {...editorProps}
       {...extra}
-    />,
+    />
   );
-  return { onChange, onSelectModeChange, ...utils };
+  const utils = render(element(true));
+  // The header's lit toggle (and a note switch, which resets the flag): the
+  // mode belongs to the host, so it can go off without the editor being asked.
+  const leaveMode = () => utils.rerender(element(false));
+  return { onChange, onSelectModeChange, leaveMode, ...utils };
 }
 
 function surface(): HTMLElement {
@@ -350,6 +357,43 @@ describe("select mode", () => {
     expect(onSelectionChange).toHaveBeenCalledWith(true);
   });
 
+  it("takes the report back when the host turns the mode off", () => {
+    const onSelectionChange = vi.fn();
+    const { leaveMode } = renderEditor({ onSelectionChange });
+    layOutRows();
+    tap(2);
+    expect(onSelectionChange).toHaveBeenLastCalledWith(true);
+
+    // Nothing is selected once the run is dropped, and no `selectionchange` is
+    // coming to say so — the mode left the caret collapsed and hidden. Left
+    // unreported, the header keeps cut / copy / format pinned out over a note
+    // with nothing in hand.
+    leaveMode();
+    expect(onSelectionChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("keeps the report when the mode hands its run over as a selection", () => {
+    const onSelectionChange = vi.fn();
+    // The host answers the exit in the same event the way `Editor` does, so
+    // the run being dropped and the mode going off land in one render.
+    let leave = () => {};
+    const { leaveMode } = renderEditor({
+      onSelectionChange,
+      onSelectModeChange: () => leave(),
+    });
+    leave = leaveMode;
+    layOutRows();
+    press(1);
+    moveTo(2);
+    release(2);
+    expect(onSelectionChange).toHaveBeenLastCalledWith(true);
+
+    // Escape hands the run over as an ordinary selection, so the actions it
+    // earned survive the host switching the mode off behind it.
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onSelectionChange).toHaveBeenLastCalledWith(true);
+  });
+
   it("refuses to rewrite a locked note, but still lets the run be taken", () => {
     const { onChange } = renderEditor({ locked: true });
     layOutRows();
@@ -367,112 +411,77 @@ describe("select mode", () => {
   });
 });
 
-describe("select mode's floating action bar", () => {
-  // The framework's `useDesktopPointer` reads `window.matchMedia`, which jsdom
-  // answers "no" to for every query — so the editor renders as it does on a
-  // touchscreen unless a test says otherwise.
-  function stubDesktopPointer() {
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn((media: string) => ({
-        matches: media.includes("pointer: fine"),
-        media,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        onchange: null,
-        dispatchEvent: vi.fn(),
-      })),
-    );
+describe("select mode's cut and delete verbs", () => {
+  // Both are reached from the editor's header (`Editor` owns those buttons),
+  // which holds this editor by its handle — so the handle is where they are
+  // tested. The header half is in `note-editor.test.tsx`.
+  function renderWithHandle() {
+    const handleRef: { current: MarkdownEditorHandle | null } = {
+      current: null,
+    };
+    return { handleRef, ...renderEditor({ handleRef }) };
   }
 
-  // The bar is `aria-hidden` while it holds nothing, which takes it out of the
-  // accessibility tree `*ByRole` walks — so it is queried by its label, which
-  // is there either way.
-  function bar(): HTMLElement | null {
-    return document.body.querySelector<HTMLElement>('[role="group"]');
-  }
-
-  function action(name: string): HTMLButtonElement {
-    return screen.getByLabelText(name) as HTMLButtonElement;
-  }
-
-  it("is folded away until a line is taken, then offers cut and delete", () => {
-    renderEditor();
-    layOutRows();
-    expect(bar()?.getAttribute("aria-hidden")).toBe("true");
-    expect(action("Cut selected lines").disabled).toBe(true);
-
-    tap(1);
-    expect(bar()?.getAttribute("aria-hidden")).toBe("false");
-    expect(action("Cut selected lines").disabled).toBe(false);
-    expect(action("Delete selected lines").disabled).toBe(false);
-  });
-
-  it("cuts the taken lines onto the clipboard and out of the note", () => {
+  function stubClipboard() {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
       configurable: true,
     });
-    const { onChange, onSelectModeChange } = renderEditor();
+    return writeText;
+  }
+
+  afterEach(() => Reflect.deleteProperty(navigator, "clipboard"));
+
+  it("cuts the taken lines onto the clipboard and out of the note", () => {
+    const writeText = stubClipboard();
+    const { handleRef, onChange, onSelectModeChange } = renderWithHandle();
     layOutRows();
     tap(1);
     tap(3);
-    fireEvent.click(action("Cut selected lines"));
+
+    handleRef.current?.cut();
+
     expect(writeText).toHaveBeenCalledWith("bravo\ndelta");
     expect(onChange).toHaveBeenCalledWith("alpha\ncharlie");
     expect(onSelectModeChange).toHaveBeenCalledWith(false);
-    Reflect.deleteProperty(navigator, "clipboard");
   });
 
   it("deletes the taken lines without touching the clipboard", () => {
-    const writeText = vi.fn(() => Promise.resolve());
-    Object.defineProperty(navigator, "clipboard", {
-      value: { writeText },
-      configurable: true,
-    });
-    const { onChange } = renderEditor();
+    const writeText = stubClipboard();
+    const { handleRef, onChange, onSelectModeChange } = renderWithHandle();
     layOutRows();
     press(1);
     moveTo(2);
     release(2);
-    fireEvent.click(action("Delete selected lines"));
+
+    handleRef.current?.deleteSelection();
+
     expect(onChange).toHaveBeenCalledWith("alpha\ndelta");
     expect(writeText).not.toHaveBeenCalled();
-    Reflect.deleteProperty(navigator, "clipboard");
+    // The lines it named are gone, so there is nothing left to hold.
+    expect(onSelectModeChange).toHaveBeenCalledWith(false);
   });
 
-  it("stays away on a desktop pointer, where the keyboard already has both", () => {
-    stubDesktopPointer();
-    renderEditor();
+  it("lets a delete pass when nothing is taken", () => {
+    const { handleRef, onChange } = renderWithHandle();
     layOutRows();
-    tap(1);
-    expect(bar()).toBeNull();
-    vi.unstubAllGlobals();
+
+    handleRef.current?.deleteSelection();
+
+    expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("stays away on a locked note, which refuses both edits anyway", () => {
-    renderEditor({ locked: true });
+  it("refuses a delete on a locked note", () => {
+    const handleRef: { current: MarkdownEditorHandle | null } = {
+      current: null,
+    };
+    const { onChange } = renderEditor({ locked: true, handleRef });
     layOutRows();
     tap(1);
-    expect(bar()).toBeNull();
-  });
 
-  it("folds away again when the last line is given back", () => {
-    renderEditor();
-    layOutRows();
-    tap(1);
-    expect(bar()?.getAttribute("aria-hidden")).toBe("false");
-    tap(1);
-    expect(bar()?.getAttribute("aria-hidden")).toBe("true");
-  });
+    handleRef.current?.deleteSelection();
 
-  it("isn't rendered at all while the mode is off", () => {
-    renderEditor({ selectMode: false });
-    layOutRows();
-    tap(1);
-    expect(bar()).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

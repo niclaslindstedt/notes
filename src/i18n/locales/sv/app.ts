@@ -12,8 +12,6 @@ const app: AppCatalog = {
   selectMode: {
     enter: "Markera rader",
     exit: "Lämna markeringsläget",
-    actions: "Åtgärder för de markerade raderna",
-    cut: "Klipp ut markerade rader",
     delete: "Radera markerade rader",
   },
   titlePlaceholder: "Titel",

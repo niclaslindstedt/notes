@@ -353,10 +353,9 @@ const achievements: AchievementsCatalog = {
     },
     offTheTop: {
       name: "Uppifr\u00e5n och ned",
-      condition:
-        "Klipp ut eller radera plockade rader med den flytande listen.",
+      condition: "Radera plockade rader fr\u00e5n sidhuvudet.",
       learnMore:
-        "Plocka en rad p\u00e5 en telefon s\u00e5 reser sig en list h\u00f6gst upp i anteckningen med tv\u00e5 halvor: klipp ut och radera. Det \u00e4r de tv\u00e5 sakerna du oftast vill g\u00f6ra med en f\u00f6ljd rader och de tv\u00e5 som l\u00e5g l\u00e4ngst bort \u2014 p\u00e5 en smal sk\u00e4rm viker sidhuvudet in sina knappar bakom ett \u22ef, och radera hade ingen knapp alls, bara ett Backsteg p\u00e5 tangentbordet som markeringsl\u00e4get med flit h\u00e5ller nere. Allts\u00e5 kommer \u00e5tg\u00e4rderna till markeringen i st\u00e4llet. Klipp ut tar raderna till urklipp; radera tar bara bort dem, utan bekr\u00e4ftelsesteg \u2014 \u00c5ngra l\u00e4gger tillbaka b\u00e5da. Listen finns f\u00f6r pekning: p\u00e5 en dator n\u00e5r Ctrl/Cmd+X, Backsteg och ett utf\u00e4llt sidhuvud redan b\u00e5da, s\u00e5 ingenting sv\u00e4var \u00f6ver texten.",
+        "Plocka en rad p\u00e5 en telefon s\u00e5 f\u00e4ller sidhuvudet ut de fyra sakerna du kan g\u00f6ra med en f\u00f6ljd rader: formatera, klippa ut, kopiera och en r\u00f6d radera. Radera \u00e4r den enda markeringsl\u00e4get saknade en knapp f\u00f6r \u2014 det var Backsteg, p\u00e5 tangentbordet som l\u00e4get med flit h\u00e5ller nere \u2014 s\u00e5 den st\u00e4ller sig hos de andra tre h\u00f6gst upp i st\u00e4llet f\u00f6r att sv\u00e4va \u00f6ver anteckningen i en egen list. Klipp ut tar raderna till urklipp; radera tar bara bort dem, utan bekr\u00e4ftelsesteg \u2014 \u00c5ngra l\u00e4gger tillbaka b\u00e5da. Raderaknappen finns f\u00f6r pekning: p\u00e5 en dator n\u00e5r Backsteg den redan, s\u00e5 raden h\u00e5lls s\u00e5 kort den kan.",
     },
     manyHands: {
       name: "Många händer",

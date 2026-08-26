@@ -98,9 +98,9 @@ export function HomePage() {
               <span aria-hidden>⋯</span> control on the right — pressing it
               slides them back out over the title, and touching the note again
               folds them away and hands the title back. Select some text and the
-              three buttons that act on a selection — formatting, cut and copy —
-              slide out on their own, so what you just highlighted is one tap
-              from being styled, cut or copied.
+              buttons that act on a selection — formatting, cut and copy — slide
+              out on their own, so what you just highlighted is one tap from
+              being styled, cut or copied.
             </li>
             <li>
               Picking out lines is a mode of its own. The button left of the
@@ -116,12 +116,12 @@ export function HomePage() {
               have taken are tinted along with their line numbers rather than
               wearing the ordinary selection colour, so the two are never
               confused. From there you can type over them, delete them, copy or
-              cut them, or style every one of them at once. On a phone a bar
-              rises at the top of the note the moment a line is taken, with a
-              cut half and a delete half, so the two things you most want to do
-              with a run of lines are one tap away instead of hidden behind the
-              header&rsquo;s ⋯. <kbd>Esc</kbd> leaves the mode, handing an
-              unbroken run over as an ordinary selection.
+              cut them, or style every one of them at once. The moment a line is
+              taken the header unfolds the four verbs that act on it — format,
+              cut, copy, and a red delete beside them on a phone — so they are
+              one tap away instead of hidden behind the header&rsquo;s ⋯.{" "}
+              <kbd>Esc</kbd> leaves the mode, handing an unbroken run over as an
+              ordinary selection.
             </li>
             <li>
               On a computer, edit at more than one place at once — the same

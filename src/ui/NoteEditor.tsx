@@ -42,6 +42,7 @@ import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { CipherGlyph } from "./CipherGlyph.tsx";
 import { writeClipboard } from "./clipboard.ts";
 import { CopyButton } from "./CopyButton.tsx";
+import { DeleteLinesButton } from "./DeleteLinesButton.tsx";
 import { CutButton } from "./CutButton.tsx";
 import {
   getEditorPosition,
@@ -102,13 +103,14 @@ const COLLAPSE_QUERY = "(max-width: 639px)";
 // cap, which is an upper bound, so there is nothing to adjust there.)
 const ACTIONS_MAX_WIDTH = "20rem";
 
-// The same cap for the three selection actions (formatting, cut, copy), which
-// unfold out of the ⋯ on their own when text is selected — real width ~8.25rem.
+// The same cap for the selection actions (formatting, cut, copy — and delete,
+// once select mode is holding a run), which unfold out of the ⋯ on their own
+// when text is selected — real width ~8.25rem, or ~11rem with the delete.
 // Both caps are upper bounds, so a row carrying fewer than the full set — a
 // desktop pointer gets no cut button (see `desktopPointer`), and a locked note
 // folds its cut and formatting buttons to zero width (see `WriteAction`) —
 // simply travels to a stop it doesn't reach.
-const SELECTION_MAX_WIDTH = "9rem";
+const SELECTION_MAX_WIDTH = "12rem";
 
 // A stable empty hit list for the closed find bar, so the editing surfaces keep
 // seeing the identical reference and their per-line memos bail out.
@@ -543,6 +545,15 @@ export function Editor({
   // the header while there is one — and it takes the note's **source**, so
   // copying out of the live preview yields the Markdown that was typed rather
   // than the rendered text (the same thing Ctrl/Cmd+C does there).
+  // Select mode's own verb: the picked lines go, and nothing goes on the
+  // clipboard (that is what the cut button beside it is for). It is the trophy
+  // press rather than the edit — Backspace reaches the same delete from a
+  // keyboard, and this is the button that brings it to a touchscreen.
+  function runDeleteLines() {
+    unlock("offTheTop");
+    markdownEditorRef.current?.deleteSelection();
+  }
+
   async function runCopy(): Promise<boolean> {
     const text = editor.renderMarkdown
       ? markdownEditorRef.current?.selection()
@@ -718,7 +729,18 @@ export function Editor({
               </WriteAction>
             )}
             {selecting ? (
-              <CopyButton onCopy={runCopy} />
+              <>
+                <CopyButton onCopy={runCopy} />
+                {/* Only select mode has a *run of lines* to delete — an
+                    ordinary text selection is served by cut, and Backspace.
+                    Same touch-only gate as the cut button beside it: a
+                    keyboard already reaches this edit. */}
+                {selectMode && !desktopPointer && (
+                  <WriteAction shown={!locked && !loading}>
+                    <DeleteLinesButton onDelete={runDeleteLines} />
+                  </WriteAction>
+                )}
+              </>
             ) : (
               <>
                 <ExportButton

@@ -841,7 +841,7 @@ describe("Editor (selection actions)", () => {
 
     selectBody(0, 3);
 
-    expect(cluster().style.maxWidth).toBe("9rem");
+    expect(cluster().style.maxWidth).toBe("12rem");
     expect(cluster().dataset.cluster).toBe("open");
     expect(screen.getByRole("button", { name: "Copy selection" })).toBeTruthy();
     // Only the three that act on a selection: the star, the export menu and
@@ -856,7 +856,7 @@ describe("Editor (selection actions)", () => {
     stubNarrow(true);
     renderEditor();
     selectBody(0, 3);
-    expect(cluster().style.maxWidth).toBe("9rem");
+    expect(cluster().style.maxWidth).toBe("12rem");
 
     selectBody(3, 3);
 
@@ -900,6 +900,113 @@ describe("Editor (selection actions)", () => {
       screen.getByRole("button", { name: "Add to favorites" }),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Copy selection" })).toBe(null);
+  });
+
+  // Select mode's own verb. Delete is the one thing a run of picked lines can
+  // do that an ordinary selection can't (cut and copy serve that), so the
+  // button joins the cluster only while the mode is holding lines — where the
+  // three other verbs already are, rather than in a bar over the note.
+  describe("the delete button", () => {
+    // The live-preview editor is the only surface that has select mode.
+    function renderMarkdown(over: Partial<Note> = {}) {
+      return renderEditor({
+        editor: DEFAULT_EDITOR_SETTINGS,
+        note: note({ body: "alpha\nbravo\ncharlie", ...over }),
+      });
+    }
+
+    // jsdom lays nothing out, so the editor falls back to measuring rows —
+    // stand each on a 20px band so a y coordinate means a line.
+    function pickLine(index: number) {
+      const rows = [
+        ...document.querySelectorAll<HTMLElement>("[data-line-row]"),
+      ];
+      for (const [i, row] of rows.entries())
+        vi.spyOn(row, "getBoundingClientRect").mockReturnValue({
+          top: i * 20,
+          bottom: i * 20 + 20,
+          left: 0,
+          right: 200,
+          width: 200,
+          height: 20,
+          x: 0,
+          y: i * 20,
+          toJSON: () => ({}),
+        } as DOMRect);
+      const scroller = rows[0]?.closest("[contenteditable]")
+        ?.parentElement as HTMLElement;
+      for (const type of ["pointerDown", "pointerUp"] as const)
+        fireEvent[type](scroller, {
+          pointerId: 1,
+          pointerType: "touch",
+          clientX: 200,
+          clientY: index * 20 + 10,
+        });
+    }
+
+    function enterSelectMode() {
+      fireEvent.click(screen.getByRole("button", { name: "Select lines" }));
+    }
+
+    function deleteButton() {
+      return screen.queryByRole("button", { name: "Delete selected lines" });
+    }
+
+    it("joins the cluster once the mode is holding lines", () => {
+      stubNarrow(true);
+      renderMarkdown();
+      enterSelectMode();
+      expect(deleteButton()).toBe(null);
+
+      pickLine(1);
+
+      expect(deleteButton()).toBeTruthy();
+      // Beside the other three, in the same box they all ride in.
+      expect(cluster().contains(deleteButton())).toBe(true);
+      expect(
+        screen.getByRole("button", { name: "Copy selection" }),
+      ).toBeTruthy();
+    });
+
+    it("takes the picked lines out of the note", () => {
+      stubNarrow(true);
+      const { onChange } = renderMarkdown();
+      enterSelectMode();
+      pickLine(1);
+
+      fireEvent.click(deleteButton()!);
+
+      expect(onChange).toHaveBeenCalledWith("alpha\ncharlie");
+    });
+
+    it("folds away on a locked note, which refuses the edit anyway", () => {
+      stubNarrow(true);
+      renderMarkdown({ locked: true });
+      enterSelectMode();
+      pickLine(1);
+
+      // Slid to nothing rather than unmounted, the way every other write-only
+      // action in the row goes (`WriteAction`) — so the eye reads as the row
+      // folding the writing tools up. Copy stays: a locked note can still be
+      // copied from.
+      expect(writeAction("Delete selected lines").className).toContain(
+        "max-w-0",
+      );
+      expect(
+        screen.getByRole("button", { name: "Copy selection" }),
+      ).toBeTruthy();
+    });
+
+    it("stays away for an ordinary selection, which has cut instead", () => {
+      stubNarrow(true);
+      renderEditor();
+      selectBody(0, 3);
+
+      expect(
+        screen.getByRole("button", { name: "Copy selection" }),
+      ).toBeTruthy();
+      expect(deleteButton()).toBe(null);
+    });
   });
 });
 
