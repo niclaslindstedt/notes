@@ -2418,7 +2418,12 @@ implementation and agree on what a press does. A block press (heading, list, quo
 indent) re-marks every line the selection touches, deciding once from whether *all*
 of them already carry the marker — so a mixed selection moves as one block — and
 replaces any existing marker rather than stacking on it (a bullet asked to become a
-heading is `# item`, never `# - item`). An inline press wraps the selection, or the
+heading is `# item`, never `# - item`). Indent reads a blank line by where the
+caret is: the caret's *own* blank line indents like any other, so the way to open
+a child item is to press Indent on the empty row and start typing — but a blank
+line caught in the middle of a **multi-line** selection keeps its left margin,
+since there it is a separator between the blocks being indented rather than one of
+them. An inline press wraps the selection, or the
 word under a bare caret, and unwraps when it is already wrapped. A link press makes
 the selection the label and hands back the `url` placeholder *selected*, ready to
 type over — unless the selection is itself a URL, in which case it becomes the href.
