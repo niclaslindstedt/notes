@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef } from "react";
+
 import { type CursorPaint } from "./multi-cursor-rects.ts";
 
 // The carets and highlights of every cursor the browser isn't drawing.
@@ -14,6 +16,23 @@ import { type CursorPaint } from "./multi-cursor-rects.ts";
 // The boxes themselves come from `measureCursors`; this component only paints
 // them, which is what keeps it re-renderable on every keystroke.
 export function MultiCursorOverlay({ paint }: { paint: CursorPaint }) {
+  const caretLayer = useRef<HTMLDivElement>(null);
+
+  // The blink runs on the **layer**, not on each caret. A CSS animation starts
+  // when its element is inserted, so carets added as the column grows would
+  // each blink on their own clock and the column would shimmer instead of
+  // pulsing — one animation over all of them is in phase by construction.
+  //
+  // Restarting it after every paint is the other half: a caret that has just
+  // moved (or just appeared) shows solid immediately and blinks from there,
+  // which is what a text caret does everywhere else. The animation is reset
+  // through its own object rather than by re-triggering the CSS — no reflow,
+  // and nothing to undo. `getAnimations` is guarded for jsdom, which has none.
+  useLayoutEffect(() => {
+    for (const animation of caretLayer.current?.getAnimations?.() ?? [])
+      animation.currentTime = 0;
+  });
+
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0">
       {paint.selections.map((r, i) => (
@@ -30,13 +49,15 @@ export function MultiCursorOverlay({ paint }: { paint: CursorPaint }) {
           }}
         />
       ))}
-      {paint.carets.map((r, i) => (
-        <div
-          key={`c${String(i)}`}
-          className="multi-caret absolute z-10 w-[2px]"
-          style={{ left: r.left - 1, top: r.top, height: r.height }}
-        />
-      ))}
+      <div ref={caretLayer} className="multi-caret-layer absolute inset-0 z-10">
+        {paint.carets.map((r, i) => (
+          <div
+            key={`c${String(i)}`}
+            className="multi-caret absolute w-[2px]"
+            style={{ left: r.left - 1, top: r.top, height: r.height }}
+          />
+        ))}
+      </div>
     </div>
   );
 }

@@ -52,6 +52,7 @@ import {
   IndentGlyph,
   KeyGlyph,
   LayersGlyph,
+  LineBreakGlyph,
   LinkGlyph,
   ListOrderedGlyph,
   LockGlyph,
@@ -801,6 +802,17 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     // Fired by switching the find bar's `.*` toggle on (`toggleRegex` in
     // `src/ui/NoteEditor.tsx`) — how a query is *read* is bar state, nowhere in
     // the document.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "lineBreaker",
+    tier: "pro",
+    glyph: LineBreakGlyph,
+    learnMore: true,
+    // Fired by a replacement that crosses a line break — a hit that matched one
+    // or a template that writes one (`crossesLineBreak` in
+    // `src/ui/NoteEditor.tsx`). The text it lands is indistinguishable from
+    // text typed by hand, so there is nothing in the document to derive.
     trigger: { kind: "manual" },
   },
   {

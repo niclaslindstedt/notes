@@ -29,6 +29,7 @@ import {
   type NoteMatch,
 } from "../domain/note-find.ts";
 import {
+  expandTemplateEscapes,
   previewReplacements,
   replaceAll,
   replaceOne,
@@ -446,11 +447,23 @@ export function Editor({
   // undo step; `onChange` is the fallback for a host that doesn't offer one.
   const applyReplacement = onReplace ?? onChange;
 
+  // Whether a replacement about to land crosses a line break — a hit that
+  // matched one, or a template that writes one. Only regex mode can do either,
+  // and it is the **Line breaker** trophy.
+  function crossesLineBreak(applied: readonly NoteMatch[]) {
+    if (!regex) return false;
+    return (
+      applied.some((m) => m.endLine > m.line) ||
+      expandTemplateEscapes(replacement, { regex }).includes("\n")
+    );
+  }
+
   // Rewrite the hit the bar is parked on and step to whatever follows the text
   // just inserted — which is what keeps holding Enter walking the note instead
   // of stalling when a replacement matches the query again (`a` → `aa`).
   function runReplace() {
     if (!canReplace || activeMatch < 0) return;
+    const target = matches[activeMatch];
     const result = replaceOne(
       note.body ?? "",
       query,
@@ -460,6 +473,7 @@ export function Editor({
     );
     if (!result) return;
     unlock("swapMeet");
+    if (crossesLineBreak(target ? [target] : [])) unlock("lineBreaker");
     applyReplacement(result.body);
     setMatchCursor(Math.max(result.index, 0));
   }
@@ -469,6 +483,7 @@ export function Editor({
     const next = replaceAll(note.body ?? "", query, replacement, { regex });
     if (next === (note.body ?? "")) return;
     unlock("swapMeet");
+    if (crossesLineBreak(matches)) unlock("lineBreaker");
     applyReplacement(next);
     setMatchCursor(0);
   }
@@ -1449,19 +1464,29 @@ function PlainEditor({
   const hit = activeMatch >= 0 ? matches[activeMatch] : undefined;
   const hitLine = hit?.line ?? null;
   const hitFrom = hit?.from ?? null;
+  // The end is its own point rather than a column on `hitLine`: a regex hit can
+  // span a line break, and a textarea selection crosses one happily.
+  const hitEndLine = hit?.endLine ?? null;
   const hitTo = hit?.to ?? null;
   useEffect(() => {
     const el = textareaRef.current;
-    if (!el || hitLine === null || hitFrom === null || hitTo === null) return;
+    if (
+      !el ||
+      hitLine === null ||
+      hitFrom === null ||
+      hitEndLine === null ||
+      hitTo === null
+    )
+      return;
     const focused = document.activeElement;
     el.setSelectionRange(
       pointToOffset(el.value, { line: hitLine, col: hitFrom }),
-      pointToOffset(el.value, { line: hitLine, col: hitTo }),
+      pointToOffset(el.value, { line: hitEndLine, col: hitTo }),
     );
     if (focused instanceof HTMLElement && document.activeElement !== focused)
       focused.focus();
     scrollTextareaToLine(el, hitLine);
-  }, [hitLine, hitFrom, hitTo]);
+  }, [hitLine, hitFrom, hitEndLine, hitTo]);
 
   // --- The styling toolbar -------------------------------------------------
   //

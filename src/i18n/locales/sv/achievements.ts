@@ -395,7 +395,13 @@ const achievements: AchievementsCatalog = {
       name: "Mönstersökaren",
       condition: "Sök i en anteckning med ett reguljärt uttryck.",
       learnMore:
-        "Omkopplaren `.*` inuti sökfältet slutar läsa din sökning som bokstavliga tecken och lämnar den i stället till ett reguljärt uttryck — så `^#{1,3} ` hittar varje rubrik, och `\\d{4}-\\d{2}-\\d{2}` hittar varje datum. Varje rad matchas för sig, så `^` och `$` betyder radens början och slut och ingen träff sträcker sig någonsin över ett radbrott. Det är också det som ger `$1` i ersättningsfältet en innebörd: ett mönsters grupper kan klistras rakt in i det som ersätter det. Ett halvskrivet mönster säger till där träffräknaren brukar stå, i stället för att låtsas att anteckningen är tom.",
+        "Omkopplaren `.*` inuti sökfältet slutar läsa din sökning som bokstavliga tecken och lämnar den i stället till ett reguljärt uttryck — så `^#{1,3} ` hittar varje rubrik, och `\\d{4}-\\d{2}-\\d{2}` hittar varje datum. `^` och `$` betyder fortfarande början och slutet på en *rad* snarare än på anteckningen, och `.` slukar aldrig ett radbrott — men `\\n` matchar ett, så ett mönster kan sträcka sig över det (se **Radbrytaren**). Det är också det som ger `$1` i ersättningsfältet en innebörd: ett mönsters grupper kan klistras rakt in i det som ersätter det. Ett halvskrivet mönster säger till där träffräknaren brukar stå, i stället för att låtsas att anteckningen är tom.",
+    },
+    lineBreaker: {
+      name: "Radbrytaren",
+      condition: "Matcha eller skriv ett radbrott från sökfältet.",
+      learnMore:
+        "Med omkopplaren `.*` på läser sökfältet anteckningen som en enda text i stället för en trave separata rader: `\\n` i sökningen matchar ett riktigt radbrott, så ett mönster kan sträcka sig över ett — `\\n\\n` hittar varje tom rad mellan stycken, och `,\\s*\\n` hittar ett kommatecken som blivit hängande i slutet av en. Ersättningsfältet förstår samma sekvenser, så `\\n` där *skriver* ett radbrott (och `\\t` en tabb, `\\\\` ett omvänt snedstreck) — vilket är det enda sättet att be om ett från ett fält där du inte kan trycka Enter. Att ersätta varje `·` med `\\n- [ ] ` gör en hoptryckt lista till en checklista med ett enda tryck. Inget av det gäller vid en vanlig bokstavlig sökning: där är `\\n` ett omvänt snedstreck och ett n, precis som du skrev det.",
     },
     shapeshifter: {
       name: "Formskiftaren",

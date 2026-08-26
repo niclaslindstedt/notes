@@ -424,8 +424,14 @@ function PreviewPanel({
       <div className="max-h-44 overflow-y-auto overscroll-contain px-3 py-1.5">
         {shown.map((line) => (
           <div key={line.line} className="flex gap-2 py-0.5 text-xs">
-            <span className="w-7 shrink-0 pt-px text-right text-muted tabular-nums">
-              {line.line + 1}
+            {/* `min-w-7` rather than `w-7`: an ordinary row keeps the same
+                seven units every other row has, and the rare row a hit spans
+                two lines of takes the width its range needs instead of
+                clipping it. */}
+            <span className="min-w-7 shrink-0 pt-px text-right text-muted tabular-nums">
+              {line.endLine > line.line
+                ? `${line.line + 1}–${line.endLine + 1}`
+                : line.line + 1}
             </span>
             <span className="min-w-0 flex-1 font-mono break-words whitespace-pre-wrap">
               {line.segments.map((segment, i) => (

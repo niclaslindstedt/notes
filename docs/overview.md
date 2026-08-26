@@ -657,11 +657,23 @@ child of it — the same rule the [empty-note prompt](#markdown-editor) and the
 [attachments block](#attachments-at-the-end) follow, because a
 `contenteditable={false}` island among the lines is a node the browser feels
 entitled to normalise around. It is painted *before* the host so a highlight
-sits behind its text exactly as `::selection` does, with each caret lifting
-itself back above on a `z-index`; the tint is literally the `::selection` tint
-and the blink is the platform's 1s cadence, so a painted cursor and the
+sits behind its text exactly as `::selection` does, with the carets lifting
+themselves back above on a `z-index`; the tint is literally the `::selection`
+tint and the blink is the platform's 1s cadence, so a painted cursor and the
 browser's own are indistinguishable. Reduced motion stops the blink rather than
 hiding the caret.
+
+**Why the blink is on the layer.** The carets share one animation, on the box
+that holds them (`.multi-caret-layer`), rather than each running its own. A CSS
+animation starts when its element is inserted, so a caret added as the column
+grows would blink against whatever was already on screen and the column would
+shimmer instead of pulsing as one — a column of carets that don't agree reads as
+two different kinds of cursor, which is the one thing the paint exists to avoid.
+`MultiCursorOverlay` also **restarts** that animation after every paint (through
+the animation object, so there is no reflow), which puts a caret that just moved
+— or just appeared — solid on the spot and blinking from there, the way a text
+caret behaves everywhere else. The browser resets its own caret on the same
+selection change, so the native one stays in step with the painted ones.
 
 **Where a column ends.** A pointer press, focus leaving the surface, a locked
 note, `Ctrl/Cmd+A`, the [cut](#cut-button) and [styling
@@ -2441,8 +2453,9 @@ every note's title and preview — and opens a result list. This one answers
 case-insensitively**: a fuzzy hit has no span to highlight, and someone scanning
 their own text expects the literal characters they typed, spaces and punctuation
 included. `findMatches` (`src/domain/note-find.ts`) is the whole engine: a pure
-scan returning every `NoteMatch` as `(line, from, to)` in the same source
-coordinates the editor speaks. It compares through a case-insensitive `RegExp`
+scan returning every `NoteMatch` as `(line, from) → (endLine, to)` in the same
+source coordinates the editor speaks — two ends rather than one, because a
+[pattern can match across a line break](#n-in-find-and-replace). It compares through a case-insensitive `RegExp`
 over the original text rather than lowercasing both sides, because a handful of
 characters change *length* when lowercased (`İ` becomes two code units), which
 would slide every later column out of step with the source being highlighted.
@@ -2514,7 +2527,8 @@ through `flushSync`, keeping the focus inside the gesture that asked for it,
 which is what raises a soft keyboard on iOS.
 
 The hits reach the live-preview editor as the `matches` / `activeMatch` props on
-[`MarkdownEditor`](#markdown-editor), which buckets them by line and hands each
+[`MarkdownEditor`](#markdown-editor), which cuts each into the per-line pieces a
+line can paint (`matchLineSpans`), buckets those by line, and hands each
 [rendered line](#rendered-line) only its own. `markSource`
 (`src/ui/MarkdownLine.tsx`) splits a rendered run of source text at the hits
 inside it and wraps each in a `<mark>`. Every emitted segment carries its **own**
@@ -2535,8 +2549,9 @@ find field blurs the editing surface, which drops the active line, so the whole
 note renders formatted (and highlighted) while you search.
 
 The Markdown-off fallback is a plain `<textarea>`, which can carry no per-match
-markup, so there the current hit shows as the field's **own selection** (the
-browser paints it greyed while unfocused) and its line is scrolled to. Every hit
+markup, so there the current hit shows as the field's **own selection** — from
+its start point to its end point, across a line break if it spans one (the
+browser paints it greyed while unfocused) — and its line is scrolled to. Every hit
 is still counted, so the counter stays honest; focus is restored afterwards in
 case the browser moved it on `setSelectionRange`.
 
@@ -2558,8 +2573,11 @@ where this is a control.
 
 Everything else about the scan is unchanged, which is the point:
 
-- it still runs **per line**, so `^` and `$` anchor to a line, `.` never
-  swallows a line break, and no match ever spans one;
+- `^` and `$` still anchor to a **line** rather than to the note (the scan runs
+  over the whole body with the `m` flag, which is how a code editor's find
+  widget reads a pattern), and `.` still never swallows a line break — but `\n`
+  matches one, so a hit *can* span lines. See
+  [`\n` in find and replace](#n-in-find-and-replace);
 - it is still **case-insensitive** — the bar is one search field, not a settings
   panel, and the promise it makes ("case doesn't matter here") shouldn't flip
   with a toggle about something else;
@@ -2619,10 +2637,12 @@ the *search* field owns the focus even if the row came up already open.
 `domain/note-replace.ts` is the engine, pure and shared with the preview so what
 the panel promises and what the buttons apply cannot drift:
 
-- **`replaceAll`** rebuilds each affected line left to right **from the original
-  line**, so inserted text is never itself matched (`a` → `aa` terminates rather
-  than feeding on its own output) and the columns stay in step as the line's
-  length changes underneath.
+- **`replaceAll`** rebuilds the body left to right **from the original text**,
+  so inserted text is never itself matched (`a` → `aa` terminates rather than
+  feeding on its own output) and the offsets stay in step as the note's length
+  changes underneath. It works in flat body offsets rather than per line,
+  because a hit may cross a line break and a replacement crossing one is just
+  an ordinary splice.
 - **`replaceOne`** rewrites one hit and then re-scans the *rewritten* body to
   find the first hit at or after the text it just inserted. That is what makes
   pressing Replace repeatedly walk the note rather than stall: a replacement
@@ -2635,7 +2655,9 @@ the panel promises and what the buttons apply cannot drift:
   template expands `$&`, `$1`…`$99`, `$<name>` and `$$`. That expansion is not
   reimplemented here: it is `expandReplacement` (`domain/transform.ts`), which
   already speaks the grammar for the [Transform](#transforms) rules — one
-  grammar, one implementation.
+  grammar, one implementation. Regex mode also resolves the backslash escapes
+  `\n`, `\r`, `\t` and `\\` first, so a replacement can write a line break —
+  see [`\n` in find and replace](#n-in-find-and-replace).
 
 **A replace is always one undo**, however many lines it touched. It writes
 through `replaceBody` (`src/app/use-notes.ts`) rather than the editor's ordinary
@@ -2649,6 +2671,56 @@ goes back to being a plain label and there is no row to open — alongside the s
 Finding still works there, because reading a locked note is what locking it is
 for. Landing a replace is the **Swap meet** achievement.
 
+### `\n` in find and replace
+
+With [regex mode](#regex-mode) on, `\n` is a **real line break** on both sides
+of the find bar — the same reading a code editor's find widget gives it, which
+is what people arriving from VS Code expect and the reason the feature exists.
+
+**In the query.** `compilePattern` compiles with `gim` and `findHits` scans the
+**whole body** in one pass rather than line by line (`domain/note-find.ts`). The
+`m` flag is what keeps `^` and `$` meaning the edges of a *line* — a note-taker
+searching `^#` means the start of a line, not of the note — while `.` still
+never swallows a break. So `\n\n` finds every blank line between paragraphs,
+`,\s*\n` finds a comma left hanging at the end of one, and `\n- \[ \]` finds
+every checklist item after the first.
+
+A hit can therefore **end on a different line than it starts on**, which every
+surface that draws one has to honour:
+
+- `NoteMatch` carries `endLine` beside `line`, and `to` is a column on
+  *`endLine`*.
+- `matchLineSpans` cuts a hit into the per-line pieces a rendered line can
+  paint: the start line from the hit's column to its end, whole lines in the
+  middle, the last line up to the hit's end column.
+  [`MarkdownEditor`](#markdown-editor) buckets those, not the hits themselves.
+  **Empty spans are dropped** — the `\n` a hit swallows lives past the end of a
+  line's text, so a search for a bare line break counts and steps like any other
+  hit while highlighting nothing. A `<mark>` of zero width would paint the same
+  nothing with more machinery.
+- The Markdown-off `<textarea>` sets its selection from the hit's start point to
+  its end point, and a textarea selection crosses a break happily.
+- [The preview](#replacement-preview) folds the lines a hit spans into one row.
+
+**In the replacement.** `expandTemplateEscapes` (`domain/note-replace.ts`)
+resolves `\n`, `\r`, `\t` and `\\` before `expandReplacement` runs the `$`
+grammar over the result. The order matters: a capture pasted in by `$1` is
+inserted as it stood in the note rather than being re-read for escapes of its
+own, so text that literally contains a backslash and an n survives a round trip.
+It exists because the replace field is a single-line `<input>` — there is no
+keystroke that puts a break into it, so an escape is the only way to ask for
+one. Replacing every `·` with `\n- [ ] ` turns a run-on list into a checklist in
+a single press.
+
+**None of it applies to a literal search.** There `\n` is a backslash and an n,
+exactly as typed, on both sides — the literal promise is that what you typed is
+what you get, and quietly reading two of those characters as something else
+would break it. The `.*` toggle governs both fields at once.
+
+Landing a replacement that crosses a break — a hit that matched one, or a
+template that writes one — is the **Line breaker** achievement
+(`crossesLineBreak` in `src/ui/NoteEditor.tsx`).
+
 ### Replacement preview
 
 The **spectacles** in the replace row (`PreviewPanel`, `src/ui/NoteFindBar.tsx`)
@@ -2660,7 +2732,11 @@ screen meaning different things.
 `previewReplacements` (`domain/note-replace.ts`) returns one entry per affected
 line — untouched lines are left out entirely, so a long note changed in two
 places is two rows rather than a wall of context — each as a run of `kept` /
-`removed` / `added` segments. The panel draws them **in place**: the line
+`removed` / `added` segments. A hit that spans a line break makes its lines
+**one** entry rather than two halves, carrying `endLine` so the row is numbered
+as a range (`23–24`); the break it swallows sits inside the `removed` run, and a
+break the replacement *writes* sits inside the `added` one, both drawn where
+they would land. The panel draws them **in place**: the line
 numbered the way the [gutter](#line-numbers) numbers it, the text each hit takes
 away struck through in `danger`, and the text arriving lit in the accent right
 beside it, so the change reads in the context of its line rather than as a pair

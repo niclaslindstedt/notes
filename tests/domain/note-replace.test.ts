@@ -122,11 +122,56 @@ describe("replaceOne", () => {
   });
 });
 
+// `\n` in regex mode: a real line break on both sides of the bar — the query
+// can match one, and the replacement can write one, which is the only way to
+// ask for a line break from a single-line field.
+describe("line breaks", () => {
+  it("replaces across a line break", () => {
+    expect(replaceAll("one\ntwo", "e\\nt", "E-T", REGEX)).toBe("onE-Two");
+  });
+
+  it("writes a line break from a `\\n` in the replacement", () => {
+    expect(replaceAll("a·b·c", "·", "\\n- ", REGEX)).toBe("a\n- b\n- c");
+  });
+
+  it("joins two lines by replacing the break with a space", () => {
+    expect(replaceAll("one\ntwo\nthree", "\\n", " ", REGEX)).toBe(
+      "one two three",
+    );
+  });
+
+  it("splits a paragraph in two", () => {
+    expect(replaceAll("a. b. c.", "\\. ", ".\\n", REGEX)).toBe("a.\nb.\nc.");
+  });
+
+  it("expands `\\t` and `\\\\` too", () => {
+    expect(replaceAll("a,b", ",", "\\t", REGEX)).toBe("a\tb");
+    expect(replaceAll("a,b", ",", "\\\\", REGEX)).toBe("a\\b");
+  });
+
+  it("resolves escapes before the `$` grammar, not inside a capture", () => {
+    // The captured text is `\n` as two literal characters in the note; pasting
+    // it back must not turn it into a line break.
+    expect(replaceAll("x\\ny", "x(\\\\n)y", "[$1]", REGEX)).toBe("[\\n]");
+  });
+
+  it("leaves the escapes alone in literal mode", () => {
+    expect(replaceAll("a,b", ",", "\\n")).toBe("a\\nb");
+  });
+
+  it("steps past a hit that spanned lines", () => {
+    const result = replaceOne("a\nb\nc", "\\n", "-", 0, REGEX);
+    expect(result?.body).toBe("a-b\nc");
+    expect(result?.index).toBe(0);
+  });
+});
+
 describe("previewReplacements", () => {
   it("describes an affected line as kept / removed / added runs", () => {
     expect(previewReplacements("one two three", "two", "2")).toEqual([
       {
         line: 0,
+        endLine: 0,
         segments: [
           { kind: "kept", text: "one " },
           { kind: "removed", text: "two" },
@@ -164,6 +209,33 @@ describe("previewReplacements", () => {
   it("shows nothing when nothing matches", () => {
     expect(previewReplacements("abc", "z", "x")).toEqual([]);
     expect(previewReplacements("abc", "", "x")).toEqual([]);
+  });
+
+  it("makes the lines a hit spans one entry, break and all", () => {
+    const preview = previewReplacements("one\ntwo", "e\\nt", "E-T", REGEX);
+    expect(preview).toEqual([
+      {
+        line: 0,
+        endLine: 1,
+        segments: [
+          { kind: "kept", text: "on" },
+          { kind: "removed", text: "e\nt" },
+          { kind: "added", text: "E-T" },
+          { kind: "kept", text: "wo" },
+        ],
+      },
+    ]);
+  });
+
+  it("shows the line break a replacement would write", () => {
+    expect(
+      previewReplacements("a·b", "·", "\\n- ", REGEX)[0]?.segments,
+    ).toEqual([
+      { kind: "kept", text: "a" },
+      { kind: "removed", text: "·" },
+      { kind: "added", text: "\n- " },
+      { kind: "kept", text: "b" },
+    ]);
   });
 
   // The preview and the buttons must agree, or the panel is a lie — same scan,
