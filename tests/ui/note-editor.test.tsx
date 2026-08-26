@@ -903,9 +903,9 @@ describe("Editor (selection actions)", () => {
   });
 
   // Select mode's own verb. Delete is the one thing a run of picked lines can
-  // do that an ordinary selection can't (cut and copy serve that), so the
-  // button joins the cluster only while the mode is holding lines — where the
-  // three other verbs already are, rather than in a bar over the note.
+  // do that an ordinary selection can't (cut and copy serve that), so it joins
+  // the three verbs already in the header — rather than a bar over the note —
+  // and stays there for the whole mode.
   describe("the delete button", () => {
     // The live-preview editor is the only surface that has select mode.
     function renderMarkdown(over: Partial<Note> = {}) {
@@ -952,20 +952,63 @@ describe("Editor (selection actions)", () => {
       return screen.queryByRole("button", { name: "Delete selected lines" });
     }
 
-    it("joins the cluster once the mode is holding lines", () => {
+    it("rides the header for the whole mode, not just while it holds lines", () => {
       stubNarrow(true);
       renderMarkdown();
+
       enterSelectMode();
-      expect(deleteButton()).toBe(null);
 
-      pickLine(1);
-
+      // Out from the moment the mode is entered: the row a press lands in must
+      // not shuffle under the finger between one pick and the next.
       expect(deleteButton()).toBeTruthy();
       // Beside the other three, in the same box they all ride in.
       expect(cluster().contains(deleteButton())).toBe(true);
       expect(
         screen.getByRole("button", { name: "Copy selection" }),
       ).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Cut" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Formatting" })).toBeTruthy();
+
+      pickLine(1);
+
+      expect(deleteButton()).toBeTruthy();
+    });
+
+    it("clears the row of everything the mode has no use for", () => {
+      stubNarrow(true);
+      renderMarkdown();
+
+      enterSelectMode();
+
+      // A star, an export, a read-only toggle and a find bar are all answers
+      // to questions nobody picking lines is asking — and each is a press that
+      // would throw the run away.
+      for (const name of [
+        "Add to favorites",
+        "Export",
+        "Make read-only",
+        "Find in note",
+        "Note actions",
+      ])
+        expect(screen.queryByRole("button", { name })).toBe(null);
+      // The lit toggle stays: it is the way back out.
+      expect(
+        screen.getByRole("button", { name: "Leave select mode" }),
+      ).toBeTruthy();
+    });
+
+    it("puts the row back the way it was when the mode goes off", () => {
+      stubNarrow(true);
+      renderMarkdown();
+      enterSelectMode();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Leave select mode" }),
+      );
+
+      expect(deleteButton()).toBe(null);
+      expect(screen.getByRole("button", { name: "Note actions" })).toBeTruthy();
+      expect(cluster().style.maxWidth).toBe("0px");
     });
 
     it("takes the picked lines out of the note", () => {
@@ -995,6 +1038,25 @@ describe("Editor (selection actions)", () => {
       expect(
         screen.getByRole("button", { name: "Copy selection" }),
       ).toBeTruthy();
+    });
+
+    it("cuts the picked lines without leaving a caret behind", () => {
+      stubNarrow(true);
+      const { onChange } = renderMarkdown();
+      enterSelectMode();
+      pickLine(1);
+
+      fireEvent.click(screen.getByRole("button", { name: "Cut" }));
+
+      expect(onChange).toHaveBeenCalledWith("alpha\ncharlie");
+      // The run was picked with a finger over a note with the keyboard down,
+      // so the edit must not pull focus back into the surface to install a
+      // caret — that is what raises the keyboard over the note.
+      expect(
+        document
+          .querySelector("[contenteditable]")
+          ?.contains(document.activeElement),
+      ).toBe(false);
     });
 
     it("stays away for an ordinary selection, which has cut instead", () => {

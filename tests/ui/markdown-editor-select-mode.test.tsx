@@ -243,6 +243,29 @@ describe("select mode", () => {
     expect(tinted()).toEqual([1]);
   });
 
+  it("refuses the press that would focus the note and raise the keyboard", () => {
+    renderEditor();
+    layOutRows();
+    // The tap a phone also delivers as a compatibility `mousedown`, which is
+    // the event that focuses the editing host: the mode has to cancel it, or
+    // picking a line raises the soft keyboard over the lines being picked.
+    const landed = fireEvent.mouseDown(rows()[1]!, {
+      clientX: BODY_X,
+      clientY: yOf(1),
+    });
+    expect(landed).toBe(false);
+    expect(surface().contains(document.activeElement)).toBe(false);
+  });
+
+  it("leaves the press alone with the mode off, so a caret can land", () => {
+    renderEditor({ selectMode: false });
+    // No rows to press with the mode off (they are the mode's own boxes) — the
+    // line itself is what a caret lands in.
+    const line = surface().querySelector<HTMLElement>('[data-line-index="1"]')!;
+    const landed = fireEvent.mouseDown(line, { clientX: BODY_X, clientY: 30 });
+    expect(landed).toBe(true);
+  });
+
   it("sweeps straight away when the touch starts on the rail", () => {
     renderEditor();
     layOutRows();

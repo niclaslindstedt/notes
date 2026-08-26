@@ -1130,10 +1130,9 @@ affordance arriving rather than a glitch. Both the numbers and the rail hang
 *outside* the line's own box, so the reservation is published as a `--gutter`
 custom property on the surface for them to measure against.
 
-**The actions are in the header, all four of them.** The moment a line is taken
-the run is reported out like any other selection, so the narrow header unfolds
-its [selection actions](#selection-actions) on its own — formatting, cut and
-copy — and select mode adds the one verb they were missing: a **delete**
+**The actions are in the header, all four of them.** Entering the mode unfolds
+the [selection actions](#selection-actions) — formatting, cut and copy — and
+select mode adds the one verb they were missing: a **delete**
 (`DeleteLinesButton`, `src/ui/DeleteLinesButton.tsx`), immediately right of
 copy. Delete is the verb the mode had no button for at all: it was Backspace, on
 a keyboard select mode deliberately keeps down. It wears the danger tone rather
@@ -1144,11 +1143,26 @@ for at thumb speed. No confirm step, because it is one Undo away. Its trophy is
 
 Being in the header rather than in a bar over the note is the point: one row,
 four verbs, in the same place every other action on the note already lives, and
-nothing hovering over the lines being picked. The delete is **touch only**
-(`useDesktopPointer`, the same gate the header's own cut button uses) — a
-keyboard reaches the same edit on Backspace — and folds to nothing on a locked
-note the way every other write-only action in the row does (`WriteAction`),
-which leaves copy as the one thing a locked note's run can still be used for.
+nothing hovering over the lines being picked. They are out for the **whole
+mode**, not only once a line is taken (`picking`, `src/ui/NoteEditor.tsx`): the
+row a press lands in must not shuffle under the finger between one pick and the
+next, and with nothing taken each verb is simply a no-op — the run *is* what
+they act on, so a cut with no line picked doesn't fall back to cutting the line
+an invisible caret was last left on. All four ride the row on **any** pointer:
+cut and delete are touch-only affordances everywhere else (`useDesktopPointer`),
+but here they are the mode's own verbs in a row that has just dropped four
+buttons to make space. They still fold to nothing on a locked note the way every
+other write-only action does (`WriteAction`), which leaves copy as the one thing
+a locked note's run can be used for.
+
+**And the header carries nothing else.** While the mode is on it stops being the
+note's action row and becomes the mode's: the star, the read-only eye, the
+export menu, find — and the ⋯ itself, which now has nothing left to unfold —
+are all gone. They are answers to questions nobody in the middle of picking
+lines is asking, and every one of them is a press that would throw the run away.
+What is left beside the four verbs is the [pinned](#pinned-header-state) lit
+toggle, which is the way back out. The whole row returns the moment the mode
+goes off.
 
 **The paint is the editor's, not the browser's.** A taken line is tinted with
 `.line-selected` (`src/styles/theme.css`) across *both* of the boxes it is drawn
@@ -1165,6 +1179,24 @@ by `.line-select-mode`'s transparent `caret-color`, because that is what keeps i
 receiving `beforeinput` — without one, typing over the selection would silently
 do nothing on a phone. The same class blanks `::selection` inside the surface, so
 nothing left over from before the mode was entered can show through.
+
+**The mode never asks for the keyboard.** A press picks a line, so it must not
+also land a caret — and a caret in the note is what raises the soft keyboard
+over the very lines being picked. Three separate things would otherwise do it,
+and each is refused where it happens. The press is answered at `pointerdown`,
+but a pointer event born of a touch cannot cancel the tap's default action, so
+the *compatibility* `mousedown` the tap also produces is cancelled instead
+(the scroller's `onMouseDown` in `MarkdownEditor`) — that is the event the
+browser focuses an editing host from, and cancelling it is what keeps the caret,
+and the keyboard, away. The header's own verbs already cancel their `mousedown`
+for the mirror-image reason (the run has to survive the press). And the edit
+those verbs commit — a cut, a delete — would install the caret it leaves behind,
+which means taking focus: `quietCommit` (`src/ui/MarkdownEditor.tsx`) marks that
+one commit as answered with the keyboard down, so with the surface unfocused the
+note is simply rewritten, every line stays formatted, and `lastCaret` remembers
+where writing would resume for whenever the note is next tapped. Focus the mode
+*inherited* — the keyboard was already up, or a desktop took it on the way in —
+is left exactly where it is, so typing over a run still works.
 
 **Leaving the mode by Escape is the handover.** It turns the taken lines into an
 ordinary browser selection over the same lines, drawn in the ordinary selection
@@ -2250,7 +2282,12 @@ presses away — `Ctrl/Cmd+K`, and the browser's own right-click **Cut** over a
 selection — so a fourth glyph in that row buys nothing and is one more thing to
 read past. Nothing else changes with it: the shortcut, `cutLine`, and the
 **Guillotine** achievement are untouched, and a touch pointer (phone, tablet,
-a touchscreen laptop's finger) still gets the button. It follows the pointer
+a touchscreen laptop's finger) still gets the button. The one place the gate is
+lifted is [select mode](#select-mode), where cut is one of the four verbs the
+mode exists for, in a row that has just dropped four other buttons to make
+space — and where cutting acts on the picked run rather than on a caret, so
+with nothing picked the press is a no-op rather than a cut of the line an
+invisible caret was last left on. Otherwise it follows the pointer
 rather than the [platform](#capabilities), because the reason is the
 input device, not the shell — the Electron window and a desktop browser tab are
 the same case, and a tablet running the PWA is not.
@@ -2751,24 +2788,33 @@ the actions that operate on a selection are wanted, so under
 [formatting](#styling-toolbar) toggle, [cut](#cut-button) (on a touch pointer —
 see the cut button), a
 [copy](#copy-scope) button that takes the highlighted text and nothing else,
-and — while [select mode](#select-mode) is the thing holding the selection — a
-`DeleteLinesButton` that takes the picked lines out of the note, the one verb
-an ordinary text selection has no use for.
+and — while [select mode](#select-mode) is on — a `DeleteLinesButton` that
+takes the picked lines out of the note, the one verb an ordinary text selection
+has no use for.
 Reaching them through the ⋯ was two taps for something the user had already
 asked for by highlighting it.
 
+[Select mode](#select-mode) opens the same box (`picking`) and keeps it open
+for as long as the mode is on, whatever is or isn't picked — and there the row
+is *only* these verbs: the star, the eye, the export menu, find and the ⋯ all
+stand down, and cut and delete drop their touch-only gate, because the mode's
+four verbs are the whole point of the row while it is up.
+
 It is **the same box on the same slide** as the ⋯ unfold — one element whose
-contents depend on the mode (`selecting`), travelling to `SELECTION_MAX_WIDTH`
-rather than `ACTIONS_MAX_WIDTH` — not a second panel. That is what makes the ⋯
-behave the way it always has over a selection: pressing it simply widens the
-row that is already out into the full five, because `actionsOpen` wins over
-`selecting`. The ⋯ itself never goes away, and letting the selection go folds
-the buttons back and hands the note's name back.
+contents depend on the mode (`selecting` / `picking`), travelling to
+`SELECTION_MAX_WIDTH` rather than `ACTIONS_MAX_WIDTH` — not a second panel. That
+is what makes the ⋯ behave the way it always has over a selection: pressing it
+simply widens the row that is already out into the full five, because
+`actionsOpen` wins over `selecting`. Over a *select-mode* row it wins over
+nothing — there is nothing else to show — so the ⋯ isn't offered at all there.
+Otherwise it never goes away, and letting the selection go folds the buttons
+back and hands the note's name back.
 
 Two things it deliberately does not do: it does not appear on a wide header
 (every action is in the row there already), and it stands down while the
 [find bar](#find-in-note) is open, where a selection belongs to the search
-rather than to the note.
+rather than to the note. Neither applies to select mode, which trims the wide
+header down to its verbs the same way it trims the narrow one.
 
 **Who decides there is a selection.** Both editing surfaces report it —
 `onSelectionChange`, deduped through a ref so `selectionchange` firing on every
