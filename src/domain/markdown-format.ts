@@ -485,12 +485,17 @@ function applyIndent(
   outdent: boolean,
 ): FormatResult {
   const next = [...lines];
+  // A blank line *within a multi-line selection* is a separator between the
+  // blocks being indented rather than one of them, so it keeps its left margin
+  // instead of becoming a run of spaces in the gap. The caret's own blank line
+  // is the opposite case — it is exactly where someone opens a nested item, and
+  // refusing to indent it makes the button look broken — so a single-line range
+  // indents whatever it is given.
+  const keepBlankLines = start.line !== end.line;
   for (const i of rangeOf(start, end)) {
     const line = lines[i] ?? "";
     if (!outdent) {
-      // A blank line has nothing to nest under; indenting it would only leave
-      // trailing whitespace the save formatter strips again.
-      next[i] = line.trim() === "" ? line : INDENT + line;
+      next[i] = keepBlankLines && line.trim() === "" ? line : INDENT + line;
       continue;
     }
     next[i] = outdentLine(line);

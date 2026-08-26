@@ -195,8 +195,16 @@ describe("indentation", () => {
     );
   });
 
-  it("leaves a blank line alone rather than making it whitespace", () => {
+  it("leaves a blank separator inside a selection alone", () => {
     expect(run("[- a\n\n- b]", { kind: "indent" })).toBe("[  - a\n\n  - b]");
+  });
+
+  it("indents the caret's own blank line, ready to type a child into", () => {
+    expect(run("- a\n|", { kind: "indent" })).toBe("- a\n  |");
+  });
+
+  it("outdents an indented blank line back to the margin", () => {
+    expect(run("- a\n  |", { kind: "indent", outdent: true })).toBe("- a\n|");
   });
 
   it("is a no-op at the left margin", () => {
