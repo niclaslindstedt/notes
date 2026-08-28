@@ -27,6 +27,7 @@ import { createLogger } from "../dev/logger.ts";
 import {
   cutLine,
   firstChangedLine,
+  moveLines,
   orderPoints,
   pointsEqual,
   replaceRange,
@@ -258,6 +259,16 @@ type Props = {
    */
   onSelectionChange?: (selected: boolean) => void;
   /**
+   * Called as the selection starts and stops covering **whole lines and nothing
+   * else**, so the header can offer the two chevrons that move those lines up
+   * and down the note (see `docs/overview.md#move-lines`). Select mode's runs
+   * always qualify; an ordinary selection only does when it starts at the head
+   * of a line and ends at the foot of one, because half a line moved as a whole
+   * one is not what the button appears to promise. Fires only on a change, like
+   * `onSelectionChange`.
+   */
+  onWholeLineSelection?: (whole: boolean) => void;
+  /**
    * Find-bar hits to paint over the note, in source coordinates. Empty (the
    * default) while the bar is closed, so nothing is highlighted and no extra
    * nodes are rendered.
@@ -355,6 +366,10 @@ export type MarkdownEditorHandle = {
   /** Take the lines select mode has picked out of the note entirely. A no-op
    *  unless the mode is holding a run — the header only offers it then. */
   deleteSelection: () => void;
+  /** Shuffle the selected lines one row up (`-1`) or down (`1`), keeping them
+   *  selected. A no-op unless the selection covers whole lines — the header
+   *  only offers it then (see `docs/overview.md#move-lines`). */
+  moveLines: (direction: -1 | 1) => void;
 };
 
 // The active line's identity: which source line is being edited as raw text, and
@@ -388,6 +403,7 @@ export function MarkdownEditor({
   onTabOut,
   onLineFormat,
   onSelectionChange,
+  onWholeLineSelection,
   matches = NO_MATCHES,
   activeMatch = -1,
   handleRef,
@@ -983,7 +999,9 @@ export function MarkdownEditor({
     // Flagged for the effect that reports the mode's own state, which is about
     // to see the mode go off and would otherwise call this handover a nothing.
     handedOver.current = handover;
-    reportSelection(handover);
+    // The handover is a run of whole lines by construction, so the chevrons the
+    // mode was offering stay offered on the selection it leaves behind.
+    reportSelection(handover, handover);
     onSelectModeChange?.(false);
   }
 
@@ -1284,6 +1302,13 @@ export function MarkdownEditor({
     }
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       e.preventDefault();
+      // Alt+↑ / Alt+↓ moves the taken lines rather than walking the selection
+      // — the code editor shortcut, answered here so it reaches the mode's own
+      // run (see `moveSelectedLines`).
+      if (e.altKey) {
+        moveSelectedLines(e.key === "ArrowUp" ? -1 : 1);
+        return;
+      }
       const count = linesRef.current.length;
       const next = sel
         ? moveLineSelection(
@@ -1377,7 +1402,9 @@ export function MarkdownEditor({
   // selection of its own and reports it before the mode goes off.
   useEffect(() => {
     if (selectMode) {
-      reportSelectionRef.current(lineSel !== null);
+      // The mode only ever holds whole lines, so a run it is holding is always
+      // one the chevrons can move.
+      reportSelectionRef.current(lineSel !== null, true);
       return;
     }
     if (!handedOver.current) reportSelectionRef.current(false);
@@ -1744,6 +1771,46 @@ export function MarkdownEditor({
       end,
       collapsed: sel.isCollapsed,
     };
+  }
+
+  /**
+   * The whole lines an ordinary selection covers, or null when it covers
+   * anything less — what decides whether the header offers the line-move
+   * chevrons, and what they then move.
+   *
+   * "Whole" is read strictly: the selection has to start at the head of a line
+   * and stop at the foot of one. A run that takes a line and the first word of
+   * the next would otherwise move that next line entire, which is not what the
+   * highlight promised.
+   *
+   * The one latitude is an end sitting at column 0 of a *later* line — where a
+   * downward drag past a line's last character naturally lands, and where the
+   * browser leaves a triple-click. Nothing on that line is highlighted, so it
+   * is the line above that was taken.
+   */
+  function wholeLineSpan(
+    pts: { start: SourcePoint; end: SourcePoint; collapsed: boolean } | null,
+  ): { from: number; to: number } | null {
+    if (!pts || pts.collapsed || pts.start.col !== 0) return null;
+    const { start, end } = pts;
+    if (end.col === 0)
+      return end.line > start.line
+        ? { from: start.line, to: end.line - 1 }
+        : null;
+    if (end.col !== (linesRef.current[end.line] ?? "").length) return null;
+    return { from: start.line, to: end.line };
+  }
+
+  /** Every line a ranged selection touches, whole lines or not — what the
+   *  keyboard shortcut moves when the selection stops mid-line. An end parked
+   *  at column 0 belongs to the line above it, exactly as in `wholeLineSpan`. */
+  function lineSpanOfSelection(
+    pts: { start: SourcePoint; end: SourcePoint; collapsed: boolean } | null,
+  ): { from: number; to: number } | null {
+    if (!pts || pts.collapsed) return null;
+    const { start, end } = pts;
+    const to = end.col === 0 && end.line > start.line ? end.line - 1 : end.line;
+    return { from: start.line, to };
   }
 
   function replaceSelection(
@@ -2195,12 +2262,25 @@ export function MarkdownEditor({
   // Deduped through a ref: `selectionchange` fires on every keystroke, and the
   // answer is the same for nearly all of them.
   const selected = useRef(false);
+  const wholeLines = useRef(false);
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
-  function reportSelection(on: boolean) {
-    if (selected.current === on) return;
-    selected.current = on;
-    onSelectionChangeRef.current?.(on);
+  const onWholeLineSelectionRef = useRef(onWholeLineSelection);
+  onWholeLineSelectionRef.current = onWholeLineSelection;
+  // `whole` rides along on the same call because the two answers always change
+  // together — every path that gains or loses a selection knows, in the same
+  // breath, whether the thing it gained covers whole lines. A selection that is
+  // going away can't cover anything, so `on: false` settles both.
+  function reportSelection(on: boolean, whole = false) {
+    const covers = on && whole;
+    if (selected.current !== on) {
+      selected.current = on;
+      onSelectionChangeRef.current?.(on);
+    }
+    if (wholeLines.current !== covers) {
+      wholeLines.current = covers;
+      onWholeLineSelectionRef.current?.(covers);
+    }
   }
   // A selection this editor no longer owns is nobody's: a surface going away
   // (a note switch, Markdown turned off) has to take its report with it, or the
@@ -2229,11 +2309,12 @@ export function MarkdownEditor({
       // Both ends have to be in here for the source mapping to work — a drag
       // that ran out of the surface is left to the browser (see
       // `selectionSource`), so it isn't offered the header's actions either.
-      reportSelection(!!sel.focusNode && root.contains(sel.focusNode));
+      const inside = !!sel.focusNode && root.contains(sel.focusNode);
       // A drag is left exactly as the browser is drawing it — but the toolbar
       // still wants to know what it covers, so selecting a bolded word lights
       // Bold. Reading the endpoints doesn't disturb the selection.
       const pts = selectionPoints();
+      reportSelection(inside, inside && wholeLineSpan(pts) !== null);
       if (!pts) return;
       if (pts.start.line === pts.end.line)
         markCaret(pts.start.line, pts.start.col, pts.end.col);
@@ -2650,6 +2731,21 @@ export function MarkdownEditor({
     // header button, so the surface may not even hold focus); handling a press
     // here too would answer it twice.
     if (selectMode) return;
+    // Alt+↑ / Alt+↓ shuffles the selected lines up and down the note — the
+    // shortcut every code editor binds, and the keyboard twin of the header's
+    // two chevrons. Read before the column handler and the vertical-run
+    // bookkeeping below, both of which would otherwise treat it as a caret move.
+    if (
+      (e.key === "ArrowUp" || e.key === "ArrowDown") &&
+      e.altKey &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.shiftKey
+    ) {
+      e.preventDefault();
+      moveSelectedLines(e.key === "ArrowUp" ? -1 : 1);
+      return;
+    }
     if (onColumnKeyDown(e)) return;
     // Read before anything else consumes the press: the `beforeinput` this
     // keydown is about to produce asks for it (see `softBreak`).
@@ -2930,6 +3026,85 @@ export function MarkdownEditor({
     reportSelection(false);
   }
 
+  // --- Moving lines ---------------------------------------------------------
+  //
+  // The header's two chevrons and the Alt+↑ / Alt+↓ every code editor binds:
+  // the selected lines shuffle one row up or down, keeping hold of the lines
+  // they started on so a second press carries on where the first left off.
+  // What moves is decided by whichever selection is in play — the run select
+  // mode is holding, or an ordinary selection that covers whole lines — and the
+  // reorder itself is `moveLines`, which is shared with the plain-textarea
+  // fallback (see `docs/overview.md#move-lines`).
+  //
+  // The two branches differ only in how the selection is put back afterwards.
+  // Select mode paints its own run, so it re-takes the lines at their new
+  // indices; an ordinary selection is the browser's, so the span is queued for
+  // the layout effect below to redraw once the moved lines have rendered — the
+  // same handover a multi-line block format does.
+  function moveSelectedLines(direction: -1 | 1) {
+    if (locked) return;
+    const sel = lineSelRef.current;
+    if (selectModeRef.current) {
+      if (!sel) return;
+      const r = moveLines(linesRef.current, sel.lines, direction);
+      if (!r) return;
+      unlock("shuffleUp");
+      const next = r.lines.join("\n");
+      setValue(next);
+      onChange(next);
+      const rows = r.selected;
+      const head = rows[rows.length - 1]!;
+      lastCaret.current = { line: head, col: (r.lines[head] ?? "").length };
+      setLineSelection({ lines: rows, anchor: rows[0]!, head });
+      scrollLineIntoView(rootRef.current, direction === -1 ? rows[0]! : head);
+      return;
+    }
+    // One caret's worth of selection is what the move is measured from, so a
+    // column of them hands the note back first.
+    clearCursors();
+    const pts = selectionPoints();
+    // A caret alone moves the line it sits on and rides along with it — which
+    // is what the shortcut does in the editors it is borrowed from, and the
+    // press you make while writing. There is no button for this: a chevron
+    // offered over an untouched note would be a control with nothing named on
+    // screen for it to act on.
+    const at = pts?.collapsed ? pts.start : pts ? null : lastCaret.current;
+    if (at) {
+      const r = moveLines(linesRef.current, [at.line], direction);
+      if (!r) return;
+      unlock("shuffleUp");
+      commit(r.lines, { line: r.selected[0] ?? at.line, col: at.col });
+      return;
+    }
+    // A selection that stops short of a line's edge still moves every line it
+    // touches, and comes back drawn over those lines whole: the move is a
+    // whole-line operation, so the highlight it leaves should say so rather
+    // than keep pointing at columns the reorder was never measured in.
+    const span = wholeLineSpan(pts) ?? lineSpanOfSelection(pts);
+    if (!span) return;
+    const rows: number[] = [];
+    for (let n = span.from; n <= span.to; n++) rows.push(n);
+    const r = moveLines(linesRef.current, rows, direction);
+    if (!r) return;
+    unlock("shuffleUp");
+    const next = r.lines.join("\n");
+    setValue(next);
+    onChange(next);
+    dropGoalColumn();
+    const from = r.selected[0]!;
+    const to = r.selected[r.selected.length - 1]!;
+    // The moved lines are drawn as a whole-line span, so no single line is
+    // active and none has columns for the toolbar to read — the same shape a
+    // block format's multi-line result leaves behind.
+    clearCaretSpan();
+    setSpanLine(from);
+    lastCaret.current = { line: to, col: (r.lines[to] ?? "").length };
+    pendingCaret.current = null;
+    pendingRange.current = null;
+    pendingLineSpan.current = { from, to };
+    setActive((a) => (a.index === null ? a : { index: null, key: a.key + 1 }));
+  }
+
   // Draw a selection over whole source lines `[from, to]`. The endpoints are
   // anchored *inside* the line elements (not at the contenteditable root) so
   // both map back to source — the same shape `selectAllLines` relies on.
@@ -3115,6 +3290,8 @@ export function MarkdownEditor({
   cutRef.current = cut;
   const selectionSourceRef = useRef(selectionSource);
   selectionSourceRef.current = selectionSource;
+  const moveSelectedLinesRef = useRef(moveSelectedLines);
+  moveSelectedLinesRef.current = moveSelectedLines;
   useImperativeHandle(
     handleRef ?? null,
     () => ({
@@ -3123,6 +3300,7 @@ export function MarkdownEditor({
       cut: () => cutRef.current(),
       selection: () => selectionSourceRef.current(),
       deleteSelection: () => deleteLineSelectionRef.current(),
+      moveLines: (direction: -1 | 1) => moveSelectedLinesRef.current(direction),
     }),
     [],
   );

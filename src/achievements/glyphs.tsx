@@ -503,6 +503,21 @@ export function LineSweepGlyph({ className }: IconProps) {
   );
 }
 
+// A boxed line with a chevron above it and one below — the two header buttons
+// that shuffle the selected lines up and down, drawn around the thing they
+// move. No columns in the box, for the same reason `LineSweepGlyph` has none:
+// what travels is whole lines.
+export function LineShuffleGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M8 5.5 12 2l4 3.5" />
+      <rect x="2" y="8.5" width="20" height="7" rx="2" />
+      <path d="M5.5 12h9" />
+      <path d="M8 18.5 12 22l4-3.5" />
+    </Svg>
+  );
+}
+
 // Two picked lines with a split pill hovering under them — the floating bar
 // select mode raises on a touchscreen, and the seam down its middle that makes
 // it two actions rather than one button.

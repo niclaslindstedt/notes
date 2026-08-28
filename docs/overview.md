@@ -2878,8 +2878,9 @@ answers it wrong. Turning the setting back on is one ⋯ away.
 the actions that operate on a selection are wanted, so under
 `COLLAPSE_QUERY` the [collapsed cluster](#collapsed-header-actions) unfolds
 **itself** then, carrying just the ones that act on one: the
-[formatting](#styling-toolbar) toggle, [cut](#cut-button) (on a touch pointer —
-see the cut button), a
+[formatting](#styling-toolbar) toggle, the two [line-move](#move-lines)
+chevrons (whenever the selection covers whole lines), [cut](#cut-button) (on a
+touch pointer — see the cut button), a
 [copy](#copy-scope) button that takes the highlighted text and nothing else,
 and — while [select mode](#select-mode) is on — a `DeleteLinesButton` that
 takes the picked lines out of the note, the one verb an ordinary text selection
@@ -2911,7 +2912,11 @@ header down to its verbs the same way it trims the narrow one.
 
 **Who decides there is a selection.** Both editing surfaces report it —
 `onSelectionChange`, deduped through a ref so `selectionchange` firing on every
-keystroke costs one boolean comparison. The live-preview editor
+keystroke costs one boolean comparison. A second answer rides the same call,
+`onWholeLineSelection`: whether what is selected is whole lines and nothing
+else, which is what the [line-move](#move-lines) chevrons wait for. The two
+always change together — every path that gains or loses a selection knows in the
+same breath what shape it is — and a selection going away settles both. The live-preview editor
 (`MarkdownEditor`) reports from the `selectionchange` handler it already runs,
 and only when **both** endpoints are inside its surface, because a drag that
 ran out of the note can't be mapped back to source (see
@@ -2941,6 +2946,58 @@ while there is a selection, so it can never take more than what is
 highlighted. It confirms with the tick-and-`Toast` pair the export row uses,
 because a copy is otherwise silent. The first unfold is the **Sleight of
 hand** achievement.
+
+### Move lines
+
+`MoveLinesButton` (`src/ui/MoveLinesButton.tsx`), `moveLines`
+(`src/domain/line-edit.ts`) — two chevrons immediately right of the
+[formatting](#styling-toolbar) toggle that shuffle the selected lines one row up
+or down the note, and the **Alt+↑ / Alt+↓** every code editor binds. Reordering a
+list is otherwise a cut and a paste with the caret aimed twice; this is one press
+per row, repeatable, with the lines staying selected so the second press carries
+on where the first left off.
+
+**What moves.** `moveLines` takes a *set* of line indices, not a range, because
+that is what [select mode](#select-mode) holds. Each unbroken run in it moves on
+its own: three scattered lines each swap with their own neighbour rather than
+dragging everything between them along. Runs are maximal, so the line a run
+swaps with is never part of another run and the moves can't collide — which is
+why they need no reconciliation between them. A run already against the edge it
+is travelling towards simply stays put (its neighbours still move), the way a
+code editor parks the top line rather than wrapping it to the bottom; when
+*nothing* could move the result is `null` and the source — and the undo timeline
+— is left alone. The note never grows or shrinks: the displaced line hops over
+the block to the other side.
+
+**When the buttons appear.** Only while the selection covers **whole lines**.
+Select mode's runs always do, so there the chevrons ride the header for the
+whole of the mode beside its four verbs, for the same reason those do — the row
+a press lands in must not shuffle under the finger between one pick and the next.
+An ordinary selection qualifies when it starts at the head of a line and stops at
+the foot of one; an end parked at column 0 of a *later* line counts too, since
+nothing on that line is highlighted (`wholeLineSpan`, in both surfaces). A
+selection holding one line and the first word of the next does **not**: moving
+that second line whole is not what the highlight promised. They fold away with
+the writing tools on a [locked note](#lock-a-note), through the same
+`WriteAction` slide.
+
+**The keyboard is the code editor's, not the buttons'.** Alt+↑ / Alt+↓ answers
+wherever the caret is: with a whole-line selection it moves that block, with a
+selection that stops mid-line it moves every line the selection touches (and
+hands it back drawn over those lines whole, because the move is a whole-line
+operation whatever columns it was measured in), and with a bare caret it moves
+the caret's own line and rides along with it. That last case has no button: a
+chevron offered over an untouched note would be a control with nothing named on
+screen for it to act on.
+
+**Both surfaces, one engine.** The live-preview editor and the plain textarea
+each expose `moveLines` on their handle and reorder through the same pure
+`moveLines`, so the two agree on what a press does. They differ only in how the
+selection is put back: select mode re-takes the lines at their new indices
+(it paints its own run), the live-preview editor queues the span for the layout
+effect that owns `pendingLineSpan` — the same handover a multi-line block format
+does — and the textarea installs the offsets through `pendingSelection`. The
+first move that actually reorders something is the **Shuffle up** achievement.
 
 ### Editor position memory
 

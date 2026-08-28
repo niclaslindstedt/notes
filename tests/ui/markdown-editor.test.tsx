@@ -2454,4 +2454,110 @@ describe("MarkdownEditor (selection reporting)", () => {
     sel.removeAllRanges();
     expect(handle.current?.selection()).toBe(null);
   });
+
+  // The second half of the report: whether what is selected is *whole lines*,
+  // which is what puts the line-move chevrons in the header (see
+  // `docs/overview.md#move-lines`).
+  it("calls a whole-line selection whole, and a part-line one not", () => {
+    const onWholeLineSelection = vi.fn();
+    renderEditor("alpha\nbeta", {
+      focusOnMount: false,
+      onWholeLineSelection,
+    });
+
+    const first = surface().querySelector<HTMLElement>(
+      '[data-line-index="0"]',
+    )!;
+    const last = surface().querySelector<HTMLElement>('[data-line-index="1"]')!;
+    const sel = window.getSelection()!;
+    const whole = document.createRange();
+    whole.setStart(first, 0);
+    whole.setEnd(last, last.childNodes.length);
+    sel.removeAllRanges();
+    sel.addRange(whole);
+    selChange();
+    expect(onWholeLineSelection).toHaveBeenLastCalledWith(true);
+
+    // A line and a bite of the next: the highlight never named the rest of that
+    // second line, so moving it whole is not on offer.
+    selectRange(screen.getByText("alpha"), 0, 5);
+    const part = document.createRange();
+    part.setStart(first, 0);
+    part.setEnd(domPointIn(last, 2).node, domPointIn(last, 2).offset);
+    sel.removeAllRanges();
+    sel.addRange(part);
+    selChange();
+    expect(onWholeLineSelection).toHaveBeenLastCalledWith(false);
+    // The selection itself is still very much there.
+    expect(sel.isCollapsed).toBe(false);
+  });
+});
+
+// Alt+↑ / Alt+↓, the shortcut every code editor binds: the selected lines (or,
+// with nothing selected, the line the caret is on) shuffle one row up or down.
+describe("MarkdownEditor (moving lines)", () => {
+  function altArrow(key: "ArrowUp" | "ArrowDown") {
+    act(() => {
+      fireEvent.keyDown(surface(), { key, altKey: true });
+    });
+  }
+
+  it("moves the caret's line down and takes the caret with it", () => {
+    const { onChange } = renderEditor("one\ntwo\nthree", {
+      focusOnMount: false,
+    });
+    caretIn(screen.getByText("two"), 1);
+    act(() => {
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+
+    altArrow("ArrowDown");
+
+    expect(onChange).toHaveBeenLastCalledWith("one\nthree\ntwo");
+    // The caret rode along, so a second press carries on from the same line.
+    expect(rawLine()?.textContent).toBe("two");
+  });
+
+  it("moves a whole-line selection as a block", () => {
+    const { onChange } = renderEditor("one\ntwo\nthree", {
+      focusOnMount: false,
+    });
+    const first = surface().querySelector<HTMLElement>(
+      '[data-line-index="1"]',
+    )!;
+    const last = surface().querySelector<HTMLElement>('[data-line-index="2"]')!;
+    const range = document.createRange();
+    range.setStart(first, 0);
+    range.setEnd(last, last.childNodes.length);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    altArrow("ArrowUp");
+
+    expect(onChange).toHaveBeenLastCalledWith("two\nthree\none");
+  });
+
+  it("leaves the note alone at the edge it is travelling towards", () => {
+    const { onChange } = renderEditor("one\ntwo", { focusOnMount: false });
+    caretIn(screen.getByText("one"), 0);
+    act(() => {
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+
+    altArrow("ArrowUp");
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("refuses the edit on a locked note", () => {
+    const { onChange } = renderEditor("one\ntwo", {
+      focusOnMount: false,
+      locked: true,
+    });
+
+    altArrow("ArrowDown");
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

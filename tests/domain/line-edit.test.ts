@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   cutLine,
   firstChangedLine,
+  moveLines,
   orderPoints,
   pointsEqual,
   replaceRange,
@@ -251,5 +252,75 @@ describe("cutLine", () => {
     const r = cutLine(["one", "two"], P(0, 99))!;
     expect(r.lines).toEqual(["two"]);
     expect(r.text).toBe("one\n");
+  });
+});
+
+describe("moveLines", () => {
+  const NOTE = ["one", "two", "three", "four"];
+
+  it("swaps a single line with the one above it", () => {
+    const r = moveLines(NOTE, [2], -1)!;
+    expect(r.lines).toEqual(["one", "three", "two", "four"]);
+    expect(r.selected).toEqual([1]);
+  });
+
+  it("swaps a single line with the one below it", () => {
+    const r = moveLines(NOTE, [1], 1)!;
+    expect(r.lines).toEqual(["one", "three", "two", "four"]);
+    expect(r.selected).toEqual([2]);
+  });
+
+  it("moves a run as one block, hopping the displaced line over it", () => {
+    const r = moveLines(NOTE, [1, 2], -1)!;
+    expect(r.lines).toEqual(["two", "three", "one", "four"]);
+    expect(r.selected).toEqual([0, 1]);
+  });
+
+  it("moves a run down as one block", () => {
+    const r = moveLines(NOTE, [1, 2], 1)!;
+    expect(r.lines).toEqual(["one", "four", "two", "three"]);
+    expect(r.selected).toEqual([2, 3]);
+  });
+
+  it("moves scattered runs independently, each swapping its own neighbour", () => {
+    const r = moveLines(["a", "b", "c", "d", "e"], [1, 3], -1)!;
+    expect(r.lines).toEqual(["b", "a", "d", "c", "e"]);
+    expect(r.selected).toEqual([0, 2]);
+  });
+
+  it("parks a run already against the edge and moves the rest", () => {
+    const r = moveLines(NOTE, [0, 2], -1)!;
+    expect(r.lines).toEqual(["one", "three", "two", "four"]);
+    expect(r.selected).toEqual([0, 1]);
+  });
+
+  it("returns null when nothing can move", () => {
+    expect(moveLines(NOTE, [0], -1)).toBeNull();
+    expect(moveLines(NOTE, [3], 1)).toBeNull();
+    expect(moveLines(NOTE, [0, 1], -1)).toBeNull();
+    expect(moveLines(["only"], [0], 1)).toBeNull();
+  });
+
+  it("returns null when nothing is selected", () => {
+    expect(moveLines(NOTE, [], -1)).toBeNull();
+  });
+
+  it("ignores lines the note no longer has", () => {
+    const r = moveLines(NOTE, [-1, 2, 99], 1)!;
+    expect(r.lines).toEqual(["one", "two", "four", "three"]);
+    expect(r.selected).toEqual([3]);
+  });
+
+  it("round-trips: down then up leaves the note as it was", () => {
+    const down = moveLines(NOTE, [1, 2], 1)!;
+    const back = moveLines(down.lines, down.selected, -1)!;
+    expect(back.lines).toEqual(NOTE);
+    expect(back.selected).toEqual([1, 2]);
+  });
+
+  it("leaves the note it was given untouched", () => {
+    const source = [...NOTE];
+    moveLines(source, [1], 1);
+    expect(source).toEqual(NOTE);
   });
 });

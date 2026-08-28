@@ -27,6 +27,13 @@ const app = {
     exit: "Leave select mode",
     delete: "Delete selected lines",
   },
+  // The pair of chevrons right of the formatting button, shown whenever the
+  // selection covers whole lines and nothing else: they shuffle those lines up
+  // or down the note, the same edit Alt+↑ / Alt+↓ makes.
+  moveLines: {
+    up: "Move lines up",
+    down: "Move lines down",
+  },
   titlePlaceholder: "Title",
   // Heading of the collected attachments block at the foot of a note, shown
   // when images / files are set to render at the end rather than inline.

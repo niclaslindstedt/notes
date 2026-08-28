@@ -364,6 +364,41 @@ describe("select mode", () => {
     expect(tinted()).toEqual([2, 3]);
   });
 
+  it("moves the taken lines with Alt and an arrow, keeping hold of them", () => {
+    const { onChange } = renderEditor();
+    layOutRows();
+    tap(1);
+
+    fireEvent.keyDown(document, { key: "ArrowDown", altKey: true });
+
+    expect(onChange).toHaveBeenLastCalledWith("alpha\ncharlie\nbravo\ndelta");
+    // Still taken, at the row it landed on — so a second press carries on.
+    expect(tinted()).toEqual([2]);
+  });
+
+  it("moves scattered lines each past their own neighbour", () => {
+    const { onChange } = renderEditor();
+    layOutRows();
+    tap(0);
+    tap(2);
+
+    fireEvent.keyDown(document, { key: "ArrowDown", altKey: true });
+
+    expect(onChange).toHaveBeenLastCalledWith("bravo\nalpha\ndelta\ncharlie");
+    expect(tinted()).toEqual([1, 3]);
+  });
+
+  it("parks a run already against the edge rather than wrapping it", () => {
+    const { onChange } = renderEditor();
+    layOutRows();
+    tap(0);
+
+    fireEvent.keyDown(document, { key: "ArrowUp", altKey: true });
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(tinted()).toEqual([0]);
+  });
+
   it("takes the whole note on Ctrl+A", () => {
     renderEditor();
     layOutRows();

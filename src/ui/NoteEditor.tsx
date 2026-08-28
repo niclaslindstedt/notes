@@ -15,7 +15,12 @@ import { flushSync } from "react-dom";
 
 import { unlock } from "../achievements/index.ts";
 import { type Attachment } from "../domain/attachment.ts";
-import { cutLine, firstChangedLine } from "../domain/line-edit.ts";
+import {
+  cutLine,
+  firstChangedLine,
+  moveLines,
+  type SourcePoint,
+} from "../domain/line-edit.ts";
 import {
   applyFormat,
   lineFormatAt,
@@ -55,6 +60,7 @@ import { ExportButton } from "./export/ExportButton.tsx";
 import { FavoriteButton } from "./FavoriteButton.tsx";
 import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
 import { LockButton } from "./LockButton.tsx";
+import { MoveLinesButton } from "./MoveLinesButton.tsx";
 import { useFindShortcut } from "./hooks/useFindShortcuts.ts";
 import { useDesktopPointer, useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
@@ -95,24 +101,26 @@ const COLLAPSE_QUERY = "(max-width: 639px)";
 // How wide the folded-out cluster is allowed to grow. Only the animation reads
 // it: the buttons size the box, and this cap is what the max-width transition
 // travels to (a width of `auto` can't be transitioned). Kept a little above the
-// real ~19.25rem — seven 2.25rem buttons, six 0.5rem gaps and the box's own
-// `pr-2` — so no button is ever clipped at rest; the cost is that the slide
-// finishes a hair before the timer does. **Raise this whenever a button joins
-// the cluster**: the box clips what doesn't fit, so a cap left behind simply
-// swallows the last glyph on a phone. (A star or eye that has pinned itself out
-// of the box — see `pinFavorite` / `pinLocked` — leaves it *narrower* than the
-// cap, which is an upper bound, so there is nothing to adjust there.)
-const ACTIONS_MAX_WIDTH = "20rem";
+// real ~24.75rem — nine 2.25rem buttons (the seven note actions plus the two
+// line-move chevrons a whole-line selection adds), eight 0.5rem gaps and the
+// box's own `pr-2` — so no button is ever clipped at rest; the cost is that the
+// slide finishes a hair before the timer does. **Raise this whenever a button
+// joins the cluster**: the box clips what doesn't fit, so a cap left behind
+// simply swallows the last glyph on a phone. (A star or eye that has pinned
+// itself out of the box — see `pinFavorite` / `pinLocked` — leaves it *narrower*
+// than the cap, which is an upper bound, so there is nothing to adjust there.)
+const ACTIONS_MAX_WIDTH = "26rem";
 
-// The same cap for the selection actions (formatting, cut, copy — and delete,
-// for the whole of select mode), which unfold out of the ⋯ on their own when
-// text is selected, or when the mode is entered — real width ~8.25rem, or
-// ~11rem with the delete.
+// The same cap for the selection actions (formatting, the two line-move
+// chevrons, cut, copy — and delete, for the whole of select mode), which unfold
+// out of the ⋯ on their own when text is selected, or when the mode is entered
+// — real width ~13.75rem, or ~16.5rem with the delete.
 // Both caps are upper bounds, so a row carrying fewer than the full set — a
-// desktop pointer gets no cut button (see `desktopPointer`), and a locked note
+// desktop pointer gets no cut button (see `desktopPointer`), a selection that
+// isn't whole lines gets no chevrons (see `canMoveLines`), and a locked note
 // folds its cut and formatting buttons to zero width (see `WriteAction`) —
 // simply travels to a stop it doesn't reach.
-const SELECTION_MAX_WIDTH = "12rem";
+const SELECTION_MAX_WIDTH = "18rem";
 
 // A stable empty hit list for the closed find bar, so the editing surfaces keep
 // seeing the identical reference and their per-line memos bail out.
@@ -131,7 +139,48 @@ type PlainEditorHandle = {
   format: (action: FormatAction) => void;
   cut: () => void;
   selection: () => string | null;
+  moveLines: (direction: -1 | 1) => void;
 };
+
+/**
+ * The whole lines a textarea selection covers, or null when it covers anything
+ * less — what decides whether the header offers the line-move chevrons over the
+ * Markdown-off editor. The same reading the live-preview editor's own
+ * `wholeLineSpan` makes: head of a line to foot of a line, with an end parked at
+ * column 0 belonging to the line above it.
+ */
+function wholeLineSpan(
+  source: string,
+  from: number,
+  to: number,
+): { from: number; to: number } | null {
+  if (from === to) return null;
+  const start = offsetToPoint(source, Math.min(from, to));
+  const end = offsetToPoint(source, Math.max(from, to));
+  if (start.col !== 0) return null;
+  if (end.col === 0)
+    return end.line > start.line
+      ? { from: start.line, to: end.line - 1 }
+      : null;
+  const lines = source.split("\n");
+  if (end.col !== (lines[end.line] ?? "").length) return null;
+  return { from: start.line, to: end.line };
+}
+
+/** Every line a textarea selection touches, whole lines or not — what the
+ *  keyboard shortcut moves when the selection stops mid-line. */
+function lineSpanOf(
+  source: string,
+  from: number,
+  to: number,
+): { from: number; to: number } {
+  const start: SourcePoint = offsetToPoint(source, Math.min(from, to));
+  const end: SourcePoint = offsetToPoint(source, Math.max(from, to));
+  return {
+    from: start.line,
+    to: end.col === 0 && end.line > start.line ? end.line - 1 : end.line,
+  };
+}
 
 export function Editor({
   note,
@@ -362,6 +411,18 @@ export function Editor({
   // bar's own business, so it doesn't count.
   const [hasSelection, setHasSelection] = useState(false);
   const selecting = narrow && hasSelection && !findOpen && !actionsOpen;
+  // Whether what is selected is *whole lines* — select mode's runs always are,
+  // and an ordinary selection is when it runs head-of-line to foot-of-line.
+  // That is what the two line-move chevrons wait for: they reorder whole lines,
+  // so a selection holding one line and the first word of the next has nothing
+  // for them to move that the highlight actually named (see
+  // `docs/overview.md#move-lines`).
+  const [wholeLineSelection, setWholeLineSelection] = useState(false);
+  // Whether the chevrons are on offer. In select mode they ride the header for
+  // the whole of it, beside the four verbs and for the same reason: the row a
+  // press lands in must not shuffle under the finger between one pick and the
+  // next. Outside it they come and go with the selection that earns them.
+  const canMoveLines = (wholeLineSelection || picking) && !locked && !loading;
   // Which set the cluster carries, and whether it is out at all. The ⋯ always
   // wins: pressing it unfolds the whole row, the way it always has — except in
   // select mode, where the row it would unfold is already out and there is
@@ -583,6 +644,14 @@ export function Editor({
     markdownEditorRef.current?.deleteSelection();
   }
 
+  // The two chevrons, routed to whichever surface is mounted the same way a
+  // toolbar press is — both reorder through the same pure `moveLines`, so the
+  // button and the Alt+↑ / Alt+↓ the surfaces bind themselves do the same thing.
+  function runMoveLines(direction: -1 | 1) {
+    if (editor.renderMarkdown) markdownEditorRef.current?.moveLines(direction);
+    else plainEditorRef.current?.moveLines(direction);
+  }
+
   async function runCopy(): Promise<boolean> {
     const text = editor.renderMarkdown
       ? markdownEditorRef.current?.selection()
@@ -772,6 +841,17 @@ export function Editor({
                   onToggle={toggleToolbar}
                 />
               </WriteAction>
+              {/* Immediately right of the formatting button, in both sets the
+                cluster carries: whatever else the header is offering, a
+                selection of whole lines can be shuffled up and down. They slide
+                in and out with the selection that earns them the same way the
+                writing tools slide away on a locked note. */}
+              <WriteAction shown={canMoveLines}>
+                <MoveLinesButton direction={-1} onMove={runMoveLines} />
+              </WriteAction>
+              <WriteAction shown={canMoveLines}>
+                <MoveLinesButton direction={1} onMove={runMoveLines} />
+              </WriteAction>
               {/* The cut button is a touch affordance everywhere else (see
                 `desktopPointer`) — but in select mode it is one of the four
                 verbs the mode exists for, in a row that has just dropped four
@@ -956,6 +1036,7 @@ export function Editor({
             onTabOut={onBodyTab}
             onLineFormat={toolbarUp ? setLineFormat : undefined}
             onSelectionChange={setHasSelection}
+            onWholeLineSelection={setWholeLineSelection}
             matches={matches}
             activeMatch={activeMatch}
           />
@@ -968,6 +1049,7 @@ export function Editor({
             onTabOut={onBodyTab}
             onLineFormat={toolbarUp ? setLineFormat : undefined}
             onSelectionChange={setHasSelection}
+            onWholeLineSelection={setWholeLineSelection}
             undoScrollSeq={undoScrollSeq}
             wordWrap={editor.wordWrap}
             disableSpellcheck={editor.disableSpellcheck}
@@ -1298,6 +1380,7 @@ function PlainEditor({
   onTabOut,
   onLineFormat,
   onSelectionChange,
+  onWholeLineSelection,
   matches = NO_MATCHES,
   activeMatch = -1,
   handleRef,
@@ -1332,6 +1415,10 @@ function PlainEditor({
   /** Report a selection appearing / disappearing, so the header can offer the
    *  actions that operate on one (see the selection actions in `Editor`). */
   onSelectionChange?: (selected: boolean) => void;
+  /** Report the selection starting / stopping covering whole lines and nothing
+   *  else, so the header can offer the line-move chevrons — see the live-preview
+   *  editor's prop of the same name. */
+  onWholeLineSelection?: (whole: boolean) => void;
   /** The find bar's hits. A textarea can't paint them, so only the one the bar
    *  is parked on shows — as the field's own selection (see below). */
   matches?: readonly NoteMatch[];
@@ -1532,6 +1619,47 @@ function PlainEditor({
     reportSelection(false);
   }
 
+  // The header's chevrons and their Alt+↑ / Alt+↓, through the same pure
+  // `moveLines` the live-preview editor uses — so the two surfaces reorder a
+  // note identically (see `docs/overview.md#move-lines`). A caret alone moves
+  // its own line and rides along with it; a selection moves every line it
+  // touches and comes back drawn over those lines whole, because the move is a
+  // whole-line operation whatever columns the selection was measured in.
+  function moveSelectedLines(direction: -1 | 1) {
+    const el = textareaRef.current;
+    if (!el || locked) return;
+    const source = el.value;
+    const lines = source.split("\n");
+    const start = offsetToPoint(source, el.selectionStart);
+    const collapsed = el.selectionStart === el.selectionEnd;
+    const span = collapsed
+      ? { from: start.line, to: start.line }
+      : lineSpanOf(source, el.selectionStart, el.selectionEnd);
+    const rows: number[] = [];
+    for (let n = span.from; n <= span.to; n++) rows.push(n);
+    const result = moveLines(lines, rows, direction);
+    if (!result) return;
+    unlock("shuffleUp");
+    const next = result.lines.join("\n");
+    setValue(next);
+    onChange(next);
+    const first = result.selected[0] ?? span.from;
+    const last = result.selected[result.selected.length - 1] ?? span.to;
+    const from = collapsed
+      ? pointToOffset(next, { line: first, col: start.col })
+      : pointToOffset(next, { line: first, col: 0 });
+    const to = collapsed
+      ? from
+      : pointToOffset(next, {
+          line: last,
+          col: (result.lines[last] ?? "").length,
+        });
+    pendingSelection.current = { from, to };
+    lastOffset.current = from;
+    if (onLineFormat) markCaret(next, from, to);
+    reportSelection(!collapsed, !collapsed);
+  }
+
   useImperativeHandle(handleRef ?? null, () => ({
     format: (action: FormatAction) => {
       const el = textareaRef.current;
@@ -1563,6 +1691,7 @@ function PlainEditor({
       if (!el || el.selectionStart === el.selectionEnd) return null;
       return el.value.slice(el.selectionStart, el.selectionEnd);
     },
+    moveLines: moveSelectedLines,
   }));
 
   // Keep the toolbar's lit buttons in step with the caret. The line decides the
@@ -1600,7 +1729,12 @@ function PlainEditor({
   function trackCaret(el: HTMLTextAreaElement) {
     lastOffset.current = el.selectionStart;
     if (onLineFormat) markCaret(el.value, el.selectionStart, el.selectionEnd);
-    reportSelection(el.selectionStart !== el.selectionEnd);
+    const ranged = el.selectionStart !== el.selectionEnd;
+    reportSelection(
+      ranged,
+      ranged &&
+        wholeLineSpan(el.value, el.selectionStart, el.selectionEnd) !== null,
+    );
   }
 
   // Whether a selection is up, reported out on change only — the caret moves on
@@ -1609,17 +1743,31 @@ function PlainEditor({
   // Markdown being turned back on), so the header can't be left offering
   // actions on a selection that no longer exists.
   const selected = useRef(false);
+  const wholeLines = useRef(false);
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
-  function reportSelection(on: boolean) {
-    if (selected.current === on) return;
-    selected.current = on;
-    onSelectionChangeRef.current?.(on);
+  const onWholeLineSelectionRef = useRef(onWholeLineSelection);
+  onWholeLineSelectionRef.current = onWholeLineSelection;
+  // Both answers travel together, for the reason the live-preview editor's own
+  // reporter gives: every path that gains or loses a selection knows in the
+  // same breath whether it covers whole lines.
+  function reportSelection(on: boolean, whole = false) {
+    const covers = on && whole;
+    if (selected.current !== on) {
+      selected.current = on;
+      onSelectionChangeRef.current?.(on);
+    }
+    if (wholeLines.current !== covers) {
+      wholeLines.current = covers;
+      onWholeLineSelectionRef.current?.(covers);
+    }
   }
   useEffect(() => {
     return () => {
       selected.current = false;
       onSelectionChangeRef.current?.(false);
+      wholeLines.current = false;
+      onWholeLineSelectionRef.current?.(false);
     };
   }, []);
 
@@ -1650,6 +1798,20 @@ function PlainEditor({
       onMouseUp={(e) => trackCaret(e.currentTarget)}
       onKeyUp={(e) => trackCaret(e.currentTarget)}
       onKeyDown={(e) => {
+        // Alt+↑ / Alt+↓ shuffles the selected lines up and down the note — the
+        // shortcut every code editor binds, and the keyboard twin of the
+        // header's two chevrons.
+        if (
+          (e.key === "ArrowUp" || e.key === "ArrowDown") &&
+          e.altKey &&
+          !e.metaKey &&
+          !e.ctrlKey &&
+          !e.shiftKey
+        ) {
+          e.preventDefault();
+          moveSelectedLines(e.key === "ArrowUp" ? -1 : 1);
+          return;
+        }
         // Ctrl/Cmd+K cuts at the caret — the keyboard twin of the header's
         // cut button, taken from the browser (which aims it at the address
         // bar) only while the note body holds focus.

@@ -57,6 +57,34 @@ function writeAction(name: string): HTMLElement {
   return screen.getByRole("button", { name }).parentElement as HTMLElement;
 }
 
+// Take a line in select mode, over the live-preview surface. jsdom lays nothing
+// out, so the editor falls back to measuring rows — stand each on a 20px band
+// so a y coordinate means a line.
+function pickLine(index: number) {
+  const rows = [...document.querySelectorAll<HTMLElement>("[data-line-row]")];
+  for (const [i, row] of rows.entries())
+    vi.spyOn(row, "getBoundingClientRect").mockReturnValue({
+      top: i * 20,
+      bottom: i * 20 + 20,
+      left: 0,
+      right: 200,
+      width: 200,
+      height: 20,
+      x: 0,
+      y: i * 20,
+      toJSON: () => ({}),
+    } as DOMRect);
+  const scroller = rows[0]?.closest("[contenteditable]")
+    ?.parentElement as HTMLElement;
+  for (const type of ["pointerDown", "pointerUp"] as const)
+    fireEvent[type](scroller, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 200,
+      clientY: index * 20 + 10,
+    });
+}
+
 function renderEditor(props: Partial<Parameters<typeof Editor>[0]> = {}) {
   const onBack = vi.fn();
   const onChange = vi.fn();
@@ -612,7 +640,7 @@ describe("Editor (narrow header)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
 
-    expect(cluster().style.maxWidth).toBe("20rem");
+    expect(cluster().style.maxWidth).toBe("26rem");
     expect(
       screen
         .getByRole("button", { name: "Hide note actions" })
@@ -625,7 +653,7 @@ describe("Editor (narrow header)", () => {
     stubNarrow(true);
     renderEditor();
     fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
-    expect(cluster().style.maxWidth).toBe("20rem");
+    expect(cluster().style.maxWidth).toBe("26rem");
 
     // Tapping into the body is the end of the detour — the title comes back
     // without a second press on the toggle.
@@ -843,7 +871,7 @@ describe("Editor (selection actions)", () => {
 
     selectBody(0, 3);
 
-    expect(cluster().style.maxWidth).toBe("12rem");
+    expect(cluster().style.maxWidth).toBe("18rem");
     expect(cluster().dataset.cluster).toBe("open");
     expect(screen.getByRole("button", { name: "Copy selection" })).toBeTruthy();
     // Only the three that act on a selection: the star, the export menu and
@@ -858,7 +886,7 @@ describe("Editor (selection actions)", () => {
     stubNarrow(true);
     renderEditor();
     selectBody(0, 3);
-    expect(cluster().style.maxWidth).toBe("12rem");
+    expect(cluster().style.maxWidth).toBe("18rem");
 
     selectBody(3, 3);
 
@@ -873,7 +901,7 @@ describe("Editor (selection actions)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Note actions" }));
 
-    expect(cluster().style.maxWidth).toBe("20rem");
+    expect(cluster().style.maxWidth).toBe("26rem");
     expect(
       screen.getByRole("button", { name: "Add to favorites" }),
     ).toBeTruthy();
@@ -915,35 +943,6 @@ describe("Editor (selection actions)", () => {
         editor: DEFAULT_EDITOR_SETTINGS,
         note: note({ body: "alpha\nbravo\ncharlie", ...over }),
       });
-    }
-
-    // jsdom lays nothing out, so the editor falls back to measuring rows —
-    // stand each on a 20px band so a y coordinate means a line.
-    function pickLine(index: number) {
-      const rows = [
-        ...document.querySelectorAll<HTMLElement>("[data-line-row]"),
-      ];
-      for (const [i, row] of rows.entries())
-        vi.spyOn(row, "getBoundingClientRect").mockReturnValue({
-          top: i * 20,
-          bottom: i * 20 + 20,
-          left: 0,
-          right: 200,
-          width: 200,
-          height: 20,
-          x: 0,
-          y: i * 20,
-          toJSON: () => ({}),
-        } as DOMRect);
-      const scroller = rows[0]?.closest("[contenteditable]")
-        ?.parentElement as HTMLElement;
-      for (const type of ["pointerDown", "pointerUp"] as const)
-        fireEvent[type](scroller, {
-          pointerId: 1,
-          pointerType: "touch",
-          clientX: 200,
-          clientY: index * 20 + 10,
-        });
     }
 
     function enterSelectMode() {
@@ -1071,6 +1070,148 @@ describe("Editor (selection actions)", () => {
       ).toBeTruthy();
       expect(deleteButton()).toBe(null);
     });
+  });
+});
+
+// The two chevrons right of the formatting button: they shuffle the selected
+// lines up and down the note, and they only appear while the selection covers
+// whole lines — half a line moved as a whole one is not what the highlight
+// promised. See `docs/overview.md#move-lines`.
+describe("Editor (moving lines)", () => {
+  const BODY = "one\ntwo\nthree";
+
+  function moveUp() {
+    return writeAction("Move lines up");
+  }
+  function moveDown() {
+    return writeAction("Move lines down");
+  }
+
+  function renderPlain() {
+    return renderEditor({ note: note({ body: BODY }) });
+  }
+
+  // Highlight `[from, to)` of the plain textarea, the way the selection-actions
+  // suite does. Found by its placeholder rather than its value: the body spans
+  // lines here, and a display-value query collapses the newlines.
+  function selectBody(from: number, to: number) {
+    const body = screen.getByPlaceholderText(
+      "Start writing…",
+    ) as HTMLTextAreaElement;
+    body.setSelectionRange(from, to);
+    fireEvent.select(body);
+    return body;
+  }
+
+  it("stays folded away until something is selected", () => {
+    renderPlain();
+
+    expect(moveUp().className).toContain("max-w-0");
+    expect(moveDown().className).toContain("max-w-0");
+  });
+
+  it("slides out for a selection that covers whole lines", () => {
+    renderPlain();
+
+    selectBody(0, 7); // "one\ntwo"
+
+    expect(moveUp().className).not.toContain("max-w-0");
+    expect(moveDown().className).not.toContain("max-w-0");
+  });
+
+  it("counts a selection that ends at the head of the next line", () => {
+    renderPlain();
+
+    selectBody(0, 4); // "one\n" — nothing on line 1 is highlighted
+
+    expect(moveUp().className).not.toContain("max-w-0");
+  });
+
+  it("stays away for a selection that stops mid-line", () => {
+    renderPlain();
+
+    selectBody(0, 6); // "one\ntw"
+
+    expect(moveUp().className).toContain("max-w-0");
+    expect(moveDown().className).toContain("max-w-0");
+  });
+
+  it("stays away for a selection that starts mid-line", () => {
+    renderPlain();
+
+    selectBody(1, 7); // "ne\ntwo"
+
+    expect(moveUp().className).toContain("max-w-0");
+  });
+
+  it("moves the selected lines down the note", () => {
+    const { onChange } = renderPlain();
+    selectBody(0, 7);
+
+    fireEvent.click(screen.getByRole("button", { name: "Move lines down" }));
+
+    expect(onChange).toHaveBeenCalledWith("three\none\ntwo");
+  });
+
+  it("moves the selected lines up the note", () => {
+    const { onChange } = renderPlain();
+    selectBody(8, 13); // "three"
+
+    fireEvent.click(screen.getByRole("button", { name: "Move lines up" }));
+
+    expect(onChange).toHaveBeenCalledWith("one\nthree\ntwo");
+  });
+
+  it("leaves the note alone when the selection is already at the edge", () => {
+    const { onChange } = renderPlain();
+    selectBody(0, 3);
+
+    fireEvent.click(screen.getByRole("button", { name: "Move lines up" }));
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("answers Alt+↑ / Alt+↓ from the keyboard, caret alone included", () => {
+    const { onChange } = renderPlain();
+    const body = selectBody(5, 5); // caret on "two"
+
+    fireEvent.keyDown(body, { key: "ArrowDown", altKey: true });
+
+    expect(onChange).toHaveBeenCalledWith("one\nthree\ntwo");
+  });
+
+  it("folds away on a locked note, which refuses the edit anyway", () => {
+    renderEditor({ note: note({ body: BODY, locked: true }) });
+
+    selectBody(0, 7);
+
+    expect(moveUp().className).toContain("max-w-0");
+  });
+
+  it("rides the header for the whole of select mode", () => {
+    renderEditor({
+      editor: DEFAULT_EDITOR_SETTINGS,
+      note: note({ body: BODY }),
+    });
+
+    // Out from the moment the mode is entered, beside the four verbs and for
+    // the same reason: the row must not shuffle between one pick and the next.
+    fireEvent.click(screen.getByRole("button", { name: "Select lines" }));
+
+    expect(moveUp().className).not.toContain("max-w-0");
+  });
+
+  it("moves the lines select mode has picked", () => {
+    const { onChange } = renderEditor({
+      editor: DEFAULT_EDITOR_SETTINGS,
+      note: note({ body: BODY }),
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Select lines" }));
+    pickLine(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Move lines up" }));
+
+    expect(onChange).toHaveBeenCalledWith("one\nthree\ntwo");
   });
 });
 
