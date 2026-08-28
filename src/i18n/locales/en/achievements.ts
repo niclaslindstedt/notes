@@ -358,6 +358,12 @@ const achievements = {
       learnMore:
         "Pick a line on a phone and the header unfolds the four things you can do with a run of them: format, cut, copy, and a red delete. Delete is the one select mode had no button for \u2014 it was Backspace, on the keyboard the mode deliberately keeps down \u2014 so it joins the other three at the top of the screen rather than hovering over the note in a bar of its own. Cut takes the lines out onto the clipboard; delete just takes them out, with no confirm step \u2014 Undo puts either back. The delete button is there for touch: on a computer Backspace already reaches it, so the row stays as short as it can.",
     },
+    shuffleUp: {
+      name: "Shuffle up",
+      condition: "Move selected lines up or down the note.",
+      learnMore:
+        "Select whole lines — by hand, or by picking them in select mode — and two chevrons appear beside the formatting button. They shuffle what you have selected one row up or down the note, carrying the lines with them so a second press carries on where the first left off, which is how a list gets reordered without a single cut and paste. Lines that are not next to each other each swap with their own neighbour, and a run already at the top or bottom simply stays put. Alt+↑ and Alt+↓ do the same from the keyboard — the shortcut every code editor binds — and with nothing selected they move the line the cursor is on.",
+    },
     manyHands: {
       name: "Many hands",
       condition: "Edit at more than one caret at once.",

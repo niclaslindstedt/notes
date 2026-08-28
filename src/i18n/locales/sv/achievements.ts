@@ -357,6 +357,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Plocka en rad p\u00e5 en telefon s\u00e5 f\u00e4ller sidhuvudet ut de fyra sakerna du kan g\u00f6ra med en f\u00f6ljd rader: formatera, klippa ut, kopiera och en r\u00f6d radera. Radera \u00e4r den enda markeringsl\u00e4get saknade en knapp f\u00f6r \u2014 det var Backsteg, p\u00e5 tangentbordet som l\u00e4get med flit h\u00e5ller nere \u2014 s\u00e5 den st\u00e4ller sig hos de andra tre h\u00f6gst upp i st\u00e4llet f\u00f6r att sv\u00e4va \u00f6ver anteckningen i en egen list. Klipp ut tar raderna till urklipp; radera tar bara bort dem, utan bekr\u00e4ftelsesteg \u2014 \u00c5ngra l\u00e4gger tillbaka b\u00e5da. Raderaknappen finns f\u00f6r pekning: p\u00e5 en dator n\u00e5r Backsteg den redan, s\u00e5 raden h\u00e5lls s\u00e5 kort den kan.",
     },
+    shuffleUp: {
+      name: "Omflyttning",
+      condition: "Flytta markerade rader uppåt eller nedåt i anteckningen.",
+      learnMore:
+        "Markera hela rader — för hand eller genom att plocka dem i markeringsläget — så dyker två pilar upp bredvid formateringsknappen. De flyttar det du markerat ett steg uppåt eller nedåt i anteckningen och tar raderna med sig, så ett andra tryck fortsätter där det första slutade — så ordnar du om en lista utan att klippa och klistra en enda gång. Rader som inte ligger intill varandra byter var för sig plats med sin egen granne, och en följd som redan ligger överst eller nederst står helt enkelt kvar. Alt+↑ och Alt+↓ gör samma sak från tangentbordet — genvägen alla kodredigerare har — och utan markering flyttar de raden markören står på.",
+    },
     manyHands: {
       name: "Många händer",
       condition: "Redigera vid fler än en markör samtidigt.",

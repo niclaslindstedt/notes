@@ -178,6 +178,80 @@ export function cutLine(
   };
 }
 
+/** A line move: the reordered source, and where the moved lines ended up. */
+export type LineMove = {
+  lines: string[];
+  /** The same lines the caller named, at their new indices — ascending, so the
+   *  caller can put the selection back over exactly what it moved. */
+  selected: number[];
+};
+
+/**
+ * Move whole lines one row up (`direction: -1`) or down (`1`), the way a code
+ * editor's Alt+↑ / Alt+↓ does: the selected lines travel as a block and the
+ * line they displace hops over them to the other side, so the note never grows
+ * or shrinks — only its order changes.
+ *
+ * `selected` is a **set** of line indices, not a range, because that is what
+ * select mode holds (see `domain/line-selection.ts`). Each unbroken run in it
+ * moves on its own: three scattered lines each swap with their own neighbour
+ * rather than dragging everything between them along. Runs are maximal, so the
+ * line a run swaps with is never part of another run, and the moves can't
+ * collide — which is why they need no reconciliation between them.
+ *
+ * A run already against the edge it is travelling towards simply stays where it
+ * is (its neighbours still move), matching the way a code editor parks the top
+ * line rather than wrapping it to the bottom. When *nothing* could move, the
+ * result is `null` so the caller leaves the source — and the undo timeline —
+ * alone rather than committing an edit that changed nothing.
+ */
+export function moveLines(
+  lines: readonly string[],
+  selected: readonly number[],
+  direction: -1 | 1,
+): LineMove | null {
+  const last = lines.length - 1;
+  const rows = [...new Set(selected)]
+    .filter((n) => Number.isInteger(n) && n >= 0 && n <= last)
+    .sort((a, b) => a - b);
+  if (rows.length === 0) return null;
+
+  const runs: { from: number; to: number }[] = [];
+  for (const n of rows) {
+    const tail = runs[runs.length - 1];
+    if (tail && n === tail.to + 1) tail.to = n;
+    else runs.push({ from: n, to: n });
+  }
+
+  const next = [...lines];
+  const moved: number[] = [];
+  let changed = false;
+  // Upwards, the topmost run goes first; downwards, the bottom one does. Either
+  // way each swap only ever touches the row just outside the run it moves, so a
+  // run processed earlier has already vacated the space the next one needs.
+  const order = direction === -1 ? runs : [...runs].reverse();
+  for (const run of order) {
+    const blocked = direction === -1 ? run.from === 0 : run.to === last;
+    if (blocked) {
+      for (let n = run.from; n <= run.to; n++) moved.push(n);
+      continue;
+    }
+    changed = true;
+    if (direction === -1) {
+      const above = next[run.from - 1] ?? "";
+      for (let n = run.from; n <= run.to; n++) next[n - 1] = next[n] ?? "";
+      next[run.to] = above;
+    } else {
+      const below = next[run.to + 1] ?? "";
+      for (let n = run.to; n >= run.from; n--) next[n + 1] = next[n] ?? "";
+      next[run.from] = below;
+    }
+    for (let n = run.from; n <= run.to; n++) moved.push(n + direction);
+  }
+  if (!changed) return null;
+  return { lines: next, selected: moved.sort((a, b) => a - b) };
+}
+
 /**
  * The column at the end of the word `col` sits in — where a **touch** tap
  * lands the caret (see `MarkdownEditor`'s tap handling).

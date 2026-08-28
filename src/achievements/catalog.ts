@@ -60,6 +60,7 @@ import {
   MergeGlyph,
   MoreGlyph,
   MousePointerGlyph,
+  LineShuffleGlyph,
   LineSweepGlyph,
   MultiCaretGlyph,
   MoveGlyph,
@@ -627,6 +628,17 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     // select mode had no button for until it joined cut and copy in the header.
     // (The id predates that move, when the button was a bar hovering off the
     // top of the note; ids are write-once, so it stays.)
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "shuffleUp",
+    tier: "intermediate",
+    glyph: LineShuffleGlyph,
+    learnMore: true,
+    // Fired by a move that actually reordered something — the header's chevrons
+    // and Alt+↑ / Alt+↓ both land here. Derived from the document is no use: a
+    // reorder leaves the same lines in it, so nothing about the note afterwards
+    // says one happened.
     trigger: { kind: "manual" },
   },
   {

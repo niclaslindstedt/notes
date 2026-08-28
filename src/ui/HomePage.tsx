@@ -188,6 +188,18 @@ export function HomePage() {
               without typing the brackets yourself.
             </li>
             <li>
+              Reorder lines without cutting and pasting. Select whole lines
+              &mdash; by hand, or by picking them in select mode &mdash; and two
+              chevrons appear beside the formatting button that shuffle what you
+              have selected one row up or down the note. The lines stay
+              selected, so a second press carries on where the first left off,
+              and lines that are not next to each other each swap with their own
+              neighbour. <kbd>Alt</kbd>+<kbd>&uarr;</kbd> and <kbd>Alt</kbd>+
+              <kbd>&darr;</kbd> do the same from the keyboard &mdash; the
+              shortcut every code editor binds &mdash; and with nothing selected
+              they move the line the cursor is on.
+            </li>
+            <li>
               Cut text out with the <em>scissors</em> button beside the copy
               button: it takes whatever you have selected, or — with nothing
               selected — the whole line the cursor is on, or just the text after

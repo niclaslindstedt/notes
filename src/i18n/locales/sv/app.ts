@@ -14,6 +14,10 @@ const app: AppCatalog = {
     exit: "Lämna markeringsläget",
     delete: "Radera markerade rader",
   },
+  moveLines: {
+    up: "Flytta raderna uppåt",
+    down: "Flytta raderna nedåt",
+  },
   titlePlaceholder: "Titel",
   attachments: "Bilagor",
   dropTitle: "Släpp för att importera",
