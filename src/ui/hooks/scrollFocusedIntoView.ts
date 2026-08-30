@@ -54,9 +54,9 @@ import { caretRectWithin } from "../contenteditable-caret.ts";
 // middle, or the end of the sentence all scrolled to the same place, never to
 // the caret. Measuring the caret reveals where the user actually pointed. A
 // short line's caret rect is its text row, so the reveal is unchanged there.
-// The same holds for a *selection* over the whole line — what a line-number
-// gutter press draws — which `caretRectWithin` measures at its head, so the
-// press reveals the line's first row rather than the middle of its box.
+// The same holds for a *selection* over whole lines — what select mode's
+// handover draws — which `caretRectWithin` measures at its head, so the reveal
+// lands on the run's first row rather than on the middle of its box.
 //
 // Non-editable targets (the Storage settings passphrase `<input>`) keep no
 // document selection to read, so they fall back to the element — which is

@@ -15,7 +15,7 @@ const app = {
   back: "Back",
   startWriting: "Start writing…",
   // Label of one line-number press target in the editor's gutter (line numbers
-  // are opt-in); pressing it selects that whole line.
+  // are opt-in); pressing it opens select mode with that whole line taken.
   selectLine: "Select line {n}",
   // The header's select-mode toggle, left of Find, and the mode it turns on:
   // a press takes a whole line, a second press gives it back, and a drag down

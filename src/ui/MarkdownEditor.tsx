@@ -325,12 +325,20 @@ const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock"]);
 // and a mode where every scroll has to out-race a hold timer is a mode that
 // fights back. A press anywhere still takes (or gives back) the line it lands
 // on, so the rail is the only thing the split costs.
+//
+// With the numbers on, that rail is the line-number gutter, and it is a
+// selection surface whether or not the mode is on yet: a press in it *enters*
+// the mode with the pressed line taken, and a drag down it takes a run (see
+// `onGutterDown`). It scrolls nothing — the gutter is the one band of the note
+// that never moves the view — which is what lets a stroke starting there mean
+// "take these lines" with no ambiguity to resolve.
 
 /** How far in from the left edge of the scroller the sweep rail reaches. A
  *  press that starts inside it drags lines; one that starts to the right of it
  *  scrolls the note as it always did. Sized as a fingertip, not as the bar the
  *  rail draws — the band a thumb actually lands in is wider than the mark that
- *  advertises it. */
+ *  advertises it. The gutter counts as rail wherever it is drawn, so this is
+ *  the floor rather than the whole answer (see `onSweepRail`). */
 const SWEEP_RAIL_PX = 44;
 
 /** The width the rail reserves in the surface's left inset when the note isn't
@@ -350,6 +358,16 @@ const SWEEP_FEEDBACK_MS = 12;
  *  without pushing the finger off the screen. */
 const SWEEP_EDGE_PX = 56;
 const SWEEP_SCROLL_MAX = 18;
+
+/** Whether an event landed in the line-number gutter — the press target
+ *  `LineRow` hangs beside every line while the numbers are on. Asked of the
+ *  event's own target rather than of a coordinate, because the gutter's width
+ *  tracks the note's digit count and its own left inset. */
+function onGutter(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element && target.closest("[data-line-gutter]") !== null
+  );
+}
 
 /** What the editor exposes to its parent: a way to start editing from outside. */
 export type MarkdownEditorHandle = {
@@ -547,18 +565,10 @@ export function MarkdownEditor({
   // index. Block formatting (heading, list, quote, indent) is a whole-line
   // affair, so when it spans several lines the selection is restored at line
   // granularity — which is what lets a press chain onto the last one: bullet
-  // three lines, then indent the same three into children. `backward` draws it
-  // from the far end so the caret lands on the span's *start* (see
-  // `selectLineSpan`) — what a gutter press asks for.
-  // `anchor` rides along when the span comes from a gutter press: the viewport
-  // y the pressed line sat at when the finger landed, which the view is pinned
-  // back to once the span is drawn (see `holdLineAnchor`).
-  const pendingLineSpan = useRef<{
-    from: number;
-    to: number;
-    backward?: boolean;
-    anchor?: number;
-  } | null>(null);
+  // three lines, then indent the same three into children. Select mode's
+  // handover queues one too, for the run it hands back as an ordinary
+  // selection on the way out.
+  const pendingLineSpan = useRef<{ from: number; to: number } | null>(null);
 
   // The latest known caret (as a source point) and scroll offset, kept current
   // as the user types / moves / scrolls so the unmount handler can stash them in
@@ -1115,6 +1125,9 @@ export function MarkdownEditor({
   // The live pointer position, read by the edge auto-scroll between moves.
   const sweepAt = useRef({ x: 0, y: 0 });
   const sweepScroll = useRef(0);
+  // Set by a gutter press on its way into the mode, read once by the effect
+  // that seeds the mode: "the run is already painted, don't seed over it".
+  const gutterEntry = useRef(false);
 
   function endSweep() {
     sweep.current = null;
@@ -1164,8 +1177,13 @@ export function MarkdownEditor({
 
   // Whether a press landed on the sweep rail — the band down the left edge of
   // the *scroller*, not of the text, so it stays put when a note with wrapping
-  // off is scrolled sideways.
-  function onSweepRail(x: number): boolean {
+  // off is scrolled sideways. The line-number gutter is always rail, however
+  // wide it has grown: a note deep enough to need three digits reserves more
+  // than the fingertip band below, and a press on the far side of its own
+  // numbers must not fall through to the scroller — the gutter takes no scroll
+  // at all (`touch-none` in `LineRow`), so a stroke it refused would do nothing.
+  function onSweepRail(x: number, target: EventTarget | null): boolean {
+    if (onGutter(target)) return true;
     const scroller = scrollerRef.current;
     if (!scroller) return false;
     return x - scroller.getBoundingClientRect().left <= SWEEP_RAIL_PX;
@@ -1221,7 +1239,7 @@ export function MarkdownEditor({
     e.preventDefault();
     const sel = lineSelRef.current;
     const mouse = e.pointerType === "mouse";
-    const rail = onSweepRail(e.clientX);
+    const rail = onSweepRail(e.clientX, e.target);
     // A stroke that owns the pointer paints as it goes; a touch outside the
     // rail is the scroller's, and only toggles the line if it never travels.
     const dragging = mouse || rail;
@@ -1241,6 +1259,50 @@ export function MarkdownEditor({
     // Confirm the rail took the finger before anything moves, so it can start
     // travelling the moment it is felt rather than after a guess.
     if (!mouse) haptics.vibrate(SWEEP_FEEDBACK_MS);
+  }
+
+  // A press in the line-number gutter with the mode still *off*: the shorthand
+  // way in. It turns select mode on and takes the line it landed on in one
+  // gesture, and the same finger carries straight on down the gutter to take a
+  // run — the sweep is live from the first pixel, so there is nothing to enter
+  // the mode and then aim again for.
+  //
+  // The gutter is the whole affordance: it never scrolls the note and never
+  // lands a caret, so there is no gesture it has to be told apart from, and
+  // nothing about it can drop the mode again. The way back out is the header
+  // toggle or Escape — the same two exits the mode entered from the header has.
+  function onGutterDown(e: ReactPointerEvent<HTMLDivElement>) {
+    const line = lineRowAt(e.clientX, e.clientY);
+    if (line === null) return;
+    // The press is ours end to end: no caret is placed and no focus moves.
+    e.preventDefault();
+    // Where the pressed line sits *now*, before the mode re-renders the note.
+    // Entering drops the active raw line back to formatted, and its markdown
+    // (a `#`, a `- `, a `**`) can wrap to one row more or fewer than the
+    // formatted line does, reflowing everything below it — so the line under
+    // the finger is pinned to the y it was pressed at (see `holdLineAnchor`).
+    const anchor = lineTop(rootRef.current, line);
+    // The mode leaves nothing selected on the way out, so the head of the
+    // pressed line is where writing picks up again.
+    lastCaret.current = { line, col: 0 };
+    gutterEntry.current = true;
+    sweep.current = {
+      pointerId: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      anchor: line,
+      // Nothing has been taken yet, so the stroke can only take.
+      mode: "add",
+      base: [],
+      dragging: true,
+      moved: false,
+    };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    paintSweep(line);
+    if (e.pointerType !== "mouse") haptics.vibrate(SWEEP_FEEDBACK_MS);
+    onSelectModeChange?.(true);
+    if (anchor !== undefined)
+      holdLineAnchor(rootRef.current, line, anchor, ANCHOR_FRAMES_FOCUSED);
   }
 
   function onSweepMove(e: ReactPointerEvent<HTMLDivElement>) {
@@ -1363,7 +1425,15 @@ export function MarkdownEditor({
       return;
     }
     clearCursorsRef.current();
-    setLineSelectionRef.current(seedLineSelectionRef.current());
+    // A gutter press enters the mode *and* takes its line in one gesture, so
+    // the run its sweep is already holding is the seed. Reading the caret here
+    // instead would paint over the line the finger is on — and, mid-drag, over
+    // the run it has taken since.
+    const fromGutter = gutterEntry.current;
+    gutterEntry.current = false;
+    setLineSelectionRef.current(
+      fromGutter ? lineSelRef.current : seedLineSelectionRef.current(),
+    );
     pendingCaret.current = null;
     pendingRange.current = null;
     pendingLineSpan.current = null;
@@ -1448,9 +1518,13 @@ export function MarkdownEditor({
   // While a sweep is dragging, the finger belongs to the selection rather than
   // to the scroller. A non-passive listener is the only thing that can say so
   // — `touch-action` can't be changed mid-gesture — and it is bound only while
-  // the mode is on, so ordinary scrolling keeps its fast path everywhere else.
+  // there is a sweep to be had, so ordinary scrolling keeps its fast path
+  // everywhere else. That is the whole mode, plus the gutter whenever the
+  // numbers are drawn: a press there starts its sweep a render *before* the
+  // host flips the mode on, so waiting for the flag would leave the first
+  // moves of the very gesture that entered the mode unguarded.
   useEffect(() => {
-    if (!selectMode) return;
+    if (!selectMode && !lineNumbers) return;
     const el = scrollerRef.current;
     if (!el) return;
     const block = (e: TouchEvent) => {
@@ -1458,7 +1532,7 @@ export function MarkdownEditor({
     };
     el.addEventListener("touchmove", block, { passive: false });
     return () => el.removeEventListener("touchmove", block);
-  }, [selectMode]);
+  }, [selectMode, lineNumbers]);
 
   // Locking the note while it is open (the header's read-only toggle, or
   // another device's lock arriving on a live pull) takes the caret's line back
@@ -3108,18 +3182,7 @@ export function MarkdownEditor({
   // Draw a selection over whole source lines `[from, to]`. The endpoints are
   // anchored *inside* the line elements (not at the contenteditable root) so
   // both map back to source — the same shape `selectAllLines` relies on.
-  //
-  // `backward` anchors the selection at the span's end and extends it back to
-  // the start, so the selection's *focus* — where the caret sits, and what the
-  // next arrow key collapses to — is the first character of the first line.
-  // Everything that reads the selection orders its endpoints (`orderPoints`),
-  // so the direction changes nothing but where the user is left standing.
-  function selectLineSpan(
-    from: number,
-    to: number,
-    backward = false,
-    anchor?: number,
-  ) {
+  function selectLineSpan(from: number, to: number) {
     const root = rootRef.current;
     const sel = window.getSelection();
     if (!root || !sel) return;
@@ -3131,39 +3194,22 @@ export function MarkdownEditor({
     settingSel.current = true;
     // Taking focus with `preventScroll`, because the browser's own focus-time
     // reveal reveals *the host* — the whole note — not the span about to be
-    // selected in it. On a note opened with the keyboard still down (no line
-    // active yet, which is exactly the state a gutter press arrives in) that
-    // throws the view to the top of the note, nowhere near the line that was
-    // pressed. The span below is what the view should follow, so the reveal is
-    // ours to do afterwards.
+    // selected in it. On a note whose keyboard is still down (no line active
+    // yet, which is the state select mode's handover arrives in) that throws
+    // the view to the top of the note, nowhere near the span. What the view
+    // should follow is the span, so the reveal is ours to do afterwards.
     const took = document.activeElement !== root;
     if (took) root.focus({ preventScroll: true });
     sel.removeAllRanges();
-    if (backward) {
-      sel.setBaseAndExtent(last, last.childNodes.length, first, 0);
-    } else {
-      const range = document.createRange();
-      range.setStart(first, 0);
-      range.setEnd(last, last.childNodes.length);
-      sel.addRange(range);
-    }
-    // Pin the pressed line back under the finger. You can only press a number
-    // you can see, so this gesture has no reveal to do — but the commit that
-    // carries it can still slide the view (see `holdLineAnchor`), and that
-    // reads as the note jumping somewhere else and scrolling back.
-    if (anchor !== undefined)
-      holdLineAnchor(
-        root,
-        from,
-        anchor,
-        took ? ANCHOR_FRAMES_TAKING_FOCUS : ANCHOR_FRAMES_FOCUSED,
-      );
+    const range = document.createRange();
+    range.setStart(first, 0);
+    range.setEnd(last, last.childNodes.length);
+    sel.addRange(range);
     // Focus raises the soft keyboard, which shrinks the visual viewport *after*
-    // this returns — so a line pressed in the lower half would end up behind
-    // it. `scrollFocusedIntoView` waits for the viewport to settle and then
-    // only moves the view if the line really is covered, leaving a press on an
-    // already-visible line exactly where the user was reading. It runs long
-    // after the anchor above, so the two never fight.
+    // this returns — so a span in the lower half would end up behind it.
+    // `scrollFocusedIntoView` waits for the viewport to settle and then only
+    // moves the view if the span really is covered, leaving one that is already
+    // visible exactly where the user was reading.
     if (took) scrollFocusedIntoView(first, { ifHidden: true });
     queueMicrotask(() => {
       settingSel.current = false;
@@ -3174,7 +3220,7 @@ export function MarkdownEditor({
     const span = pendingLineSpan.current;
     if (!span) return;
     pendingLineSpan.current = null;
-    selectLineSpan(span.from, span.to, span.backward, span.anchor);
+    selectLineSpan(span.from, span.to);
   });
 
   // Focus has genuinely left the surface: drop any selection still standing in
@@ -3185,8 +3231,8 @@ export function MarkdownEditor({
   // the next tap on those lines hands the browser an existing selection to act
   // on: it repaints the row and raises the Cut / Copy / Paste bar instead of
   // placing the caret, and only the tap *after* that gets a caret back into a
-  // line that looked idle. Most visible after a line-number press, which draws
-  // a whole-line span with no active line to blur out from under it.
+  // line that looked idle. Most visible after select mode's handover, which
+  // draws a whole-line span with no active line to blur out from under it.
   //
   // Desktop keeps the browser's own behaviour, where a selection that survives
   // a click elsewhere stays painted (greyed) and is the platform convention —
@@ -3203,54 +3249,6 @@ export function MarkdownEditor({
     // The toolbar's stand-in for a whole-line span goes with the span itself —
     // it only ever spoke for a selection that is now gone.
     setSpanLine(null);
-  }
-
-  // A press anywhere in the line-number gutter: take the whole line. The line stops
-  // being the active raw one first — a whole-line selection reads as the
-  // formatted line the rest of the note shows, and both endpoints then map back
-  // to source the same way a block format's multi-line result does. Clearing
-  // the active line is what re-renders it, so the selection is queued for the
-  // effect above to draw afterwards; with no active line to clear there is no
-  // re-render to wait for and it is drawn straight away.
-  //
-  // The line is taken from its *start*: the selection is drawn backwards (see
-  // `selectLineSpan`) and the caret we remember is column 0, so the gesture
-  // leaves the user at the beginning of the line — which is the end of it the
-  // reveal brings into view, and the only end of a long wrapped line that says
-  // anything about where you are.
-  function selectLine(index: number) {
-    // Select mode owns every press on a line while it is on, gutter included
-    // (see `onSweepDown`); this is the ordinary gutter press.
-    if (selectModeRef.current) return;
-    clearCursors();
-    const len = (linesRef.current[index] ?? "").length;
-    // Where the pressed line sits *now*, before anything below re-renders it —
-    // the y the view is pinned back to once the selection is drawn.
-    const anchor = lineTop(rootRef.current, index);
-    lastCaret.current = { line: index, col: 0 };
-    // The arming the touch press did on the way in is dropped, the same way
-    // ticking a task item drops it: this press leaves *no* line active, so the
-    // caret-placement effect that would consume the arming never runs, and a
-    // flag left set would fire the reveal on whatever the next tap happens to
-    // be. `selectLineSpan` owns the reveal for this gesture instead.
-    revealPending.current = false;
-    // No single line is active, so the toolbar reads the pressed one instead
-    // (see `reportIndex`) — bulleting a gutter-selected line lights the button.
-    setSpanLine(index);
-    markCaret(index, 0, len);
-    if (activeRef.current.index === null) {
-      selectLineSpan(index, index, true, anchor);
-      return;
-    }
-    pendingCaret.current = null;
-    pendingRange.current = null;
-    pendingLineSpan.current = {
-      from: index,
-      to: index,
-      backward: true,
-      anchor,
-    };
-    setActive((a) => ({ index: null, key: a.key + 1 }));
   }
 
   // Tell the toolbar what is already in effect at the caret, so the H2 /
@@ -3364,6 +3362,15 @@ export function MarkdownEditor({
             onSweepDown(e);
             return;
           }
+          // And the gutter takes it even with the mode off: a press there is
+          // the shorthand that turns the mode on with that line taken, and a
+          // drag down it takes a run (see `onGutterDown`). With no host to ask
+          // there is no mode to enter, so the press falls through to the caret
+          // rather than doing nothing at all.
+          if (onSelectModeChange && onGutter(e.target)) {
+            onGutterDown(e);
+            return;
+          }
           // A touch (or pen) tap anywhere in the editor arms the reveal so the
           // line the caret lands on is scrolled clear of the soft keyboard; a
           // mouse never needs it (no keyboard steals the caret's space).
@@ -3379,15 +3386,12 @@ export function MarkdownEditor({
           // them, the same way it is in VS Code.
           clearCursors();
         }}
-        onPointerMove={(e) => {
-          if (selectMode) onSweepMove(e);
-        }}
-        onPointerUp={(e) => {
-          if (selectMode) onSweepUp(e);
-        }}
-        onPointerCancel={() => {
-          if (selectMode) endSweep();
-        }}
+        // Unconditional, because the sweep can outlive — and, from the gutter,
+        // predate — the flag: `onGutterDown` starts one a render before the
+        // host turns the mode on. Each of these is a no-op with no sweep live.
+        onPointerMove={onSweepMove}
+        onPointerUp={onSweepUp}
+        onPointerCancel={endSweep}
         onMouseDown={(e) => {
           // Select mode lands no caret anywhere, so it cancels the press that
           // would place one — and this is the event that has to do it. The
@@ -3532,7 +3536,6 @@ export function MarkdownEditor({
                   current
                   selectable={selectMode}
                   selected={false}
-                  onSelect={selectLine}
                   label={t("app.selectLine", { n: index + 1 })}
                 >
                   <ActiveLine
@@ -3560,7 +3563,6 @@ export function MarkdownEditor({
                   current
                   selectable={selectMode}
                   selected={false}
-                  onSelect={selectLine}
                   label={t("app.selectLine", { n: index + 1 })}
                 >
                   <div
@@ -3588,7 +3590,6 @@ export function MarkdownEditor({
                 current={false}
                 selectable={selectMode}
                 selected={selectedLines?.has(index) === true}
-                onSelect={selectLine}
                 label={t("app.selectLine", { n: index + 1 })}
               >
                 <div
@@ -3671,6 +3672,17 @@ export function MarkdownEditor({
 // digit at three-quarter size is far below the size of a fingertip — the
 // gesture is "press to the left of the line", and the target has to be the
 // band the finger actually lands in.
+//
+// **The gutter is a selection surface and nothing else.** A press in it enters
+// [select mode](docs/overview.md#select-mode) with that line taken and a drag
+// down it takes a run — the surface resolves both against the row's geometry
+// (`onGutterDown` / `onSweepDown`), which is why the button carries a
+// `data-line-gutter` marker rather than a handler of its own. `touch-none` is
+// the other half of that: the one band of the note a finger can't scroll with,
+// so a stroke starting here is always a selection and never has to be told
+// apart from the start of a scroll. Its `mousedown` is cancelled for the usual
+// reason — that is the event an editing host takes focus from, and the gutter
+// lands no caret and raises no keyboard.
 function LineRow({
   index,
   numbered,
@@ -3678,7 +3690,6 @@ function LineRow({
   selectable,
   selected,
   label,
-  onSelect,
   children,
 }: {
   index: number;
@@ -3691,7 +3702,6 @@ function LineRow({
   /** This line is part of the run select mode has taken. */
   selected: boolean;
   label: string;
-  onSelect: (index: number) => void;
   children: ReactNode;
 }) {
   if (!numbered && !selectable) return children;
@@ -3706,6 +3716,7 @@ function LineRow({
       {numbered && (
         <button
           type="button"
+          data-line-gutter=""
           // Out of the tab order for the same reason the surface itself is: the
           // editor hands focus on via `onTabOut`, and one tab stop per line would
           // make tabbing out of a long note impossible.
@@ -3713,13 +3724,13 @@ function LineRow({
           contentEditable={false}
           aria-label={label}
           onMouseDown={(e) => {
-            // Take the press before the browser moves the caret / focus with it,
-            // so the selection we draw is the only one. A tap on a touch screen
-            // arrives here as a synthesized mousedown, so this covers both.
+            // Keep the browser from moving the caret / focus with the press —
+            // the gesture is answered at `pointerdown` on the surface, and a
+            // tap on a touch screen arrives here as a synthesized mousedown, so
+            // this covers both pointer types.
             e.preventDefault();
-            onSelect(index);
           }}
-          className={`absolute inset-y-0 right-full flex cursor-pointer items-start justify-end pl-4 select-none${tint} ${
+          className={`absolute inset-y-0 right-full flex touch-none cursor-pointer items-start justify-end pl-4 select-none${tint} ${
             current || selected
               ? "text-fg-bright"
               : "text-muted/50 hover:text-muted"
@@ -3831,17 +3842,15 @@ function lineTop(root: HTMLElement | null, index: number): number | undefined {
 // was measured at on the way in.
 //
 // A gutter press has no reveal to do — you can only press a number you can see
-// — but the commit that answers it can still slide the view out from under it,
-// two ways. The line the caret *left* drops back to formatted, and its raw
+// — but the render that answers it can still slide the view out from under it.
+// Entering select mode takes the active raw line back to formatted, and its raw
 // markdown (a `#`, a `- `, a `**`) can wrap to one row more or fewer than the
-// formatted line does, which reflows everything below it. And the browser runs
-// its own reveal for the focus / selection change, which reveals the editing
-// *host* — the top of the note — and then glides back down. Either one reads as
-// the note jumping somewhere else and scrolling to the line, rather than the
-// line simply being selected where it already was.
+// formatted line does, which reflows everything below it. That reads as the
+// note jumping somewhere else under the finger, rather than as the line simply
+// being taken where it already was.
 //
-// Re-anchoring the line's first row to the y it was pressed at cancels both,
-// and costs nothing when neither happened (the sub-pixel delta bails).
+// Re-anchoring the line's first row to the y it was pressed at cancels it, and
+// costs nothing when nothing moved (the sub-pixel delta bails).
 //
 // Held for `frames` more frames rather than applied once, because a native
 // reveal is run as part of updating the rendering — it can land a frame or two
@@ -3877,13 +3886,14 @@ function holdLineAnchor(
   if (left > 0) requestAnimationFrame(again);
 }
 
-// How long the anchor above holds the view, in frames. One frame is enough when
-// the soft keyboard is about to open (`scrollFocusedIntoView` owns the reveal
-// from there, and holding the old offset would fight it); when the surface was
-// already focused nothing else is going to move the view, so the anchor holds
-// across the couple of frames a late native reveal can arrive in.
+// How long the anchor above holds the view, in frames. Held across several
+// rather than applied once, because the reflow it corrects lands a frame or two
+// after the press — the mode is entered by the host, so the re-render that
+// drops the raw line is a render behind the gesture — and correcting it a frame
+// late is the difference between a flicker and a scroll the user has to undo by
+// hand. The window is short enough (a handful of frames after a press that has
+// only just landed) that no real scroll gesture can be underway inside it.
 const ANCHOR_FRAMES_FOCUSED = 8;
-const ANCHOR_FRAMES_TAKING_FOCUS = 1;
 
 // Restore a scroll container's offset when reopening a note. A plain helper
 // (rather than an inline `el.scrollTop = …` in the effect) so the value being

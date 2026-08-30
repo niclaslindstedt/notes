@@ -2099,45 +2099,43 @@ describe("MarkdownEditor", () => {
       );
     });
 
-    it("selects the whole line when its number is pressed", () => {
-      renderEditor("alpha\nbeta", { focusOnMount: false, lineNumbers: true });
-      act(() => {
-        fireEvent.mouseDown(gutter()[0]!);
-      });
-      const sel = window.getSelection()!;
-      expect(sel.isCollapsed).toBe(false);
-      expect(sel.toString()).toBe("alpha");
-    });
-
-    it("leaves the caret at the start of the line it selects", () => {
-      // The selection is drawn backwards, so its *focus* — where the caret
-      // sits, what the next arrow key collapses to — is the first character of
-      // the line rather than its end. On a long wrapped line the two ends are
-      // screens apart, and only the start says where you are.
-      renderEditor("alpha\nbeta", { focusOnMount: false, lineNumbers: true });
-      act(() => {
-        fireEvent.mouseDown(gutter()[0]!);
-      });
-      const sel = window.getSelection()!;
-      const line = surface().querySelector("[data-line-index='0']")!;
-      expect(sel.toString()).toBe("alpha");
-      expect(sel.focusNode).toBe(line);
-      expect(sel.focusOffset).toBe(0);
-    });
-
-    it("remembers the start of the pressed line as the session caret", () => {
-      // Reopening the note lands where the press left the user: the head of
-      // the line, not its tail.
-      const { unmount } = renderEditor("alpha\nbeta", {
+    it("asks the host for select mode when a number is pressed", () => {
+      // The gutter is the shorthand way into select mode: pressing a number
+      // turns the mode on with that line taken, rather than drawing a browser
+      // selection of its own. What the taken line then looks like, and how a
+      // drag down the gutter takes a run, is `markdown-editor-select-mode`.
+      const onSelectModeChange = vi.fn();
+      renderEditor("alpha\nbeta", {
         focusOnMount: false,
         lineNumbers: true,
-        noteId: "gutter",
+        onSelectModeChange,
       });
       act(() => {
-        fireEvent.mouseDown(gutter()[1]!);
+        fireEvent.pointerDown(gutter()[0]!, { pointerId: 1, bubbles: true });
       });
-      unmount();
-      expect(getEditorPosition("gutter")?.caret).toEqual({ line: 1, col: 0 });
+      expect(onSelectModeChange).toHaveBeenCalledWith(true);
+      // No browser selection: the mode paints the lines itself, and a range
+      // here would raise the platform's own callout over them.
+      expect(window.getSelection()!.toString()).toBe("");
+    });
+
+    it("lands no caret and takes no scroll from the gutter", () => {
+      // The gutter is purely a selection area. Cancelling `mousedown` is what
+      // keeps the caret — and with it the soft keyboard — off the note, and
+      // `touch-none` is what stops a finger scrolling with it, so a stroke
+      // starting here is always a selection.
+      renderEditor("alpha\nbeta", { focusOnMount: false, lineNumbers: true });
+      const button = gutter()[0]!;
+      expect(button.className).toContain("touch-none");
+      const down = new MouseEvent("mousedown", {
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => {
+        button.dispatchEvent(down);
+      });
+      expect(down.defaultPrevented).toBe(true);
+      expect(document.activeElement).not.toBe(surface());
     });
 
     it("keeps the digits a gutter gap clear of the text while the target spans the column", () => {
@@ -2154,132 +2152,84 @@ describe("MarkdownEditor", () => {
       expect(button.className).toContain("items-start");
       expect(button.querySelector("span")?.className).toContain("h-[1lh]");
     });
-
-    it("takes focus for the row it selects, without the browser's own reveal", () => {
-      // The press a note opened with the keyboard down receives: focus has to
-      // land on the editing host (what raises the keyboard) *and* the pressed
-      // row has to end up selected. `preventScroll` is what keeps the two
-      // together — the focus-time reveal reveals the whole host, throwing the
-      // view to the top of the note instead of the line that was pressed.
-      renderEditor("alpha\nbeta\ngamma", {
-        focusOnMount: false,
-        lineNumbers: true,
-      });
-      expect(document.activeElement).not.toBe(surface());
-      const focus = vi.spyOn(surface(), "focus");
-      act(() => {
-        fireEvent.mouseDown(gutter()[2]!);
-      });
-      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
-      expect(document.activeElement).toBe(surface());
-      expect(window.getSelection()!.toString()).toBe("gamma");
-    });
-
-    it("drops the active raw line so the selection covers the formatted one", () => {
-      // The caret opens on the last line (raw); pressing another line's number
-      // takes the whole note back to formatted and selects that line.
-      renderEditor("**bold**\nplain", { lineNumbers: true });
-      expect(rawLine()).not.toBeNull();
-      act(() => {
-        fireEvent.mouseDown(gutter()[0]!);
-      });
-      expect(rawLine()).toBeNull();
-      expect(window.getSelection()!.toString()).toBe("bold");
-    });
-
-    it("cuts the pressed line through the editor's own cut", () => {
-      // The selection a press draws is an ordinary ranged one, so everything
-      // that reads the selection — cut, copy, typing over it — sees it.
-      const { onChange } = renderEditor("alpha\nbeta", {
-        focusOnMount: false,
-        lineNumbers: true,
-      });
-      act(() => {
-        fireEvent.mouseDown(gutter()[0]!);
-      });
-      beforeInput("insertText", "X");
-      expect(onChange).toHaveBeenLastCalledWith("X\nbeta");
-    });
-
-    // Focus leaves the surface while a selection is still standing in it — what
-    // dismissing the soft keyboard does on a phone, and the state the drop is
-    // about.
-    //
-    // Assembled by hand, because jsdom won't produce it: its `blur()` clears the
-    // selection outright, and focusing anything else collapses the selection
-    // into *that* element — neither of which a browser does. So blur for real to
-    // get `activeElement` off the surface, put the selection back where a
-    // browser would have left it, and re-deliver the `focusout` that Preact maps
-    // `onBlur` onto. Awaited because the handler defers to a microtask.
-    async function dismissKeyboard(lineIndex: number, text: string) {
-      await act(async () => {
-        surface().blur();
-      });
-      selectRange(
-        surface().querySelector<HTMLElement>(
-          `[data-line-index='${lineIndex}']`,
-        )!,
-        0,
-        text.length,
-      );
-      await act(async () => {
-        surface().dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
-      });
-    }
-
-    it("drops the line's selection when focus leaves the surface", async () => {
-      // Dismissing the keyboard blurs the surface and takes the highlight with
-      // it, but the DOM range used to survive: the next tap on those lines then
-      // handed the browser a selection to act on — it repainted the row and
-      // raised the Cut / Copy / Paste bar — so it took a second tap to get a
-      // caret back into a line that looked idle.
-      renderEditor("alpha\nbeta", { focusOnMount: false, lineNumbers: true });
-      act(() => {
-        fireEvent.mouseDown(gutter()[0]!);
-      });
-      expect(window.getSelection()!.toString()).toBe("alpha");
-
-      await dismissKeyboard(0, "alpha");
-
-      expect(window.getSelection()!.rangeCount).toBe(0);
-    });
-
-    it("leaves the selection standing for a desktop pointer", async () => {
-      // A mouse has no soft keyboard to dismiss, and the browser keeps painting
-      // the selection (greyed) once focus moves on — so nothing goes invisible
-      // and the platform's own behaviour stands.
-      vi.stubGlobal(
-        "matchMedia",
-        vi.fn(() => ({
-          matches: true,
-          media: "",
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          onchange: null,
-          dispatchEvent: vi.fn(),
-        })),
-      );
-      try {
-        renderEditor("alpha\nbeta", { focusOnMount: false, lineNumbers: true });
-        act(() => {
-          fireEvent.mouseDown(gutter()[0]!);
-        });
-
-        await dismissKeyboard(0, "alpha");
-
-        expect(window.getSelection()!.toString()).toBe("alpha");
-      } finally {
-        vi.unstubAllGlobals();
-      }
-    });
   });
 });
 
 // A locked note is read-only: the surface takes no caret (so no soft keyboard
 // comes up and nothing blinks on a desktop) and refuses every edit — while
 // reading, selecting and the line-number gutter carry on untouched.
+// A selection outliving the focus that drew it — what dismissing the soft
+// keyboard leaves behind on a phone.
+describe("MarkdownEditor (selection on blur)", () => {
+  // Focus leaves the surface while a selection is still standing in it — what
+  // dismissing the soft keyboard does on a phone, and the state the drop is
+  // about.
+  //
+  // Assembled by hand, because jsdom won't produce it: its `blur()` clears the
+  // selection outright, and focusing anything else collapses the selection
+  // into *that* element — neither of which a browser does. So blur for real to
+  // get `activeElement` off the surface, put the selection back where a
+  // browser would have left it, and re-deliver the `focusout` that Preact maps
+  // `onBlur` onto. Awaited because the handler defers to a microtask.
+  async function dismissKeyboard(lineIndex: number, text: string) {
+    await act(async () => {
+      surface().blur();
+    });
+    selectRange(
+      surface().querySelector<HTMLElement>(`[data-line-index='${lineIndex}']`)!,
+      0,
+      text.length,
+    );
+    await act(async () => {
+      surface().dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+  }
+
+  it("drops the line's selection when focus leaves the surface", async () => {
+    // Dismissing the keyboard blurs the surface and takes the highlight with
+    // it, but the DOM range used to survive: the next tap on those lines then
+    // handed the browser a selection to act on — it repainted the row and
+    // raised the Cut / Copy / Paste bar — so it took a second tap to get a
+    // caret back into a line that looked idle.
+    renderEditor("alpha\nbeta", { focusOnMount: false });
+    selectRange(screen.getByText("alpha"), 0, 5);
+    expect(window.getSelection()!.toString()).toBe("alpha");
+
+    await dismissKeyboard(0, "alpha");
+
+    expect(window.getSelection()!.rangeCount).toBe(0);
+  });
+
+  it("leaves the selection standing for a desktop pointer", async () => {
+    // A mouse has no soft keyboard to dismiss, and the browser keeps painting
+    // the selection (greyed) once focus moves on — so nothing goes invisible
+    // and the platform's own behaviour stands.
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: true,
+        media: "",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      })),
+    );
+    try {
+      renderEditor("alpha\nbeta", { focusOnMount: false });
+      selectRange(screen.getByText("alpha"), 0, 5);
+
+      await dismissKeyboard(0, "alpha");
+
+      expect(window.getSelection()!.toString()).toBe("alpha");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("MarkdownEditor (locked)", () => {
   function gutter(): HTMLElement[] {
     return [
@@ -2332,48 +2282,35 @@ describe("MarkdownEditor (locked)", () => {
     expect(screen.getByText("heading").closest("[data-raw]")).toBeNull();
   });
 
-  it("still selects the whole line from the gutter", () => {
-    renderEditor("alpha\nbeta", { locked: true, lineNumbers: true });
-    act(() => {
-      fireEvent.mouseDown(gutter()[0]!);
-    });
-    const sel = window.getSelection()!;
-    expect(sel.isCollapsed).toBe(false);
-    expect(sel.toString()).toBe("alpha");
-  });
-
-  it("still reports that selection, so the header's copy button appears", async () => {
-    const onSelectionChange = vi.fn();
+  it("still opens select mode from the gutter", () => {
+    // The whole point of leaving the gutter working on a locked note: picking
+    // lines is how you copy them, and select mode is what a gutter press asks
+    // for. It is a read of the note, so the lock has nothing to refuse.
+    const onSelectModeChange = vi.fn();
     renderEditor("alpha\nbeta", {
       locked: true,
       lineNumbers: true,
-      onSelectionChange,
+      onSelectModeChange,
     });
     act(() => {
-      fireEvent.mouseDown(gutter()[0]!);
+      fireEvent.pointerDown(gutter()[0]!, { pointerId: 1, bubbles: true });
     });
-    // The editor swallows the `selectionchange` its own `setBaseAndExtent`
-    // fires and re-arms the handler in a microtask, so let that drain before
-    // standing in for the browser's event.
-    await act(async () => {});
-    act(() => {
-      document.dispatchEvent(new Event("selectionchange"));
-    });
-    expect(onSelectionChange).toHaveBeenLastCalledWith(true);
+    expect(onSelectModeChange).toHaveBeenCalledWith(true);
   });
 
-  it("hands out the pressed line's verbatim source, so it can be copied", () => {
-    // The whole point of leaving the gutter working: press a line number on a
-    // locked note and the header's copy button takes the Markdown you typed,
-    // `**` and all, not the rendered text.
+  it("hands out the taken line's verbatim source, so it can be copied", () => {
+    // Press a line number on a locked note and the header's copy button takes
+    // the Markdown you typed, `**` and all, not the rendered text.
     const handle: { current: MarkdownEditorHandle | null } = { current: null };
     renderEditor("**bold** tail\nsecond", {
       locked: true,
       lineNumbers: true,
+      selectMode: true,
       handleRef: handle,
     });
     act(() => {
-      fireEvent.mouseDown(gutter()[0]!);
+      fireEvent.pointerDown(gutter()[0]!, { pointerId: 1, bubbles: true });
+      fireEvent.pointerUp(gutter()[0]!, { pointerId: 1, bubbles: true });
     });
     expect(handle.current?.selection()).toBe("**bold** tail");
   });
