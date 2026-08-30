@@ -164,8 +164,10 @@ jobs:
           the message about Notes and choose **Open Anyway**. macOS remembers
           after that.
 
-          Cloud sync (Dropbox, Google Drive) is browser-only — the desktop
-          build stores notes locally or in a folder you pick.
+          Dropbox sync works here too: signing in opens your normal browser
+          and hands the app back the result. Google Drive sync is
+          browser-only. The desktop build otherwise stores notes locally or in
+          a folder you pick.
           NOTES
 
       - name: Sanity build
@@ -287,9 +289,20 @@ jobs:
       - run: npm ci
         working-directory: electron
 
+      # The same build-time keys the web deploy gets. Without
+      # VITE_DROPBOX_APP_KEY the packaged app has no Dropbox app to sign in to
+      # and the picker's Dropbox row stays disabled — the loopback flow the
+      # shell provides is necessary but not sufficient (see
+      # ../../src/platform/capabilities.ts). VITE_GOOGLE_CLIENT_ID is passed
+      # for symmetry with the deploy env; Drive is withheld on this surface for
+      # its own reason and the key alone will not light it up.
       - name: Package
         shell: bash
         run: npm --prefix electron run ${{ matrix.script }}
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
+          VITE_DROPBOX_APP_FOLDER: ${{ vars.VITE_DROPBOX_APP_FOLDER }}
 
       # Matched by extension rather than by filename, so a job that changed
       # target suffix fails loudly instead of silently uploading nothing.

@@ -230,7 +230,12 @@ export function PrivacyPage() {
               app-scoped folder, so it can only read and write inside its own
               dedicated folder — never the rest of your Dropbox. Sign-in uses
               Dropbox&apos;s OAuth flow (PKCE), and the resulting token is held
-              only in this browser.
+              only in this browser. In the downloadable desktop app, sign-in
+              opens in your normal browser instead and Dropbox returns you to a
+              listener the app opens on your own machine (
+              <code className="text-fg-bright">127.0.0.1</code>, reachable from
+              nowhere else) for the moment the sign-in takes; it receives the
+              sign-in result and nothing else, and closes immediately after.
             </li>
             <li>
               <span className="text-fg-bright">Self-hosted (app only).</span> In

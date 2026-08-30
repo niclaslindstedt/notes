@@ -570,10 +570,18 @@ The rule for both, and the one to check a change against:
 For `native/` that is a short, closed list — haptics, SPKI-pinned HTTPS, QR
 camera scan — each behind the `postMessage` bridge in
 [`src/platform/native-bridge.ts`](src/platform/native-bridge.ts), which is
-inert on the web. For `electron/` the list is **one item long**: the remembered
-window bounds, because a web page cannot size or place its own OS window. The
-whole main process is still one file, with no preload, no IPC, and no storage
-the renderer can see. Keep it that way.
+inert on the web. For `electron/` the list is **two items long**: the
+remembered window bounds, because a web page cannot size or place its own OS
+window, and a loopback HTTP listener for one OAuth redirect, because a web page
+cannot hold a listening socket — the flow RFC 8252 prescribes for native apps,
+and the only way the desktop build gets cloud sync at all (its `notes://app`
+origin is not a redirect URI any provider will register). The whole main
+process is still one file, with no preload, no IPC, and no storage the renderer
+can see: the loopback capability is reached through the `notes://` protocol
+handler that already exists, from
+[`src/platform/desktop-bridge.ts`](src/platform/desktop-bridge.ts). Keep it
+that way — the shell holds the socket, and every decision about what to do with
+what arrives on it stays in `src/`.
 
 So when a feature request arrives while you are working in a wrapper:
 
@@ -645,6 +653,7 @@ would take the whole app down for everyone, including their own namespaces.
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |
 | PWA / service-worker behaviour           | `src/pwa/`                         |
 | A native-wrapper capability (bridge)     | `src/platform/native-bridge.ts` + `native/` |
+| A desktop-wrapper capability (bridge)    | `src/platform/desktop-bridge.ts` + `electron/main.js` |
 | Anything a wrapper seems to need         | `src/` — see "The wrappers are thin" |
 | A "can this surface do X?" check          | `src/platform/capabilities.ts` — never re-derive it at the call site |
 | A new achievement / its unlock trigger   | `src/achievements/catalog.ts`      |

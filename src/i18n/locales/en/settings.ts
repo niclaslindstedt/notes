@@ -327,6 +327,8 @@ const settings = {
     folderChoose: "Choose folder…",
     dropboxConnected: "Your notes sync to your Dropbox app folder.",
     dropboxUnconnected: "Sign in to keep your notes in your own Dropbox.",
+    dropboxWaiting:
+      "Finish signing in to Dropbox in your browser, then come back here.",
     gdriveConnected: "Your notes sync to a folder in your Google Drive.",
     gdriveUnconnected: "Sign in to keep your notes in your own Google Drive.",
     backendNotesd: "Self-hosted",

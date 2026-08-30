@@ -445,8 +445,10 @@ export function HomePage() {
                 desktop builds
               </a>{" "}
               for Windows, macOS, and Linux: the same app in its own window,
-              sending nothing anywhere. Cloud sync is available in the browser
-              and mobile app only.
+              sending nothing anywhere unless you connect a sync location.
+              Dropbox sync works there too — sign-in opens in your own browser
+              and comes back to the app. Google Drive sync is available in the
+              browser and mobile app only.
             </li>
             <li>
               Optionally sync your notes to a location you control: a local

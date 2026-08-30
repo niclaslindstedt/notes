@@ -49,6 +49,7 @@ import {
   type TokenResult,
   completeAuth,
   refreshAccessToken,
+  runLoopbackAuth,
   startAuth,
 } from "../oauth-pkce.ts";
 
@@ -62,10 +63,20 @@ const log = createLogger("dropbox");
 // picker.
 //
 // The matching app is registered at https://www.dropbox.com/developers/apps
-// as "Scoped access" with permission type "App folder". Its redirect URIs
-// must include the prod and dev origins with no trailing slash — `startAuth`
-// derives the URI from `window.location.origin` + pathname and Dropbox
-// requires an exact match.
+// as "Scoped access" with permission type "App folder". Dropbox matches
+// redirect URIs EXACTLY, so its allowlist has to carry every URI either flow
+// shape can produce:
+//
+//   - The web origins, with no trailing slash — `startAuth` derives the URI
+//     from `window.location.origin` + pathname.
+//   - The desktop loopback URIs, one per port the shell may bind:
+//     `http://127.0.0.1:53682/`, `:53683/`, `:53684/` (the `LOOPBACK_PORTS`
+//     in `electron/main.js` — keep the two lists in step). Dropbox permits
+//     plain `http` for loopback hosts, which is why the desktop flow works
+//     without a certificate; the trailing slash is part of the match.
+//
+// A port missing from that list fails at the consent screen with Dropbox's
+// "invalid redirect_uri", not at the token exchange, so it is obvious.
 
 export { DROPBOX_APP_KEY, isDropboxConfigured } from "../cloud-configured.ts";
 
@@ -484,6 +495,16 @@ export type DropboxAuthResult = TokenResult;
 
 export function startDropboxAuth(): Promise<void> {
   return startAuth(DROPBOX_OAUTH);
+}
+
+// The desktop sign-in: opens Dropbox in the user's browser and resolves with
+// the tokens once the redirect lands on the shell's loopback listener. Unlike
+// `startDropboxAuth` nothing navigates, so the caller gets the result directly
+// instead of picking it up from the next boot.
+export function connectDropboxLoopback(
+  fetchImpl: FetchImpl = fetch,
+): Promise<DropboxAuthResult> {
+  return runLoopbackAuth(DROPBOX_OAUTH, fetchImpl);
 }
 
 // True when a Dropbox OAuth flow is mid-flight — i.e. `startDropboxAuth`

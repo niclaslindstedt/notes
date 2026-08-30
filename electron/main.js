@@ -3,6 +3,10 @@
 // own. Anything that looks like a feature belongs in `../src/`, not here (see
 // AGENTS.md, "The wrappers are thin — put the logic in the PWA").
 //
+// It owns exactly two things a web page cannot do for itself: remember the
+// window's size and position, and hold open a loopback HTTP listener for one
+// OAuth redirect. Neither decides anything — the page asks, the shell answers.
+//
 // Plain CommonJS rather than TypeScript on purpose: compiling one file would
 // mean a `dist/`, a build to run before both `electron .` and packaging, and a
 // `main` field pointing at generated output — so the file that runs would stop
@@ -35,6 +39,7 @@ const {
   statSync,
   writeFileSync,
 } = require("node:fs");
+const { createServer } = require("node:http");
 const { join, normalize, resolve, sep } = require("node:path");
 const { pathToFileURL } = require("node:url");
 
@@ -82,6 +87,176 @@ function webrootFile(pathname) {
   // so a directory — including the bare root — is always the app shell.
   const index = join(candidate, "index.html");
   return existsSync(index) ? index : null;
+}
+
+/**
+ * A LOOPBACK LISTENER FOR ONE OAUTH REDIRECT.
+ *
+ * The other thing a web page cannot do for itself. The app is served from
+ * `notes://app`, and no OAuth provider will register a custom scheme as a
+ * redirect URI — which is why cloud sync was simply withheld on the desktop.
+ * The way out is the one RFC 8252 prescribes for native apps: send the user to
+ * the provider in their real browser, and catch the redirect on a loopback
+ * server the app opens for the occasion.
+ *
+ * The shell holds the socket and nothing else. It does not know which provider
+ * is being connected, what scopes were asked for, or what the code is worth —
+ * `../src/storage/oauth-pkce.ts` builds the authorization URL, checks `state`,
+ * and trades the code for tokens. This answers two questions: "what URI can I
+ * be redirected to?" and "what came back?".
+ *
+ * Bound to `127.0.0.1` — never `0.0.0.0`, which would put a listener holding a
+ * live authorization code on the local network.
+ */
+
+// A fixed, tiny set rather than an ephemeral port: providers match redirect
+// URIs exactly, so every port the app might use has to be registered on the
+// OAuth app up front (see `../src/storage/dropbox/index.ts`). Three is enough
+// slack for something else already holding the first one, and few enough to
+// register by hand.
+const LOOPBACK_PORTS = [53682, 53683, 53684];
+
+// Long enough to find the browser window, sign in, and approve; short enough
+// that an abandoned flow doesn't leave a socket open for the session. The
+// listener also closes the moment a redirect arrives.
+const LOOPBACK_TIMEOUT_MS = 5 * 60_000;
+
+// Shown in the browser tab the provider redirected. Deliberately plain and
+// self-contained: it is served by a socket that is about to close, so it can
+// reference nothing.
+const LOOPBACK_DONE_PAGE = `<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><title>Notes</title>
+<style>html{color-scheme:dark light}body{margin:0;min-height:100vh;display:flex;
+align-items:center;justify-content:center;background:#1f2933;color:#e6edf3;
+font:16px/1.5 system-ui,sans-serif}p{text-align:center;padding:2rem}</style>
+</head><body><p>Notes is connected.<br>You can close this tab.</p></body></html>`;
+
+/**
+ * The current flow: its socket while one is open, and its outcome for as long
+ * as nobody has asked for it.
+ *
+ * The socket and the flow are deliberately separate lifetimes. The listener
+ * closes the instant a redirect lands, but the result has to outlive it — the
+ * page asks for the redirect URI, opens the browser, and only then asks what
+ * came back, and a provider the user has already authorized can redirect
+ * inside that gap. Tying the two together would drop exactly the fastest,
+ * most ordinary sign-in on the floor.
+ *
+ * @type {{
+ *   server: import("node:http").Server | null,
+ *   redirectUri: string,
+ *   result: Promise<{ query: string } | { error: string }>,
+ * } | null}
+ */
+let loopback = null;
+
+/** Close the socket, keeping the flow's result readable. */
+function closeLoopbackSocket() {
+  const server = loopback?.server;
+  if (!server || !loopback) return;
+  loopback.server = null;
+  server.close();
+  // `close` only stops NEW connections; a browser holding the socket open with
+  // keep-alive would keep the port bound, and the next flow would step down to
+  // the following port for no reason. The response has already been flushed by
+  // every path that gets here.
+  server.closeAllConnections();
+}
+
+/** Close the socket and forget the flow entirely. */
+function discardLoopback() {
+  closeLoopbackSocket();
+  loopback = null;
+}
+
+/**
+ * @param {import("node:http").Server} server
+ * @param {number} port
+ * @returns {Promise<void>}
+ */
+function listenOnPort(server, port) {
+  return new Promise((resolvePort, rejectPort) => {
+    const onError = (/** @type {Error} */ err) => {
+      server.off("listening", onListening);
+      rejectPort(err);
+    };
+    const onListening = () => {
+      server.off("error", onError);
+      resolvePort();
+    };
+    server.once("error", onError);
+    server.once("listening", onListening);
+    server.listen(port, "127.0.0.1");
+  });
+}
+
+/**
+ * Open a one-shot loopback listener and report the URI to be redirected to.
+ * Replaces any listener already waiting — a second connect attempt supersedes
+ * the first, and two sockets waiting for one redirect is never right.
+ *
+ * @returns {Promise<string>} The redirect URI to hand the provider.
+ */
+async function startLoopback() {
+  discardLoopback();
+
+  /** @type {(value: { query: string } | { error: string }) => void} */
+  let settle = () => {};
+  /** @type {Promise<{ query: string } | { error: string }>} */
+  const result = new Promise((res) => {
+    settle = res;
+  });
+
+  const server = createServer((req, res) => {
+    let search = "";
+    try {
+      search = new URL(req.url ?? "/", "http://127.0.0.1").search;
+    } catch {
+      search = "";
+    }
+    // Browsers ask for `/favicon.ico` off their own bat. Anything without a
+    // query string is not the redirect, so it must not end the wait.
+    if (!search) {
+      res.writeHead(404).end();
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    // Settle on `finish`, not before: closing tears the socket down, and the
+    // browser has to have the page first or the user is left looking at a
+    // connection error after a successful sign-in.
+    res.on("finish", () => {
+      settle({ query: search.slice(1) });
+      closeLoopbackSocket();
+    });
+    res.end(LOOPBACK_DONE_PAGE);
+  });
+
+  let bound = null;
+  for (const port of LOOPBACK_PORTS) {
+    try {
+      await listenOnPort(server, port);
+      bound = port;
+      break;
+    } catch {
+      // In use by something else (or by a listener this app has not finished
+      // closing) — try the next one.
+    }
+  }
+  if (bound === null) {
+    server.close();
+    throw new Error("no loopback port available");
+  }
+
+  const timer = setTimeout(() => {
+    settle({ error: "timed out waiting for the authorization redirect" });
+    closeLoopbackSocket();
+  }, LOOPBACK_TIMEOUT_MS);
+  // An abandoned sign-in must not be the reason the app refuses to quit.
+  timer.unref();
+  void result.then(() => clearTimeout(timer));
+
+  loopback = { server, redirectUri: `http://127.0.0.1:${bound}/`, result };
+  return loopback.redirectUri;
 }
 
 /**
@@ -212,9 +387,47 @@ function openExternally(url) {
     void shell.openExternal(url);
 }
 
+/**
+ * The loopback capability's whole surface, answered on the scheme the app is
+ * already served from. This is why there is still no preload and no IPC: the
+ * protocol handler is a request/response seam that exists anyway, and the page
+ * reaches it with a plain `fetch` (see `../src/platform/desktop-bridge.ts`,
+ * which owns these two paths on the other side).
+ *
+ * `/__oauth/begin` opens the listener and answers with the redirect URI.
+ * `/__oauth/await` resolves when the redirect lands — or when it times out.
+ *
+ * Under `__oauth/`, which `webrootFile` could never resolve to: Vite emits no
+ * such directory, and a path that escaped the webroot is refused there anyway.
+ *
+ * @param {string} pathname
+ * @returns {Promise<Response> | null} null when this is not a loopback request.
+ */
+function handleLoopbackRequest(pathname) {
+  if (pathname === "/__oauth/begin") {
+    return startLoopback().then(
+      (redirectUri) => Response.json({ redirectUri }),
+      (err) => Response.json({ error: String(err?.message ?? err) }),
+    );
+  }
+  if (pathname === "/__oauth/await") {
+    // A wait with no flow behind it is a bug in the page, not a redirect that
+    // will arrive — answer rather than hang forever. It is NOT what a redirect
+    // that already landed looks like: that flow is still here, with its result
+    // settled and waiting to be read.
+    if (!loopback) return Promise.resolve(Response.json({ error: "no flow" }));
+    return loopback.result.then((value) => Response.json(value));
+  }
+  return null;
+}
+
 app.whenReady().then(() => {
   protocol.handle(SCHEME, (request) => {
-    const file = webrootFile(new URL(request.url).pathname);
+    const { pathname } = new URL(request.url);
+    const loopbackResponse = handleLoopbackRequest(pathname);
+    if (loopbackResponse) return loopbackResponse;
+
+    const file = webrootFile(pathname);
     if (!file) return new Response("Not found", { status: 404 });
     // Electron's file loader sets the Content-Type from the extension, which
     // matters more than it looks: the app is ES modules, and a module served
@@ -229,5 +442,8 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  // A sign-in the user walked away from must not keep a socket bound after the
+  // window it was started from is gone.
+  discardLoopback();
   if (process.platform !== "darwin") app.quit();
 });

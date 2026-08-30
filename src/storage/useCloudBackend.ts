@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 // Aliased: the storage layer also has a passphrase `unlock` of its own.
 import { unlock as unlockAchievement } from "../achievements/index.ts";
 import { createLogger } from "../dev/logger.ts";
+import { capabilities } from "../platform/capabilities.ts";
 import {
   type BackendId,
   clearDropboxRefreshToken,
@@ -75,8 +76,15 @@ export interface CloudBackend {
    * refreshes mid-session lands back in state.
    */
   rememberDropboxAccessToken: (token: string) => void;
-  /** Begin the Dropbox OAuth flow; completion runs in the boot effect. */
-  connectDropbox: () => void;
+  /**
+   * Connect Dropbox. Two shapes behind one verb, picked by what the surface
+   * can do (`capabilities()`): on the web the page navigates to Dropbox and
+   * the promise resolves as it leaves, with completion running in the boot
+   * effect after the redirect; on the desktop the whole round trip happens
+   * here and the promise rejects with anything that went wrong, so the caller
+   * can show it.
+   */
+  connectDropbox: () => Promise<void>;
   /** Forget the Dropbox tokens and fall back to the browser store. */
   disconnectDropbox: () => void;
   /** Run the Google Drive OAuth popup and switch to the gdrive backend. */
@@ -103,6 +111,23 @@ export function useCloudBackend({
     setDropboxTokenState(token);
   }, []);
 
+  // Persist + activate a completed Dropbox grant. Shared by the two flow
+  // shapes so a token landing from the boot redirect and one landing from the
+  // desktop's loopback listener are stored identically.
+  const acceptDropboxTokens = useCallback(
+    (result: { accessToken: string; refreshToken: string | null }) => {
+      setDropboxToken(result.accessToken);
+      setDropboxTokenState(result.accessToken);
+      if (result.refreshToken) {
+        setDropboxRefreshToken(result.refreshToken);
+        setDropboxRefreshState(result.refreshToken);
+      }
+      selectBackend("dropbox");
+      unlockAchievement("cloudWalker");
+    },
+    [selectBackend],
+  );
+
   // Complete a Dropbox OAuth redirect on boot. Google Drive uses a popup
   // (resolved inline in `connectGdrive`), so only Dropbox lands back here
   // with a `?code=`. `selectBackend` is a stable callback, so this still runs
@@ -119,14 +144,7 @@ export function useCloudBackend({
         const { completeDropboxAuth } = await import("./dropbox/index.ts");
         const result = await completeDropboxAuth(code);
         if (cancelled) return;
-        setDropboxToken(result.accessToken);
-        setDropboxTokenState(result.accessToken);
-        if (result.refreshToken) {
-          setDropboxRefreshToken(result.refreshToken);
-          setDropboxRefreshState(result.refreshToken);
-        }
-        selectBackend("dropbox");
-        unlockAchievement("cloudWalker");
+        acceptDropboxTokens(result);
       } catch (err) {
         log.error("boot: Dropbox OAuth completion failed", err);
       } finally {
@@ -136,13 +154,22 @@ export function useCloudBackend({
     return () => {
       cancelled = true;
     };
-  }, [selectBackend]);
+  }, [acceptDropboxTokens]);
 
-  const connectDropbox = useCallback(() => {
-    // Redirects away; completion runs in the boot effect above — anything
-    // queued here wouldn't survive the redirect.
-    void import("./dropbox/index.ts").then((m) => m.startDropboxAuth());
-  }, []);
+  const connectDropbox = useCallback(async () => {
+    const m = await import("./dropbox/index.ts");
+    if (capabilities().loopbackOauth) {
+      // The desktop: Dropbox opens in the user's browser and comes back to a
+      // loopback listener, so the tokens land right here (see
+      // `runLoopbackAuth`). Rejections propagate — the settings panel shows
+      // them, since there is no redirect to explain a silent failure.
+      acceptDropboxTokens(await m.connectDropboxLoopback());
+      return;
+    }
+    // The web: redirects away, and completion runs in the boot effect above.
+    // Anything queued after this wouldn't survive the navigation.
+    await m.startDropboxAuth();
+  }, [acceptDropboxTokens]);
 
   const disconnectDropbox = useCallback(() => {
     clearDropboxToken();

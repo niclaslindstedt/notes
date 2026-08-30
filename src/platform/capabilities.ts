@@ -9,14 +9,16 @@
 //     browser-engine question (Chromium yes, Firefox/Safari no).
 //   - **Redirect-based OAuth** needs an origin a provider will accept as a
 //     registered redirect URI, which is an `https://` question.
+//   - **Loopback OAuth** needs something able to hold a listening socket,
+//     which is a wrapper question — and it is how the desktop build gets
+//     cloud sync despite failing the one above.
 //   - **SPKI-pinned fetch** needs native code, which is a wrapper question.
 //
 // Answering each of them at its own call site is how they drift apart, and it
-// already bit once: the desktop build offers no cloud sync today only because
-// the packaging job happens not to pass `VITE_DROPBOX_APP_KEY` /
-// `VITE_GOOGLE_CLIENT_ID`. Add those secrets to that job and both options
-// light up and then fail at the redirect — the real reason they cannot work
-// there was written down nowhere. This module is where it is written down.
+// already bit once: the desktop build offered no cloud sync, and the reason
+// looked like the packaging job not passing `VITE_DROPBOX_APP_KEY` /
+// `VITE_GOOGLE_CLIENT_ID` when the real one was that the redirect could never
+// land. This module is where that is written down.
 //
 // **This lives in `src/`, not in a wrapper.** The page works out its own
 // surface from what it can observe; no shell tells it anything, and there is
@@ -56,8 +58,7 @@ export interface Capabilities {
   folderPicker: boolean;
 
   /**
-   * Whether a redirect-based OAuth flow can complete on this origin — the
-   * gate on both cloud backends.
+   * Whether a redirect-based OAuth flow can complete on this origin.
    *
    * False on the desktop, and not for want of trying: `redirectUri()`
    * (`src/storage/oauth-pkce.ts`) is built from `window.location`, so on the
@@ -67,6 +68,25 @@ export interface Capabilities {
    * browser and the WebView wrapper both have a real `https://` origin.
    */
   redirectOauth: boolean;
+
+  /**
+   * Whether an OAuth redirect can instead be caught on a loopback listener —
+   * the flow RFC 8252 prescribes for native apps: open the provider in the
+   * user's real browser and receive the redirect on `http://127.0.0.1:<port>`
+   * rather than on the app's own origin.
+   *
+   * True only on the desktop, and it is the reason cloud sync exists there at
+   * all. It needs something able to hold a listening socket, which a web page
+   * is not — `electron/main.js` owns it and `./desktop-bridge.ts` reaches it.
+   * The browser and the WebView wrapper have `redirectOauth` and need no such
+   * thing.
+   *
+   * A provider still has to carry the loopback URIs on its redirect
+   * allowlist, so this says the flow *can complete here*, not that every
+   * backend is registered for it — see `dropboxAvailable` / `gdriveAvailable`
+   * in `src/storage/useStorageBackend.ts` for which ones are.
+   */
+  loopbackOauth: boolean;
 
   /**
    * SPKI-pinned HTTPS, behind the self-hosted **notesd** backend. Needs native
@@ -82,6 +102,7 @@ export function capabilities(): Capabilities {
     folderPicker:
       typeof window !== "undefined" && "showDirectoryPicker" in window,
     redirectOauth: surface !== "desktop",
+    loopbackOauth: surface === "desktop",
     pinnedFetch: surface === "native",
   };
 }

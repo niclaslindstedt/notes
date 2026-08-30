@@ -64,6 +64,30 @@ describe("capabilities", () => {
     expect(capabilities().redirectOauth).toBe(false);
   });
 
+  // The two are complementary by construction, and have to stay that way: a
+  // surface with neither can never connect a cloud backend at all.
+  it("offers the loopback redirect only on the desktop, where the redirect cannot land", () => {
+    expect(capabilities()).toMatchObject({
+      redirectOauth: true,
+      loopbackOauth: false,
+    });
+    setProtocol("notes:");
+    expect(capabilities()).toMatchObject({
+      redirectOauth: false,
+      loopbackOauth: true,
+    });
+  });
+
+  it("withholds the loopback redirect from the native wrapper, which has a real origin", () => {
+    (window as unknown as Record<string, unknown>).ReactNativeWebView = {
+      postMessage: () => {},
+    };
+    expect(capabilities()).toMatchObject({
+      redirectOauth: true,
+      loopbackOauth: false,
+    });
+  });
+
   it("offers the pinned fetch only inside the native wrapper", () => {
     expect(capabilities().pinnedFetch).toBe(false);
     (window as unknown as Record<string, unknown>).ReactNativeWebView = {

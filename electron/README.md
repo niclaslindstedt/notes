@@ -12,13 +12,34 @@ the shell's own. The desktop build has nothing the browser build lacks; it
 exists so the app can be downloaded, launched from the dock or Start menu, and
 kept out of a browser tab.
 
-The one thing the shell does own is the **window's remembered size and
-position**, because a web page cannot size or place its own OS window — there
-is nowhere in `../src/` to put it. Saved to `window-state.json` in the app's
-user-data directory on close, and read back defensively: a rectangle that no
-longer overlaps any connected display keeps its size but loses its position
-(otherwise unplugging a monitor leaves a window you cannot reach), and an
-unreadable file falls through to the defaults.
+The shell owns exactly two things, both of them things a web page cannot do
+for itself.
+
+**The window's remembered size and position**, because a web page cannot size
+or place its own OS window — there is nowhere in `../src/` to put it. Saved to
+`window-state.json` in the app's user-data directory on close, and read back
+defensively: a rectangle that no longer overlaps any connected display keeps
+its size but loses its position (otherwise unplugging a monitor leaves a window
+you cannot reach), and an unreadable file falls through to the defaults.
+
+**A loopback listener for one OAuth redirect**, because a web page cannot hold
+a listening socket. The app is served from `notes://app`, which no provider
+will register as a redirect URI, so cloud sign-in uses the flow RFC 8252
+prescribes for native apps: the consent screen opens in the user's real browser
+and the provider redirects to `http://127.0.0.1:<port>/`, where the shell is
+listening. It binds `127.0.0.1` (never `0.0.0.0`), takes the first free port of
+three fixed ones, closes the moment a redirect arrives, and times out after
+five minutes.
+
+The shell holds the socket and nothing more: it does not know which provider is
+being connected, what was asked for, or what the code is worth. Building the
+authorization URL, checking `state`, and trading the code for tokens all happen
+in [`../src/storage/oauth-pkce.ts`](../src/storage/oauth-pkce.ts). And it still
+needs no preload and no IPC — the page reaches the capability by `fetch`ing two
+reserved paths on the `notes://` scheme the protocol handler already serves
+(`__oauth/begin`, `__oauth/await`), with
+[`../src/platform/desktop-bridge.ts`](../src/platform/desktop-bridge.ts) owning
+them on the other side.
 
 **Anything that looks like a feature belongs in `../src/`, not here.** If a
 change would add logic to this directory, that is the signal it should be
@@ -96,11 +117,20 @@ to notarize — and the same job signs for real and the prompt goes away.
 
 ## Known limitations
 
-- **The cloud backends (Dropbox, Google Drive) are not offered here.** Their
-  OAuth flows redirect back to a registered `https://` URL, which the
-  `notes://app` origin is not, so the storage picker shows both rows disabled.
+- **Google Drive is not offered here.** It signs in through Google Identity
+  Services' popup rather than the shared PKCE helpers, and moving it to the
+  loopback flow needs a Google OAuth client of the **Desktop app** type — a
+  separate registration from the web client the app's key belongs to. Dropbox,
+  local storage and the picked-folder backend all work as they do on the web;
+  use [notes.niclaslindstedt.se](https://notes.niclaslindstedt.se) for Drive.
   That decision is made in the web app, not in this shell — see
   `../src/platform/capabilities.ts`, which resolves the surface to `desktop`
-  from the `notes:` scheme. Local storage and the picked-folder backend work
-  as they do on the web; use
-  [notes.niclaslindstedt.se](https://notes.niclaslindstedt.se) for cloud sync.
+  from the `notes:` scheme, and `dropboxAvailable` / `gdriveAvailable` in
+  `../src/storage/useStorageBackend.ts`.
+
+- **Dropbox sign-in needs the loopback URIs on the app registration.** The
+  three ports the shell may bind (`LOOPBACK_PORTS` in `main.js`) each have to
+  appear on the Dropbox app's redirect-URI allowlist as
+  `http://127.0.0.1:53682/`, `:53683/`, `:53684/` — Dropbox matches them
+  exactly, trailing slash included. A missing one fails at the consent screen
+  with "invalid redirect_uri" rather than later, so it is easy to spot.
