@@ -59,6 +59,17 @@ Electron binary — which is why the release workflow uses one runner per
 platform. `npm run dist:mac` builds **both** macOS slices as separate
 archives.
 
+The app icon is not authored here. `electron-builder.config.cjs` points at
+`public/maskable-icon-1024x1024.png`, one of the PNGs `make icons` generates
+from `public/favicon.svg` at the repo root, and electron-builder converts it
+into each platform's format. It is the **maskable** variant on purpose: that
+one is opaque edge-to-edge, and the macOS 26 Dock masks every app icon into
+the system squircle — artwork carrying a transparent margin is read as a
+legacy icon and gets inset onto a light backdrop instead of filling the
+shape. Restyle the icon in `favicon.svg` and rerun `make icons`; there is
+nothing to change in this directory. See
+[`.agent/skills/tune-pwa-icons/SKILL.md`](../.agent/skills/tune-pwa-icons/SKILL.md).
+
 ## How it's put together
 
 - [`scripts/bundle-web.mjs`](scripts/bundle-web.mjs) builds the web app with

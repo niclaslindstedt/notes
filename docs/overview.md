@@ -5754,6 +5754,55 @@ to compute download progress (0–100%) and reads the incoming `version.json`,
 feeding the [update toast](#update-toast). `cacheIdForBase` keys the cache per
 deploy slot.
 
+### App icon
+
+Every icon the app is *represented by* — browser tab, iOS home screen, Android
+launcher, Windows taskbar, the macOS Dock — is generated from **one** file,
+`public/favicon.svg`: a document glyph (a page with a folded top-right corner
+and two text lines, stroked in the green `ink` gradient) on a full-bleed
+`#1f2933` `<rect>` matching `theme_color`. `make icons` runs
+`@vite-pwa/assets-generator` over it with `pwa-assets.config.ts` and rewrites
+every raster in `public/`; the outputs are committed, and **no CI job checks
+that they match the SVG**, so regenerating in the same change as an artwork
+edit is a manual discipline. (Skipping it is how the committed rasters came to
+be a generation behind the SVG.)
+
+Three variants come out, and the difference between them is only how much the
+generator insets the artwork before centring it on the dark background:
+
+- **`pwa-{64,192,512}.png`** (`purpose: "any"`) and
+  **`apple-touch-icon-180x180.png`** — padding 0, so the SVG lands on the
+  canvas 1:1. The mark fills ~67% of the tile, inside the 60–80% band Apple's
+  HIG asks for.
+- **`maskable-icon-512x512.png`** (`purpose: "maskable"`) — padding 0.1, which
+  shrinks the mark to ~61% so every foreground pixel clears the W3C
+  80%-diameter safe circle whatever shape an Android launcher masks it with.
+- **`maskable-icon-1024x1024.png`** — the same artwork at the largest size an
+  `.icns` carries. It is not in the manifest and is excluded from the
+  service-worker precache; it exists solely as `ICON` in
+  `electron/electron-builder.config.cjs`, which converts it into the desktop
+  app's `.icns` / `.ico` / PNG set.
+
+Every output is **fully opaque, edge-to-edge** — there is no transparent margin
+anywhere in the set. That is a requirement, not a stylistic choice: iOS paints
+transparent regions white, and the macOS 26 Dock masks every app icon into the
+system squircle and treats artwork carrying its own margin as a legacy icon,
+insetting it further and filling the rest of the shape with a light backdrop.
+An icon with a 2.5% transparent border therefore shows up in the Dock as a
+small dark tile floating on a white plate rather than filling its shape. The
+cost of the full-bleed source is that macOS 15 and earlier, which apply no
+mask, draw it as a literal square.
+
+Two follow-on notes. The mark is **stroked, not filled**, so its real extent is
+half a `stroke-width` past the path coordinates on every side, scaled by the
+group's `scale()` — reason about the raster, not the `d` attribute. And the
+dark `#1f2933` is written in four places that must be retoned together: the
+`<rect>` fill in `favicon.svg`, `THEME_BACKGROUND` in `pwa-assets.config.ts`,
+`theme_color` / `background_color` in `vite.config.ts`, and `FAVICON_BG` in
+`src/ui/glyphs.ts`, which paints the same plate behind a
+[namespace's glyph](#namespace-favicon) so a re-badged tab icon still reads as
+the same app.
+
 ### Standalone detection
 
 `isStandaloneMobile` / `useStandaloneMobile` (`src/pwa/standalone.ts`) — detects

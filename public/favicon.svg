@@ -5,7 +5,22 @@
       <stop offset="100%" stop-color="#34d399" />
     </linearGradient>
   </defs>
-  <g transform="translate(32 32) scale(1.75) translate(-32 -32)">
+  <!-- The dark plate every generated icon is built on. Edge-to-edge and
+       fully opaque on purpose: each surface that wants a rounded icon
+       rounds it itself (iOS, Android masks, the macOS 26 Dock), and a
+       transparent margin is exactly what makes macOS read the artwork as a
+       small legacy icon and inset it onto a light backdrop. `#1f2933`
+       matches `theme_color` and `FAVICON_BG` in `src/ui/glyphs.ts`. -->
+  <rect width="64" height="64" fill="#1f2933" />
+  <!-- Scaled about the STROKED mark's centre, not the viewBox's: the fold
+       makes the page 1 unit wider to the right of x=32, so centring on 32
+       leaves the mark visibly off to the right at icon sizes.
+       `scale(1.2)` puts the stroked mark at 67.5% of the plate's height —
+       big enough not to read as a stamp on a tile, and small enough that
+       `maskable`'s further 10% inset lands it inside the W3C 80%-diameter
+       safe circle (its corners sit at 79% of the diameter). Re-do that sum
+       before growing it. -->
+  <g transform="translate(32 32) scale(1.2) translate(-33 -32)">
     <path
       d="M20 16 H38 L46 24 V48 H20 Z"
       fill="none"
