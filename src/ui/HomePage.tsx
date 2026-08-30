@@ -103,30 +103,32 @@ export function HomePage() {
               being styled, cut or copied.
             </li>
             <li>
-              Picking out lines is a mode of its own. The button left of the
-              magnifier turns the note into a list you choose from, and with
-              line numbers on so does the gutter itself: press a number and the
-              mode opens with that line already taken, or drag down the numbers
-              to take a run in the same stroke. One press takes a whole line and
-              a second press on it gives that line back, so picking one line
-              never gives up the last one — the lines you want need not even be
-              next to each other. For a run of them, drag down the rail at the
-              note&rsquo;s left edge; everywhere to the right of it the note
-              keeps scrolling as it always did, so you can travel between picks
-              without fighting the gesture. The gutter is the exception: it
-              takes no scroll at all, because it is there to pick lines. There
-              are no handles to aim at a single character with, which is what
-              makes taking eight lines on a phone awkward otherwise. The lines
-              you have taken are tinted along with their line numbers rather
-              than wearing the ordinary selection colour, so the two are never
-              confused. From there you can type over them, delete them, copy or
-              cut them, or style every one of them at once. The moment a line is
-              taken the header unfolds the four verbs that act on it — format,
-              cut, copy, and a red delete beside them on a phone — so they are
-              one tap away instead of hidden behind the header&rsquo;s ⋯. The
-              mode is left the way it was entered &mdash; the same header
-              button, or <kbd>Esc</kbd>, which hands an unbroken run over as an
-              ordinary selection.
+              Picking out lines is a mode of its own. With line numbers on, the
+              gutter is the way in: press a number and the note becomes a list
+              you choose from with that line already taken, or drag down the
+              numbers to take a run in the same stroke. With them off, the
+              button left of the magnifier does the same job. One press takes a
+              whole line and a second press on it gives that line back, so
+              picking one line never gives up the last one — the lines you want
+              need not even be next to each other. For a run of them, drag down
+              the rail at the note&rsquo;s left edge; everywhere to the right of
+              it the note keeps scrolling as it always did, so you can travel
+              between picks without fighting the gesture. The gutter is the
+              exception: it takes no scroll at all, because it is there to pick
+              lines. There are no handles to aim at a single character with,
+              which is what makes taking eight lines on a phone awkward
+              otherwise. The lines you have taken are tinted along with their
+              line numbers rather than wearing the ordinary selection colour, so
+              the two are never confused. From there you can type over them,
+              delete them, copy or cut them, or style every one of them at once.
+              The moment a line is taken the header unfolds the four verbs that
+              act on it — format, cut, copy, and a red delete beside them on a
+              phone — so they are one tap away instead of hidden behind the
+              header&rsquo;s ⋯. The mode ends when the picking does: give the
+              last line back and you are out of it, or leave deliberately with
+              the header button &mdash; which is on the row for as long as the
+              mode is &mdash; or <kbd>Esc</kbd>, which hands an unbroken run
+              over as an ordinary selection.
             </li>
             <li>
               On a computer, edit at more than one place at once — the same

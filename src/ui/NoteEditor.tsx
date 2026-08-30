@@ -383,6 +383,18 @@ export function Editor({
   // grace period: the press that leaves the mode is the press that unpins it.
   const pinSelectMode = narrow && renderMarkdown && selectMode;
 
+  // But the toggle is only a way *in* where there is nothing better. With
+  // [line numbers](docs/overview.md#line-numbers) on, pressing one enters the
+  // mode with that line already taken — the gesture and the mode arrive
+  // together — so a button that only arms the mode and then waits for the same
+  // press is a button the row is better off without. With the numbers off there
+  // is no gutter to press, and the toggle is the only door there is.
+  //
+  // This says nothing about the way *out*: while the mode is on the toggle is
+  // rendered whatever the setting says, because on a phone it is the only exit
+  // that doesn't need a keyboard.
+  const offerSelectMode = renderMarkdown && !editor.lineNumbers;
+
   // While the mode is on the header stops being the note's action row and
   // becomes the mode's own: the note is a list being picked from, so a star, an
   // export, a read-only toggle and a find bar are all answers to questions
@@ -888,7 +900,7 @@ export function Editor({
                     copyScope={editor.copyScope}
                     transforms={transforms}
                   />
-                  {renderMarkdown && !pinSelectMode && (
+                  {offerSelectMode && !pinSelectMode && (
                     <SelectModeButton
                       on={selectMode}
                       onToggle={() => setSelectMode((on) => !on)}

@@ -949,6 +949,54 @@ describe("Editor (selection actions)", () => {
       fireEvent.click(screen.getByRole("button", { name: "Select lines" }));
     }
 
+    /** The live-preview editor with its line-number gutter drawn. */
+    function renderNumbered() {
+      return renderEditor({
+        editor: { ...DEFAULT_EDITOR_SETTINGS, lineNumbers: true },
+        note: note({ body: "alpha\nbravo\ncharlie" }),
+      });
+    }
+
+    function wayIn() {
+      return screen.queryByRole("button", { name: "Select lines" });
+    }
+
+    function wayOut() {
+      return screen.queryByRole("button", { name: "Leave select mode" });
+    }
+
+    it("offers no way-in toggle where the gutter is the way in", () => {
+      // With line numbers on, pressing one enters the mode with that line
+      // taken — so a button that only arms the mode and then waits for the
+      // same press is one the row is better off without.
+      stubNarrow(false);
+      renderNumbered();
+
+      expect(wayIn()).toBeNull();
+    });
+
+    it("keeps the toggle where there is no gutter to press", () => {
+      // Numbers off: no gutter, so the toggle is the only door there is.
+      stubNarrow(false);
+      renderMarkdown();
+
+      expect(wayIn()).toBeTruthy();
+    });
+
+    it("brings the toggle back as the way out once the gutter opens the mode", () => {
+      // It says nothing about the way *out*: on a phone the lit toggle is the
+      // only exit that doesn't need a keyboard, so the mode always carries it.
+      stubNarrow(false);
+      renderNumbered();
+
+      fireEvent.pointerDown(
+        document.querySelector<HTMLElement>("[data-line-gutter]")!,
+        { pointerId: 1, bubbles: true },
+      );
+
+      expect(wayOut()).toBeTruthy();
+    });
+
     function deleteButton() {
       return screen.queryByRole("button", { name: "Delete selected lines" });
     }

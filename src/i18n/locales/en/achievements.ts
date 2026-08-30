@@ -236,7 +236,7 @@ const achievements = {
       name: "Count the lines",
       condition: "Turn the editor's line numbers on.",
       learnMore:
-        "Settings → Editor numbers every line down the left edge, the way a code editor does. The gutter is also the quickest way into select mode: press a number and the mode opens with that line taken, or drag down the numbers to take a run — ready to cut, replace, or restyle.",
+        "Settings → Editor numbers every line down the left edge, the way a code editor does. The gutter is also the way into select mode: press a number and the mode opens with that line taken, or drag down the numbers to take a run — ready to cut, replace, or restyle.",
     },
     freehand: {
       name: "Freehand",
@@ -350,7 +350,7 @@ const achievements = {
       name: "Sweeping statement",
       condition: "Take more than one line at once in select mode.",
       learnMore:
-        "The header's select-mode button turns the note into a list you pick from \u2014 and with line numbers on, so does a press in the gutter, which opens the mode with that line already taken. One press takes a whole line and a second press on it gives that line back, so picking one line never gives up the last one \u2014 no handles to aim at a character with. For a run of them, drag down the rail at the left edge of the note \u2014 the numbers themselves, when they are on; everywhere to the right of it the note goes on scrolling as usual. The lines you have taken are tinted along with their line numbers rather than wearing the ordinary selection colour, so you can tell the two apart at a glance. From there, type over them, delete them, copy or cut them, or style every one at once. Escape leaves the mode, handing an unbroken run over as an ordinary selection.",
+        "With line numbers on, a press in the gutter turns the note into a list you pick from, opening with that line already taken; with them off, the header's select-mode button does the same job. One press takes a whole line and a second press on it gives that line back, so picking one line never gives up the last one \u2014 no handles to aim at a character with. For a run of them, drag down the rail at the left edge of the note \u2014 the numbers themselves, when they are on; everywhere to the right of it the note goes on scrolling as usual. The lines you have taken are tinted along with their line numbers rather than wearing the ordinary selection colour, so you can tell the two apart at a glance. From there, type over them, delete them, copy or cut them, or style every one at once. Give the last line back and the mode ends with it; Escape leaves it too, handing an unbroken run over as an ordinary selection.",
     },
     offTheTop: {
       name: "Off the top",

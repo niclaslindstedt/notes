@@ -234,7 +234,7 @@ const achievements: AchievementsCatalog = {
       name: "Räkna raderna",
       condition: "Slå på radnummer i redigeraren.",
       learnMore:
-        "Inställningar → Redigerare numrerar varje rad längs vänsterkanten, som i en kodredigerare. Marginalen är också genvägen in i markeringsläget: tryck på ett nummer så öppnas läget med den raden tagen, eller dra nedför numren för att ta en följd — redo att klippa ut, ersätta eller formatera om.",
+        "Inställningar → Redigerare numrerar varje rad längs vänsterkanten, som i en kodredigerare. Marginalen är också vägen in i markeringsläget: tryck på ett nummer så öppnas läget med den raden tagen, eller dra nedför numren för att ta en följd — redo att klippa ut, ersätta eller formatera om.",
     },
     freehand: {
       name: "Frihand",
@@ -349,7 +349,7 @@ const achievements: AchievementsCatalog = {
       name: "Svepande formulering",
       condition: "Ta fler än en rad samtidigt i markeringsläge.",
       learnMore:
-        "Knappen för markeringsläge i sidhuvudet gör anteckningen till en lista du plockar ur \u2014 och med radnummer på gör ett tryck i marginalen detsamma, med den raden redan tagen. Ett tryck tar en hel rad och ett andra tryck på samma rad lämnar tillbaka den, så att plocka en rad ger aldrig upp den förra \u2014 inga handtag att sikta mot ett enskilt tecken med. Vill du ha en följd drar du längs listen i anteckningens vänsterkant \u2014 numren själva, när de är påslagna; överallt till höger om den rullar anteckningen som vanligt. Raderna du tagit tonas tillsammans med sina radnummer i stället för att bära den vanliga markeringsfärgen, så du ser skillnaden direkt. Därifrån kan du skriva över dem, radera dem, kopiera eller klippa ut dem, eller formatera varje rad på en gång. Escape avslutar läget och lämnar över en obruten följd som en vanlig markering.",
+        "Med radnummer på gör ett tryck i marginalen anteckningen till en lista du plockar ur, med den raden redan tagen; med dem av gör knappen för markeringsläge i sidhuvudet samma sak. Ett tryck tar en hel rad och ett andra tryck på samma rad lämnar tillbaka den, så att plocka en rad ger aldrig upp den förra \u2014 inga handtag att sikta mot ett enskilt tecken med. Vill du ha en följd drar du längs listen i anteckningens vänsterkant \u2014 numren själva, när de är påslagna; överallt till höger om den rullar anteckningen som vanligt. Raderna du tagit tonas tillsammans med sina radnummer i stället för att bära den vanliga markeringsfärgen, så du ser skillnaden direkt. Därifrån kan du skriva över dem, radera dem, kopiera eller klippa ut dem, eller formatera varje rad på en gång. Lämnar du tillbaka den sista raden avslutas läget med den; Escape avslutar det också och lämnar över en obruten följd som en vanlig markering.",
     },
     offTheTop: {
       name: "Uppifr\u00e5n och ned",
