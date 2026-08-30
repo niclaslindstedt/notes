@@ -5853,28 +5853,76 @@ answer to *which surface is this, and what can it do*. `platform()` returns
 `"native"` (the `native/` WebView wrapper, detected by
 `window.ReactNativeWebView`), `"desktop"` (the `electron/` shell, detected by
 its private `notes:` scheme), or `"web"`. `capabilities()` turns that into the
-three things that actually differ:
+four things that actually differ:
 
 - **`folderPicker`** — the File System Access API behind the
   [folder backend](#folder-backend). A browser-engine question (Chromium yes,
   Firefox/Safari no), so it is true in both wrappers.
 - **`redirectOauth`** — whether a redirect-based OAuth flow can complete on
-  this origin, gating both cloud backends. False on the desktop: `redirectUri()`
+  this origin. False on the desktop: `redirectUri()`
   (`src/storage/oauth-pkce.ts`) is built from `window.location`, so it is
   `notes://app` there, and no provider will register a custom scheme (Google
   rejects non-`https` outright).
+- **`loopbackOauth`** — whether the redirect can be caught on a
+  [loopback listener](#loopback-oauth) instead. True only on the desktop, and
+  complementary to the flag above by construction: it is what gives that
+  surface cloud sync despite failing it.
 - **`pinnedFetch`** — SPKI-pinned HTTPS behind the
   [notesd backend](#notesd-backend). Native code only.
 
 `useStorageBackend` reads all four of its availability flags from here
 (`dropboxAvailable`, `gdriveAvailable`, `folderAvailable`, `notesdAvailable`)
 rather than re-deriving each at its own call site. That centralisation is the
-point: before it, the desktop build offered no cloud sync only because the
-packaging job happened not to pass `VITE_DROPBOX_APP_KEY` /
-`VITE_GOOGLE_CLIENT_ID` — adding those secrets would have lit both options up
-and then failed at the redirect, because the reason they cannot work there was
-written down nowhere. The module lives in `src/`, not in a wrapper: the page
-works its surface out from what it can observe, and no shell tells it anything.
+point: before it, the desktop build offered no cloud sync and the reason looked
+like the packaging job not passing `VITE_DROPBOX_APP_KEY` /
+`VITE_GOOGLE_CLIENT_ID`, when the real one was that the redirect could never
+land. The module lives in `src/`, not in a wrapper: the page works its surface
+out from what it can observe, and no shell tells it anything.
+
+Note that `dropboxAvailable` and `gdriveAvailable` are no longer the same
+expression. Dropbox takes either OAuth flow, so it is offered wherever one of
+them works. Drive signs in through Google Identity Services' popup rather than
+the shared PKCE helpers, and the loopback flow would additionally need a Google
+OAuth client of the **Desktop app** type — a different registration from the
+web client — so it stays gated on `redirectOauth` alone.
+
+### Loopback OAuth
+
+`runLoopbackAuth` (`src/storage/oauth-pkce.ts`) + `beginLoopbackRedirect` /
+`awaitLoopbackRedirect` (`src/platform/desktop-bridge.ts`) + the listener in
+`electron/main.js` — how the desktop build signs in to a cloud provider at all.
+
+The problem it solves: the desktop app is served from `notes://app`, and no
+provider will accept a custom scheme as a redirect URI, so the web flow
+(`startAuth` navigating away and the provider redirecting back to the app's own
+origin) has nowhere to land. The answer is the one RFC 8252 prescribes for
+native apps — open the consent screen in the user's **real browser**, and
+receive the redirect on a loopback listener the app opens for the occasion.
+
+The split is deliberate and is the same one the
+[native bridge](#notesd-backend) makes. The Electron shell holds the socket and
+nothing else: it binds `127.0.0.1` (never `0.0.0.0`, which would put a listener
+holding a live authorization code on the local network), takes the first free
+port of three fixed ones, closes the instant a redirect arrives, and times out
+after five minutes. It does not know which provider is being connected or what
+the code is worth. Everything decided — the PKCE challenge, the `state` check,
+the token exchange — is in `runLoopbackAuth`, which also passes the loopback
+URI explicitly to `completeAuth`, since `window.location` knows nothing about
+it and the providers re-check the URI at the token endpoint.
+
+It needs no preload and no IPC: the page reaches the shell by `fetch`ing two
+reserved paths (`__oauth/begin`, `__oauth/await`) on the `notes://` scheme the
+protocol handler already serves. The ports are fixed rather than ephemeral
+because providers match redirect URIs exactly, so each one has to be on the
+Dropbox app's allowlist up front — `LOOPBACK_PORTS` in `electron/main.js` and
+the list in `src/storage/dropbox/index.ts`'s header comment are the two halves
+of that, and drift between them fails at the consent screen.
+
+`connectDropbox` (`src/storage/useCloudBackend.ts`) is the one verb over both
+shapes. On the web it navigates away and the boot effect completes the
+round-trip; on the desktop the whole thing resolves in place, so the tokens are
+stored right there and a failure rejects to the settings panel — there being no
+redirect to explain a silent one.
 
 ### Desktop app (Electron)
 

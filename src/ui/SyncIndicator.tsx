@@ -54,15 +54,13 @@ export function SyncIndicator({
   // The browser backend has no remote to sync against — nothing to show.
   if (storage.backend === "browser") return null;
 
-  // Re-issue the active backend's grant. Dropbox redirects away (so the
-  // returned promise never really resolves — the boot effect completes the
-  // round-trip); Drive and the picked folder re-grant inline and reject on
-  // failure so the modal's button can surface it.
+  // Re-issue the active backend's grant. On the web Dropbox redirects away, so
+  // the promise resolves as the page leaves and the boot effect completes the
+  // round-trip; on the desktop it runs the loopback flow and rejects on
+  // failure, like Drive and the picked folder, so the modal's button can
+  // surface it.
   const reconnect = (): Promise<void> => {
-    if (storage.backend === "dropbox") {
-      storage.connectDropbox();
-      return Promise.resolve();
-    }
+    if (storage.backend === "dropbox") return storage.connectDropbox();
     if (storage.backend === "gdrive") return storage.connectGdrive();
     return storage.reconnectFolder();
   };

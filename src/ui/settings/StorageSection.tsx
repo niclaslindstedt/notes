@@ -75,6 +75,12 @@ export function StorageSection({ storage, conversion }: Props) {
     namespaces.find((n) => n.slug === activeNamespace)?.name ?? activeNamespace;
 
   const [gdriveError, setGdriveError] = useState<string | null>(null);
+  // Dropbox only reports anything here on the desktop. On the web the connect
+  // navigates away, so there is no failure left to show and no wait to sit
+  // through; on the desktop the sign-in happens in the user's browser and this
+  // panel is what's left on screen while it does.
+  const [dropboxError, setDropboxError] = useState<string | null>(null);
+  const [dropboxPending, setDropboxPending] = useState(false);
   // Opening the notesd panel with no daemon paired reveals the pair form.
   const [pairing, setPairing] = useState(false);
 
@@ -111,6 +117,18 @@ export function StorageSection({ storage, conversion }: Props) {
       : []),
   ];
 
+  const connectDropboxWithCapture = async () => {
+    setDropboxError(null);
+    setDropboxPending(true);
+    try {
+      await connectDropbox();
+    } catch (err) {
+      setDropboxError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDropboxPending(false);
+    }
+  };
+
   const connectGdriveWithCapture = async () => {
     setGdriveError(null);
     try {
@@ -122,10 +140,11 @@ export function StorageSection({ storage, conversion }: Props) {
 
   const onPickBackend = (next: BackendId) => {
     setGdriveError(null);
+    setDropboxError(null);
     if (next === backend) return;
     if (next === "browser") selectBrowser();
     else if (next === "folder") void connectFolder();
-    else if (next === "dropbox") connectDropbox();
+    else if (next === "dropbox") void connectDropboxWithCapture();
     else if (next === "gdrive") void connectGdriveWithCapture();
     // notesd doesn't auto-connect on pick — it reveals the pair form (a QR /
     // paste flow), and only switches backend once pairing succeeds.
@@ -214,7 +233,9 @@ export function StorageSection({ storage, conversion }: Props) {
             <p className="text-xs text-muted">
               {dropboxConnected
                 ? t("settings.storage.dropboxConnected")
-                : t("settings.storage.dropboxUnconnected")}
+                : dropboxPending
+                  ? t("settings.storage.dropboxWaiting")
+                  : t("settings.storage.dropboxUnconnected")}
             </p>
             {dropboxConnected ? (
               <div className="flex items-center gap-2">
@@ -226,9 +247,23 @@ export function StorageSection({ storage, conversion }: Props) {
                 </span>
               </div>
             ) : (
-              <Button variant="primary" onClick={connectDropbox}>
-                {t("common.connect")}
+              <Button
+                variant="primary"
+                disabled={dropboxPending}
+                onClick={() => void connectDropboxWithCapture()}
+              >
+                <BusyLabel busy={dropboxPending}>
+                  {t("common.connect")}
+                </BusyLabel>
               </Button>
+            )}
+            {dropboxError && (
+              <p
+                role="alert"
+                className="rounded-[var(--radius)] border border-danger/50 px-2 py-1.5 text-xs break-words text-danger"
+              >
+                {dropboxError}
+              </p>
             )}
           </div>
         )}

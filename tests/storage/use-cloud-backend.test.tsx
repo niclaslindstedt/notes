@@ -49,9 +49,23 @@ vi.mock("../../src/storage/backend-preference.ts", () => ({
 const startDropboxAuth = vi.fn(async () => {});
 const hasPendingDropboxAuth = vi.fn(() => false);
 const completeDropboxAuth = vi.fn();
+const connectDropboxLoopback = vi.fn();
 vi.mock("../../src/storage/dropbox/index.ts", () => ({
   startDropboxAuth: () => startDropboxAuth(),
   completeDropboxAuth: (code: string) => completeDropboxAuth(code),
+  connectDropboxLoopback: () => connectDropboxLoopback(),
+}));
+
+// `connectDropbox` picks its flow shape from the surface. jsdom is a browser
+// tab, so the redirect path is the default; the desktop tests below flip this.
+let loopbackOauth = false;
+vi.mock("../../src/platform/capabilities.ts", () => ({
+  capabilities: () => ({
+    folderPicker: false,
+    redirectOauth: !loopbackOauth,
+    loopbackOauth,
+    pinnedFetch: false,
+  }),
 }));
 // `hasPendingDropboxAuth` lives in its own module so the boot probe can answer
 // without pulling the adapter into the first paint — mock it there.
@@ -76,6 +90,7 @@ beforeEach(() => {
   dropboxRefreshStore = null;
   gdriveTokenStore = null;
   hasPendingDropboxAuth.mockReturnValue(false);
+  loopbackOauth = false;
   setSearch("");
 });
 afterEach(() => {
@@ -103,6 +118,47 @@ describe("useCloudBackend", () => {
     // redirect, not a popup that a blocker could tie to the click.
     await waitFor(() => expect(startDropboxAuth).toHaveBeenCalledTimes(1));
     // Completion only lands in the boot effect after the redirect returns.
+    expect(selectBackend).not.toHaveBeenCalled();
+  });
+
+  // The desktop cannot complete a redirect back to `notes://app`, so the same
+  // verb runs the loopback flow instead — and unlike the redirect, it finishes
+  // in place, so everything the boot effect would have done happens here.
+  it("connectDropbox runs the loopback flow and finishes in place on the desktop", async () => {
+    loopbackOauth = true;
+    connectDropboxLoopback.mockResolvedValue({
+      accessToken: "dbx-loop",
+      refreshToken: "dbx-loop-ref",
+    });
+    const selectBackend = vi.fn();
+    const { result } = renderHook(() => useCloudBackend({ selectBackend }));
+
+    await act(async () => {
+      await result.current.connectDropbox();
+    });
+
+    expect(connectDropboxLoopback).toHaveBeenCalledTimes(1);
+    // The redirect flow is the one thing that must NOT happen here — it would
+    // navigate the shell to a page with no way back.
+    expect(startDropboxAuth).not.toHaveBeenCalled();
+    expect(setDropboxToken).toHaveBeenCalledWith("dbx-loop");
+    expect(setDropboxRefreshToken).toHaveBeenCalledWith("dbx-loop-ref");
+    expect(result.current.dropboxToken).toBe("dbx-loop");
+    expect(result.current.dropboxRefresh).toBe("dbx-loop-ref");
+    expect(selectBackend).toHaveBeenCalledWith("dropbox");
+    expect(unlock).toHaveBeenCalledWith("cloudWalker");
+  });
+
+  // There is no redirect to explain a silent failure on the desktop, so the
+  // rejection has to reach the caller for the settings panel to show it.
+  it("connectDropbox rejects on the desktop when the loopback flow fails", async () => {
+    loopbackOauth = true;
+    connectDropboxLoopback.mockRejectedValue(new Error("declined"));
+    const selectBackend = vi.fn();
+    const { result } = renderHook(() => useCloudBackend({ selectBackend }));
+
+    await expect(result.current.connectDropbox()).rejects.toThrow("declined");
+    expect(setDropboxToken).not.toHaveBeenCalled();
     expect(selectBackend).not.toHaveBeenCalled();
   });
 

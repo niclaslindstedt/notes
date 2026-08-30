@@ -183,7 +183,7 @@ export interface UseStorageBackend {
   reconnectFolder: () => Promise<void>;
   /** Mirror the folder back into the browser store, then forget the folder. */
   disconnectFolder: () => Promise<void>;
-  connectDropbox: () => void;
+  connectDropbox: () => Promise<void>;
   disconnectDropbox: () => void;
   connectGdrive: () => Promise<void>;
   disconnectGdrive: () => void;
@@ -691,7 +691,13 @@ export function useStorageBackend(): UseStorageBackend {
     // to be able to finish a redirect OAuth flow. The desktop shell fails the
     // second even when a build passes it the keys.
     dropboxAvailable:
-      platformCapabilities.redirectOauth && isDropboxConfigured(),
+      (platformCapabilities.redirectOauth ||
+        platformCapabilities.loopbackOauth) &&
+      isDropboxConfigured(),
+    // Drive stays redirect-only: it signs in through Google Identity Services'
+    // popup rather than `oauth-pkce`, and the loopback flow would need a
+    // Google OAuth client of the "Desktop app" type, which is a separate
+    // registration from the web one this key belongs to.
     gdriveAvailable: platformCapabilities.redirectOauth && isGdriveConfigured(),
     dropboxConnected: dropboxToken !== null,
     gdriveConnected: gdriveToken !== null,
