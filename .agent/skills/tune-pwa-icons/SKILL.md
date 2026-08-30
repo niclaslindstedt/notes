@@ -13,13 +13,22 @@ notes derives its whole PWA icon set from **one source SVG** with
   and regenerating, not hand-exporting PNGs.
 - **The generator config**, `pwa-assets.config.ts` at the repo root. It
   extends `@vite-pwa/assets-generator`'s `minimal2023Preset` and
-  overrides the `apple` / `maskable` padding + background (via
+  overrides all three variants' padding + background (via
   `THEME_BACKGROUND`) so the dark `theme_color` (`#1f2933`) bleeds
-  edge-to-edge instead of the preset's default white frame.
+  edge-to-edge instead of the preset's default white frame. Note that
+  `padding: p` resizes the **whole SVG** to `size * (1 - p)` and centres
+  it on the background — it does not inset the glyph within its plate,
+  so it compounds with the mark's own `scale()` in `favicon.svg`.
 - **The manifest**, declared inline in `vite.config.ts` under
   `VitePWA({ manifest: { icons: [...] } })`. It lists `pwa-64x64.png`,
   `pwa-192x192.png`, `pwa-512x512.png` (`purpose` defaults to `any`) and
   `maskable-icon-512x512.png` (`purpose: "maskable"`).
+- **The desktop packaging config**, `electron/electron-builder.config.cjs`.
+  Its `ICON` points at `maskable-icon-1024x1024.png`, which
+  electron-builder converts into the `.icns` / `.ico` / PNG set the
+  downloadable app ships with. That file is generated but deliberately
+  **not** in the manifest and is excluded from the service-worker
+  precache in `vite.config.ts` — it is packaging input, not a web asset.
 
 Running `make icons` (→ `pwa-assets-generator`) reads
 `public/favicon.svg`, applies the config, and writes the committed PNGs
@@ -33,6 +42,7 @@ public/favicon.svg            (the single source of truth)
    ├─ public/pwa-192x192.png             ← manifest icon (any)
    ├─ public/pwa-512x512.png             ← manifest icon (any)
    ├─ public/maskable-icon-512x512.png   ← manifest icon (maskable)
+   ├─ public/maskable-icon-1024x1024.png ← desktop app icon (electron-builder)
    ├─ public/apple-touch-icon-180x180.png ← <link rel="apple-touch-icon"> in index.html
    └─ public/favicon.ico                 ← legacy browser tab
    │  make build   (vite build → vite-plugin-pwa)
@@ -61,6 +71,9 @@ icon looks wrong on a real device:
   brand expects the dark `theme_color`.
 - Glyph clipped by iOS's rounded corners (~22.5% radius) because it
   extends to the bleeds.
+- The macOS Dock showing the app as a small tile floating on a light
+  plate instead of filling the system squircle — see **Desktop app
+  icon** below.
 - Maskable PNG looks fine in a square but loses critical content under
   an Android circle / squircle / teardrop mask.
 
@@ -69,7 +82,9 @@ Also invoke when:
 - Restyling the artwork (new colour, new glyph, new background) in
   `public/favicon.svg`.
 - Adding or removing an icon size from the manifest `icons` array, or
-  tuning the `apple` / `maskable` padding in `pwa-assets.config.ts`.
+  tuning any variant's padding in `pwa-assets.config.ts`.
+- Changing which generated PNG `electron/electron-builder.config.cjs`
+  packages as the desktop app icon.
 
 Do **not** invoke for unrelated visual work (in-app DOM/CSS — that's
 the theme/styles work in `src/styles/theme.css`; the social-preview /
@@ -90,6 +105,15 @@ session. The loop is short and is meant to be repeated.
    Read public/maskable-icon-512x512.png
    Read public/pwa-192x192.png
    ```
+
+   Reading is for the artwork; for geometry, measure. The two questions
+   that decide whether an icon is correct — "does any pixel have alpha
+   below 255?" and "what diameter circle contains every foreground
+   pixel?" — are a few lines of PNG decoding and are far more reliable
+   than eyeballing a render. Both are easy to get wrong by eye: a
+   transparent margin is invisible against a light preview background,
+   and a stroked glyph extends half a stroke width past the path
+   coordinates you reasoned about.
 
 2. **Edit the source, not the output.** Change `public/favicon.svg`
    (the artwork) or `pwa-assets.config.ts` (padding / background). Make
@@ -178,6 +202,29 @@ edge-to-edge `apple` / `any` icons, which want the glyph bigger. The
 note's folded corner sits in the top-right; watch that it doesn't poke
 outside the safe-zone circle under a tight circular mask.
 
+## Desktop app icon — what good looks like
+
+`electron-builder` converts one PNG into the `.icns` (macOS), `.ico`
+(Windows) and PNG set (Linux) the downloadable app ships with. All three
+platforms draw a square tile or apply their own mask, so the source must
+be **opaque and edge-to-edge**; that is why `ICON` points at the
+*maskable* variant rather than `pwa-512x512.png`.
+
+macOS is the one that punishes getting this wrong, and it changed:
+
+| Rule                                                                                    | Why                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Zero transparency anywhere in the icon** — not even a 2% margin.                       | macOS 26 masks every app icon into the system squircle. Artwork that carries its own margin is read as a legacy icon: the Dock insets it further and fills the rest of the shape with a light backdrop, so a dark app shows up as a small tile on a white plate. Opaque artwork simply fills the mask. |
+| **Don't round the corners in the source.** Same rule as maskable.                        | The Dock's mask is the rounding. Pre-rounded artwork either double-rounds or leaves the system backdrop showing in the four corners.                                                                                                            |
+| **1024×1024 source.** Nothing smaller.                                                   | 1024 is the largest slice an `.icns` carries. A 512 source leaves the Dock upscaling on every Retina display.                                                                                                                                   |
+| **Keep the mark inside the maskable safe zone.**                                         | The squircle is gentler than an Android circle, so clearing the 80%-diameter circle clears the Dock with room to spare.                                                                                                                         |
+
+The tradeoff worth naming: a full-bleed source renders as a literal
+square on macOS 15 and earlier, which apply no mask. That is the
+accepted cost of looking right on the current release — if the balance
+ever needs revisiting, the real fix is an Icon Composer `.icon` asset,
+which electron-builder cannot package today.
+
 ## Common pitfalls
 
 In roughly descending order of likelihood:
@@ -191,22 +238,32 @@ In roughly descending order of likelihood:
 3. **Maskable content outside the 80%-diameter safe zone.** Fine in a
    square preview, clipped under an Android circle. Bump
    `maskable.padding` in `pwa-assets.config.ts`.
-4. **Transparent background.** iOS paints white. The `<rect>` in
-   `favicon.svg` plus the generator's opaque `background` keep the tile
-   dark; don't remove either.
-5. **Thin strokes vanishing at small sizes.** The glyph is stroked, not
+4. **Transparent background.** iOS paints white and the macOS Dock
+   demotes the icon to a tile on a light plate. The `<rect>` in
+   `favicon.svg` plus the generator's opaque `background` keep every
+   output opaque; don't remove either, and don't reintroduce a
+   transparent margin via `padding` on the `transparent` / `apple`
+   variants.
+5. **Reasoning about the glyph's size from its path coordinates.** The
+   mark is stroked, so it extends half a `stroke-width` past every path
+   endpoint — and that overhang is scaled by the group's `scale()` too.
+   The document path nominally spans 50% of the viewBox but its stroked
+   extent is 56%, and a `scale(1.75)` that looks like "87% of the plate"
+   is really 98%, i.e. the mark bleeding off the tile. Measure the
+   raster, don't compute from the `d` attribute.
+6. **Thin strokes vanishing at small sizes.** The glyph is stroked, not
    filled — at `pwa-64x64` a 4px stroke on a 64-unit viewBox can read as
    a faint scribble. Thicken the strokes or simplify the glyph rather
    than accepting a blurry small icon.
-6. **Editing the manifest `icons` array but not the generator (or vice
+7. **Editing the manifest `icons` array but not the generator (or vice
    versa).** A manifest `src` with no matching generated file 404s on
    install. Keep the array in `vite.config.ts` aligned with the files
    `pwa-assets.config.ts` emits.
-7. **Forgetting the `apple-touch-icon` `<link>` in `index.html`.**
+8. **Forgetting the `apple-touch-icon` `<link>` in `index.html`.**
    `vite-plugin-pwa` writes the manifest and registers the SW, but the
    apple-touch and favicon `<link>` tags are plain HTML you add by
    hand.
-8. **Not rebuilding before judging.** `make icons` produces the PNGs,
+9. **Not rebuilding before judging.** `make icons` produces the PNGs,
    but only `make build` proves the manifest references resolve and the
    files land in `dist/`.
 
@@ -225,6 +282,9 @@ current files:
 - [ ] `maskable-icon-512x512.png` keeps every foreground pixel within
       the inner 80%-diameter circle, and its background bleeds to all
       four edges.
+- [ ] `maskable-icon-1024x1024.png` — the desktop app icon — has **no**
+      pixel with alpha below 255, anywhere. Measure it; a transparent
+      margin is what puts the macOS Dock's white plate back.
 - [ ] `pwa-192x192.png` is still legible at thumbnail size — the glyph
       is recognisable, not a blob — and `pwa-64x64.png`'s strokes haven't
       thinned into a scribble.
