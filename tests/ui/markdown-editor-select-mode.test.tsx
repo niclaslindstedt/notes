@@ -40,6 +40,30 @@ function renderEditor(extra?: Record<string, unknown>) {
   return { onChange, onSelectModeChange, leaveMode, ...utils };
 }
 
+/** The editor as a note opens: the mode off and the numbers on — the state a
+ *  gutter press arrives in. The flag is the host's, so it hands back whatever
+ *  the editor asks for, exactly as `Editor` does. */
+function renderClosed(extra?: Record<string, unknown>) {
+  const onChange = vi.fn();
+  const onSelectModeChange = vi.fn();
+  const element = (on: boolean) => (
+    <MarkdownEditor
+      body={BODY}
+      onChange={onChange}
+      lineNumbers
+      selectMode={on}
+      onSelectModeChange={(next: boolean) => {
+        onSelectModeChange(next);
+        utils.rerender(element(next));
+      }}
+      {...editorProps}
+      {...extra}
+    />
+  );
+  const utils = render(element(false));
+  return { onChange, onSelectModeChange, ...utils };
+}
+
 function surface(): HTMLElement {
   return screen.getByRole("textbox");
 }
@@ -107,6 +131,24 @@ function release(index: number, pointerType = "mouse", clientX = BODY_X) {
     pointerId: 1,
     pointerType,
     clientX,
+    clientY: yOf(index),
+  });
+}
+
+/** The line-number gutter's press targets, in document order. */
+function gutter(): HTMLElement[] {
+  return [...surface().querySelectorAll<HTMLElement>("[data-line-gutter]")];
+}
+
+/** A press that lands in the gutter beside line `index`, which is where the
+ *  mode is entered from. Fired on the number itself so the surface resolves it
+ *  as a gutter press rather than as a press on the note's body. */
+function gutterPress(index: number, pointerType = "mouse") {
+  fireEvent.pointerDown(gutter()[index]!, {
+    pointerId: 1,
+    pointerType,
+    bubbles: true,
+    clientX: RAIL_X,
     clientY: yOf(index),
   });
 }
@@ -541,5 +583,97 @@ describe("select mode's cut and delete verbs", () => {
     handleRef.current?.deleteSelection();
 
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+// The line-number gutter is the shorthand way into the mode: pressing a number
+// turns select mode on with that line taken, and dragging down the numbers
+// takes the run the stroke crosses. It is purely a selection area — it scrolls
+// nothing and lands no caret — so the way back out is the header toggle or
+// Escape, never a press on the note.
+describe("select mode from the line-number gutter", () => {
+  it("turns the mode on with the pressed line taken", () => {
+    const { onSelectModeChange } = renderClosed();
+    layOutRows();
+    expect(tinted()).toEqual([]);
+
+    gutterPress(2);
+
+    expect(onSelectModeChange.mock.calls).toEqual([[true]]);
+    expect(tinted()).toEqual([2]);
+  });
+
+  it("takes the pressed line rather than seeding from the caret", () => {
+    // Entering from the header seeds the run from wherever the user was
+    // pointing; entering from the gutter, the press *is* the answer, and
+    // seeding over it would take a line the finger never touched.
+    renderClosed({ focusOnMount: true });
+    layOutRows();
+    gutterPress(1);
+    expect(tinted()).toEqual([1]);
+  });
+
+  it("takes the run a drag down the gutter crosses", () => {
+    renderClosed();
+    layOutRows();
+
+    gutterPress(1, "touch");
+    layOutRows();
+    moveTo(3, "touch", RAIL_X);
+
+    expect(tinted()).toEqual([1, 2, 3]);
+  });
+
+  it("scrolls nothing: the gutter refuses the touch it took", () => {
+    // The one band of the note a finger can't scroll with — which is what lets
+    // a stroke starting there mean "take these lines" with nothing to tell it
+    // apart from the start of a scroll.
+    renderClosed();
+    layOutRows();
+    gutterPress(1, "touch");
+
+    const move = new Event("touchmove", { bubbles: true, cancelable: true });
+    act(() => {
+      surface().parentElement!.dispatchEvent(move);
+    });
+
+    expect(move.defaultPrevented).toBe(true);
+  });
+
+  it("stays in the mode when the finger lifts, and keeps taking lines", () => {
+    // A gutter press is never the way out — only the header toggle and Escape
+    // are — so a second one adds to the run rather than replacing or ending it.
+    const { onSelectModeChange } = renderClosed();
+    layOutRows();
+
+    gutterPress(1);
+    release(1, "mouse", RAIL_X);
+    layOutRows();
+    gutterPress(3);
+    release(3, "mouse", RAIL_X);
+
+    expect(tinted()).toEqual([1, 3]);
+    expect(onSelectModeChange.mock.calls).toEqual([[true]]);
+  });
+
+  it("gives a line back when its number is pressed a second time", () => {
+    renderClosed();
+    layOutRows();
+    gutterPress(1);
+    release(1, "mouse", RAIL_X);
+    layOutRows();
+    gutterPress(1);
+    release(1, "mouse", RAIL_X);
+    expect(tinted()).toEqual([]);
+  });
+
+  it("draws no browser selection of its own", () => {
+    // The mode paints the taken lines itself. A range here would raise the
+    // platform's own Cut / Copy callout over the very lines being picked.
+    renderClosed();
+    layOutRows();
+    gutterPress(2);
+    release(2, "mouse", RAIL_X);
+    expect(window.getSelection()?.toString() ?? "").toBe("");
   });
 });

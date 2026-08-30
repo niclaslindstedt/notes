@@ -366,8 +366,9 @@ the same place, with the caret often off screen. A short line's caret rect is it
 text row, so the reveal is unchanged there. Targets with no document selection to
 read (the Storage settings passphrase `<input>`) fall back to the element box.
 
-A *ranged* selection is measured at the point it **starts** — which is what a
-[gutter press](#line-numbers) leans on to reveal a long line at its head. Its
+A *ranged* selection is measured at the point it **starts** — which is what
+[select mode](#select-mode)'s handover leans on to reveal a long line at its
+head. Its
 range begins on the line *element* (`(line, 0)`) rather than inside the text, and
 a range's client rects lead with the border box of every element it swallows
 whole, so the first rect there is the line's own box, as tall as all its rows.
@@ -952,7 +953,7 @@ Off by default. With the `lineNumbers` editor setting on, the
 [live-preview editor](#markdown-editor) numbers every line in a gutter hanging
 in its left padding, the way a code editor does — the line the caret sits on lit
 brighter than the rest — and the gutter beside each line is a press target that
-**selects that whole line**.
+**opens [select mode](#select-mode) with that line taken**.
 
 `LineRow` (`src/ui/MarkdownEditor.tsx`) is the whole feature. With the setting
 off it renders its child — the line element — verbatim, so the default editor
@@ -999,69 +1000,51 @@ inset as its left. Two or three characters of digit at three-quarter size is
 far below the size of a fingertip; the gesture is "press to the left of the
 line", so the target has to be the band the finger actually lands in.
 
-A press runs `selectLine`, which reuses the same machinery a multi-line block
-format does: the line stops being the active raw one, and the whole-line
-selection is queued in `pendingLineSpan` for the layout effect to draw with
-`selectLineSpan` once the re-render lands (with no active line to clear there is
-no re-render to wait for, so it is drawn straight away). The result is an
-ordinary ranged selection over the formatted line, so cut / copy / type-over and
-the styling toolbar all treat it exactly as a hand-drawn one — `spanLine` keeps
-the toolbar reporting the pressed line while no single line is active.
+**The gutter is a selection surface and nothing else.** A press in it enters
+[select mode](#select-mode) with the pressed line taken, and the same finger
+carries straight on down the numbers to take a run — the mode's sweep is live
+from the first pixel, so there is nothing to enter the mode and then aim again
+for. It follows that the gutter **takes no scroll at all**: `touch-none` on the
+button is what makes a stroke starting there unambiguously a selection, with no
+tap-versus-scroll to resolve. That is the one band of the note a finger can't
+travel with, and it is the price of the gesture being this direct; everywhere to
+the right of it the note scrolls exactly as it always did.
 
-**The line is taken from its start.** `selectLineSpan` draws the gutter's span
-`backward` — anchored at the line's end and extended back to its first
-character — so the selection's *focus*, where the caret sits and what the next
-arrow key collapses to, is the beginning of the line; `selectLine` remembers
-column 0 as the session caret to match. Everything that reads a selection orders
-its endpoints (`orderPoints`), so the direction changes nothing but where the
-user is left standing. It is also the end the reveal brings into view:
-`caretRectWithin` measures the span at the point it *starts* — stepping into the
-line's first character, because the range begins on the line element and a
-range's rect list leads with that element's full, screens-tall box — so a line
-taller than the screen is revealed at its head rather than centred on its middle
-with its opening rows scrolled off the top. One consequence beyond where the view
-lands: the head is a single text row, so `ifHidden` can tell that an already-
-visible line needs no reveal at all, where the line's box (which runs past the
-bottom of the band by definition) always read as hidden and moved the view.
+The button itself carries no handler beyond cancelling its `mousedown` (the
+event an editing host takes focus from — the gutter lands no caret and raises no
+keyboard). It marks itself `data-line-gutter`, and the surface's own pointer
+handling does the rest: `onGutterDown` resolves the row with `lineRowAt`, starts
+a sweep, remembers the head of the line as `lastCaret`, and asks the host for
+the mode with `onSelectModeChange(true)`. The run the sweep has already painted
+is what the mode's entry effect seeds from (`gutterEntry`) rather than the caret
+— seeding would take a line the finger never touched.
 
-**A press works from a note that isn't being edited yet**, which on a phone is
-the common case: an existing note opens with no active line and the soft
-keyboard down, so the press has to raise the keyboard *and* land the selection,
-without the view going anywhere. `selectLineSpan` takes focus with
-`preventScroll` — the browser's own focus-time reveal reveals the editing host,
-the whole note, which throws the view to its top rather than to the line that
-was pressed — and then does the reveal itself: `scrollFocusedIntoView` in
-`ifHidden` mode waits for the soft keyboard to settle the visual viewport and
-only moves the view if the pressed line ends up behind the keyboard, leaving a
-press on an already-visible line exactly where the user was reading. `selectLine`
-also drops the reveal a touch `pointerdown` armed, the same way
-[ticking a task item](#task-items) does and for the same reason: this gesture
-leaves no active line, so the caret-placement effect that would consume the
-arming never runs, and a flag left set fires on whatever the next tap happens
-to be.
+**The press never raises the keyboard**, which on a phone is the whole reason
+the gesture is worth having: an existing note opens with no active line and the
+soft keyboard down, and a gesture that landed a caret would answer "pick these
+lines" by covering them. Three things would otherwise put one there, and select
+mode refuses each where it happens — the surface's `mousedown` (the event an
+editing host takes focus from, cancelled by the gutter button as well as by the
+mode), the mode's own entry (which takes focus only on a
+[desktop pointer](#select-mode)), and the edit a header verb commits
+(`quietCommit`). The head of the pressed line is remembered as `lastCaret` all
+the same, so it is where writing picks up if the user leaves the mode and taps
+the note.
 
-**And a press from a note that *is* being edited must not move the view at
-all.** You can only press a number you can see, so there is no reveal owed — but
-the commit that answers the press can still slide the note out from under the
-finger, two ways. The line the caret *left* drops back to formatted, and its raw
-markdown (a `#`, a `- `, a `**` pair) can wrap to one row more or fewer than the
-formatted line does, reflowing everything below it. And the browser runs its own
-reveal for the focus / selection change, which reveals the host — the top of the
-note — and then glides back down to the selection. Either one reads as the note
-jumping somewhere else and scrolling to the line, rather than the line being
-selected where it already was. So `selectLine` measures the pressed line's first
-row on the way in and `holdLineAnchor` pins it back to that y once the span is
-drawn (`anchoredScrollTop` is the clamped arithmetic, alongside its siblings in
-`scrollFocusedIntoView.ts`). The pin is held across a few frames, because a
-native reveal is run as part of updating the rendering and can land a frame or
-two after the commit that provoked it — but only one frame when the press is
-also taking focus, since from there the keyboard-aware reveal above owns the
-view and holding the old offset would fight it.
-
-**The span ends when focus does**, on a phone: dismissing the soft keyboard
-blurs the surface, and `dropSelectionOnBlur` takes the range with the highlight
-rather than leaving an invisible selection for the next tap to trip over — see
-[selection mapping](#selection-mapping).
+**And the press must not move the view.** You can only press a number you can
+see, so there is no reveal owed — but the render that answers the press can
+still slide the note out from under the finger. Entering the mode takes the
+active raw line back to formatted, and its raw markdown (a `#`, a `- `, a `**`
+pair) can wrap to one row more or fewer than the formatted line does, reflowing
+everything below it. That reads as the note jumping somewhere else under the
+finger, rather than as the line being taken where it already was. So
+`onGutterDown` measures the pressed line's first row (`lineTop`) on the way in
+and `holdLineAnchor` pins it back to that y (`anchoredScrollTop` is the clamped
+arithmetic, alongside its siblings in `scrollFocusedIntoView.ts`). The pin is
+held across a few frames rather than applied once: the mode is the host's flag,
+so the re-render that drops the raw line is a render behind the gesture, and
+correcting a frame late is the difference between a flicker and a scroll the
+user has to undo by hand.
 
 Numbers are the *source* line numbers, so a line hidden from the preview — an
 [at-end attachment](#attachments-at-the-end) reference, or a
@@ -1078,6 +1061,13 @@ close to impossible, which is what makes "select these eight lines and delete
 them" one of the hardest things to do in the editor on a phone. **Select mode**
 drops the columns entirely: the note stops being a surface you put a caret in
 and becomes a list you pick lines from.
+
+**The way in is either the toggle or the gutter.** With
+[line numbers](#line-numbers) on, a press in the gutter is the shorthand: the
+mode opens with that line taken, and a drag down the numbers takes a run in the
+same stroke — the gesture and the mode arrive together, rather than the mode
+being armed first and the lines aimed for second. The toggle is the way in
+without the numbers, and the way in over an existing selection.
 
 The toggle is the header button immediately **left of Find**
 (`SelectModeButton`, `src/ui/SelectModeButton.tsx`), lit while the mode is on
@@ -1111,7 +1101,10 @@ phone is also the only way to scroll, and those two gestures want the same
 pixels. The split is **spatial**: the sweep owns a rail down the left edge of
 the scroller (`SWEEP_RAIL_PX`, drawn per line by `LineRow` as `.sweep-rail` /
 `.sweep-rail-on`), and everywhere to the right of it the note scrolls exactly as
-it always did. The timed split this replaced — hold still and the press becomes
+it always did. The [line-number gutter](#line-numbers) is rail wherever it
+reaches, however wide the note's digit count has made it — a press on the far
+side of its own numbers must not fall through to a scroller the gutter has
+already refused. The timed split this replaced — hold still and the press becomes
 a drag — asked the user to out-race a timer on every scroll, which is the wrong
 trade for a mode you *stay* in: picking eight lines out of forty means scrolling
 between the picks. A **mouse** has no such conflict, since it scrolls with a
@@ -1210,6 +1203,12 @@ where writing would resume for whenever the note is next tapped. Focus the mode
 *inherited* — the keyboard was already up, or a desktop took it on the way in —
 is left exactly where it is, so typing over a run still works.
 
+**There is exactly one way out, and a press on the note is not it.** The header
+toggle and Escape are the two exits; every press inside the note takes or gives
+back a line, so nothing the picking gesture itself does can end the mode by
+accident. That is what makes the gutter safe as a way in — the stroke that
+opened the mode can't also close it.
+
 **Leaving the mode by Escape is the handover.** It turns the taken lines into an
 ordinary browser selection over the same lines, drawn in the ordinary selection
 colour, and the mode goes off. The **header toggle** is the other exit and is
@@ -1222,8 +1221,8 @@ flag the same way. The range is *queued* in
 `pendingLineSpan` rather than drawn on the spot: leaving the mode unwraps every
 line's row, so nodes a range pointed at now would be thrown away before the
 browser painted it, and the layout effect that already owns `pendingLineSpan`
-(the same one a [gutter press](#line-numbers) uses) draws it once the DOM is
-final. Only an **unbroken** run is handed over (`isContiguous`) — the browser
+(the same one a multi-line [block format](#styling-toolbar) uses) draws it once
+the DOM is final. Only an **unbroken** run is handed over (`isContiguous`) — the browser
 draws one range, so a scattered set would come back with the lines *between* the
 taken ones silently selected too, and a handover that quietly takes more than was
 picked is worse than no handover at all.
