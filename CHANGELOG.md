@@ -13,6 +13,170 @@ predate the pipeline.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-08-30
+
+### Added
+
+- **Multiple cursors** — Edit at several places at once on a computer: ⌘/Ctrl+D selects the word under the cursor and then each next occurrence of it, ⌘/Ctrl+↑ / ↓ grow a column of cursors a line at a time, every keystroke lands at all of them — copy, cut and paste included, a column with nothing selected taking whole lines the way VS Code does — and Escape drops back to one.
+- **Transform rules** — A new Transform tab in Settings holds regex rules that rewrite what a note
+  shows without changing what it stores — an issue number as a link to the issue,
+  a shorthand as the words it stands for, a phone number masked to `076****123` —
+  each built in a dialog — full-screen on a phone — that previews your own sample
+  text as you type it.
+- **Regex reference in the transform dialog** — Building a transform rule no longer means remembering regex: a reference
+  dropdown under the pattern field lists the constructs with what each one does,
+  and pressing one types it in at the cursor — or wraps what you've selected, so
+  `\d+` becomes `(\d+)` in a press.
+- **Export a note** — The up arrow in a note's header exports it — as a PDF laid out by your device's
+  own print engine, as a plain `.md` file, or straight to the clipboard (which is
+  where the header's separate copy button has moved to, confirming with a
+  "Copied" toast) — with a new
+  Settings → Export tab for the PDF's paper size, margins, fonts, code styling,
+  and bullet glyph.
+- **Transform rules per namespace** — A Transform rule now belongs to a namespace — work and home can rewrite
+  different things — with an **Applies to** picker on the rule and a scope chip
+  in the list; existing rules keep running in every namespace.
+- **Sentences start with a capital** — The editor now writes the capital that opens a sentence — after a full stop,
+  question mark or exclamation mark, and at the start of a line — so the
+  capitalisation your keyboard stopped applying inside a note is back, and works
+  the same on a computer; turn it off with **Capitalise sentences** in
+  Settings → Editor.
+- **Favorite notes** — The star at the left of a note's header marks it a favorite and lifts it into a
+  new **Favorites** section above the note list in the side menu — listed flat
+  wherever the note is filed, or grouped by folder if you turn that on under
+  Appearance → Sidebar — and the find-in-note magnifier has moved to the far
+  right of the header to make room.
+- **⌘F finds inside the note, ⌘⇧F across every note** — ⌘F / Ctrl+F while a note is open now raises the note's own find bar instead of
+  the browser's find-on-page, and holding Shift asks the same question wider —
+  ⌘⇧F / Ctrl+Shift+F opens the search across every note from anywhere in the app.
+- **Selection actions on a phone** — Selecting text on a narrow screen slides the formatting, cut and copy buttons
+  out of the note header's ⋯ on their own — with copy taking just what you
+  highlighted — so the ⋯ is only there for the rest of the row.
+- **Copy a slice of the sync log** — The sync log's Copy button in the cloud-sync dialog now asks how far back to
+  reach — the last 10 minutes, 30 minutes, hour, or everything it still holds,
+  each row saying how many lines it would copy — so the minutes around a sync
+  problem can be handed to a bug report or an AI assistant without the rest of
+  the session's history burying them.
+- **Lock a note** — An eye button beside the star in a note's header makes it read-only — no cursor, no
+  on-screen keyboard and no edits, while reading, selecting, copying, finding and
+  exporting carry on as before, and the line-number gutter still selects a line so
+  you can copy it.
+- **Page-number style and position for the PDF export** — Settings → Export now chooses how an exported PDF writes its page number —
+  `2 of 7`, `2 / 7` or a bare `2` — and whether it sits left, centre or right in
+  the bottom margin.
+- **Collapse the sidebar on desktop** — Bring the pointer to the docked sidebar's inner edge and a slim full-height
+  strip appears with a chevron that folds the whole menu away — go back to that
+  edge to bring it back, and the choice is remembered on the device.
+- **Replace in a note** — Pressing the find bar's magnifier unfolds a replace field with buttons for the current
+  match or all of them, a `.*` switch that reads the search as a regular
+  expression (with `$1` capture groups in the replacement), and a preview that
+  lists every line the replacement would change without writing any of it.
+- **Settings have a scope** — Save and Reset now carry a chevron that picks how far a setting reaches — everyone on the account, everyone in the current namespace, or this device only — with the narrowest choice winning and device settings never leaving the device.
+- **PIN codes on a namespace** — A namespace can ask for a short code before it opens, stored as a one-way verifier that travels with the namespace to every device that uses it.
+- **Dropzone** — Press and hold any “new note” button to make a temporary **dropzone** note for handing text to your other devices — it syncs the moment you make one, waits in its own side-menu section, opens ready to type, deletes itself through its checkmark when you've picked it up (a toast confirms the deletion, with an Undo button), and offers to be kept as a regular note if you name it.
+- **Select mode** — A new button left of Find turns the note into a list of lines you pick from — press to take a line, press it again to give it back, drag the rail down the left edge to take a run of them, then format, cut, copy or delete it from the four buttons the header carries for as long as the mode is on, type over it, or style every line at once — all without the keyboard ever coming up, and the lit button stays on the header so leaving the mode again is always one press away.
+- **Line breaks in find and replace** — With the find bar's `.*` switch on, `\n` now matches a real line break in the
+  search and writes one in the replacement — so a pattern can span two lines, and
+  replacing every `·` with `\n- [ ] ` turns a run-on list into a checklist.
+- **Move lines up and down** — Select whole lines and two chevrons appear beside the formatting button that shuffle them one row up or down the note, on Alt+↑ / Alt+↓ as well.
+
+### Changed
+
+- **Solid sidebar collapse grip** — The docked sidebar's collapse grip now paints a solid strip — flat at rest, accent-filled under the pointer — instead of a translucent wash over the divider.
+- **Numbered lists always count from 1** — An ordered list now always displays as 1., 2., 3. — a list typed starting at another number (e.g. 3.) is renumbered from 1 in the preview and in exported PDFs.
+- **Pinned star and eye follow the note** — On a phone the favorite star and read-only eye now fold back behind the ⋯ as
+  soon as you switch them off, instead of staying in the header for the rest of
+  the visit.
+- **Tighter line-number gutter** — The line-number gutter now reserves only the width the note's highest number
+  needs — a nine-line note gives the writing column a digit more room than a
+  ten-line one — and each number sits beside the first row of the line it belongs
+  to however far that line wraps.
+- **Lighter, faster first load** — The app now renders with Preact and loads the settings, changelog,
+  achievements and namespace dialogs — and the cloud backends — only when you
+  reach for them, cutting the JavaScript it downloads to start by 47% (237 KB to
+  126 KB compressed), and the public home and privacy pages by more than 90%.
+- **The sidebar opens on the note you have open** — Sliding the side menu open now expands the folder the active note is filed in,
+  so the note you are working on is visible instead of hidden behind a collapsed
+  folder.
+- **PDF export writes the file itself** — Exporting to PDF now typesets and downloads the file directly instead of going
+  through the print dialog, so no URL, date or title is stamped into the margins —
+  and Settings → Export gains a heading-font choice and a page-numbers toggle.
+- **One ⋯ button for a note's actions on a phone** — A narrow editor header now folds its five action buttons behind a single ⋯
+  button so the note's name gets the whole row — pressing it slides them back out
+  over the title, and touching the note again folds them away.
+- **No cut button on a computer** — The note header's scissors button is now a touch affordance only — on a mouse
+  and keyboard, where Ctrl/Cmd+K and the right-click menu already cut, the row
+  keeps the space instead.
+- **The writing tools fold away when you lock a note** — Pressing the eye now slides the formatting and cut buttons out of the note
+  header instead of blinking them out of existence, and unlocking unfolds them
+  again.
+- **A starred or read-only note keeps saying so on a phone** — The star and the eye now stay on the note header instead of folding behind the
+  ⋯ whenever they have something to report — a favorited note or a read-only one
+  — so what is true of the open note is visible without opening the menu.
+- **Read-only notes wear the eye in the sidebar** — A locked note now shows the read-only eye instead of the document glyph on its
+  side-menu row, so you can tell which notes are view-only without opening them.
+- **The star lights up the whole button** — Starring a note now fills its header button edge to edge with the accent and
+  knocks the star out of it, matching the read-only eye, so both of the header's
+  readouts about the open note look alike at a glance.
+- **The sidebar lists every note** — The side menu now lists all your notes instead of only the six most recently edited, scrolling when they overflow while the button island and footer stay pinned — so a newly created note is always there, whichever sort order you use.
+- **A collapsed sidebar now gives back all of its space** — Folding the desktop sidebar away leaves no gutter behind — the note takes the
+  whole window, and the control that brings the sidebar back is a discreet
+  full-height strip that appears only when you move the pointer to that edge of
+  the screen, brightening under the cursor (it also lets the row highlight run the
+  sidebar's full width while it's open).
+- **Encryption is per namespace** — Turning encryption on now seals the namespace you are in rather than everything, so a namespace someone else locked no longer locks you out of your own — and a locked namespace offers to open a different one instead.
+- **Calmer sidebar collapse grip** — The sidebar's collapse grip now lights up in the same green as the side menu's
+  selected note instead of the full-strength accent.
+- **The line-number gutter picks lines** — Pressing a line number now opens select mode with that line taken, and dragging
+  down the numbers takes a run of them in the same stroke — the gutter no longer
+  scrolls the note or draws an ordinary selection, and the header's select button
+  (or Escape) is the way back out.
+
+### Fixed
+
+- **Edge swipes no longer open a note** — Swiping inward from the left or right screen edge is now reserved for the side
+  menu, so it no longer opens or archives the note it passed over.
+- **Double-tapping space ends the sentence again** — Tapping space twice at the end of a word writes a full stop again — the note
+  editor now applies the shortcut itself, so it works the same on a phone, on a
+  computer, and in the desktop and mobile apps.
+- **Pressing a line number while writing** — Pressing a line number in a note you are already editing now selects that line
+  exactly where it sits, instead of jumping the view to the top of the note and
+  scrolling back down to it.
+- **Selecting a line longer than the screen** — Pressing the number of a line that wraps past the bottom of the screen now
+  leaves you at the start of that line, instead of settling on its middle with its
+  opening words scrolled off the top.
+- **Selection clears when the keyboard goes down** — Dismissing the soft keyboard now drops the note's selection along with its
+  highlight, so a line selected from the line-number gutter takes the caret on the
+  next tap instead of coming back selected with a Cut / Copy / Paste bar over it.
+- **A stale device can no longer overwrite newer cloud notes** — Opening the app on a second device no longer risks writing its old copy over
+  work another device just synced — a save whose baseline the backend can't
+  account for now raises the conflict prompt instead, and edits that never
+  reached the cloud are remembered as unsynced across a restart.
+- **Arrowing up and down keeps your column** — Walking the caret up or down through the note now keeps aiming at the column you
+  started from — passing a short line parks the caret at its end for that line
+  only, and stepping into a long wrapped paragraph lands on the row you came in
+  through rather than at the paragraph's first line.
+- **Changelog clears the notch** — The "What's new" dialog no longer opens flush against the top of the screen on a
+  phone — its header sits below the status bar and the notch like every other
+  dialog, and it can be swiped down to close.
+- **The Export settings no longer blank out when you flip a toggle** — Tapping "Print the title" or "Number the pages" scrolled the settings dialog's
+  own frame away and left an empty card behind, and the "Custom" code-background
+  swatch is now the same size and shape as the presets beside it — showing the
+  selected ring when the fill is a colour of your own.
+- **Autocorrect keeps the bullet** — Letting the phone's keyboard correct the first word of a list item, heading or
+  quote no longer takes the leading marker with it — `4. Somethign` now becomes
+  `4. Something` instead of `Something`.
+- **The caret keeps up with a held eraser** — Holding Backspace on iOS no longer leaves the caret drawn a row or two above the text being erased — it is re-taken once the edited line has been laid out, so what you see is where you are.
+- **Typing a dash and pressing Enter draws a divider** — A `-` typed on its own line now stays the divider it looks like and Enter moves
+  on to the next line, instead of the dash being swallowed when the note has a
+  list further up.
+- **Undoing a deletion brings the note's text back** — Undoing a deleted note — including the Undo on the toast that follows ticking a
+  dropzone note off — restores it with everything that was written in it, rather
+  than as an empty note.
+- **Export failure toast** — Exporting a note to PDF or MD from a page opened before the latest deploy no longer fails silently — the export menu now shows an "Export failed" toast with a Reload action instead.
+- **Header actions overflow** — The editor header's unfolded action row no longer pushes the ⋯ button off the edge of a narrow screen — the row shrinks to fit and scrolls sideways instead, with the overflow hanging off its left edge.
+- **Indent on a blank line** — The styling toolbar's Indent button now indents the caret's own blank line, so a nested item can be opened on an empty row before typing it.
+
 ## [1.5.0] - 2026-08-07
 
 ### Added
