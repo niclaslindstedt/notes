@@ -201,9 +201,39 @@ describe("select mode", () => {
     tap(3);
     tap(1);
     expect(tinted()).toEqual([3]);
-    // Dropping the last line leaves the mode standing, ready to pick again —
-    // pressing a line is never the way out.
+    expect(onSelectModeChange).not.toHaveBeenCalled();
+  });
+
+  it("leaves the mode when the last taken line is given back", () => {
+    // An empty list is not one you are picking from: every header verb is a
+    // no-op and the note still refuses a caret, so undoing the last pick undoes
+    // the mode with it.
+    const { onSelectModeChange } = renderEditor();
+    layOutRows();
+    tap(1);
     tap(3);
+    expect(onSelectModeChange).not.toHaveBeenCalled();
+
+    tap(1);
+    tap(3);
+
+    expect(tinted()).toEqual([]);
+    expect(onSelectModeChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("stays put when a stroke that took nothing away ends on an empty run", () => {
+    // Only an *erasing* stroke can be the way out. Scrolling a note that has
+    // nothing taken — an off-rail touch, which paints nothing at all — leaves
+    // the run empty at the lift without a single line having been given back,
+    // and must not be read as the last pick being undone.
+    const { onSelectModeChange } = renderEditor();
+    layOutRows();
+    expect(tinted()).toEqual([]);
+
+    press(1, "touch", BODY_X);
+    moveTo(3, "touch", BODY_X);
+    release(3, "touch", BODY_X);
+
     expect(tinted()).toEqual([]);
     expect(onSelectModeChange).not.toHaveBeenCalled();
   });

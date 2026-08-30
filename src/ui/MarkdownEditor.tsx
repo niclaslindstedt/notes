@@ -1331,6 +1331,20 @@ export function MarkdownEditor({
     // finger lifts there is no telling a tap from the start of a scroll.
     if (!s.dragging && !s.moved) paintSweep(s.anchor);
     endSweep();
+    // Giving the last line back is the other way out. The mode is a list you
+    // are picking from, and an empty list is not one: with nothing taken every
+    // verb in the header is a no-op and the note still refuses a caret, so
+    // emptying the run and staying in the mode is a state with nothing to do in
+    // it. Undoing your last pick therefore undoes the mode as well — which is
+    // what makes a mis-press cost one press to fix rather than two.
+    //
+    // Only an **erasing** stroke can do it, and only on the lift. A stroke that
+    // started on an untaken line has taken nothing away, so a touch that merely
+    // scrolled a note with nothing taken is not an exit; and an erasing stroke
+    // can pass through empty on its way to giving back fewer lines than it
+    // began over, so mid-drag is too early to ask.
+    if (s.mode === "remove" && selectModeRef.current && !lineSelRef.current)
+      exitSelectMode(false);
   }
 
   // Everything the mode answers from the keyboard, bound to the document

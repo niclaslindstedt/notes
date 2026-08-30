@@ -1062,12 +1062,19 @@ them" one of the hardest things to do in the editor on a phone. **Select mode**
 drops the columns entirely: the note stops being a surface you put a caret in
 and becomes a list you pick lines from.
 
-**The way in is either the toggle or the gutter.** With
-[line numbers](#line-numbers) on, a press in the gutter is the shorthand: the
+**The way in is the gutter, and the toggle only where there isn't one.** With
+[line numbers](#line-numbers) on, a press in the gutter *is* the way in: the
 mode opens with that line taken, and a drag down the numbers takes a run in the
 same stroke — the gesture and the mode arrive together, rather than the mode
-being armed first and the lines aimed for second. The toggle is the way in
-without the numbers, and the way in over an existing selection.
+being armed first and the lines aimed for second. A button that only armed the
+mode and then waited for the same press would be a button the row is better off
+without, so with the numbers on it isn't offered (`offerSelectMode`,
+`src/ui/NoteEditor.tsx`). With them off there is no gutter, and the toggle is
+the only door there is.
+
+That says nothing about the way **out**: while the mode is on the toggle is
+rendered whatever the setting says, because on a phone it is the only exit that
+doesn't need a keyboard.
 
 The toggle is the header button immediately **left of Find**
 (`SelectModeButton`, `src/ui/SelectModeButton.tsx`), lit while the mode is on
@@ -1080,9 +1087,10 @@ in `Editor` (`src/ui/NoteEditor.tsx`) and is dropped on a note switch and on
 turning Markdown off — the mode is a detour from writing, so every note opens
 ready to be written in. On a narrow header the lit toggle **pins itself out of
 the ⋯** while the mode is on, exactly the way the star and the eye do — see
-[pinned header state](#pinned-header-state) — because the mode has no other
-exit on a phone: the note takes no caret while it is up, and Escape is a
-keyboard a touch user doesn't have.
+[pinned header state](#pinned-header-state) — because it is the mode's only
+deliberate exit on a phone: the note takes no caret while it is up, Escape is a
+keyboard a touch user doesn't have, and giving every line back one at a time is
+not a way out anybody would go looking for.
 
 **What is taken is a set, not a range.** A press takes the line it lands on; a
 second press on the same line gives that line back; pressing a *different* line
@@ -1203,11 +1211,19 @@ where writing would resume for whenever the note is next tapped. Focus the mode
 *inherited* — the keyboard was already up, or a desktop took it on the way in —
 is left exactly where it is, so typing over a run still works.
 
-**There is exactly one way out, and a press on the note is not it.** The header
-toggle and Escape are the two exits; every press inside the note takes or gives
-back a line, so nothing the picking gesture itself does can end the mode by
-accident. That is what makes the gutter safe as a way in — the stroke that
-opened the mode can't also close it.
+**Giving the last line back is the third way out.** The mode is a list you are
+picking from, and an empty list is not one: with nothing taken every verb in the
+header is a no-op and the note still refuses a caret, so emptying the run and
+staying in the mode is a state with nothing to do in it. Undoing your last pick
+therefore undoes the mode as well, which is what makes a mis-press cost one
+press to fix rather than two — and it is why the toggle can be a pure exit
+rather than a switch: the run and the mode begin and end together.
+
+Only an **erasing** stroke can do it, and only on the lift (`onSweepUp`). A
+stroke that started on an untaken line has taken nothing away, so a touch that
+merely scrolled a note with nothing taken is not an exit; and an erasing stroke
+can pass through empty on its way to giving back fewer lines than it began over,
+so mid-drag is too early to ask.
 
 **Leaving the mode by Escape is the handover.** It turns the taken lines into an
 ordinary browser selection over the same lines, drawn in the ordinary selection
