@@ -153,16 +153,14 @@ jobs:
 
           ### Desktop downloads
 
-          The app also runs in the browser at
-          [notes.niclaslindstedt.se](https://notes.niclaslindstedt.se) — these
-          are the same app in a window. Pick the archive for your machine:
+          The same app in its own window. Pick the archive for your machine:
           `mac-arm64` for Apple Silicon (M1 and later), `mac-x64` for an Intel
           Mac.
 
           **macOS:** the app is signed but not notarized, so the first launch
           is refused. Open **System Settings → Privacy & Security**, scroll to
-          the message about Notes and choose **Open Anyway**. macOS remembers
-          after that.
+          the message about the app and choose **Open Anyway**. macOS
+          remembers after that.
 
           Dropbox sync works here too: signing in opens your normal browser
           and hands the app back the result. Google Drive sync is

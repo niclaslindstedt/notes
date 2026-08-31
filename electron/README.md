@@ -122,7 +122,7 @@ to notarize — and the same job signs for real and the prompt goes away.
   loopback flow needs a Google OAuth client of the **Desktop app** type — a
   separate registration from the web client the app's key belongs to. Dropbox,
   local storage and the picked-folder backend all work as they do on the web;
-  use [notes.niclaslindstedt.se](https://notes.niclaslindstedt.se) for Drive.
+  use the browser build for Drive.
   That decision is made in the web app, not in this shell — see
   `../src/platform/capabilities.ts`, which resolves the surface to `desktop`
   from the `notes:` scheme, and `dropboxAvailable` / `gdriveAvailable` in

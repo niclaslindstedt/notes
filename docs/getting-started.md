@@ -31,8 +31,8 @@ deploy), so install/offline behaviour is tested against `preview`, not `dev`.
 
 ## Trying it as an installed app
 
-1. Run `npm run preview` and open the printed URL on your phone (same network),
-   or deploy and open the live URL.
+1. Run `npm run preview` and open the printed URL on your phone (same
+   network).
 2. Use **Share → Add to Home Screen** (iOS Safari) or the install prompt
    (Android Chrome).
 3. Launch the installed tile — it runs full-screen and works offline.

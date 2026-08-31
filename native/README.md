@@ -6,9 +6,9 @@ single full-screen WebView. Everything the user sees is the web app; the
 wrapper exists only to add the two capabilities a WebView can't provide.
 
 [`RELEASING.md`](RELEASING.md) is the step-by-step for building and submitting
-to the App Store and Google Play via EAS; [`APP_STORE.md`](APP_STORE.md) is the
-source material for the store listings — what the app offers over the website
-(the reasons to install) plus draft copy.
+to the App Store and Google Play via EAS. The store listings themselves — the
+name, the description, the screenshots — are maintained in App Store Connect
+and the Play Console, not in this repository.
 
 ## Why a wrapper (and why it's thin)
 

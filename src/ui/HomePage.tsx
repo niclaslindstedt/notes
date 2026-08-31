@@ -8,11 +8,19 @@
 // `PrivacyPage`.
 import { ArrowLeftIcon } from "./icons.tsx";
 
+// Where a visitor takes a question. A mailbox rather than a tracker, so the
+// page is self-contained and sends nobody off to another service to be heard.
+const CONTACT_EMAIL = "niclas@agilator.se";
+
 export function HomePage() {
   // BASE_URL carries the trailing slash, so these resolve per deploy slot:
   // `/` + … in production, `/preview/` + … in the preview slot, etc.
   const appUrl = import.meta.env.BASE_URL;
   const privacyUrl = `${import.meta.env.BASE_URL}privacy`;
+  // The host serving this page, read at runtime rather than written down —
+  // accurate for whichever slot or host is serving, and one less place a
+  // deployment hostname is hard-coded.
+  const host = window.location.hostname;
   return (
     <div className="h-full overflow-y-auto bg-page-bg px-4 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-[calc(2.5rem+env(safe-area-inset-bottom))] text-fg">
       <article className="mx-auto flex w-full max-w-2xl flex-col gap-8 leading-relaxed">
@@ -27,9 +35,9 @@ export function HomePage() {
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl font-bold text-fg-bright">notes</h1>
             <p className="text-base text-muted">
-              A local-first, open-source note-taking app that works great on
-              mobile and desktop — hosted at{" "}
-              <span className="text-fg-bright">notes.niclaslindstedt.se</span>.
+              A local-first note-taking app that works great on mobile and
+              desktop — hosted at <span className="text-fg-bright">{host}</span>
+              .
             </p>
           </div>
           <div className="flex flex-wrap gap-3 text-sm">
@@ -50,25 +58,17 @@ export function HomePage() {
 
         <Section title="What notes is">
           <p>
-            <span className="text-fg-bright">notes</span> is a free, open-source
-            Progressive Web App (PWA) for writing and organising notes. It runs
-            entirely in your browser and can be installed to your home screen so
-            it opens like a native app and works fully offline. There is no
-            account to create and nothing to pay for — open the page and start
-            writing.
+            <span className="text-fg-bright">notes</span> is a free Progressive
+            Web App (PWA) for writing and organising notes. It runs entirely in
+            your browser and can be installed to your home screen so it opens
+            like a native app and works fully offline. There is no account to
+            create and nothing to pay for — open the page and start writing.
           </p>
           <p>
             It is <span className="text-fg-bright">local-first</span>: by
             default your notes live only on the device you wrote them on, inside
-            your browser&apos;s own storage. The project is developed in the
-            open; you can read every line of its source on{" "}
-            <a
-              href="https://github.com/niclaslindstedt/notes"
-              className="text-link hover:underline"
-            >
-              GitHub
-            </a>
-            .
+            your browser&apos;s own storage. Nothing is uploaded anywhere unless
+            you connect one of the optional sync locations described below.
           </p>
         </Section>
 
@@ -438,17 +438,11 @@ export function HomePage() {
             <li>
               Install it as an app and keep using it offline — no connection
               required once it has loaded. There are also downloadable{" "}
-              <a
-                href="https://github.com/niclaslindstedt/notes/releases/latest"
-                className="text-link hover:underline"
-              >
-                desktop builds
-              </a>{" "}
-              for Windows, macOS, and Linux: the same app in its own window,
-              sending nothing anywhere unless you connect a sync location.
-              Dropbox sync works there too — sign-in opens in your own browser
-              and comes back to the app. Google Drive sync is available in the
-              browser and mobile app only.
+              <em>desktop builds</em> for Windows, macOS, and Linux: the same
+              app in its own window, sending nothing anywhere unless you connect
+              a sync location. Dropbox sync works there too — sign-in opens in
+              your own browser and comes back to the app. Google Drive sync is
+              available in the browser and mobile app only.
             </li>
             <li>
               Optionally sync your notes to a location you control: a local
@@ -569,15 +563,14 @@ export function HomePage() {
           </p>
         </Section>
 
-        <Section title="Contact &amp; source">
+        <Section title="Contact">
           <p>
-            notes is open source. Browse the code, report a bug, or ask a
-            question at{" "}
+            Questions, bug reports, and feature requests all go to{" "}
             <a
-              href="https://github.com/niclaslindstedt/notes"
+              href={`mailto:${CONTACT_EMAIL}`}
               className="text-link hover:underline"
             >
-              github.com/niclaslindstedt/notes
+              {CONTACT_EMAIL}
             </a>
             .
           </p>

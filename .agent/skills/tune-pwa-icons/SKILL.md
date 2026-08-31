@@ -315,7 +315,7 @@ current files:
 5. `make lint`, `make test`, `make build` are all green.
 6. The quality-criteria checklist above clears.
 7. (Manual) on a real iPhone, the home-screen tile of the deployed
-   build (notes.niclaslindstedt.se) looks correct — dark background,
+   build looks correct — dark background,
    prominent centred glyph, no kissing of the rounded corners. Apple's
    simulator and Chromium DevTools don't always replicate the rounding
    visually; the real device is ground truth.

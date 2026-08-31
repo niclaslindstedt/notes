@@ -7,16 +7,12 @@ import { FloatingPanel } from "./FloatingPanel.tsx";
 import type { FloatingPlacement } from "./hooks/useFloatingPosition.ts";
 import { AchievementsMenuItem } from "./achievements/AchievementsMenuItem.tsx";
 import {
-  CodeIcon,
   CogIcon,
   HeartIcon,
   HelpCircleIcon,
   ShieldIcon,
   SparklesIcon,
 } from "./icons.tsx";
-
-// notes is open source; the "source" link points at its repository.
-const SOURCE_URL = "https://github.com/niclaslindstedt/notes";
 
 // The footer "About" dropdown opens "up and to the left" of its trigger:
 // `useFloatingPosition` flips it above automatically (there is no room below
@@ -29,10 +25,10 @@ const ABOUT_PLACEMENT: FloatingPlacement = {
 
 // The relocated burger menu, pinned to the foot of the drawer: an optional
 // Donate, the trophy (achievements), an "About" dropdown that folds away the
-// project links (What's new / source with the app version as a subtitle /
-// privacy), and Settings pinned last under the thumb. Self-contained — the only
-// thing it borrows from the drawer is the `onClose` that retracts it behind a
-// modal; the About dropdown's open state lives here.
+// project links (What's new / privacy) above the build label, and Settings
+// pinned last under the thumb. Self-contained — the only thing it borrows from
+// the drawer is the `onClose` that retracts it behind a modal; the About
+// dropdown's open state lives here.
 //
 // The drawer reserves no bottom safe-area inset any more (it renders edge to
 // edge — see theme.css), so the footer owns its own bottom breathing room: it
@@ -43,8 +39,8 @@ export function SideMenuFooter({ onClose }: { onClose: () => void }) {
   const t = useT();
   const dispatch = useModalDispatch();
 
-  // The footer "About" dropdown (What's new / source / privacy), opened against
-  // `aboutRef` and flipped upward by `FloatingPanel`.
+  // The footer "About" dropdown (What's new / privacy / build label), opened
+  // against `aboutRef` and flipped upward by `FloatingPanel`.
   const [aboutOpen, setAboutOpen] = useState(false);
   const aboutRef = useRef<HTMLButtonElement>(null);
 
@@ -112,17 +108,6 @@ export function SideMenuFooter({ onClose }: { onClose: () => void }) {
           }}
         />
         <MenuLink
-          icon={<CodeIcon className="h-5 w-5" />}
-          label={t("menu.source")}
-          href={SOURCE_URL}
-          external
-          sublabel={BUILD_LABEL}
-          onClick={() => {
-            setAboutOpen(false);
-            onClose();
-          }}
-        />
-        <MenuLink
           icon={<ShieldIcon className="h-5 w-5" />}
           label={t("menu.privacy")}
           href={privacyUrl}
@@ -131,6 +116,11 @@ export function SideMenuFooter({ onClose }: { onClose: () => void }) {
             onClose();
           }}
         />
+        {/* The build label closes the panel out: which build is running, as
+            plain text rather than a row, since there is nothing to press. */}
+        <p className="px-5 pt-1 pb-1.5 text-xs text-muted tabular-nums">
+          {BUILD_LABEL}
+        </p>
       </FloatingPanel>
     </>
   );
@@ -167,15 +157,12 @@ function MenuLink({
   label,
   href,
   external,
-  sublabel,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
   href: string;
   external?: boolean;
-  /** Secondary line beneath the label (e.g. the app version). */
-  sublabel?: string;
   onClick?: () => void;
 }) {
   return (
@@ -188,12 +175,7 @@ function MenuLink({
       className="flex w-full cursor-pointer items-center gap-3 px-5 py-[var(--density-row-py)] text-left text-sm text-fg hover:bg-surface-2 hover:text-fg-bright"
     >
       <span className="text-muted">{icon}</span>
-      <span className="flex flex-1 flex-col">
-        <span>{label}</span>
-        {sublabel && (
-          <span className="text-xs text-muted tabular-nums">{sublabel}</span>
-        )}
-      </span>
+      <span className="flex-1">{label}</span>
     </a>
   );
 }

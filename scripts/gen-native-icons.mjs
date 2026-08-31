@@ -162,7 +162,7 @@ function emit(path, size, frac, bg) {
 // per Apple's marketing-icon requirement).
 emit("native/assets/icon.png", 1024, 1.0, THEME);
 // adaptive-icon.png: Android masks the outer ring, so pad the mark into the
-// central safe zone over the theme background (matches app.json backgroundColor).
+// central safe zone over the theme background (matches app.config.js backgroundColor).
 emit("native/assets/adaptive-icon.png", 1024, 0.66, THEME);
 // splash.png: smaller centred mark on the splash background.
 emit("native/assets/splash.png", 1024, 0.42, SPLASH_BG);

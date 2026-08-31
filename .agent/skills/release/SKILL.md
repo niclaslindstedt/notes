@@ -1,15 +1,20 @@
 ---
 name: release
-description: "Use when the maintainer (or an agent acting on their behalf) wants to cut a new release of the notes app. Walks the pre-flight checklist, dispatches the Release workflow, verifies the deploy at notes.niclaslindstedt.se, and links to the rollback recipe. Manual playbook — not part of the `maintenance` umbrella."
+description: "Use when the maintainer (or an agent acting on their behalf) wants to cut a new release of the notes app. Walks the pre-flight checklist, dispatches the Release workflow, verifies the deployed site, and links to the rollback recipe. Manual playbook — not part of the `maintenance` umbrella."
 ---
 
 # Cutting a release
 
 Releases are semver-tagged GitHub releases that promote a commit to the
-production `/` slot of the GitHub Pages deploy at
-`https://notes.niclaslindstedt.se`. The mechanism lives in
+production `/` slot of the GitHub Pages deploy. The mechanism lives in
 `.github/workflows/release.yml`; this skill is the human-friendly
 checklist around it.
+
+The deployed host is **not written down anywhere in the repo** — it comes
+from the `PAGES_CNAME` repository secret (see `docs/configuration.md`).
+Wherever this skill says "the deployed site", open the Pages deployment
+URL from the `pages` workflow run, or ask the maintainer. Don't add the
+hostname back into the tree.
 
 `release.yml` is **`workflow_dispatch`-only** and takes two inputs:
 `bump` (`auto` / `patch` / `minor` / `major`, default `auto`) and an
@@ -156,8 +161,8 @@ After the workflow finishes successfully:
    (Skip `git pull --ff-only` for a `commit`-input release — `main` was
    deliberately left untouched there.)
 
-3. **Pages is serving the new version at `/`.** Open
-   `https://notes.niclaslindstedt.se/` and confirm the new build is
+3. **Pages is serving the new version at `/`.** Open the deployed site
+   at `/` (the `pages` workflow run links it) and confirm the new build is
    live (hard-reload past the service worker first — notes uses
    `registerType: "prompt"`, so the waiting worker won't auto-activate;
    DevTools → Application → Service Workers → "Update on reload", or

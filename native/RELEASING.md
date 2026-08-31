@@ -8,10 +8,25 @@ WebView wrapper** that embeds the compiled web PWA and loads it offline; see
 [`README.md`](README.md). Run `make build-native` (from the repo root) before
 `eas build` / `expo prebuild` so the embedded bundle in `native/web/` exists.
 
-Both store identities are already wired in [`app.json`](app.json):
+[`app.config.js`](app.config.js) resolves the store identity from three build
+variables rather than hard-coding it:
 
-- iOS `ios.bundleIdentifier` — `se.niclaslindstedt.notes`
-- Android `android.package` — `se.niclaslindstedt.notes`
+| Variable           | Fills                                                  |
+| ------------------ | ------------------------------------------------------ |
+| `APP_DISPLAY_NAME` | `expo.name` — the listing name and the name under the icon |
+| `APP_BUNDLE_ID`    | `ios.bundleIdentifier` and `android.package`            |
+| `EAS_PROJECT_ID`   | `extra.eas.projectId` — the Expo project to build against |
+
+Each has to exist in **two** places: as a repository variable, which
+[`native-build.yml`](../.github/workflows/native-build.yml) forwards, and as an
+EAS environment variable on the EAS project, because EAS resolves
+`app.config.js` again on its own builders. Unset, each falls back to a local
+development default so `expo start` still works — and a `production` build
+throws in `app.config.js` rather than uploading under the wrong identity.
+
+None of the three is in the tree; read the current values from the repository
+variables or from App Store Connect / the Play Console, and don't paste them
+back into a file here.
 
 Build/submit profiles live in [`eas.json`](eas.json). Icons and the splash
 image live in [`assets/`](assets), rendered at 1024×1024 from the web app's
@@ -32,11 +47,11 @@ source mark (`../public/favicon.svg`) — see "Artwork" below.
 - A **Mac is not required** — EAS builds iOS in the cloud and manages the
   signing certificates for you.
 
-This project is **already linked** to its EAS project — the id lives in
-[`app.json`](app.json) under `extra.eas.projectId`
-(`19f8db84-52f4-4b20-9eb0-b578721147c0`), so `eas build` / `eas submit`
-resolve it without any further `eas init`. If you ever need to re-link (new
-account, new project), run it from this directory:
+This project is **already linked** to its EAS project — `app.config.js` fills
+`extra.eas.projectId` from the `EAS_PROJECT_ID` variable, so `eas build` /
+`eas submit` resolve it without any further `eas init` wherever that variable
+is set. If you ever need to re-link (new account, new project), run it from
+this directory and update the variable rather than the file:
 
 ```sh
 cd native
@@ -46,7 +61,7 @@ eas init --id <projectId>
 
 ## 1. Set the marketing version
 
-`app.json` → `expo.version` is the user-visible version (e.g. `1.0.0`). Bump
+`app.config.js` → `expo.version` is the user-visible version (e.g. `1.0.0`). Bump
 it for each store release. The per-store build number is handled
 automatically — `eas.json` sets `appVersionSource: "remote"` and the
 `production` profile has `autoIncrement: true`, so EAS increments the iOS
@@ -110,8 +125,9 @@ the `preview` profile (Android APK / iOS simulator build) instead.
    questionnaire, and the **Data safety** form. Declare: no data collected by
    us; notes live on-device by default, and cloud sync happens only when the
    user opts into a backend (their own Dropbox / Google Drive, or a
-   self-hosted notesd server). Point the privacy-policy URL at
-   `https://notes.niclaslindstedt.se/privacy`.
+   self-hosted notesd server). Point the privacy-policy URL at the deployed
+   app's `/privacy` page (the host is the `PAGES_CNAME` repository secret —
+   see `docs/configuration.md`).
 
 ## 5. Apple App Store submission
 

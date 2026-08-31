@@ -1,14 +1,13 @@
 import type { Widen } from "./_widen.ts";
 
 // Strings for the footer of the side drawer — settings, the changelog
-// dialog, and the project links.
+// dialog, and the About links.
 
 const menu = {
   settings: "Settings",
   about: "About",
   changelog: "What's new",
   privacy: "Privacy",
-  source: "Source",
   donate: "Donate",
 } as const;
 

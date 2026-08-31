@@ -111,6 +111,17 @@ this list and keep it in sync.
 
 **Deliberate, permanent deviations (not bugs — don't "fix" these):**
 
+- **§3 README shape / §11.4.6 installability in the README** — `README.md` is
+  a **contributor's** front page, not a product page: prerequisites, install,
+  run, build, the quality gates, the source layout, and where the docs are.
+  It deliberately carries no "Why?" bullets, no feature or usage tour, no
+  examples pointer, and no "add it to your home screen" paragraph — the
+  product surface is described by `src/ui/HomePage.tsx` (the `/home` showcase,
+  which is also what Google's OAuth verification reads) and by `docs/`, and
+  the README does not duplicate it. Its badge row is `ci` + `license` only.
+  `update-readme` and `sync-oss-spec` must keep it that way rather than
+  restoring the §3 product sections.
+
 - **§20.2 Test file suffix** — tests use the Vitest-idiomatic `*.test.ts`
   suffix under `tests/<concern>/`, matching checklist exactly. The pinned
   `validate.sh` (spec 2.8.0) flags this because it expects a
@@ -201,11 +212,18 @@ the PR handed off.
 
 ### Deployment slots
 
-The app is hosted on GitHub Pages under the custom domain
-**notes.niclaslindstedt.se** (set by `public/CNAME`, which Vite copies into
-every build; the Pages workflow keeps a single CNAME in the root of the
-artifact). `.github/workflows/pages.yml` assembles up to three slots into one
-Pages artifact:
+The app is hosted on GitHub Pages under a custom domain. **The domain is not
+in the tree** — there is no `public/CNAME`; `.github/workflows/pages.yml`
+writes `dist/CNAME` from the `PAGES_CNAME` repository secret, once, into the
+root of the merged artifact (Pages reads only the root CNAME). With the
+secret unset the deploy simply serves on the default `*.github.io` host, so a
+fork needs no change. Do not reintroduce a checked-in CNAME, and do not write
+the deployment hostname into source, docs, or workflow text — read it from
+the secret, or, in the app, off `window.location` at runtime (which is what
+`HomePage` / `PrivacyPage` do).
+
+`.github/workflows/pages.yml` assembles up to three slots into one Pages
+artifact:
 
 - `/` — the latest released `v*` tag. Before the first release exists, `main`
   is served here instead (no `/preview/` slot yet).
@@ -221,10 +239,46 @@ The base path each slot is built with comes from `VITE_BASE` (`/`,
 per-slot Workbox `cacheId`, PWA name, and navigation-fallback denylist off it
 so the slots don't clobber one another's service worker on the shared origin.
 
-> **Storage caveat.** All three slots share one origin, and `localStorage` is
-> per-origin (not per-path), so `/preview/` and `/branch/` read and write the
-> **same** notes as production. Namespace the storage keys by base path before
-> using the preview/branch slots for destructive testing.
+### Two names: the project and the store listing
+
+The repository, the Pages deploy, and the desktop archives are all **the
+project**, and they all carry the project name, written down once per surface
+(`vite.config.ts`'s `PROJECT_NAME`, `electron-builder.config.cjs`'s
+`PRODUCT_NAME`). The **mobile store listing** is a deployment of the project,
+and a deployment's coordinates are configuration, not source — so the values
+that identify the app in the App Store and on Google Play are not in the tree
+at all:
+
+| Variable           | Fills                                                        |
+| ------------------ | ------------------------------------------------------------ |
+| `APP_DISPLAY_NAME` | `expo.name`, and the built-in wordmark of the bundle embedded in the mobile app |
+| `APP_BUNDLE_ID`    | `ios.bundleIdentifier` and `android.package`                  |
+| `EAS_PROJECT_ID`   | `extra.eas.projectId`                                         |
+
+Each lives as a repository variable (forwarded by `native-build.yml`) **and**
+as an EAS environment variable, because EAS resolves `native/app.config.js`
+again on its own builders. Unset, each falls back to a local development
+default so a plain checkout runs; a `production` build with any of them
+missing throws in `app.config.js` rather than shipping under the wrong
+identity.
+
+What this means when you touch the code:
+
+- **Never hard-code a user-visible app name.** A string that names the app
+  reads `APP_NAME` (`src/build-env.ts`, from the `__APP_NAME__` define, with
+  `%APP_NAME%` substituted into `index.html` by the `inject-app-name` plugin).
+  That is also why the header wordmark is not an i18n string: it is a proper
+  noun, identical in every language.
+- **Only `VITE_TARGET=native` reads `APP_DISPLAY_NAME`.** `vite.config.ts`
+  gates it on the target, so the web and Electron builds cannot pick up a
+  listing name even if the variable happens to be exported. Don't remove that
+  gate.
+- **The project's own identity keys stay literal** — `expo.slug`, `scheme`,
+  the Electron `appId`, the executable name, and the release-archive names.
+  They are not listing coordinates, and changing them breaks resolution.
+- **Store listing copy is not kept in the repo.** The name, description, and
+  screenshots live in App Store Connect and the Play Console. Don't add a
+  drafting document for them here.
 
 ### Cutting a release
 
@@ -672,9 +726,9 @@ each its own component in `src/ui/` mounted by the path switch in
   given on the Google OAuth consent screen.
 - **`/home`** (`HomePage.tsx`) — the public **showcase / landing page**. It is
   the homepage Google's OAuth verification requires for the Google Drive
-  scope, so it must keep meeting that bar: accurately identify the app and its
-  verified domain (`notes.niclaslindstedt.se`), **fully describe what the app
-  does**, **transparently explain every reason the app requests user data**
+  scope, so it must keep meeting that bar: accurately identify the app and the
+  verified domain it is served from (read off `window.location.hostname` at
+  runtime, never written down), **fully describe what the app does**, **transparently explain every reason the app requests user data**
   (today: the opt-in cloud-sync backends and the exact scopes they ask for —
   Google Drive `drive.file`, the Dropbox app folder), and link to the privacy
   policy.

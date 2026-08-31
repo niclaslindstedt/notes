@@ -18,7 +18,7 @@ const { version } = require("../package.json");
  * WHO SIGNS THE macOS BUILD — and why an UNSIGNED one is not an option.
  *
  * Apple Silicon does not merely distrust unsigned arm64 code, it refuses to
- * EXECUTE it, and macOS reports that to the user as "Notes.app is damaged" —
+ * EXECUTE it, and macOS reports that to the user as "<App>.app is damaged" —
  * the same wording it uses for a corrupt download. So the mac build always
  * signs, and the only question is with what: a real Developer ID certificate
  * when `CSC_LINK` / `CSC_NAME` provide one (with `APPLE_ID` and friends set,
@@ -36,12 +36,19 @@ const MAC_IDENTITY =
   process.env.CSC_LINK || process.env.CSC_NAME ? undefined : "-";
 const MAC_ADHOC = MAC_IDENTITY === "-";
 
-/** Shared with the mobile wrapper (native/app.json) — one identity for the
- * app wherever it ships. */
+/** Shared with the mobile wrapper (native/app.config.js) — one identity for
+ * the app wherever it ships. */
 const BUNDLE_ID = "se.niclaslindstedt.notes";
 
-/** What the executable is called where it is a COMMAND: one lowercase word. */
+/** What the executable is called where it is a COMMAND: one lowercase word.
+ * It also names the release archives. */
 const EXECUTABLE_NAME = "notes";
+
+/** The display name the packaged app shows (window, Dock/taskbar, .app
+ * bundle). The desktop archives are the project's own build, so this is the
+ * project name, fixed — the mobile wrapper is the only surface that ships
+ * under a separate store listing name. */
+const PRODUCT_NAME = "Notes";
 
 /**
  * The app icon electron-builder converts into each platform's format
@@ -64,7 +71,7 @@ const ICON = "../public/maskable-icon-1024x1024.png";
 
 module.exports = {
   appId: BUNDLE_ID,
-  productName: "Notes",
+  productName: PRODUCT_NAME,
   copyright: `Copyright © ${new Date().getFullYear()} Niclas Lindstedt`,
 
   directories: { output: "release" },

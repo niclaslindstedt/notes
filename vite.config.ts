@@ -27,23 +27,42 @@ const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 ) as { version: string };
 
+// The display name the built app calls itself: the window/tab title, the
+// header wordmark, and the installed PWA tile.
+//
+// Only the MOBILE build reads the `APP_DISPLAY_NAME` variable. The Pages
+// deploy and the Electron archives are the project's own deploys and always
+// carry the project name; the store build is the one that ships under a
+// listing name, and `native/app.config.js` reads the same variable for
+// `expo.name` so the wordmark inside the app matches the tile outside it.
+// Unset, every surface falls back to the project name, so a plain checkout
+// builds either target with nothing configured.
+//
+// Not `VITE_`-prefixed on purpose: it is resolved here and handed to the app
+// as the `__APP_NAME__` define, never through `import.meta.env`.
+const PROJECT_NAME = "Notes";
+const APP_NAME =
+  process.env.VITE_TARGET === "native"
+    ? process.env.APP_DISPLAY_NAME?.trim() || PROJECT_NAME
+    : PROJECT_NAME;
+
 // Short build identifier surfaced next to the header wordmark and in the
 // update prompt so you can tell at a glance which build is running. Shape:
-// `<pkg.version>[.<run>][-<slot>][+<commit>]`:
+// `<pkg.version>[.<run>][-<slot>]`:
 //
 //   - `<run>`    — the GitHub Actions run number (omitted locally).
 //   - `<slot>`   — `pre` for the `/preview/` slot, `br` for `/branch/`,
 //                  omitted for the production `/` slot.
-//   - `<commit>` — the short `GITHUB_SHA` as build metadata after the `+`.
+//
+// The run number is the whole build identity on purpose: it orders builds
+// without pointing at a revision.
 const GITHUB_RUN_NUMBER = process.env.GITHUB_RUN_NUMBER;
-const COMMIT_HASH = (process.env.GITHUB_SHA ?? "").slice(0, 7);
 const BUILD_SLOT =
   base === "/preview/" ? "pre" : base === "/branch/" ? "br" : "";
 const BUILD_LABEL =
   pkg.version +
   (GITHUB_RUN_NUMBER ? `.${GITHUB_RUN_NUMBER}` : "") +
-  (BUILD_SLOT ? `-${BUILD_SLOT}` : "") +
-  (COMMIT_HASH ? `+${COMMIT_HASH}` : "");
+  (BUILD_SLOT ? `-${BUILD_SLOT}` : "");
 
 // Per-slot Workbox precache cache id. The three Pages slots share one
 // origin, so a slot-specific id keeps each deploy's precache cache
@@ -60,20 +79,20 @@ const CACHE_ID =
 
 // Per-slot PWA display name so the preview and branch slots install as
 // visibly separate apps on the home screen rather than three identically
-// named "Notes" tiles. The W3C identity (`id`/`scope`/`start_url`) is
-// already per-slot below; this just labels the tile to match.
+// named tiles. The W3C identity (`id`/`scope`/`start_url`) is already
+// per-slot below; this just labels the tile to match.
 const PWA_NAME =
   base === "/preview/"
-    ? "Notes (preview)"
+    ? `${APP_NAME} (preview)`
     : base === "/branch/"
-      ? "Notes (branch)"
-      : "Notes";
+      ? `${APP_NAME} (branch)`
+      : APP_NAME;
 const PWA_SHORT_NAME =
   base === "/preview/"
-    ? "Notes pre"
+    ? `${APP_NAME} pre`
     : base === "/branch/"
-      ? "Notes br"
-      : "Notes";
+      ? `${APP_NAME} br`
+      : APP_NAME;
 
 // Keep each slot's service worker inside its own base path. The default
 // `navigateFallback` (index.html for any in-scope navigation) means the
@@ -208,6 +227,20 @@ function emitHomeAlias(): Plugin {
   };
 }
 
+// Substitute the app's display name into the HTML shell. `index.html` carries
+// the `%APP_NAME%` placeholder wherever the name is spelled out (the `<title>`,
+// `application-name`, and the iOS home-screen title) so the checked-in shell
+// stays generic and the mobile build carries whatever `APP_DISPLAY_NAME`
+// supplies (see `APP_NAME` above).
+function injectAppName(): Plugin {
+  return {
+    name: "inject-app-name",
+    transformIndexHtml(html) {
+      return html.replaceAll("%APP_NAME%", APP_NAME);
+    },
+  };
+}
+
 export default defineConfig({
   base,
   plugins: [
@@ -222,6 +255,7 @@ export default defineConfig({
     // regresses and React sneaks back in.
     preact(),
     tailwindcss(),
+    injectAppName(),
     VitePWA({
       // The wrapper builds embed the bundle locally, so the service worker
       // is redundant (assets are already on-device) and would misbehave off a
@@ -332,6 +366,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_LABEL__: JSON.stringify(BUILD_LABEL),
+    __APP_NAME__: JSON.stringify(APP_NAME),
     // True only in the wrapper builds (native WebView / Electron); gates the
     // SW-registration and update-prompt paths that have no service worker to
     // talk to there.

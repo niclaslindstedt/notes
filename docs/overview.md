@@ -5391,8 +5391,10 @@ optional donate link, the trophy ([achievements](#achievements)), an **About**
 dropdown, and settings pinned last, built from the footer-local `MenuButton` /
 `MenuLink` row primitives. The **About** row is a plain footer row (no chevron)
 that toggles a `FloatingPanel` of the project links — What's new
-([changelog](#changelog--whats-new)), source (with the build label as a
-subtitle), and privacy. The panel flips **upward** (`ABOUT_PLACEMENT`, anchored
+([changelog](#changelog--whats-new)) and privacy — closed out by the
+[build label](#build-env) as plain text, since there is nothing to press. The
+panel carries no outbound link: the shipped app does not point anywhere at
+itself. The panel flips **upward** (`ABOUT_PLACEMENT`, anchored
 left, viewport-spaced) because there is no room below it at the foot of the
 drawer. The dropdown's open state (`aboutOpen` / `aboutRef`) lives inside
 `SideMenuFooter`, so nothing of the footer leaks back into the drawer container.
@@ -5827,9 +5829,38 @@ diagnostics through it.
 
 ### Build env
 
-`src/build-env.ts` — `APP_VERSION` and `BUILD_LABEL`, injected by Vite's
-`define` at build time (`__APP_VERSION__` / `__BUILD_LABEL__`) and re-exported
-typed.
+`src/build-env.ts` — `APP_VERSION`, `BUILD_LABEL`, and `APP_NAME`, injected by
+Vite's `define` at build time (`__APP_VERSION__` / `__BUILD_LABEL__` /
+`__APP_NAME__`) and re-exported typed.
+
+`BUILD_LABEL` is `<version>[.<run>][-<slot>]`: the package version, the GitHub
+Actions run number when there is one, and `pre` / `br` for the non-production
+deploy slots. It names *which build*, not which revision — no commit hash — and
+it is shown as plain text at the foot of the [About panel](#side-menu-footer).
+
+### App display name
+
+`APP_NAME` (`src/build-env.ts`) is what the app calls itself: the header
+wordmark ([`AppTitle`](#app-title)), the `<title>` and the iOS home-screen
+title in `index.html` (substituted for `%APP_NAME%` by the `inject-app-name`
+plugin in `vite.config.ts`), and the PWA manifest's `name` / `short_name`,
+suffixed per deploy slot.
+
+The project has **two** names, and this is the seam between them. The
+repository, the Pages deploy, and the desktop archives are the project and
+carry the project name. The mobile store listing is a deployment of the
+project, so its name is configuration: `vite.config.ts` reads
+`APP_DISPLAY_NAME` **only** when `VITE_TARGET=native`, and falls back to the
+project name everywhere else — so the wordmark inside the store build matches
+the tile outside it, and no other surface can pick the listing name up.
+`native/app.config.js` reads the same variable for `expo.name`, alongside
+`APP_BUNDLE_ID` and `EAS_PROJECT_ID`; none of the three is in the tree (see
+`docs/configuration.md`).
+
+It is a build variable rather than an i18n string on purpose — it is a proper
+noun, identical in every language. The project's identity keys (`expo.slug`,
+`scheme`, the Electron `appId`, the executable and archive names) are
+deliberately independent of it.
 
 ### Embedded (wrapper) builds
 

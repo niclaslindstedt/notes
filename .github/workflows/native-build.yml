@@ -11,6 +11,15 @@ name: Native build
 # submission additionally needs the store credentials described in
 # native/RELEASING.md (Apple App Store Connect / a Google Play service
 # account key) configured on the EAS project.
+#
+# The values that identify the app in the stores — APP_DISPLAY_NAME (listing
+# name), APP_BUNDLE_ID (iOS bundle identifier / Android package) and
+# EAS_PROJECT_ID — are NOT in the tree. `native/app.config.js` reads them from
+# the environment and falls back to local development defaults. They live as
+# repository variables (forwarded below) and, because EAS resolves that config
+# again on its own builders, as EAS environment variables on the EAS project.
+# A `production` build with any of them missing fails in app.config.js rather
+# than uploading a binary under the wrong identity.
 
 on:
   workflow_dispatch:
@@ -75,9 +84,17 @@ jobs:
       - name: EAS build
         if: ${{ !inputs.submit }}
         run: eas build --non-interactive --no-wait --platform ${{ inputs.platform }} --profile ${{ inputs.profile }}
+        env:
+          APP_DISPLAY_NAME: ${{ vars.APP_DISPLAY_NAME }}
+          APP_BUNDLE_ID: ${{ vars.APP_BUNDLE_ID }}
+          EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
 
       # Submit requested: the runner must stay up until the build finishes so
       # --auto-submit can hand the artifact to EAS Submit.
       - name: EAS build + submit
         if: ${{ inputs.submit }}
         run: eas build --non-interactive --platform ${{ inputs.platform }} --profile ${{ inputs.profile }} --auto-submit
+        env:
+          APP_DISPLAY_NAME: ${{ vars.APP_DISPLAY_NAME }}
+          APP_BUNDLE_ID: ${{ vars.APP_BUNDLE_ID }}
+          EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}

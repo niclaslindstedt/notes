@@ -6,7 +6,6 @@
   "description": "Desktop (Electron) wrapper around the notes PWA — a window showing the bundled app.",
   "author": "Niclas Lindstedt <niclas@agilator.se>",
   "license": "PolyForm-Noncommercial-1.0.0",
-  "repository": "https://github.com/niclaslindstedt/notes",
   "main": "main.js",
   "scripts": {
     "typecheck": "tsc --noEmit -p jsconfig.json",

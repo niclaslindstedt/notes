@@ -14,11 +14,21 @@ import { ArrowLeftIcon } from "./icons.tsx";
 // Last meaningful change to the policy text below. Bump this whenever the
 // wording is edited — it renders verbatim at the top of the page and is the
 // only line readers have to look at to see how fresh the policy is.
-const LAST_UPDATED = "2026-08-05";
+const LAST_UPDATED = "2026-08-31";
+
+// Where a reader takes a question about this policy. A mailbox rather than a
+// tracker, so the policy stands on its own and does not send readers off to
+// another service to be heard.
+const CONTACT_EMAIL = "niclas@agilator.se";
 
 export function PrivacyPage() {
   // The deploy-slot root (`/`, `/preview/`, …) — the link back to the app.
   const homeUrl = import.meta.env.BASE_URL;
+  // The host serving this page, read at runtime rather than written down. The
+  // policy has to name the origin it applies to, and reading it back off the
+  // address bar is both accurate for whichever slot or host is serving and one
+  // less place a deployment hostname is hard-coded.
+  const host = window.location.hostname;
   return (
     <div className="h-full overflow-y-auto bg-page-bg px-4 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-[calc(2.5rem+env(safe-area-inset-bottom))] text-fg">
       <article className="mx-auto flex w-full max-w-2xl flex-col gap-6 text-sm leading-relaxed">
@@ -38,10 +48,10 @@ export function PrivacyPage() {
           <p>
             <span className="text-fg-bright">notes</span> is a local-first
             note-taking app served as a static site at{" "}
-            <span className="text-fg-bright">notes.niclaslindstedt.se</span>. It
-            runs entirely in your browser. There is no backend of our own, no
-            account, no cookies, and no analytics or tracking. By default your
-            notes are stored only on your device and never leave it.
+            <span className="text-fg-bright">{host}</span>. It runs entirely in
+            your browser. There is no backend of our own, no account, no
+            cookies, and no analytics or tracking. By default your notes are
+            stored only on your device and never leave it.
           </p>
           <p>
             You may <span className="text-fg-bright">optionally</span> turn on
@@ -71,8 +81,7 @@ export function PrivacyPage() {
           <p>
             On your device, inside your browser&apos;s{" "}
             <code className="text-fg-bright">localStorage</code> for the origin{" "}
-            <span className="text-fg-bright">notes.niclaslindstedt.se</span>,
-            the app keeps:
+            <span className="text-fg-bright">{host}</span>, the app keeps:
           </p>
           <ul className="ml-5 list-disc space-y-1">
             <li>
@@ -333,22 +342,22 @@ export function PrivacyPage() {
 
         <Section title="Changes to this policy">
           <p>
-            Material changes are tracked in the public commit history of the
-            source repository. The <em>Last updated</em> date at the top of this
-            page reflects the most recent edit. Should a future version change
-            what data is stored or sent, or add another place it can be sent,
-            this policy will be updated to describe it before that change ships.
+            The <em>Last updated</em> date at the top of this page reflects the
+            most recent edit. Should a future version change what data is stored
+            or sent, or add another place it can be sent, this policy will be
+            updated to describe it before that change ships.
           </p>
         </Section>
 
         <Section title="Contact">
           <p>
-            For everything, open an issue at{" "}
+            For everything — questions about this policy, a bug, a privacy
+            request — write to{" "}
             <a
-              href="https://github.com/niclaslindstedt/notes/issues"
+              href={`mailto:${CONTACT_EMAIL}`}
               className="text-link hover:underline"
             >
-              github.com/niclaslindstedt/notes
+              {CONTACT_EMAIL}
             </a>
             .
           </p>
