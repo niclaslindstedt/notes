@@ -4,6 +4,9 @@
 // Injected by `define` in `vite.config.ts`.
 declare const __APP_VERSION__: string;
 declare const __BUILD_LABEL__: string;
+// The app's display name, resolved in `vite.config.ts` from the
+// `APP_DISPLAY_NAME` build variable (generic default when unset).
+declare const __APP_NAME__: string;
 // True only in the wrapper builds that embed the bundle locally — the native
 // WebView shell (`VITE_TARGET=native`) and the Electron desktop shell
 // (`VITE_TARGET=electron`); false on the web. Gates paths that assume a

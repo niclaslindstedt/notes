@@ -1,11 +1,12 @@
 import type { Widen } from "./_widen.ts";
 
-// User-visible strings for the notes shell itself — the header wordmark, the
-// empty state, the editor placeholder, and the per-note controls in the
-// full-screen editor. Lives here so the shell has a single i18n entry point.
+// User-visible strings for the notes shell itself — the empty state, the
+// editor placeholder, and the per-note controls in the full-screen editor.
+// Lives here so the shell has a single i18n entry point. The header wordmark
+// is deliberately absent: it is the app's name, a build variable
+// (`APP_NAME`), not a translated string.
 
 const app = {
-  title: "Notes",
   empty: "No notes yet. Tap + (or press Enter) to write your first one.",
   // Shown on the overview while the active namespace's first load is still in
   // flight (a folder/cloud round-trip), so switching into it shows "loading"

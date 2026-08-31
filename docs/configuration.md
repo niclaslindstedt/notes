@@ -6,28 +6,53 @@ generated assets.
 
 ## Build-time environment
 
-| Variable           | Default | Purpose                                                                                 |
-| ------------------ | ------- | --------------------------------------------------------------------------------------- |
-| `VITE_BASE`        | `/`     | The base path the app is served from. `pages.yml` sets this per deploy slot — `/` (production), `/preview/`, or `/branch/` — so one bundle serves any of them. |
-| `GITHUB_RUN_NUMBER`| —       | Set by GitHub Actions; appended to the build label so you can tell which build is live. |
-| `GITHUB_SHA`       | —       | Set by GitHub Actions; its short form is appended to the build label as `+<commit>`.    |
+| Variable            | Default | Purpose                                                                                 |
+| ------------------- | ------- | --------------------------------------------------------------------------------------- |
+| `VITE_BASE`         | `/`     | The base path the app is served from. `pages.yml` sets this per deploy slot — `/` (production), `/preview/`, or `/branch/` — so one bundle serves any of them. |
+| `APP_DISPLAY_NAME`  | `Notes` | The mobile store listing's name — read **only** when `VITE_TARGET=native`, and by `native/app.config.js` for `expo.name`. The web and Electron builds always use the project name. In the app it surfaces as `APP_NAME` (`src/build-env.ts`, from the `__APP_NAME__` define, and `%APP_NAME%` in `index.html`). |
+| `GITHUB_RUN_NUMBER` | —       | Set by GitHub Actions; appended to the build label so you can tell which build is live. |
 
-None are required for local development.
+None are required for local development — every one has a working default.
 
 ## Deployment
 
-The production app is served from the custom domain
-**notes.niclaslindstedt.se** (set by `public/CNAME`, which Vite copies into
-every build). `.github/workflows/pages.yml` builds up to three slots into one
-GitHub Pages artifact — `/` (latest release), `/preview/` (current `main`),
-and an optional `/branch/` — and `.github/workflows/release.yml` cuts a
-versioned release. See `AGENTS.md` → "Releases and changelog".
+`.github/workflows/pages.yml` builds up to three slots into one GitHub Pages
+artifact — `/` (latest release), `/preview/` (current `main`), and an optional
+`/branch/` — and `.github/workflows/release.yml` cuts a versioned release. See
+`AGENTS.md` → "Releases and changelog".
+
+The custom domain is **not** in the repository: there is no `public/CNAME`.
+`pages.yml` writes `dist/CNAME` from the `PAGES_CNAME` repository secret, into
+the root of the merged artifact only (GitHub Pages reads the root CNAME and
+ignores per-slot copies). With the secret unset the deploy serves on the
+default `*.github.io` host, which is what a fork gets with no configuration.
+
+## Repository secrets and variables
+
+Everything the deployed and packaged builds need that is not in the tree. The
+three `native-build.yml` variables also have to exist as **EAS environment
+variables** on the EAS project, because EAS resolves `native/app.config.js`
+again on its own builders; a `production` build with any of them missing fails
+there rather than shipping under the wrong identity.
+
+| Name                      | Kind     | Used by                                            |
+| ------------------------- | -------- | -------------------------------------------------- |
+| `PAGES_CNAME`             | secret   | `pages.yml` — the custom domain for the Pages deploy. |
+| `APP_DISPLAY_NAME`        | variable | `native-build.yml` — the store listing's name.       |
+| `APP_BUNDLE_ID`           | variable | `native-build.yml` — iOS bundle identifier / Android package name. |
+| `EAS_PROJECT_ID`          | variable | `native-build.yml` — the Expo project to build against. |
+| `VITE_GOOGLE_CLIENT_ID`   | secret   | Google Drive backend (public PKCE client id).       |
+| `VITE_DROPBOX_APP_KEY`    | secret   | Dropbox backend (public PKCE app key).              |
+| `VITE_DROPBOX_APP_FOLDER` | variable | Dropbox app-folder name.                            |
+| `VITE_DONATE_URL`         | variable | Optional donate row in the side menu.               |
+| `GITHUB_PAT`              | secret   | `npm ci` against the GitHub Packages registry.      |
 
 ## PWA manifest
 
 The web app manifest is defined inline in `vite.config.ts` (the `VitePWA`
-plugin's `manifest` block): name, theme color (`#1f2933`), icons, and the
-`id`/`scope`/`start_url` (all derived from `VITE_BASE`). Edit it there.
+plugin's `manifest` block): name (the project name, suffixed per deploy slot),
+theme color (`#1f2933`), icons, and the `id`/`scope`/`start_url` (all
+derived from `VITE_BASE`). Edit it there.
 
 ## Icons
 

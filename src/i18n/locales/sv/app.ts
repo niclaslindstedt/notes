@@ -1,7 +1,6 @@
 import type { AppCatalog } from "../en/app.ts";
 
 const app: AppCatalog = {
-  title: "Notes",
   empty:
     "Inga anteckningar än. Tryck på + (eller tryck Enter) för att skriva din första.",
   loading: "Laddar anteckningar…",

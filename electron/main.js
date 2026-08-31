@@ -123,13 +123,14 @@ const LOOPBACK_TIMEOUT_MS = 5 * 60_000;
 
 // Shown in the browser tab the provider redirected. Deliberately plain and
 // self-contained: it is served by a socket that is about to close, so it can
-// reference nothing.
+// reference nothing — including the app's own name, which the packaged build
+// gets from a build variable this string has no access to.
 const LOOPBACK_DONE_PAGE = `<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><title>Notes</title>
+<meta charset="utf-8"><title>Signed in</title>
 <style>html{color-scheme:dark light}body{margin:0;min-height:100vh;display:flex;
 align-items:center;justify-content:center;background:#1f2933;color:#e6edf3;
 font:16px/1.5 system-ui,sans-serif}p{text-align:center;padding:2rem}</style>
-</head><body><p>Notes is connected.<br>You can close this tab.</p></body></html>`;
+</head><body><p>You&rsquo;re connected.<br>You can close this tab.</p></body></html>`;
 
 /**
  * The current flow: its socket while one is open, and its outcome for as long

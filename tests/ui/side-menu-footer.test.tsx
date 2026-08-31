@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
 
+import { BUILD_LABEL } from "../../src/build-env.ts";
 import { SideMenuFooter } from "../../src/ui/SideMenuFooter.tsx";
 import { ModalBusContext, type ModalCommand } from "../../src/ui/modal-bus.ts";
 
@@ -55,36 +56,44 @@ describe("SideMenuFooter", () => {
     const about = screen.getByRole("menuitem", { name: "About" });
     expect(about.getAttribute("aria-expanded")).toBe("false");
     // The project links live behind the dropdown, so they aren't shown yet.
-    expect(screen.queryByText("Source")).toBeNull();
+    expect(screen.queryByText("Privacy")).toBeNull();
 
     fireEvent.click(about);
     expect(about.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByText("Source")).toBeTruthy();
+    expect(screen.getByText("What's new")).toBeTruthy();
     expect(screen.getByText("Privacy")).toBeTruthy();
   });
 
-  it("links source to the repository and privacy to the in-slot /privacy page", () => {
+  it("links privacy to the in-slot /privacy page and offers no outbound link", () => {
     renderFooter();
     fireEvent.click(screen.getByRole("menuitem", { name: "About" }));
-
-    const source = screen.getByText("Source").closest("a");
-    expect(source?.getAttribute("href")).toBe(
-      "https://github.com/niclaslindstedt/notes",
-    );
-    expect(source?.getAttribute("target")).toBe("_blank");
 
     const privacy = screen.getByText("Privacy").closest("a");
     // BASE_URL carries the trailing slash; in tests it resolves to "/".
     expect(privacy?.getAttribute("href")).toBe("/privacy");
     // Privacy is a same-origin page, not an external link.
     expect(privacy?.getAttribute("target")).toBeNull();
+
+    // No donate URL is configured in this render, so privacy is the only
+    // anchor the panel carries: the build is not linked to anywhere.
+    expect(document.querySelectorAll('a[target="_blank"]')).toHaveLength(0);
+  });
+
+  it("shows the build label in the About dropdown, as plain text", () => {
+    renderFooter();
+    fireEvent.click(screen.getByRole("menuitem", { name: "About" }));
+    // `__BUILD_LABEL__` is defined by vitest's `define`; whatever it resolves
+    // to, it renders unlinked.
+    const label = screen.getByText(BUILD_LABEL);
+    expect(label.tagName).toBe("P");
+    expect(label.closest("a")).toBeNull();
   });
 
   it("closes the drawer and collapses About when a project link is followed", () => {
     const { onClose } = renderFooter();
     const about = screen.getByRole("menuitem", { name: "About" });
     fireEvent.click(about);
-    fireEvent.click(screen.getByText("Source"));
+    fireEvent.click(screen.getByText("Privacy"));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(about.getAttribute("aria-expanded")).toBe("false");
   });

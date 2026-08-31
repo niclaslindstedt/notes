@@ -27,7 +27,10 @@
     />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta name="author" content="Niclas Lindstedt" />
-    <meta name="application-name" content="Notes" />
+    <!-- `%APP_NAME%` is substituted at build time by the
+         `inject-app-name` plugin in `vite.config.ts` (from `APP_DISPLAY_NAME`),
+         so the shell in the tree stays generic. -->
+    <meta name="application-name" content="%APP_NAME%" />
     <meta
       name="description"
       content="A local-first PWA for taking notes that works great on mobile and desktop."
@@ -40,13 +43,13 @@
          time. The Apple-specific tags below are static. -->
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Notes" />
+    <meta name="apple-mobile-web-app-title" content="%APP_NAME%" />
     <meta
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
 
-    <title>Notes</title>
+    <title>%APP_NAME%</title>
   </head>
   <body>
     <div id="app"></div>

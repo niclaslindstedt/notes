@@ -98,10 +98,13 @@ JS when the user clicks it — never silently mid-edit.
 
 ## Build-time injection
 
-`vite.config.ts` injects `__APP_VERSION__` and `__BUILD_LABEL__` (re-exported
-typed from `src/build-env.ts`) and runs two small plugins to emit
-`version.json` and `precache-manifest.json`. The base path comes from
-`VITE_BASE` so one bundle deploys to any subpath.
+`vite.config.ts` injects `__APP_VERSION__`, `__BUILD_LABEL__`, and
+`__APP_NAME__` (re-exported typed from `src/build-env.ts`) and runs two small
+plugins to emit `version.json` and `precache-manifest.json`, plus one that
+substitutes `%APP_NAME%` into `index.html`. The base path comes from
+`VITE_BASE` so one bundle deploys to any subpath. The display name is the
+project name everywhere except the mobile build, which reads the
+`APP_DISPLAY_NAME` variable — see `docs/overview.md#app-display-name`.
 
 ## What's intentionally not here yet
 

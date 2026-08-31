@@ -185,9 +185,6 @@ jobs:
           mv dist dist-branch
           STAGE=$(mktemp -d)
           cp -R dist-branch/. "$STAGE/"
-          # Drop CNAME from the per-slot copy; only the root artifact
-          # may carry it. (Vite copies public/CNAME into every build.)
-          rm -f "$STAGE/CNAME"
           # Build an orphan tree containing just the build output and
           # force-push it to BRANCH_DEPLOY_REF. Force-push is safe: the
           # branch is auto-managed and only ever written by this step.
@@ -226,8 +223,7 @@ jobs:
             mkdir -p dist-branch
             git --work-tree=dist-branch checkout "origin/$BRANCH_DEPLOY_REF" -- .
             # The branch's tree is rooted at the build output, no
-            # nested directory. CNAME was stripped on push, so nothing
-            # to clean up here.
+            # nested directory.
             echo "has_branch_dist=true" >> "$GITHUB_OUTPUT"
             echo "Rehydrated /branch/ from $BRANCH_DEPLOY_REF."
           else
@@ -242,9 +238,6 @@ jobs:
             mv dist dist-preview
             mv dist-prod dist
             mkdir -p dist/preview
-            # Only one CNAME may exist in the artifact (Pages picks the
-            # root). Drop the per-slot copies before merging in.
-            rm -f dist-preview/CNAME
             cp -R dist-preview/. dist/preview/
             echo "Merged: / = ${{ steps.tag.outputs.ref }}, /preview/ = ${{ github.sha }}"
           else
@@ -254,6 +247,22 @@ jobs:
             mkdir -p dist/branch
             cp -R dist-branch/. dist/branch/
             echo "Merged: /branch/ from $BRANCH_DEPLOY_REF"
+          fi
+
+      # The custom domain is not checked in — a `public/CNAME` would put the
+      # deployment's hostname in the tree and in every build artifact. It is
+      # supplied by the PAGES_CNAME secret instead and written once, into the
+      # root of the merged artifact (GitHub Pages reads only the root CNAME).
+      # Unset, the deploy simply serves on the default *.github.io host.
+      - name: Write CNAME
+        env:
+          PAGES_CNAME: ${{ secrets.PAGES_CNAME }}
+        run: |
+          if [ -n "$PAGES_CNAME" ]; then
+            printf '%s\n' "$PAGES_CNAME" > dist/CNAME
+            echo "Wrote dist/CNAME."
+          else
+            echo "PAGES_CNAME is unset — deploying without a custom domain."
           fi
 
       - uses: actions/configure-pages@v6

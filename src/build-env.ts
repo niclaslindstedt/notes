@@ -7,3 +7,6 @@ export const APP_VERSION: string = __APP_VERSION__;
 
 /** Human-facing build label (`<version>[.<run>][+<commit>]`). */
 export const BUILD_LABEL: string = __BUILD_LABEL__;
+
+/** The app's display name (window title, header wordmark, installed tile). */
+export const APP_NAME: string = __APP_NAME__;

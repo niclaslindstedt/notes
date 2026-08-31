@@ -1,37 +1,16 @@
 # notes
 
-> A local-first PWA for taking notes that works great on mobile and desktop.
-
 [![ci](https://github.com/niclaslindstedt/notes/actions/workflows/ci.yml/badge.svg)](https://github.com/niclaslindstedt/notes/actions/workflows/ci.yml)
-[![pages](https://github.com/niclaslindstedt/notes/actions/workflows/pages.yml/badge.svg)](https://github.com/niclaslindstedt/notes/actions/workflows/pages.yml)
-[![release](https://github.com/niclaslindstedt/notes/actions/workflows/release.yml/badge.svg)](https://github.com/niclaslindstedt/notes/actions/workflows/release.yml)
 [![license](https://img.shields.io/badge/license-PolyForm--Noncommercial--1.0.0-blue.svg)](LICENSE)
 
-Try it: **<https://notes.niclaslindstedt.se>**
+A Vite + Preact + Tailwind progressive web app, with a React Native (Expo)
+WebView wrapper under [`native/`](native/README.md) and an Electron wrapper
+under [`electron/`](electron/README.md) that both embed the compiled bundle.
 
-## What
-
-`notes` is a tiny, fast note-taking app that lives in your browser. It's a
-Progressive Web App: install it to your phone's home screen and it runs
-full-screen, offline, and feels native. Your notes are stored locally on your
-device — there is no account and no backend.
-
-It's built on the same stack and conventions as
-[`checklist`](https://github.com/niclaslindstedt/checklist), and most of its
-richer features (modals, settings, themes, sync) will be ported across over
-time using the `copy-feature` agent skill.
-
-## Why
-
-- **Local-first.** Notes are saved to the browser, instantly, with no network
-  round-trip and no sign-in. It works on a plane.
-- **Installable.** Add it to your home screen and it behaves like a native
-  app — its own icon, full-screen, offline-capable. There are downloadable
-  desktop builds for Windows, macOS, and Linux too.
-- **Mobile-first.** The primary testing device is a phone; the desktop layout
-  is the same UI given more room.
-- **Cross-platform by design.** The note model is framework-free, so a planned
-  React Native app can reuse it unchanged.
+This README covers working on the code. For how the pieces fit together, read
+[`docs/architecture.md`](docs/architecture.md); for what the words in the
+codebase mean, [`docs/dictionary.md`](docs/dictionary.md) and
+[`docs/overview.md`](docs/overview.md).
 
 ## Prerequisites
 
@@ -53,98 +32,82 @@ export GITHUB_PAT=<token with read:packages>
 npm ci
 ```
 
-## Quick start
+## Run
 
 ```sh
-npm run dev      # start the dev server, then open the printed URL
+npm run dev        # dev server with hot reload; open the URL it prints
+npm run dev:seed   # same, seeded with sample data (see AGENTS.md)
 ```
 
-To build and preview the production PWA (with the service worker):
+Mobile is the primary target — check every visible change at a phone viewport
+first (devtools device toolbar, or open the dev server's network URL on a
+phone on the same network).
+
+## Build
 
 ```sh
-npm run build
-npm run preview
+npm run build      # production build → dist/ (including the service worker)
+npm run preview    # serve dist/ locally
 ```
 
-### Install on your phone
+The service worker only registers in a production build, so install and
+offline behaviour is exercised against `preview`, never `dev`.
 
-Open the deployed app (or your `preview` URL) in mobile Safari or Chrome, then
-use **Share → Add to Home Screen**. The app installs with its own icon and
-launches full-screen and offline-capable.
-
-### Install on your desktop
-
-Grab the archive for your platform from the
-[latest release](https://github.com/niclaslindstedt/notes/releases/latest) —
-Windows, Linux, and macOS (Intel and Apple Silicon). It is the same app in its
-own window rather than a browser tab, built by the thin Electron wrapper in
-[`electron/`](electron/README.md). Cloud sync is browser-only; the desktop
-build stores notes locally or in a folder you pick.
-
-To build it yourself:
+The two wrappers embed a build of their own:
 
 ```sh
-make build-electron               # build the web app into electron/webroot/
-npm --prefix electron ci
-npm --prefix electron start       # launch it
-npm --prefix electron run dist    # package an archive for this platform
+make build-native    # → native/web/, then see native/README.md
+make build-electron  # → electron/webroot/, then see electron/README.md
 ```
 
-## Usage
+## Quality gates
 
-- Tap the **+** button to start a new note.
-- **Hold** the **+** (or the side menu's New note) to make a *dropzone*
-  note — a temporary note for handing a link, an address or a code to your
-  other devices. It waits in the side menu's Dropzone section, its
-  checkmark deletes it once you've picked it up, and naming it offers to
-  keep it as a regular note. Offered whenever your notes are stored
-  somewhere your other devices can read (a folder, a cloud, your own
-  server).
-- The first line becomes the note's title in the list.
-- Notes auto-save as you type; the list shows the most recently edited first.
-- Use the theme toggle in the header to switch Dark / Light / System.
-- **Delete** removes a note from the editor; an abandoned blank note discards
-  itself.
+These are the same checks CI runs; all four must pass before a PR merges.
+
+```sh
+npm run test       # vitest
+npm run lint       # eslint + tsc --noEmit, zero warnings
+npm run fmt        # prettier --write
+npm run fmt:check  # prettier --check (the CI gate)
+```
+
+`make` targets exist for each of the above (`make test`, `make lint`,
+`make fmt`, `make fmt-check`) — see the [`Makefile`](Makefile) for the full
+list, including `make icons` (regenerate the PWA icon set) and `make bump` /
+`make changelog` (release tooling).
+
+## Layout
+
+| Path         | What lives there                                              |
+| ------------ | ------------------------------------------------------------- |
+| `src/domain` | Pure functions over the note model. No DOM, no I/O.           |
+| `src/storage`| Persistence adapters and the serialize/migrate pipeline.      |
+| `src/ui`     | Presentational components.                                    |
+| `src/app`    | Root component, entry point, top-level state.                 |
+| `src/theme`  | Theme engine; `src/styles` holds the CSS token system.        |
+| `tests/`     | Vitest suites, `*.test.ts(x)`, mirroring the `src/` concerns.  |
+| `native/`    | Expo WebView wrapper (thin — see its README).                 |
+| `electron/`  | Electron desktop wrapper (thin — see its README).             |
+| `notesd/`    | Optional self-hosted sync daemon.                             |
+
+Dependency direction is `app → ui → domain` and `app → storage → domain`;
+eslint enforces that nothing in `domain/` reaches for the DOM or the layers
+above it.
 
 ## Configuration
 
-There is no configuration file — the app runs with sensible defaults. The
-GitHub Pages base path is injected at build time via the `VITE_BASE`
-environment variable so the same bundle works at `/` or any subpath. See
-[`docs/configuration.md`](docs/configuration.md).
+Nothing is required to run locally. Every knob is a build-time environment
+variable — see [`docs/configuration.md`](docs/configuration.md) and
+[`.env.example`](.env.example).
 
-## Examples
+## Contributing
 
-The repository itself is the example: clone it, run `npm run dev`, and you have
-a working note app. The `src/domain/note.ts` module is a self-contained,
-dependency-free model you can read top to bottom in a minute.
-
-## Troubleshooting
-
-- **The PWA doesn't update.** A new build parks in the service worker's
-  `waiting` state and prompts you to reload — click **Reload** in the toast.
-  See [`docs/troubleshooting.md`](docs/troubleshooting.md).
-- **Notes disappeared.** They live in this browser's `localStorage` for this
-  origin. A different browser, cleared site data, or private mode won't see
-  them.
-
-## Public pages
-
-Two routes are served outside the app, without a login, on the same verified
-domain:
-
-- **[/home](https://notes.niclaslindstedt.se/home)** — a showcase landing page
-  that introduces the app, describes what it does, and explains why the
-  optional cloud-sync feature asks for access to your own Google Drive (the
-  narrow `drive.file` scope — only files the app creates) or Dropbox app
-  folder. It's also the homepage used for Google's OAuth verification.
-- **[/privacy](https://notes.niclaslindstedt.se/privacy)** — the privacy
-  policy.
-
-Both live in `src/ui/` (`HomePage.tsx`, `PrivacyPage.tsx`). **When you add or
-change a user-facing feature — especially anything affecting what data the app
-reads, writes, or sends — update `/home` (and `/privacy` where relevant) in the
-same change** so they keep accurately and fully describing the app.
+Read [`AGENTS.md`](AGENTS.md) first: it is the canonical guide to the
+conventions in this repo (commit format, changeset fragments, the docs that
+must move in lockstep with a change). Then
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the workflow, the
+[Code of Conduct](CODE_OF_CONDUCT.md), and [`SECURITY.md`](SECURITY.md) for
+reporting a vulnerability.
 
 ## Documentation
 
@@ -154,12 +117,6 @@ same change** so they keep accurately and fully describing the app.
 - [Troubleshooting](docs/troubleshooting.md)
 - [`AGENTS.md`](AGENTS.md) — guidance for AI coding agents
 - [`OSS_SPEC.md`](OSS_SPEC.md) — the spec this repo follows
-
-## Contributing
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md). By participating you agree to the
-[Code of Conduct](CODE_OF_CONDUCT.md); report security issues per
-[`SECURITY.md`](SECURITY.md).
 
 ## License
 

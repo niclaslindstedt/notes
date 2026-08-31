@@ -5,7 +5,6 @@ const menu: MenuCatalog = {
   about: "Om",
   changelog: "Nyheter",
   privacy: "Integritetspolicy",
-  source: "Visa källkod",
   donate: "Donera",
 };
 
