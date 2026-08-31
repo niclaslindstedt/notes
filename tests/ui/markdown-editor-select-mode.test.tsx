@@ -338,13 +338,48 @@ describe("select mode", () => {
     expect(landed).toBe(true);
   });
 
-  it("sweeps straight away when the touch starts on the rail", () => {
+  it("sweeps from the anchor as soon as the rail touch goes vertical", () => {
     renderEditor();
     layOutRows();
     press(1, "touch", RAIL_X);
-    expect(tinted()).toEqual([1]);
+    // Nothing yet: the rail runs down the same screen edge the side menu opens
+    // from, so a finger has to say which way it is going first.
+    expect(tinted()).toEqual([]);
     moveTo(3, "touch", RAIL_X);
+    // It went down, so the whole stroke was the note's — the line it pressed
+    // included.
     expect(tinted()).toEqual([1, 2, 3]);
+  });
+
+  it("takes the line a rail touch that never travelled lifts off", () => {
+    renderEditor();
+    layOutRows();
+    tap(1, "touch", RAIL_X);
+    expect(tinted()).toEqual([1]);
+  });
+
+  it("leaves a sideways stroke on the rail to the side menu", () => {
+    // The gesture that opens the drawer starts on this very strip of screen,
+    // and only its direction tells the two apart: a rail stroke that goes
+    // sideways belongs to the menu, and the note must take nothing from it —
+    // not on the way across, and not on the lift.
+    const { onSelectModeChange } = renderEditor();
+    layOutRows();
+    press(1, "touch", RAIL_X);
+    moveTo(1, "touch", RAIL_X + 60);
+    expect(tinted()).toEqual([]);
+    release(1, "touch", RAIL_X + 60);
+    expect(tinted()).toEqual([]);
+    expect(onSelectModeChange).not.toHaveBeenCalled();
+  });
+
+  it("still drags from the rail on the first move of a mouse", () => {
+    // Only a touch waits: there is no edge swipe on a pointer, so a mouse
+    // press paints the line it landed on straight away.
+    renderEditor();
+    layOutRows();
+    press(1, "mouse", RAIL_X);
+    expect(tinted()).toEqual([1]);
   });
 
   it("draws a rail segment for every line, lit for the taken ones", () => {
@@ -652,6 +687,36 @@ describe("select mode from the line-number gutter", () => {
     moveTo(3, "touch", RAIL_X);
 
     expect(tinted()).toEqual([1, 2, 3]);
+  });
+
+  it("enters the mode when a gutter touch lifts without travelling", () => {
+    const { onSelectModeChange } = renderClosed();
+    layOutRows();
+
+    gutterPress(1, "touch");
+    // A tap is answered on the lift, once the stroke has proved it wasn't the
+    // side menu's swipe.
+    expect(onSelectModeChange).not.toHaveBeenCalled();
+    release(1, "touch", RAIL_X);
+
+    expect(onSelectModeChange.mock.calls).toEqual([[true]]);
+    expect(tinted()).toEqual([1]);
+  });
+
+  it("stays out of the swipe that opens the side menu", () => {
+    // On a phone the gutter sits inside the screen-edge strip the drawer opens
+    // from, so the two gestures start on the same pixels. A stroke that goes
+    // sideways is the drawer's: no line is taken and the mode never turns on.
+    const { onSelectModeChange } = renderClosed();
+    layOutRows();
+
+    gutterPress(1, "touch");
+    moveTo(1, "touch", RAIL_X + 60);
+    expect(tinted()).toEqual([]);
+    release(1, "touch", RAIL_X + 60);
+
+    expect(tinted()).toEqual([]);
+    expect(onSelectModeChange).not.toHaveBeenCalled();
   });
 
   it("scrolls nothing: the gutter refuses the touch it took", () => {

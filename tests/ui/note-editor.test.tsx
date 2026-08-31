@@ -989,10 +989,9 @@ describe("Editor (selection actions)", () => {
       stubNarrow(false);
       renderNumbered();
 
-      fireEvent.pointerDown(
-        document.querySelector<HTMLElement>("[data-line-gutter]")!,
-        { pointerId: 1, bubbles: true },
-      );
+      const number = document.querySelector<HTMLElement>("[data-line-gutter]")!;
+      fireEvent.pointerDown(number, { pointerId: 1, bubbles: true });
+      fireEvent.pointerUp(number, { pointerId: 1, bubbles: true });
 
       expect(wayOut()).toBeTruthy();
     });
