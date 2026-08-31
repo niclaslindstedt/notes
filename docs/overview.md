@@ -1002,22 +1002,35 @@ line", so the target has to be the band the finger actually lands in.
 
 **The gutter is a selection surface and nothing else.** A press in it enters
 [select mode](#select-mode) with the pressed line taken, and the same finger
-carries straight on down the numbers to take a run — the mode's sweep is live
-from the first pixel, so there is nothing to enter the mode and then aim again
-for. It follows that the gutter **takes no scroll at all**: `touch-none` on the
-button is what makes a stroke starting there unambiguously a selection, with no
-tap-versus-scroll to resolve. That is the one band of the note a finger can't
-travel with, and it is the price of the gesture being this direct; everywhere to
-the right of it the note scrolls exactly as it always did.
+carries straight on down the numbers to take a run — the mode's sweep picks up
+from the line the press landed on, so there is nothing to enter the mode and
+then aim again for. It follows that the gutter **takes no scroll at all**:
+`touch-none` on the button is what makes a stroke starting there unambiguously a
+selection, with no tap-versus-scroll to resolve. That is the one band of the
+note a finger can't travel with, and it is the price of the gesture being this
+direct; everywhere to the right of it the note scrolls exactly as it always did.
+
+**It answers clicks and vertical strokes, and leaves sideways ones alone.** The
+gutter is [rail](#select-mode), and on a phone it sits inside the screen-edge
+strip the [side menu](#side-menu) opens from, so a touch says nothing yet: a
+right swipe that means "open the drawer" starts on the very same pixels as a
+press that means "take this line". The gutter therefore takes nothing — and does
+not turn the mode on — until the stroke has travelled `SWEEP_SLOP` and shown
+which way it is going. Sideways is the menu's and the gutter never fires; up,
+down, or a lift with no travel at all is the gutter's and enters the mode as it
+always did, an instant later than the press. Only a touch waits; a mouse enters
+on the way down.
 
 The button itself carries no handler beyond cancelling its `mousedown` (the
 event an editing host takes focus from — the gutter lands no caret and raises no
 keyboard). It marks itself `data-line-gutter`, and the surface's own pointer
-handling does the rest: `onGutterDown` resolves the row with `lineRowAt`, starts
-a sweep, remembers the head of the line as `lastCaret`, and asks the host for
-the mode with `onSelectModeChange(true)`. The run the sweep has already painted
-is what the mode's entry effect seeds from (`gutterEntry`) rather than the caret
-— seeding would take a line the finger never touched.
+handling does the rest: `onGutterDown` resolves the row with `lineRowAt` and
+starts a sweep; `enterFromGutter` — reached on the way down from a mouse, and
+from the stroke that declares itself vertical (or the lift that never travels)
+on a touch — paints the line, remembers its head as `lastCaret`, and asks the
+host for the mode with `onSelectModeChange(true)`. The run the sweep has already
+painted is what the mode's entry effect seeds from (`gutterEntry`) rather than
+the caret — seeding would take a line the finger never touched.
 
 **The press never raises the keyboard**, which on a phone is the whole reason
 the gesture is worth having: an existing note opens with no active line and the
@@ -1038,8 +1051,8 @@ active raw line back to formatted, and its raw markdown (a `#`, a `- `, a `**`
 pair) can wrap to one row more or fewer than the formatted line does, reflowing
 everything below it. That reads as the note jumping somewhere else under the
 finger, rather than as the line being taken where it already was. So
-`onGutterDown` measures the pressed line's first row (`lineTop`) on the way in
-and `holdLineAnchor` pins it back to that y (`anchoredScrollTop` is the clamped
+`enterFromGutter` measures the pressed line's first row (`lineTop`) before it
+asks for the mode, and `holdLineAnchor` pins it back to that y (`anchoredScrollTop` is the clamped
 arithmetic, alongside its siblings in `scrollFocusedIntoView.ts`). The pin is
 held across a few frames rather than applied once: the mode is the host's flag,
 so the re-render that drops the raw line is a render behind the gesture, and
@@ -1119,6 +1132,21 @@ between the picks. A **mouse** has no such conflict, since it scrolls with a
 wheel, so a mouse drags from anywhere. Off the rail, a touch is still a press
 that toggles its line — it just has to lift without travelling first, because
 until the finger comes up there is no telling a tap from the start of a scroll.
+
+**The rail answers presses and vertical strokes, never sideways ones.** It runs
+down the left edge of the note, which on a phone is also the left edge of the
+*screen* — the strip the [side menu](#side-menu) opens from when its floating
+button is hidden (`useEdgeSwipeOpen`, and the `EDGE_ZONE` the row swipes stand
+down in). Both gestures therefore begin on the same pixels, and only their
+direction tells them apart. So a **touch** that lands on the rail takes nothing
+until it has travelled `SWEEP_SLOP` and declared an axis: sideways is the
+drawer's, and the rail never fires — not on the way across, and not on the lift,
+which is no longer a tap. Up, down, or nowhere at all is the rail's, and lands
+exactly as a press always did, picking up from the line the finger pressed as
+though it had been painting from the first pixel. The test is the complement of
+the drawer's own (it stands down the moment `|dy| > |dx|`), so precisely one of
+the two answers any given stroke. A mouse skips the wait: there is no edge swipe
+on a pointer, and a drag from the rail is unambiguous.
 
 Whether a stroke *takes* or *gives back* is decided once, by the line it starts
 on (`PaintMode`): start on an untaken line and the finger paints, start on a

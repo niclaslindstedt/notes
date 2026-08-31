@@ -332,6 +332,19 @@ const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock"]);
 // `onGutterDown`). It scrolls nothing — the gutter is the one band of the note
 // that never moves the view — which is what lets a stroke starting there mean
 // "take these lines" with no ambiguity to resolve.
+//
+// **The rail answers presses and vertical strokes, never sideways ones.** It
+// runs down the left edge of the note, which on a phone is also the left edge
+// of the *screen* — the strip the side menu's own open gesture starts in
+// (`useEdgeSwipeOpen`, `ui/hooks/edge-gesture.ts`). Both gestures therefore
+// begin on the same pixels, and only their direction tells them apart, so a
+// touch that lands on the rail takes nothing until it has travelled
+// `SWEEP_SLOP` and declared an axis: sideways is the drawer's and the rail
+// never fires; up, down, or nowhere at all (a tap) is the rail's and lands
+// exactly as a press always did. The test is the complement of the drawer's
+// own (it stands down the moment |dy| > |dx|), so precisely one of the two
+// answers any given stroke. A mouse skips the wait — there is no edge swipe on
+// a pointer, and a drag from the rail is unambiguous.
 
 /** How far in from the left edge of the scroller the sweep rail reaches. A
  *  press that starts inside it drags lines; one that starts to the right of it
@@ -358,6 +371,32 @@ const SWEEP_FEEDBACK_MS = 12;
  *  without pushing the finger off the screen. */
 const SWEEP_EDGE_PX = 56;
 const SWEEP_SCROLL_MAX = 18;
+
+/** A stroke the sweep is following, from the press that started it to the
+ *  lift that ends it. */
+type SweepStroke = {
+  pointerId: number;
+  /** Where the press landed, so a move can measure how far it has come. */
+  x: number;
+  y: number;
+  /** The line the stroke started on; the far end follows the pointer. */
+  anchor: number;
+  /** Taking lines or giving them back — fixed when the press landed. */
+  mode: PaintMode;
+  /** What was taken before this stroke began. Every move replays the stroke
+   *  against it, so dragging back up un-paints rather than leaving a
+   *  high-water mark, and earlier picks are never disturbed. */
+  base: readonly number[];
+  /** The stroke owns the pointer: it is on the rail, or it is a mouse. A
+   *  touch outside the rail leaves this false so the note can scroll. */
+  dragging: boolean;
+  moved: boolean;
+  /** A touch stroke on the rail that has not said which way it is going yet,
+   *  and so has taken nothing (see `commitSweep`). `null` once it has said —
+   *  and from the first frame for a mouse, which has nothing to be told apart
+   *  from. */
+  pending: { entering: boolean } | null;
+};
 
 /** Whether an event landed in the line-number gutter — the press target
  *  `LineRow` hangs beside every line while the numbers are on. Asked of the
@@ -1105,23 +1144,7 @@ export function MarkdownEditor({
   // untaken line and the finger paints, start on a taken one and it erases.
   // That is the same rule that makes a second press on a line drop it — a press
   // is simply a stroke that never moved.
-  const sweep = useRef<{
-    pointerId: number;
-    x: number;
-    y: number;
-    /** The line the stroke started on; the far end follows the pointer. */
-    anchor: number;
-    /** Taking lines or giving them back — fixed when the press landed. */
-    mode: PaintMode;
-    /** What was taken before this stroke began. Every move replays the stroke
-     *  against it, so dragging back up un-paints rather than leaving a
-     *  high-water mark, and earlier picks are never disturbed. */
-    base: readonly number[];
-    /** The stroke owns the pointer: it is on the rail, or it is a mouse. A
-     *  touch outside the rail leaves this false so the note can scroll. */
-    dragging: boolean;
-    moved: boolean;
-  } | null>(null);
+  const sweep = useRef<SweepStroke | null>(null);
   // The live pointer position, read by the edge auto-scroll between moves.
   const sweepAt = useRef({ x: 0, y: 0 });
   const sweepScroll = useRef(0);
@@ -1252,13 +1275,31 @@ export function MarkdownEditor({
       base: sel?.lines ?? [],
       dragging,
       moved: false,
+      // A finger on the rail is a stroke the side menu could also be claiming,
+      // so it waits out the axis test before it takes anything.
+      pending: dragging && !mouse ? { entering: false } : null,
     };
     if (!dragging) return;
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    paintSweep(line);
-    // Confirm the rail took the finger before anything moves, so it can start
-    // travelling the moment it is felt rather than after a guess.
-    if (!mouse) haptics.vibrate(SWEEP_FEEDBACK_MS);
+    if (!sweep.current.pending) paintSweep(line);
+  }
+
+  // The stroke has declared itself the note's rather than the side menu's (or
+  // never had to). Take the line it pressed — and, from a gutter press with the
+  // mode still off, turn the mode on around it.
+  function commitSweep(s: SweepStroke) {
+    const p = s.pending;
+    if (!p) return;
+    s.pending = null;
+    if (p.entering) {
+      // Only a touch ever waits, so the stroke that got here is never a mouse.
+      enterFromGutter(s.anchor, false);
+      return;
+    }
+    paintSweep(s.anchor);
+    // Confirm the rail took the finger as it starts to travel, so the stroke
+    // is felt rather than guessed at.
+    haptics.vibrate(SWEEP_FEEDBACK_MS);
   }
 
   // A press in the line-number gutter with the mode still *off*: the shorthand
@@ -1276,16 +1317,7 @@ export function MarkdownEditor({
     if (line === null) return;
     // The press is ours end to end: no caret is placed and no focus moves.
     e.preventDefault();
-    // Where the pressed line sits *now*, before the mode re-renders the note.
-    // Entering drops the active raw line back to formatted, and its markdown
-    // (a `#`, a `- `, a `**`) can wrap to one row more or fewer than the
-    // formatted line does, reflowing everything below it — so the line under
-    // the finger is pinned to the y it was pressed at (see `holdLineAnchor`).
-    const anchor = lineTop(rootRef.current, line);
-    // The mode leaves nothing selected on the way out, so the head of the
-    // pressed line is where writing picks up again.
-    lastCaret.current = { line, col: 0 };
-    gutterEntry.current = true;
+    const mouse = e.pointerType === "mouse";
     sweep.current = {
       pointerId: e.pointerId,
       x: e.clientX,
@@ -1296,10 +1328,32 @@ export function MarkdownEditor({
       base: [],
       dragging: true,
       moved: false,
+      // The gutter is on the screen edge the side menu opens from, so a finger
+      // says which gesture it meant by which way it goes (see the rail's note
+      // above). Nothing is taken and the mode does not turn on until it has.
+      pending: mouse ? null : { entering: true },
     };
     e.currentTarget.setPointerCapture?.(e.pointerId);
+    if (mouse) enterFromGutter(line, mouse);
+  }
+
+  // Turn select mode on around the line a gutter stroke pressed. Split out of
+  // `onGutterDown` because a touch only reaches it once the stroke has proved
+  // it isn't the side menu's — on a lift that never travelled, or on the first
+  // movement that is more vertical than sideways.
+  function enterFromGutter(line: number, mouse: boolean) {
+    // Where the pressed line sits *now*, before the mode re-renders the note.
+    // Entering drops the active raw line back to formatted, and its markdown
+    // (a `#`, a `- `, a `**`) can wrap to one row more or fewer than the
+    // formatted line does, reflowing everything below it — so the line under
+    // the finger is pinned to the y it was pressed at (see `holdLineAnchor`).
+    const anchor = lineTop(rootRef.current, line);
+    // The mode leaves nothing selected on the way out, so the head of the
+    // pressed line is where writing picks up again.
+    lastCaret.current = { line, col: 0 };
+    gutterEntry.current = true;
     paintSweep(line);
-    if (e.pointerType !== "mouse") haptics.vibrate(SWEEP_FEEDBACK_MS);
+    if (!mouse) haptics.vibrate(SWEEP_FEEDBACK_MS);
     onSelectModeChange?.(true);
     if (anchor !== undefined)
       holdLineAnchor(rootRef.current, line, anchor, ANCHOR_FRAMES_FOCUSED);
@@ -1308,11 +1362,28 @@ export function MarkdownEditor({
   function onSweepMove(e: ReactPointerEvent<HTMLDivElement>) {
     const s = sweep.current;
     if (!s || s.pointerId !== e.pointerId) return;
-    if (
-      Math.abs(e.clientX - s.x) > SWEEP_SLOP ||
-      Math.abs(e.clientY - s.y) > SWEEP_SLOP
-    )
-      s.moved = true;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (Math.abs(dx) > SWEEP_SLOP || Math.abs(dy) > SWEEP_SLOP) s.moved = true;
+    // A rail stroke that hasn't said which way it is going: the first real
+    // travel decides. Sideways is the side menu opening from the screen edge
+    // the rail shares — the note takes nothing and stays out of the way, this
+    // lift included (`moved` is set, so it is no longer a tap either). Up or
+    // down is the note's, and picks up from the line the finger pressed as
+    // though it had been painting all along.
+    if (s.pending) {
+      if (!s.moved) return;
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        // Hand the pointer back as well as the gesture: the press captured it
+        // on the way down, and the rest of this stroke belongs to whatever the
+        // drawer does with it.
+        if (e.currentTarget.hasPointerCapture?.(e.pointerId))
+          e.currentTarget.releasePointerCapture?.(e.pointerId);
+        endSweep();
+        return;
+      }
+      commitSweep(s);
+    }
     // The note is scrolling under a finger that started outside the rail. Leave
     // it alone entirely — and remember that it travelled, so letting go doesn't
     // toggle whatever line the scroll happened to end on.
@@ -1328,8 +1399,12 @@ export function MarkdownEditor({
     // A press that never travelled toggles the line it landed on: it takes an
     // untaken line, and gives back one that was already taken. Off the rail
     // that is decided here rather than on the way down, because until the
-    // finger lifts there is no telling a tap from the start of a scroll.
-    if (!s.dragging && !s.moved) paintSweep(s.anchor);
+    // finger lifts there is no telling a tap from the start of a scroll — and
+    // on the rail, because until then there is no telling it from the side
+    // menu's swipe.
+    if (s.pending) {
+      if (!s.moved) commitSweep(s);
+    } else if (!s.dragging && !s.moved) paintSweep(s.anchor);
     endSweep();
     // Giving the last line back is the other way out. The mode is a list you
     // are picking from, and an empty list is not one: with nothing taken every

@@ -2111,7 +2111,11 @@ describe("MarkdownEditor", () => {
         onSelectModeChange,
       });
       act(() => {
+        // A whole press and lift: a touch on the gutter waits until the stroke
+        // has proved it isn't the swipe that opens the side menu, which starts
+        // on the same strip of screen (see `markdown-editor-select-mode`).
         fireEvent.pointerDown(gutter()[0]!, { pointerId: 1, bubbles: true });
+        fireEvent.pointerUp(gutter()[0]!, { pointerId: 1, bubbles: true });
       });
       expect(onSelectModeChange).toHaveBeenCalledWith(true);
       // No browser selection: the mode paints the lines itself, and a range
@@ -2294,6 +2298,7 @@ describe("MarkdownEditor (locked)", () => {
     });
     act(() => {
       fireEvent.pointerDown(gutter()[0]!, { pointerId: 1, bubbles: true });
+      fireEvent.pointerUp(gutter()[0]!, { pointerId: 1, bubbles: true });
     });
     expect(onSelectModeChange).toHaveBeenCalledWith(true);
   });
