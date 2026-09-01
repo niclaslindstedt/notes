@@ -19,6 +19,7 @@ import {
   BulletListGlyph,
   ChecklistGlyph,
   CodeBlockGlyph,
+  FileGlyph,
   FormatIcon,
   HeadingGlyph,
   ImageGlyph,
@@ -44,7 +45,7 @@ import { ChevronDownIcon } from "./icons.tsx";
 // Twenty constructs would be twenty buttons, which wraps to three rows on a
 // phone. So the ones that form a natural family collapse into a **menu**: the
 // six heading levels, the five block styles (bullet / numbered / checklist,
-// quote, code block), and the three inserts (link, image, divider). Each menu's trigger
+// quote, code block), and the four inserts (link, image, file, divider). Each menu's trigger
 // wears the glyph of whichever member is currently applied — so a caret on an H2
 // line shows `H2`, lit — and its rows carry both the glyph and its name, which
 // the bare icon buttons never could. That takes the row to nine controls, which
@@ -66,10 +67,25 @@ import { ChevronDownIcon } from "./icons.tsx";
 // `role="toolbar"` with a roving tabindex keeps the row one stop in the keyboard
 // order rather than nine.
 
+/**
+ * A press that reaches for a file instead of writing Markdown: the Insert
+ * menu's **File** entry opens the file browser and attaches whatever comes
+ * back at the caret, the same way a paste or a drop does. `images` narrows the
+ * browser to pictures (on a phone, the photo library).
+ *
+ * It is deliberately not a `FormatAction`: nothing about it is a construct the
+ * parser understands, and the host — not the pure formatter — is what owns the
+ * picker and the note's attachment list.
+ */
+export type AttachAction = { kind: "attach"; images?: boolean };
+
+/** Everything a toolbar press can ask the host for. */
+export type ToolbarAction = FormatAction | AttachAction;
+
 /** One control: what it inserts, how it is labelled, and when it is lit. */
 type ToolbarItem = {
   id: string;
-  action: FormatAction;
+  action: ToolbarAction;
   label: string;
   glyph: ReactNode;
   /** Whether the caret already sits in (or on) this construct. */
@@ -111,7 +127,7 @@ const MENU_PLACEMENT: FloatingPlacement = {
   coordinateSpace: "viewport",
 };
 
-function buildGroups(t: TFunction): ToolbarGroup[] {
+function buildGroups(t: TFunction, canAttach: boolean): ToolbarGroup[] {
   return [
     {
       kind: "menu",
@@ -244,6 +260,20 @@ function buildGroups(t: TFunction): ToolbarGroup[] {
           label: t("app.format.image"),
           glyph: <ImageGlyph className={ICON} />,
         },
+        // Only where the backend can hold attachments at all — on the browser
+        // backend there is nowhere for the bytes to go, and a row that silently
+        // does nothing is worse than an absent one. (Image stays either way:
+        // without attachments it still writes `![](url)`.)
+        ...(canAttach
+          ? [
+              {
+                id: "file",
+                action: { kind: "attach" } as const,
+                label: t("app.format.file"),
+                glyph: <FileGlyph className={ICON} />,
+              },
+            ]
+          : []),
         {
           id: "rule",
           action: { kind: "rule" },
@@ -259,15 +289,18 @@ export function FormatToolbar({
   line,
   onAction,
   maxWidth,
+  canAttach = false,
 }: {
   /** The block state of the line the caret sits on, for the lit controls. */
   line: LineFormat | null;
-  onAction: (action: FormatAction) => void;
+  onAction: (action: ToolbarAction) => void;
   /** The writing column's width, so the toolbar lines up with the text. */
   maxWidth: string;
+  /** Whether this surface can attach a file — what puts **File** in the menu. */
+  canAttach?: boolean;
 }) {
   const t = useT();
-  const groups = buildGroups(t);
+  const groups = buildGroups(t, canAttach);
   const rowRef = useRef<HTMLDivElement>(null);
 
   // Roving tabindex: the toolbar is a single stop in the page's tab order and
@@ -364,7 +397,7 @@ function ToolbarButton({
 }: {
   item: ToolbarItem;
   line: LineFormat | null;
-  onAction: (action: FormatAction) => void;
+  onAction: (action: ToolbarAction) => void;
   tabIndex: number;
   onFocus: () => void;
 }) {
@@ -398,8 +431,8 @@ function ToolbarButton({
 }
 
 /**
- * A family of constructs behind one trigger — the six heading levels, the four
- * block styles, the three inserts. The trigger wears the glyph of whichever
+ * A family of constructs behind one trigger — the six heading levels, the five
+ * block styles, the inserts. The trigger wears the glyph of whichever
  * member is currently applied (and lights up with it), falling back to the
  * group's own glyph; the panel lists every member with its glyph *and* its
  * name, which the bare icon buttons in the row can't show.
@@ -413,7 +446,7 @@ function FormatMenu({
 }: {
   group: Extract<ToolbarGroup, { kind: "menu" }>;
   line: LineFormat | null;
-  onAction: (action: FormatAction) => void;
+  onAction: (action: ToolbarAction) => void;
   tabIndex: number;
   onFocus: () => void;
 }) {

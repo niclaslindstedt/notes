@@ -72,6 +72,17 @@ const URL_PLACEHOLDER = "url";
 const URL_RE = /^(?:https?:\/\/|www\.)\S+$/i;
 
 /**
+ * Whether a piece of text is itself an address, which is what makes a link
+ * press take it as the **href** rather than the label. Exported because the
+ * toolbar's Image entry asks the same question before it decides between
+ * writing `![](…)` around a selected URL and opening the photo browser to
+ * attach one (see `docs/overview.md#styling-toolbar`).
+ */
+export function isUrlText(text: string): boolean {
+  return URL_RE.test(text);
+}
+
+/**
  * Where the caret (or a selection) sits within one line, as source columns.
  * Null when the selection spans several lines — inline emphasis can't cross a
  * line boundary, so there is no single run to be inside of.
@@ -825,7 +836,7 @@ function applyLink(
   const selected = line.slice(from, to);
   const next = [...lines];
 
-  if (URL_RE.test(selected)) {
+  if (isUrlText(selected)) {
     next[start.line] =
       `${line.slice(0, from)}${bang}[](${selected})${line.slice(to)}`;
     const col = from + bang.length + 1;

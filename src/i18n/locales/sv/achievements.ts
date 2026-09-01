@@ -98,7 +98,7 @@ const achievements: AchievementsCatalog = {
       name: "Stilisten",
       condition: "Formatera något med formateringsraden.",
       learnMore:
-        "Formateringsknappen uppe till höger i en anteckning fäller ut en rad ovanför texten — rubriker, fet, kursiv, genomstruken, kod i text, punktlistor och numrerade listor, citat, kodblock, indrag, länkar, bilder och avdelare, en knapp var. Den skriver vanlig Markdown, så allt du når där kan du lika gärna skriva för hand; varje knapp är en växel, så ett tryck på en tänd knapp tar bort formateringen igen.",
+        "Formateringsknappen uppe till höger i en anteckning fäller ut en rad ovanför texten — rubriker, fet, kursiv, genomstruken, kod i text, punktlistor och numrerade listor, citat, kodblock, indrag, länkar, bilder, filer och avdelare, en knapp var. Den skriver vanlig Markdown, så allt du når där kan du lika gärna skriva för hand; varje knapp är en växel, så ett tryck på en tänd knapp tar bort formateringen igen. Bild och Fil är de två som räcker förbi Markdown: de öppnar enhetens bild- eller filväljare och bifogar det du väljer vid markören, precis som när du klistrar in en bild.",
     },
 
     fullStop: {

@@ -103,7 +103,7 @@ const achievements = {
       name: "Stylist",
       condition: "Format something with the styling toolbar.",
       learnMore:
-        "The formatting button at the top right of a note opens a toolbar above the text — headings, bold, italic, strikethrough, inline code, bullet and numbered lists, quotes, code blocks, indent and outdent, links, images and dividers, one button each. It writes ordinary Markdown, so anything you reach for there you can also just type; every button is a toggle, so pressing a lit one takes the formatting back off.",
+        "The formatting button at the top right of a note opens a toolbar above the text — headings, bold, italic, strikethrough, inline code, bullet and numbered lists, quotes, code blocks, indent and outdent, links, images, files and dividers, one button each. It writes ordinary Markdown, so anything you reach for there you can also just type; every button is a toggle, so pressing a lit one takes the formatting back off. Image and File are the two that reach past Markdown: they open your photo or file browser and attach what you pick at the cursor, the same as pasting a picture in.",
     },
 
     fullStop: {

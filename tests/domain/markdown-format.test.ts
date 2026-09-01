@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { classifyLines } from "../../src/domain/markdown.ts";
 import {
   applyFormat,
+  isUrlText,
   lineFormatAt,
   newlineFor,
   type FormatAction,
@@ -363,6 +364,17 @@ describe("links and images", () => {
 
   it("writes image syntax when asked", () => {
     expect(run("|", { kind: "link", image: true })).toBe("![]([url])");
+  });
+
+  // The same question the toolbar's Image entry asks before it decides between
+  // writing `![](…)` and opening the photo browser.
+  it("recognises an address, and nothing else, as a link", () => {
+    expect(isUrlText("https://a.example/x")).toBe(true);
+    expect(isUrlText("HTTP://a.example")).toBe(true);
+    expect(isUrlText("www.a.example")).toBe(true);
+    expect(isUrlText("")).toBe(false);
+    expect(isUrlText("a picture of a cat")).toBe(false);
+    expect(isUrlText("https://a.example with words")).toBe(false);
   });
 });
 
