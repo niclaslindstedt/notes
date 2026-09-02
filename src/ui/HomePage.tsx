@@ -154,11 +154,12 @@ export function HomePage() {
               well type by hand, and every button is a toggle — the toolbar
               lights up whatever the cursor is already sitting in, from the
               heading it's on to the bold or italic phrase around it, so
-              pressing a lit button takes that formatting back off. Image and
-              File open your device's photo or file browser and attach what you
-              pick right where the cursor is, exactly as pasting or dropping a
-              file into the note does — the file is stored in your own folder or
-              cloud alongside the note, never anywhere else.
+              pressing a lit button takes that formatting back off. Image/file
+              opens your device's photo or file browser — one entry for both —
+              and attaches what you pick right where the cursor is, exactly as
+              pasting or dropping a file into the note does — the file is stored
+              in your own folder or cloud alongside the note, never anywhere
+              else.
             </li>
             <li>
               Tap <kbd>space</kbd> twice at the end of a word and the sentence

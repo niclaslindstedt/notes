@@ -2676,7 +2676,7 @@ export function MarkdownEditor({
   function insertAttachments(atts: readonly Attachment[]) {
     if (atts.length === 0) return;
     // Where the caret is — and `lastCaret` is the one that survives a trip out
-    // of the surface, which the toolbar's Image / File entries always take: the
+    // of the surface, which the toolbar's Image/file entry always takes: the
     // file browser blurs the editor, so by the time the files come back there
     // is no active line left. Falling back to the end of the note would drop
     // the attachment somewhere the user wasn't looking.

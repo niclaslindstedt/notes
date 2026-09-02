@@ -1,9 +1,9 @@
 // Open the platform's file browser and hand back what was chosen. The
 // counterpart to the paste / drop routes into `fileToAttachment`: the styling
-// toolbar's Image and File entries need a way to *ask* for a file rather than
-// waiting for one to arrive, and on a phone that browser is the photo library
-// (an `accept` of `image/*` is what makes the picker offer photos and the
-// camera rather than a folder of documents).
+// toolbar's Image/file entry needs a way to *ask* for a file rather than
+// waiting for one to arrive. Left unnarrowed, a phone's browser offers the
+// photo library and the camera alongside the files — which is why one entry
+// covers both; an `accept` of `image/*` would make it offer photos only.
 //
 // DOM-bound, so it lives beside the rest of the attachment plumbing in `ui/`.
 
