@@ -23,6 +23,7 @@ import {
 } from "../domain/line-edit.ts";
 import {
   applyFormat,
+  isUrlText,
   lineFormatAt,
   type ColumnSpan,
   type FormatAction,
@@ -58,7 +59,11 @@ import {
 } from "./editor-position.ts";
 import { ExportButton } from "./export/ExportButton.tsx";
 import { FavoriteButton } from "./FavoriteButton.tsx";
-import { FormatToolbar, FormatToolbarButton } from "./FormatToolbar.tsx";
+import {
+  FormatToolbar,
+  FormatToolbarButton,
+  type ToolbarAction,
+} from "./FormatToolbar.tsx";
 import { LockButton } from "./LockButton.tsx";
 import { MoveLinesButton } from "./MoveLinesButton.tsx";
 import { useFindShortcut } from "./hooks/useFindShortcuts.ts";
@@ -69,6 +74,7 @@ import {
   MarkdownEditor,
   type MarkdownEditorHandle,
 } from "./MarkdownEditor.tsx";
+import { pickFiles } from "./attachments/pick-files.ts";
 import { NoteFindBar, NoteFindButton } from "./NoteFindBar.tsx";
 import { SelectModeButton } from "./SelectModeButton.tsx";
 
@@ -624,11 +630,50 @@ export function Editor({
     });
   }
 
+  // Whether this surface can put a file in the note at all: the backend has to
+  // store attachments, the note must not be sealed, and the live-preview editor
+  // is the only surface with an attach path (the plain textarea has none — it
+  // doesn't attach a paste or a drop either).
+  const attachable = canAttach && editor.renderMarkdown && !locked;
+
+  // Ask for a file and drop it in at the caret, which is what the Insert menu's
+  // **File** entry does and what its **Image** entry falls back to. Deliberately
+  // the same route a paste or a drop takes — `fileToAttachment` then the
+  // editor's own insert — so an attachment made from the toolbar is
+  // indistinguishable from one that arrived off the clipboard.
+  async function pickAndAttach(images: boolean) {
+    if (!attachable) return;
+    const files = await pickFiles(images ? { accept: "image/*" } : {});
+    if (files.length > 0) markdownEditorRef.current?.attach(files);
+  }
+
   // Route a toolbar press to whichever surface is mounted — the live-preview
   // editor, or the plain textarea when Markdown rendering is switched off.
   // Both apply the same pure formatter, so the two agree on what a press does.
-  function runFormat(action: FormatAction) {
+  //
+  // Two of the Insert entries reach for a file rather than the formatter:
+  //
+  //   * **File** always does — it exists to attach one.
+  //   * **Image** does *unless an actual link is selected*. `![alt](url)` is
+  //     only useful when there is a `url` to put in it, and the far commoner
+  //     intent behind pressing Image is "put this picture in my note" — so a
+  //     selected address still becomes a Markdown image, and everything else
+  //     opens the photo browser. Where nothing can be attached (the browser
+  //     backend, the plain editor, a sealed note) it writes the `![](url)`
+  //     placeholder as before, which is still better than doing nothing.
+  function runFormat(action: ToolbarAction) {
     unlock("stylist");
+    if (action.kind === "attach") {
+      void pickAndAttach(action.images === true);
+      return;
+    }
+    if (action.kind === "link" && action.image === true && attachable) {
+      const selected = markdownEditorRef.current?.selection() ?? "";
+      if (!isUrlText(selected)) {
+        void pickAndAttach(true);
+        return;
+      }
+    }
     if (editor.renderMarkdown) markdownEditorRef.current?.format(action);
     else plainEditorRef.current?.format(action);
   }
@@ -1011,6 +1056,7 @@ export function Editor({
             line={lineFormat}
             onAction={runFormat}
             maxWidth={maxWidth}
+            canAttach={attachable}
           />
         )}
         {loading ? (

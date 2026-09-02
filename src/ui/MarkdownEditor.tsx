@@ -427,6 +427,10 @@ export type MarkdownEditorHandle = {
    *  selected. A no-op unless the selection covers whole lines — the header
    *  only offers it then (see `docs/overview.md#move-lines`). */
   moveLines: (direction: -1 | 1) => void;
+  /** Attach files chosen from the file browser, exactly as a paste or a drop
+   *  of the same files would: each becomes an `Attachment` and its Markdown
+   *  reference lands at the caret. */
+  attach: (files: readonly File[]) => void;
 };
 
 // The active line's identity: which source line is being edited as raw text, and
@@ -2671,7 +2675,13 @@ export function MarkdownEditor({
   // --- Attachments (paste / drop) ------------------------------------------
   function insertAttachments(atts: readonly Attachment[]) {
     if (atts.length === 0) return;
-    const i = clampedIndex ?? lines.length - 1;
+    // Where the caret is — and `lastCaret` is the one that survives a trip out
+    // of the surface, which the toolbar's Image / File entries always take: the
+    // file browser blurs the editor, so by the time the files come back there
+    // is no active line left. Falling back to the end of the note would drop
+    // the attachment somewhere the user wasn't looking.
+    const at = clampedIndex ?? lastCaret.current?.line ?? lines.length - 1;
+    const i = Math.max(0, Math.min(at, lines.length - 1));
     const cur = lines[i] ?? "";
     const inserted = [...atts.map(attachmentMarkdown), ""];
     const next = [...lines];
@@ -2680,7 +2690,7 @@ export function MarkdownEditor({
     commit(next, { line: base + inserted.length - 1, col: 0 });
   }
 
-  async function attachFiles(files: File[]) {
+  async function attachFiles(files: readonly File[]) {
     if (!canAttach || files.length === 0) return;
     const built = await Promise.all(files.map(fileToAttachment));
     const atts = built.filter((a): a is Attachment => a !== null);
@@ -2688,6 +2698,11 @@ export function MarkdownEditor({
     for (const a of atts) onAttach?.(a);
     insertAttachments(atts);
   }
+
+  // So the imperative handle can reach the attach path without taking a
+  // rebuilt-every-render closure as a dependency (see the other `*Ref`s).
+  const attachFilesRef = useRef(attachFiles);
+  attachFilesRef.current = attachFiles;
 
   function onPaste(e: ReactClipboardEvent<HTMLDivElement>) {
     // Nothing lands in a locked note — not text, not a file.
@@ -3388,6 +3403,7 @@ export function MarkdownEditor({
       selection: () => selectionSourceRef.current(),
       deleteSelection: () => deleteLineSelectionRef.current(),
       moveLines: (direction: -1 | 1) => moveSelectedLinesRef.current(direction),
+      attach: (files: readonly File[]) => void attachFilesRef.current(files),
     }),
     [],
   );

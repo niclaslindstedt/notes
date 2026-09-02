@@ -87,6 +87,7 @@ const app: AppCatalog = {
     outdent: "Minska indrag",
     link: "Länk",
     image: "Bild",
+    file: "Fil",
     rule: "Avdelare",
   },
   find: {
