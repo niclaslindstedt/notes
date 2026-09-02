@@ -433,6 +433,12 @@ const achievements = {
       learnMore:
         "Connect Dropbox or Google Drive and your notes sync to your own cloud storage, so they follow you to every device you sign in on.",
     },
+    homeCloud: {
+      name: "Home cloud",
+      condition: "Connect your own Nextcloud.",
+      learnMore:
+        "Point the app at a Nextcloud you run and your notes sync there as ordinary markdown files, reachable from every device that account signs in on — no third-party cloud in the middle. The app signs in with a revocable app password, never your account password.",
+    },
     selfHoster: {
       name: "Self-hoster",
       condition: "Pair with your own notesd server.",

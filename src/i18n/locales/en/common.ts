@@ -13,6 +13,7 @@ const common = {
   create: "Create",
   confirm: "Confirm",
   back: "Back",
+  change: "Change",
   connect: "Connect",
   disconnect: "Disconnect",
   connected: "Connected",

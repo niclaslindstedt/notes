@@ -331,6 +331,25 @@ const settings = {
       "Finish signing in to Dropbox in your browser, then come back here.",
     gdriveConnected: "Your notes sync to a folder in your Google Drive.",
     gdriveUnconnected: "Sign in to keep your notes in your own Google Drive.",
+    backendNextcloud: "Nextcloud",
+    nextcloudConnected:
+      "Your notes sync to “{folder}” on {server} — a server you run.",
+    nextcloudUnconnected:
+      "Keep your notes in your own Nextcloud. Sign in with an app password rather than your account password — create one under Settings → Security on your Nextcloud, and revoke it there whenever you like.",
+    nextcloudServer: "Server address",
+    nextcloudServerPlaceholder: "cloud.example.com",
+    nextcloudUser: "User name",
+    nextcloudUserPlaceholder: "your Nextcloud login",
+    nextcloudAppPassword: "App password",
+    nextcloudAppPasswordPlaceholder: "from Settings → Security",
+    nextcloudFolder: "Folder",
+    nextcloudFolderHint:
+      "Where the notes are kept in your account. Left empty, “{fallback}” is created at the top level.",
+    nextcloudConnecting: "Connecting…",
+    nextcloudCorsHint:
+      "Reaching a Nextcloud from a web page needs that server to allow this app's address to use its WebDAV API — a setting you make once, on the server.",
+    nextcloudReauth:
+      "Nextcloud rejected the stored app password. Enter a new one in Settings → Storage.",
     backendNotesd: "Self-hosted",
     notesdConnected:
       "Your notes sync to your own notesd server — no cloud, no accounts.",

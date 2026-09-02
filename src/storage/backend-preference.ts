@@ -8,7 +8,8 @@ import { createLogger } from "../dev/logger.ts";
 
 const log = createLogger("backend-pref");
 
-export type BackendId = "browser" | "folder" | "dropbox" | "gdrive" | "notesd";
+export type BackendId =
+  "browser" | "folder" | "dropbox" | "gdrive" | "nextcloud" | "notesd";
 
 // Everything needed to reach and trust a paired notesd daemon, stored
 // per-device (like the cloud tokens). `spkiPin` validates the daemon's
@@ -24,6 +25,21 @@ export type NotesdConfig = {
   name: string;
 };
 
+// Everything needed to reach one Nextcloud account, stored per-device like the
+// cloud tokens. There is no OAuth and no refresh: `appPassword` is the
+// revocable per-client credential Nextcloud mints under Settings → Security,
+// sent as HTTP Basic on every request.
+export type NextcloudConfig = {
+  /** `https://cloud.example.com` base URL, no trailing slash. */
+  endpoint: string;
+  /** The Nextcloud login name the app password belongs to. */
+  username: string;
+  /** The app password, used as the HTTP Basic secret. */
+  appPassword: string;
+  /** App-folder path at the account root, e.g. `notes` or `Apps/notes`. */
+  folder: string;
+};
+
 // Whether a namespace's stored bytes are wrapped in the AES-GCM envelope
 // before being handed to the adapter. Defaults to "plaintext" — encryption is
 // an explicit opt-in from Settings, and there are no accounts to inherit a
@@ -36,6 +52,7 @@ const DROPBOX_TOKEN_KEY = "notes:dropbox:token";
 // key so a legacy install (access token only) round-trips unchanged.
 const DROPBOX_REFRESH_KEY = "notes:dropbox:refresh";
 const GDRIVE_TOKEN_KEY = "notes:gdrive:token";
+const NEXTCLOUD_CONFIG_KEY = "notes:nextcloud:config";
 const NOTESD_CONFIG_KEY = "notes:notesd:config";
 // The account-wide encryption flag written before encryption became a
 // per-namespace decision. Still read as the fallback for a namespace that has
@@ -76,6 +93,7 @@ export function getBackend(): BackendId {
   if (raw === "dropbox") return "dropbox";
   if (raw === "gdrive") return "gdrive";
   if (raw === "folder") return "folder";
+  if (raw === "nextcloud") return "nextcloud";
   if (raw === "notesd") return "notesd";
   // Any unknown / missing value falls through to the browser backend.
   return "browser";
@@ -136,6 +154,33 @@ export function setGdriveToken(token: string): void {
 
 export function clearGdriveToken(): void {
   clear(GDRIVE_TOKEN_KEY);
+}
+
+export function getNextcloudConfig(): NextcloudConfig | null {
+  const raw = read(NEXTCLOUD_CONFIG_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<NextcloudConfig>;
+    if (
+      typeof parsed.endpoint === "string" &&
+      typeof parsed.username === "string" &&
+      typeof parsed.appPassword === "string" &&
+      typeof parsed.folder === "string"
+    ) {
+      return parsed as NextcloudConfig;
+    }
+  } catch {
+    // fall through to null on a corrupt blob
+  }
+  return null;
+}
+
+export function setNextcloudConfig(config: NextcloudConfig): void {
+  write(NEXTCLOUD_CONFIG_KEY, JSON.stringify(config));
+}
+
+export function clearNextcloudConfig(): void {
+  clear(NEXTCLOUD_CONFIG_KEY);
 }
 
 export function getNotesdConfig(): NotesdConfig | null {

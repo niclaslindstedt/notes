@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { unlock } from "../achievements/index.ts";
 import { noteTitle, type Note } from "../domain/note.ts";
+import { useT } from "../i18n/index.ts";
 import type { UseStorageBackend } from "../storage/useStorageBackend.ts";
 import type { NotesSync } from "../app/use-notes-sync.ts";
 import type { EncryptionConversionState } from "./settings/EncryptionLogModal.tsx";
@@ -41,6 +42,7 @@ export function SyncIndicator({
   notes,
   conversion,
 }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   const uploads = useMemo(
@@ -62,6 +64,12 @@ export function SyncIndicator({
   const reconnect = (): Promise<void> => {
     if (storage.backend === "dropbox") return storage.connectDropbox();
     if (storage.backend === "gdrive") return storage.connectGdrive();
+    // Nextcloud has no grant to re-issue: the credential is an app password
+    // the user pastes, so a rejected one is re-entered in Settings. Rejecting
+    // with that instruction is what the modal has room to show.
+    if (storage.backend === "nextcloud") {
+      return Promise.reject(new Error(t("settings.storage.nextcloudReauth")));
+    }
     return storage.reconnectFolder();
   };
 
@@ -78,6 +86,7 @@ export function SyncIndicator({
         open={open}
         backend={storage.backend}
         namespace={storage.activeNamespace}
+        nextcloudConfig={storage.nextcloudConfig}
         providerName={storage.adapter.label}
         status={sync.status}
         statusDetail={sync.statusDetail}

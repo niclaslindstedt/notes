@@ -381,7 +381,8 @@ lands back in everyone's first download:
   the search modal opens in a `flushSync` so iOS raises the keyboard, and an
   await there breaks it. That one stays static, deliberately.
 - **`src/storage/remote-backends.ts` holds every backend that isn't
-  `localStorage`.** Dropbox, Drive, the picked folder and notesd — plus the
+  `localStorage`.** Dropbox, Drive, Nextcloud, the picked folder and notesd —
+  plus the
   directory adapter and offline-cache mirror they share — are behind one
   `import()`, because the app opens on the browser backend and stays there
   unless someone connects something. The render path reaches them through
@@ -532,7 +533,9 @@ The source tree under `src/` is organized by concern, not by file type:
   `migrations.ts`) runs on every load/save so backends only move bytes.
   Backends: `local/` (localStorage, default), `folder/` (a picked directory
   of markdown files via the File System Access API), `dropbox/` and `gdrive/`
-  (each note a markdown file in the user's own cloud). `encrypting/` and
+  (each note a markdown file in the user's own cloud), and `nextcloud/` (the
+  same, over WebDAV to a Nextcloud the user runs, reached with a revocable app
+  password rather than OAuth). `encrypting/` and
   `cache/` are higher-order wrappers (AES-GCM at rest; offline mirror for the
   cloud backends); `markdown/codec.ts` is the one-`.md`-file-per-note codec
   the file backends share via `directory-adapter.ts`. `attachment-store.ts` is

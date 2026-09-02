@@ -16,7 +16,11 @@ import { useCallback, useMemo } from "react";
 
 import { createPinnedFetch } from "../platform/native-bridge.ts";
 import type { StorageAdapter } from "./adapter.ts";
-import type { BackendId, NotesdConfig } from "./backend-preference.ts";
+import type {
+  BackendId,
+  NextcloudConfig,
+  NotesdConfig,
+} from "./backend-preference.ts";
 import type { DirectoryCrypto } from "./directory-adapter.ts";
 import type { DropboxAuth } from "./dropbox/index.ts";
 import { BrowserLocalStorageAdapter } from "./local/index.ts";
@@ -28,6 +32,7 @@ import type { RemoteBackends } from "./remote-backends.ts";
 export type BackendSelection =
   | { kind: "dropbox"; auth: DropboxAuth }
   | { kind: "gdrive"; token: string }
+  | { kind: "nextcloud"; config: NextcloudConfig }
   | { kind: "folder"; handle: FileSystemDirectoryHandle }
   | { kind: "notesd"; config: NotesdConfig }
   | { kind: "browser" };
@@ -48,6 +53,8 @@ export interface BackendSelectionDeps {
   gdriveToken: string | null;
   /** Persist a silently-refreshed Dropbox access token back to storage. */
   rememberDropboxAccessToken: (accessToken: string) => void;
+  /** The stored Nextcloud connection, null until one is set up. */
+  nextcloudConfig: NextcloudConfig | null;
   /** The paired notesd daemon config, null until a daemon is paired. */
   notesdConfig: NotesdConfig | null;
   /** The picked folder handle + whether the boot probe has resolved it. */
@@ -88,6 +95,7 @@ export function useBackendSelection(
     dropboxRefresh,
     gdriveToken,
     rememberDropboxAccessToken,
+    nextcloudConfig,
     notesdConfig,
     folderHandle,
     folderHandleLoaded,
@@ -117,6 +125,9 @@ export function useBackendSelection(
     if (backend === "gdrive" && gdriveToken) {
       return { kind: "gdrive", token: gdriveToken };
     }
+    if (backend === "nextcloud" && nextcloudConfig) {
+      return { kind: "nextcloud", config: nextcloudConfig };
+    }
     if (backend === "notesd" && notesdConfig) {
       return { kind: "notesd", config: notesdConfig };
     }
@@ -134,6 +145,7 @@ export function useBackendSelection(
     dropboxRefresh,
     gdriveToken,
     rememberDropboxAccessToken,
+    nextcloudConfig,
     notesdConfig,
     folderHandle,
     folderHandleLoaded,
@@ -180,6 +192,27 @@ export function useBackendSelection(
             {
               storage: globalThis.localStorage,
               key: remote.localCacheKey("gdrive", namespace),
+              seal: sealFor(namespace),
+              unseal: unsealFor(namespace),
+            },
+          );
+        // Nextcloud is a WebDAV directory backend on a server the user runs.
+        // Like the other network backends it mirrors its bytes locally so the
+        // document stays readable and editable while the server is out of
+        // reach; unlike them there is no token to refresh, so a rejected app
+        // password surfaces as an `AuthError` and sends the user back to the
+        // connect form.
+        case "nextcloud":
+          return remote.withLocalCache(
+            remote.createNextcloudAdapter(
+              selection.config,
+              fetch,
+              namespace,
+              cryptoFor(namespace),
+            ),
+            {
+              storage: globalThis.localStorage,
+              key: remote.localCacheKey("nextcloud", namespace),
               seal: sealFor(namespace),
               unseal: unsealFor(namespace),
             },

@@ -11,13 +11,20 @@ import {
 import { unlock } from "../achievements/index.ts";
 import { useT, type MessageKey, type TFunction } from "../i18n/index.ts";
 import type { SaveStatus } from "../app/use-notes-sync.ts";
-import type { BackendId } from "../storage/backend-preference.ts";
+import type {
+  BackendId,
+  NextcloudConfig,
+} from "../storage/backend-preference.ts";
 import { getLogs, subscribeToLogs, type LogLevel } from "../dev/logger.ts";
 import { DROPBOX_APP_FOLDER, dropboxWebUrl } from "../storage/dropbox/index.ts";
 import {
   GDRIVE_APP_FOLDER_NAME,
   gdriveWebUrl,
 } from "../storage/gdrive/index.ts";
+import {
+  nextcloudNotesPath,
+  nextcloudWebUrl,
+} from "../storage/nextcloud/index.ts";
 import { namespaceNotesFolder } from "../storage/namespaces.ts";
 import { writeClipboard } from "./clipboard.ts";
 import { FloatingPanel } from "./FloatingPanel.tsx";
@@ -73,6 +80,8 @@ type Props = {
   open: boolean;
   backend: BackendId;
   namespace: string;
+  /** The stored Nextcloud connection, so the file location names its server. */
+  nextcloudConfig?: NextcloudConfig | null;
   providerName: string;
   status: SaveStatus;
   statusDetail: string | null;
@@ -124,7 +133,11 @@ const RANGE_LABEL_KEY: Record<SyncLogRangeId, MessageKey> = {
   everything: "sync.copyRange.everything",
 };
 
-function providerView(backend: BackendId, namespace: string): ProviderView {
+function providerView(
+  backend: BackendId,
+  namespace: string,
+  nextcloudConfig: NextcloudConfig | null,
+): ProviderView {
   const notesFolder = namespaceNotesFolder(namespace);
   if (backend === "dropbox") {
     return {
@@ -138,6 +151,12 @@ function providerView(backend: BackendId, namespace: string): ProviderView {
       // Drive home — the folder id isn't threaded here, so the user scrolls to
       // the folder from My Drive.
       url: gdriveWebUrl(null),
+    };
+  }
+  if (backend === "nextcloud" && nextcloudConfig) {
+    return {
+      path: nextcloudNotesPath(nextcloudConfig, namespace),
+      url: nextcloudWebUrl(nextcloudConfig, namespace),
     };
   }
   // Picked folder: no web URL, and the OS path isn't exposed to the app.
@@ -256,6 +275,7 @@ export function SyncDetailsModal({
   open,
   backend,
   namespace,
+  nextcloudConfig,
   providerName,
   status,
   statusDetail,
@@ -288,7 +308,7 @@ export function SyncDetailsModal({
     if (status !== "auth-error") setReconnectError(null);
   }, [status]);
 
-  const view = providerView(backend, namespace);
+  const view = providerView(backend, namespace, nextcloudConfig ?? null);
   // The "Open in …" link names the destination service itself — Dropbox,
   // Google Drive — not the at-rest encryption state. `providerName` is the
   // adapter label, which the encryption wrapper suffixes with " (encrypted)";

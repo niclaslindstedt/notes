@@ -25,6 +25,7 @@ import {
   type EncryptionLogEntry,
 } from "./EncryptionLogModal.tsx";
 import { NamespacePinSection } from "./NamespacePinSection.tsx";
+import { NextcloudConnectForm } from "./NextcloudConnectForm.tsx";
 import { Section } from "./shared.tsx";
 
 // Storage settings: pick the backend that persists the notes (this device /
@@ -48,6 +49,10 @@ export function StorageSection({ storage, conversion }: Props) {
     folderAvailable,
     folderConnected,
     folderReconnectNeeded,
+    nextcloudConnected,
+    nextcloudConfig,
+    connectNextcloud,
+    disconnectNextcloud,
     notesdAvailable,
     notesdConnected,
     pairNotesd,
@@ -83,6 +88,9 @@ export function StorageSection({ storage, conversion }: Props) {
   const [dropboxPending, setDropboxPending] = useState(false);
   // Opening the notesd panel with no daemon paired reveals the pair form.
   const [pairing, setPairing] = useState(false);
+  // Same for Nextcloud: picking it with nothing stored reveals the connect
+  // form, and "Change server" brings it back with the stored values prefilled.
+  const [editingNextcloud, setEditingNextcloud] = useState(false);
 
   const backendOptions: {
     value: BackendId;
@@ -104,6 +112,13 @@ export function StorageSection({ storage, conversion }: Props) {
       value: "gdrive",
       label: t("settings.storage.backendGoogleDrive"),
       disabled: !gdriveAvailable,
+    },
+    // Nextcloud needs no build-time key and no OAuth redirect — it is a server
+    // the user runs, reached with credentials they paste — so it is offered on
+    // every surface.
+    {
+      value: "nextcloud",
+      label: t("settings.storage.backendNextcloud"),
     },
     // Self-hosted is native-only: the SPKI-pinned fetch it needs exists only in
     // the app wrapper, so the option simply isn't offered on the plain web.
@@ -146,6 +161,10 @@ export function StorageSection({ storage, conversion }: Props) {
     else if (next === "folder") void connectFolder();
     else if (next === "dropbox") void connectDropboxWithCapture();
     else if (next === "gdrive") void connectGdriveWithCapture();
+    // Nextcloud doesn't auto-connect on pick either: with nothing stored it
+    // reveals the connect form, and only switches backend once the server has
+    // accepted the credentials.
+    else if (next === "nextcloud") setEditingNextcloud(!nextcloudConnected);
     // notesd doesn't auto-connect on pick — it reveals the pair form (a QR /
     // paste flow), and only switches backend once pairing succeeds.
     else if (next === "notesd") setPairing(!notesdConnected);
@@ -299,6 +318,54 @@ export function StorageSection({ storage, conversion }: Props) {
               >
                 {gdriveError}
               </p>
+            )}
+          </div>
+        )}
+
+        {backend === "nextcloud" && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-muted">
+              {nextcloudConnected && nextcloudConfig
+                ? t("settings.storage.nextcloudConnected", {
+                    folder: nextcloudConfig.folder,
+                    server: nextcloudConfig.endpoint.replace(
+                      /^https?:\/\//,
+                      "",
+                    ),
+                  })
+                : t("settings.storage.nextcloudUnconnected")}
+            </p>
+            {nextcloudConnected && !editingNextcloud ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setEditingNextcloud(true)}
+                >
+                  {t("common.change")}
+                </Button>
+                <Button variant="secondary" onClick={disconnectNextcloud}>
+                  {t("common.disconnect")}
+                </Button>
+                <span className="text-xs text-accent">
+                  {t("common.connected")}
+                </span>
+              </div>
+            ) : (
+              <NextcloudConnectForm
+                initial={
+                  nextcloudConfig
+                    ? {
+                        server: nextcloudConfig.endpoint,
+                        username: nextcloudConfig.username,
+                        folder: nextcloudConfig.folder,
+                      }
+                    : undefined
+                }
+                onConnect={async (request) => {
+                  await connectNextcloud(request);
+                  setEditingNextcloud(false);
+                }}
+              />
             )}
           </div>
         )}

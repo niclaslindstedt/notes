@@ -330,6 +330,25 @@ const settings: SettingsCatalog = {
       "Dina anteckningar synkas till en mapp i din Google Drive.",
     gdriveUnconnected:
       "Logga in för att behålla dina anteckningar i din egen Google Drive.",
+    backendNextcloud: "Nextcloud",
+    nextcloudConnected:
+      "Dina anteckningar synkas till ”{folder}” på {server} — en server du kör själv.",
+    nextcloudUnconnected:
+      "Behåll dina anteckningar i din egen Nextcloud. Logga in med ett applösenord i stället för ditt kontolösenord — skapa ett under Inställningar → Säkerhet i din Nextcloud, och återkalla det där när du vill.",
+    nextcloudServer: "Serveradress",
+    nextcloudServerPlaceholder: "moln.exempel.se",
+    nextcloudUser: "Användarnamn",
+    nextcloudUserPlaceholder: "din Nextcloud-inloggning",
+    nextcloudAppPassword: "Applösenord",
+    nextcloudAppPasswordPlaceholder: "från Inställningar → Säkerhet",
+    nextcloudFolder: "Mapp",
+    nextcloudFolderHint:
+      "Var anteckningarna sparas i ditt konto. Lämnas det tomt skapas ”{fallback}” på översta nivån.",
+    nextcloudConnecting: "Ansluter…",
+    nextcloudCorsHint:
+      "För att nå en Nextcloud från en webbsida måste servern tillåta att den här appens adress använder dess WebDAV-API — en inställning du gör en gång, på servern.",
+    nextcloudReauth:
+      "Nextcloud avvisade det sparade applösenordet. Ange ett nytt under Inställningar → Lagring.",
     backendNotesd: "Egen server",
     notesdConnected:
       "Dina anteckningar synkas till din egen notesd-server — inget moln, inga konton.",
