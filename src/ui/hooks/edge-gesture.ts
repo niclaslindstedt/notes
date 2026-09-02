@@ -19,8 +19,8 @@
 import { useCallback, useRef, type MouseEvent, type PointerEvent } from "react";
 
 // How close to a screen border (px) a gesture must start to count as an edge
-// gesture. Shared with `useSuppressSwipeNavigation` and passed to
-// `useEdgeSwipeOpen` so all three agree on where the edge is.
+// gesture. Passed to `useEdgeSwipeOpen` so it and the row guard below agree on
+// where the edge is.
 export const EDGE_ZONE = 30;
 
 // Movement (px) that separates a tap from a swipe. Below this the gesture is

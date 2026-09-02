@@ -2503,3 +2503,67 @@ describe("MarkdownEditor (moving lines)", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+// The Insert menu's Image/file row leaves the app for the device's file
+// browser, which blurs the surface — and on a phone takes the soft keyboard,
+// and with it the caret, down too. The caret is the only thing on screen
+// saying where the attachment is about to land, so it is held for the trip.
+describe("MarkdownEditor (holding the caret across a trip out)", () => {
+  function leaveSurface() {
+    act(() => {
+      surface().focus();
+      surface().blur();
+    });
+  }
+
+  async function settle() {
+    // The blur verdict is deferred to a microtask (a cross-line edit fires a
+    // transient blur it has to ignore).
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+
+  function editorWithHandle() {
+    const handle: { current: MarkdownEditorHandle | null } = { current: null };
+    renderEditor("alpha\nbeta", { handleRef: handle });
+    return handle;
+  }
+
+  it("folds the active line away on an ordinary blur", async () => {
+    editorWithHandle();
+    expect(rawLine()).not.toBeNull();
+    leaveSurface();
+    await settle();
+    expect(rawLine()).toBeNull();
+  });
+
+  it("keeps the active line while the caret is held", async () => {
+    const handle = editorWithHandle();
+    act(() => handle.current!.holdCaret(true));
+    leaveSurface();
+    await settle();
+    expect(rawLine()).not.toBeNull();
+  });
+
+  it("puts the caret back when the hold is released", async () => {
+    const handle = editorWithHandle();
+    act(() => handle.current!.holdCaret(true));
+    leaveSurface();
+    await settle();
+    act(() => handle.current!.holdCaret(false));
+    expect(rawLine()).not.toBeNull();
+    expect(surface().contains(document.activeElement)).toBe(true);
+  });
+
+  it("folds away again on the next real blur once released", async () => {
+    const handle = editorWithHandle();
+    act(() => handle.current!.holdCaret(true));
+    leaveSurface();
+    await settle();
+    act(() => handle.current!.holdCaret(false));
+    leaveSurface();
+    await settle();
+    expect(rawLine()).toBeNull();
+  });
+});

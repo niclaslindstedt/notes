@@ -644,10 +644,24 @@ export function Editor({
   // same route a paste or a drop takes — `fileToAttachment` then the editor's
   // own insert — so an attachment made from the toolbar is indistinguishable
   // from one that arrived off the clipboard.
+  //
+  // The file browser is a full-screen trip out of the app: it blurs the editor,
+  // which on a phone takes the soft keyboard down with it — and with it the
+  // caret, since the editor folds its active line back into formatted text the
+  // moment focus leaves. The caret is the whole answer to "where is this
+  // picture about to land", so the surface is asked to hold it for the length
+  // of the trip and to put it back afterwards, whether a file came back or the
+  // user backed out.
   async function pickAndAttach() {
     if (!attachable) return;
-    const files = await pickFiles();
-    if (files.length > 0) markdownEditorRef.current?.attach(files);
+    const surface = markdownEditorRef.current;
+    surface?.holdCaret(true);
+    try {
+      const files = await pickFiles();
+      if (files.length > 0) surface?.attach(files);
+    } finally {
+      surface?.holdCaret(false);
+    }
   }
 
   // Route a toolbar press to whichever surface is mounted — the live-preview

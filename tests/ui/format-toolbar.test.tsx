@@ -122,3 +122,41 @@ describe("FormatToolbar — the Insert menu", () => {
     expect(onAction).toHaveBeenCalledWith({ kind: "attach" });
   });
 });
+
+// A pointer opens a menu on the press itself. The click that trails it on a
+// phone is the half that goes missing — swallowed by another panel's
+// dismissal, or hit-tested against geometry the soft keyboard is still
+// animating — which read as "the menu won't open until I put the keyboard
+// away first".
+describe("FormatToolbar — opening a menu from a pointer", () => {
+  function trigger() {
+    return screen.getByRole("button", { name: "Insert" });
+  }
+
+  it("opens on the press", () => {
+    renderToolbar(null, true);
+    fireEvent.pointerDown(trigger());
+    expect(screen.getAllByRole("menuitem")).toHaveLength(3);
+  });
+
+  it("keeps the caret in the editor by cancelling that press", () => {
+    renderToolbar(null, true);
+    expect(fireEvent.pointerDown(trigger())).toBe(false); // preventDefault()ed
+  });
+
+  it("stays open when the press's own click trails in", () => {
+    renderToolbar(null, true);
+    const button = trigger();
+    fireEvent.pointerDown(button);
+    // `detail` above 0 is what marks a click as a pointer's rather than a
+    // keyboard activation — acting on it would shut the menu on opening.
+    fireEvent.click(button, { detail: 1 });
+    expect(screen.getAllByRole("menuitem")).toHaveLength(3);
+  });
+
+  it("still opens from a keyboard activation, which has no press", () => {
+    renderToolbar(null, true);
+    fireEvent.click(trigger(), { detail: 0 });
+    expect(screen.getAllByRole("menuitem")).toHaveLength(3);
+  });
+});

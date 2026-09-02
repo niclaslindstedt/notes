@@ -431,6 +431,9 @@ export type MarkdownEditorHandle = {
    *  of the same files would: each becomes an `Attachment` and its Markdown
    *  reference lands at the caret. */
   attach: (files: readonly File[]) => void;
+  /** Hold the caret's line open across a trip out of the surface, and put the
+   *  caret back when the trip ends — see `holdCaret` in the editor. */
+  holdCaret: (hold: boolean) => void;
 };
 
 // The active line's identity: which source line is being edited as raw text, and
@@ -822,6 +825,33 @@ export function MarkdownEditor({
       index,
       key: a.index === index && !remount ? a.key : a.key + 1,
     }));
+  }
+
+  // The surface is about to lose focus to something the user has not actually
+  // left the note for — the Insert menu's file browser is the only one — so the
+  // active line must survive the trip. It is the line the attachment will land
+  // on, and the ordinary blur (below) would fold it back into formatted text:
+  // with the caret gone *and* the soft keyboard down there is nothing left on
+  // screen saying where the picture is about to go, which is exactly what makes
+  // the round trip feel like a guess on a phone.
+  //
+  // Releasing the hold puts the caret back where `lastCaret` left it, unless
+  // whatever the trip was for has already placed one of its own (an attachment
+  // commits at the caret and takes focus with it).
+  const caretHeld = useRef(false);
+
+  function holdCaret(hold: boolean) {
+    caretHeld.current = hold;
+    if (hold) return;
+    const root = rootRef.current;
+    if (!root || root.contains(document.activeElement)) return;
+    // Where writing would resume: the caret the surface last saw, or — on a
+    // note nothing has been typed into yet — the head of the line still held
+    // open.
+    const held = activeRef.current.index;
+    const at =
+      lastCaret.current ?? (held === null ? null : { line: held, col: 0 });
+    if (at) activate(at.line, at.col);
   }
 
   // --- Multiple cursors -----------------------------------------------------
@@ -3394,6 +3424,8 @@ export function MarkdownEditor({
   selectionSourceRef.current = selectionSource;
   const moveSelectedLinesRef = useRef(moveSelectedLines);
   moveSelectedLinesRef.current = moveSelectedLines;
+  const holdCaretRef = useRef(holdCaret);
+  holdCaretRef.current = holdCaret;
   useImperativeHandle(
     handleRef ?? null,
     () => ({
@@ -3404,6 +3436,7 @@ export function MarkdownEditor({
       deleteSelection: () => deleteLineSelectionRef.current(),
       moveLines: (direction: -1 | 1) => moveSelectedLinesRef.current(direction),
       attach: (files: readonly File[]) => void attachFilesRef.current(files),
+      holdCaret: (hold: boolean) => holdCaretRef.current(hold),
     }),
     [],
   );
@@ -3604,6 +3637,9 @@ export function MarkdownEditor({
             queueMicrotask(() => {
               const root = rootRef.current;
               if (!root || root.contains(document.activeElement)) return;
+              // Focus left for a round trip the caret is expected back from
+              // (see `holdCaret`), so the active line stays exactly as it is.
+              if (caretHeld.current) return;
               setActive((a) =>
                 a.index === null ? a : { index: null, key: a.key + 1 },
               );

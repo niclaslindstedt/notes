@@ -1,69 +1,98 @@
 import { useEffect } from "react";
 
-import { EDGE_ZONE } from "./edge-gesture.ts";
-
-// Suppresses the browser's native edge-swipe history navigation — the
-// "swipe in from the left edge to go *back*" (and its mirror, swipe in from
-// the right edge to go *forward*) gesture phones fire on a horizontal drag
-// that starts at a screen border.
+// Suppresses the browser's native swipe history navigation — the "drag right to
+// go *back*" (and its mirror, drag left to go *forward*) gesture phones fire on
+// a horizontal swipe.
 //
-// On notes that gesture lives on the same edges as the side menu's own swipes
-// — the edge-swipe-to-open, the drawer-swipe-to-close, and the row
-// swipe-to-reveal/archive — so a horizontal drag near a border yanked the page
-// out from under the drawer mid-swipe. `overscroll-behavior` (set on `html`)
-// tames Chrome's overscroll navigation but has no effect on iOS Safari's
-// edge-back gesture, so this is the belt to that suspenders: a document-level,
-// non-passive `touchmove` guard that calls `preventDefault` once a single-touch
-// drag starting within `EDGE_ZONE` of a border proves horizontal, cancelling
-// the native navigation while leaving the app's own pointer-driven swipe
-// gestures (a separate event stream) untouched.
+// On notes that gesture collides with the app's own horizontal swipes at every
+// turn — the side menu's edge-swipe-to-open and drawer-swipe-to-close, the note
+// card's swipe-to-archive, the sidebar row's swipe-to-reveal — so a horizontal
+// drag yanked the page out from under the gesture mid-swipe.
+// `overscroll-behavior` (set on `html`) tames Chrome's overscroll navigation
+// but has no effect on iOS Safari's edge-back gesture, so this is the belt to
+// that suspenders: a document-level, non-passive `touchmove` guard that calls
+// `preventDefault` once a single-touch drag proves horizontal, cancelling the
+// native navigation while leaving the app's own pointer-driven swipe gestures
+// (a separate event stream) untouched.
 //
-// It only claims gestures that *begin* at the very edge, so horizontal scrolls
-// inside the page (a wide code block, a carousel) are never touched.
+// Two things about *which* drags it claims are load-bearing:
+//
+//   * **Anywhere, not just at the screen edge.** iOS starts its interactive
+//     back transition from a band wider than the 30px the side menu calls the
+//     edge, and Chrome's overscroll navigation doesn't need an edge at all — so
+//     an edge-only guard let a swipe that began an inch in navigate the page
+//     away regardless.
+//   * **A drag stays undecided until one axis actually wins.** The guard used
+//     to write a gesture off as a scroll the moment its first few pixels
+//     leaned vertical, which is exactly the shape of a swipe that arcs
+//     downward as it sets off: it was disarmed before it ever turned
+//     horizontal, and the native navigation ran.
+//
+// It stands down inside anything that scrolls sideways (a wide code block, the
+// editor with word wrap off, the header's action rail), which is what keeps a
+// real horizontal scroll a scroll.
 
-// Horizontal travel (px) before we commit the gesture to "navigation" and
-// claim it. Small, so the native swipe is cancelled before it animates.
-const AXIS_LOCK = 10;
+// Travel (px) on one axis before the gesture is committed to that axis. Small,
+// so the native swipe is cancelled before it animates.
+const AXIS_LOCK = 8;
+
+/**
+ * Whether the gesture began inside an element that can scroll sideways. Those
+ * own their horizontal drags — and already carry `overscroll-x` containment, so
+ * a drag that runs off their end doesn't chain out to the browser either.
+ */
+function insideHorizontalScroller(target: EventTarget | null): boolean {
+  let el = target instanceof Element ? target : null;
+  for (; el; el = el.parentElement) {
+    if (el.scrollWidth <= el.clientWidth) continue;
+    const overflowX = getComputedStyle(el).overflowX;
+    if (overflowX === "auto" || overflowX === "scroll") return true;
+  }
+  return false;
+}
 
 export function useSuppressSwipeNavigation(): void {
   useEffect(() => {
-    const start = { x: 0, y: 0, atEdge: false, decided: false };
+    const start = { x: 0, y: 0, tracking: false, claimed: false };
 
     const onTouchStart = (e: TouchEvent) => {
-      start.atEdge = false;
-      start.decided = false;
+      start.tracking = false;
+      start.claimed = false;
       if (e.touches.length !== 1) return;
       const touch = e.touches[0];
       if (!touch) return;
-      const fromLeft = touch.clientX <= EDGE_ZONE;
-      const fromRight = touch.clientX >= window.innerWidth - EDGE_ZONE;
-      if (!fromLeft && !fromRight) return;
+      if (insideHorizontalScroller(e.target)) return;
       start.x = touch.clientX;
       start.y = touch.clientY;
-      start.atEdge = true;
+      start.tracking = true;
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (!start.atEdge || start.decided) return;
-      const touch = e.touches[0];
-      if (!touch) return;
-      const dx = touch.clientX - start.x;
-      const dy = touch.clientY - start.y;
-      if (Math.abs(dx) < AXIS_LOCK && Math.abs(dy) < AXIS_LOCK) return;
-      // A mostly-vertical drag is a scroll — let it be.
-      if (Math.abs(dy) > Math.abs(dx)) {
-        start.atEdge = false;
-        return;
+      if (!start.tracking) return;
+      if (!start.claimed) {
+        const touch = e.touches[0];
+        if (!touch) return;
+        const dx = Math.abs(touch.clientX - start.x);
+        const dy = Math.abs(touch.clientY - start.y);
+        // Neither axis has won yet: keep watching rather than deciding off the
+        // first wobble (see the note about arcing swipes above).
+        if (dx < AXIS_LOCK && dy < AXIS_LOCK) return;
+        if (dy >= dx) {
+          // A scroll, and it stays one for the rest of the gesture.
+          start.tracking = false;
+          return;
+        }
+        start.claimed = true;
       }
-      // A horizontal drag from the edge is the native back/forward swipe —
-      // cancel it. The app's own gestures ride pointer events and keep working.
-      start.decided = true;
+      // Every move of a claimed gesture is cancelled, not just the one that
+      // decided it: one `preventDefault` is enough on paper, but a browser only
+      // stays stood down while the page keeps saying so.
       if (e.cancelable) e.preventDefault();
     };
 
     const onTouchEnd = () => {
-      start.atEdge = false;
-      start.decided = false;
+      start.tracking = false;
+      start.claimed = false;
     };
 
     document.addEventListener("touchstart", onTouchStart, { passive: true });

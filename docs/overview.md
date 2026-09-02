@@ -2432,6 +2432,17 @@ tabindex, arrow keys walking the controls; a menu opened *from the keyboard*
 (a click with `detail === 0`) moves focus onto its first row, since the panel is
 portalled out of the row and Tab would otherwise sail past it.
 
+**A pointer opens a menu on the press itself** (`pointerdown`), never on the
+click that trails it. On a phone that click is the fragile half, and two ways it
+goes missing both read as "the menu won't open until I put the keyboard away
+first": dismissing any other panel in the app swallows every trailing
+`pointerup` / `mouseup` / `click` for 300ms (the framework's `DismissBackdrop`),
+and iOS hit-tests a click against geometry the soft keyboard is still animating,
+so the tap lands where the trigger *was*. `pointerdown` is in neither path. The
+click handler is left for the keyboard activation it is the only route for —
+which is exactly what `detail === 0` distinguishes, so a pointer's own trailing
+click is ignored rather than shutting the menu on opening.
+
 Two behaviours make it usable rather than merely present:
 
 - **It never takes focus.** Every button — and every menu row, and the header
@@ -2488,11 +2499,24 @@ having their own — what comes back is told apart by its type
 file chip. What comes back goes through the very route a paste or a drop takes
 ([attachments](#attachments)): `fileToAttachment` mints the `Attachment` and the
 editor drops its Markdown reference **at the caret** — `insertAttachments` falls
-back to `lastCaret`, since the picker blurs the editor and there is no active
-line left by the time the files arrive. The press is an `AttachAction`
-(`{ kind: "attach" }`) rather than a `FormatAction`, because nothing
-about it is a construct the parser understands and the host, not the pure
-formatter, owns the picker (`pickFiles`, `src/ui/attachments/pick-files.ts`).
+back to `lastCaret`, since the picker blurs the editor. The press is an
+`AttachAction` (`{ kind: "attach" }`) rather than a `FormatAction`, because
+nothing about it is a construct the parser understands and the host, not the
+pure formatter, owns the picker (`pickFiles`,
+`src/ui/attachments/pick-files.ts`).
+
+**The caret is held for the length of that trip** (`holdCaret` on
+`MarkdownEditorHandle`, driven by `pickAndAttach` in `NoteEditor`). The file
+browser is a full-screen departure: it blurs the editor, which on a phone takes
+the soft keyboard down with it — and the editor ordinarily folds its active line
+back into formatted text the moment focus leaves, so the caret goes too. The
+caret is the whole answer to *where this picture is about to land*, so while the
+hold is on the blur leaves the active line exactly as it is, and releasing it
+puts the caret back — after a file lands, and equally when the user backs out.
+That makes the picker's answer load-bearing rather than merely convenient, which
+is why `pickFiles` also settles empty a moment after the window regains focus:
+a browser without the `cancel` event says nothing at all on a cancellation, and
+the hold has to end.
 
 The row reads **Image/file** only where a file can actually land: the backend
 has to carry the `attachments` capability (the folder and cloud backends — not
@@ -3944,8 +3968,10 @@ and axis-locked so vertical scrolls don't trigger it.
 `edge-gesture.ts` (`src/ui/hooks/edge-gesture.ts`) — the single definition of
 where "the edge" is (`EDGE_ZONE`, 30px from either screen border) plus
 `useEdgeGestureGuard`, which reserves that strip for the side menu. The zone is
-shared by [edge swipe to open](#edge-swipe-to-open) (passed as its `edgeZone`),
-[suppress swipe navigation](#suppress-swipe-navigation), and both row gestures.
+shared by [edge swipe to open](#edge-swipe-to-open) (passed as its `edgeZone`)
+and both row gestures. It is *not* what
+[suppress swipe navigation](#suppress-swipe-navigation) works from any more —
+that one claims a horizontal drag wherever it starts.
 
 The guard exists because an inward edge swipe still lands on whatever the page
 paints there — a note card in the overview, a note row in the open drawer — and
@@ -3963,16 +3989,38 @@ window keeps no dead strip.
 ### Suppress swipe navigation
 
 `useSuppressSwipeNavigation` (`src/ui/hooks/useSuppressSwipeNavigation.ts`) —
-mounted once in `App`, it cancels the browser's native edge-swipe history
-navigation (swipe in from the left edge to go *back*, the right to go
-*forward*) so it stops hijacking the side menu's own horizontal swipes, which
-live on the same edges. A document-level, non-passive `touchmove` guard:
-once a single-touch drag that *starts* within 30px of a screen border proves
+mounted once in `App`, it cancels the browser's native swipe history navigation
+(drag right to go *back*, left to go *forward*) so it stops hijacking the app's
+own horizontal swipes: the side menu's [edge swipe to open](#edge-swipe-to-open)
+and [swipe to close](#drawer-swipe-to-close), the note card's
+[row swipe](#row-swipe), the sidebar's [swipe reveal](#swipe-reveal-sidebar). A
+document-level, non-passive `touchmove` guard: once a single-touch drag proves
 horizontal it calls `preventDefault`, killing the native navigation while
 leaving the app's pointer-driven swipe gestures (a separate event stream)
-untouched. `overscroll-behavior: none` on `html` (`src/styles/theme.css`)
-covers Chrome's overscroll navigation; this covers iOS Safari's edge-back
-gesture, which that property doesn't reach.
+untouched. `overscroll-behavior: none` on `html` (`src/styles/theme.css`) covers
+Chrome's overscroll navigation; this covers iOS Safari's edge-back gesture,
+which that property doesn't reach.
+
+Two things about *which* drags it claims are load-bearing, and both were bugs
+before they were rules:
+
+- **Anywhere on the screen, not only at the edge.** iOS starts its interactive
+  back transition from a band wider than the 30px the side menu calls the
+  [edge](#edge-zone--edge-gesture-guard), and Chrome's overscroll navigation
+  needs no edge at all — so an edge-only guard let a swipe that began an inch in
+  navigate the page away regardless.
+- **A drag stays undecided until one axis actually wins** (8px of travel, and
+  more of it than the other axis has). The guard used to write a gesture off as
+  a scroll the moment its first pixels leaned vertical, which is exactly the
+  shape of a swipe that arcs downward as it sets off: it was disarmed before it
+  ever turned horizontal, and the navigation ran anyway.
+
+It stands down inside anything that scrolls sideways — a wide code block, the
+editor with word wrap off, the [header's action rail](#collapsed-header-actions)
+— found by walking up from the touch's target for an ancestor whose `overflow-x`
+is `auto` / `scroll` *and* whose content actually overflows. Those own their
+horizontal drags, and already carry the `overscroll-x` containment that keeps a
+drag running off their end from chaining out to the browser.
 
 ### Drawer swipe to close
 
