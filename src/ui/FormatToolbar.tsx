@@ -478,11 +478,32 @@ function FormatMenu({
         aria-expanded={open}
         tabIndex={tabIndex}
         onFocus={onFocus}
-        // As with the plain buttons: opening the menu must not move focus out
-        // of the editor, or there would be no selection left to act on.
+        // A pointer opens the menu on the press itself, never on the click
+        // that trails it: on a phone that click is the fragile half. Two ways
+        // it goes missing, and both read as "the menu won't open until I put
+        // the keyboard away first" — dismissing any other panel in the app
+        // swallows every trailing `pointerup` / `mouseup` / `click` for 300ms
+        // (see the framework's `DismissBackdrop`), and iOS hit-tests a click
+        // against geometry the soft keyboard is still animating, so the tap
+        // lands where the trigger *was*. `pointerdown` is in neither path.
+        //
+        // Cancelled, as with the plain buttons: opening the menu must not move
+        // focus out of the editor, or there would be no selection left to act
+        // on. `onMouseDown` says the same thing again for a browser that
+        // synthesizes the mouse event regardless.
+        onPointerDown={(e) => {
+          e.preventDefault();
+          setFromKeyboard(false);
+          setOpen((v) => !v);
+        }}
         onMouseDown={(e) => e.preventDefault()}
+        // Only a keyboard activation is left for the click to carry: it has no
+        // pointer press behind it, which is what `detail === 0` says. Anything
+        // else is the trailing click of a press already handled above, and
+        // acting on it would shut the menu the instant it opened.
         onClick={(e) => {
-          setFromKeyboard(e.detail === 0);
+          if (e.detail !== 0) return;
+          setFromKeyboard(true);
           setOpen((v) => !v);
         }}
         className={`inline-flex h-8 w-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-100 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${

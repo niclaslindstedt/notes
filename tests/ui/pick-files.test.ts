@@ -61,4 +61,40 @@ describe("pickFiles", () => {
     expect(await picked).toEqual([]);
     expect(input.isConnected).toBe(false);
   });
+
+  // Without `cancel` (older browsers) the only sign the trip ended is the page
+  // coming back — and it has to be a sign, because the caller holds the
+  // editor's caret open until this settles.
+  it("resolves empty when the page comes back with nothing chosen", async () => {
+    vi.useFakeTimers();
+    try {
+      const opened = catchInput();
+      const picked = pickFiles();
+      const input = await opened;
+      window.dispatchEvent(new Event("focus"));
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await picked).toEqual([]);
+      expect(input.isConnected).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Some platforms hand focus back before they deliver the choice, so the
+  // grace period must not turn a real pick into a cancellation.
+  it("still takes a choice that arrives just after focus returns", async () => {
+    vi.useFakeTimers();
+    try {
+      const opened = catchInput();
+      const picked = pickFiles();
+      const input = await opened;
+      window.dispatchEvent(new Event("focus"));
+      const file = new File(["x"], "cat.png", { type: "image/png" });
+      choose(input, [file]);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await picked).toEqual([file]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

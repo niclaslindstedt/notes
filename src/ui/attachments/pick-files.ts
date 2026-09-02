@@ -15,6 +15,10 @@ export type PickOptions = {
   multiple?: boolean;
 };
 
+// How long after the page comes back a choice can still arrive before the trip
+// is read as a cancellation.
+const CANCEL_GRACE_MS = 700;
+
 /**
  * Show the file browser and resolve with the chosen files — an empty array when
  * the user backs out.
@@ -22,8 +26,13 @@ export type PickOptions = {
  * The input is appended to the document rather than merely constructed: Safari
  * ignores a programmatic `click()` on a detached node. It is removed again as
  * soon as the choice (or the cancellation) arrives, so nothing is left behind.
- * Browsers without the `cancel` event simply leave the promise pending, which
- * is inert — the caller only ever inserts on a non-empty result.
+ *
+ * A browser without the `cancel` event says nothing at all when the user backs
+ * out, so coming back to the page has to stand in for it: the promise settles
+ * empty a moment after the window regains focus with no choice delivered.
+ * Waiting matters — some platforms hand focus back *before* the `change` — and
+ * so does settling at all, since the caller holds the editor's caret open for
+ * the length of the trip and needs to be told when it ended.
  */
 export function pickFiles({
   accept,
@@ -40,15 +49,20 @@ export function pickFiles({
     input.style.opacity = "0";
 
     let settled = false;
-    const done = (files: File[]) => {
+    function onWindowFocus() {
+      window.setTimeout(() => done([]), CANCEL_GRACE_MS);
+    }
+    function done(files: File[]) {
       if (settled) return;
       settled = true;
+      window.removeEventListener("focus", onWindowFocus);
       input.remove();
       resolve(files);
-    };
+    }
 
     input.addEventListener("change", () => done(Array.from(input.files ?? [])));
     input.addEventListener("cancel", () => done([]));
+    window.addEventListener("focus", onWindowFocus, { once: true });
     document.body.append(input);
     input.click();
   });
