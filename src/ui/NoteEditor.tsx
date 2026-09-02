@@ -637,13 +637,16 @@ export function Editor({
   const attachable = canAttach && editor.renderMarkdown && !locked;
 
   // Ask for a file and drop it in at the caret, which is what the Insert menu's
-  // **File** entry does and what its **Image** entry falls back to. Deliberately
-  // the same route a paste or a drop takes — `fileToAttachment` then the
-  // editor's own insert — so an attachment made from the toolbar is
-  // indistinguishable from one that arrived off the clipboard.
-  async function pickAndAttach(images: boolean) {
+  // **Image/file** entry does. The browser is not narrowed to pictures: on a
+  // phone that is what puts the photo library, the camera *and* the files
+  // behind the one row, and what comes back is told apart by its type — a
+  // picture lands as an image, anything else as a file chip. Deliberately the
+  // same route a paste or a drop takes — `fileToAttachment` then the editor's
+  // own insert — so an attachment made from the toolbar is indistinguishable
+  // from one that arrived off the clipboard.
+  async function pickAndAttach() {
     if (!attachable) return;
-    const files = await pickFiles(images ? { accept: "image/*" } : {});
+    const files = await pickFiles();
     if (files.length > 0) markdownEditorRef.current?.attach(files);
   }
 
@@ -651,28 +654,25 @@ export function Editor({
   // editor, or the plain textarea when Markdown rendering is switched off.
   // Both apply the same pure formatter, so the two agree on what a press does.
   //
-  // Two of the Insert entries reach for a file rather than the formatter:
-  //
-  //   * **File** always does — it exists to attach one.
-  //   * **Image** does *unless an actual link is selected*. `![alt](url)` is
-  //     only useful when there is a `url` to put in it, and the far commoner
-  //     intent behind pressing Image is "put this picture in my note" — so a
-  //     selected address still becomes a Markdown image, and everything else
-  //     opens the photo browser. Where nothing can be attached (the browser
-  //     backend, the plain editor, a sealed note) it writes the `![](url)`
-  //     placeholder as before, which is still better than doing nothing.
+  // The Insert menu's **Image/file** entry reaches for a file rather than the
+  // formatter — *unless an actual link is selected*. `![alt](url)` is only
+  // useful when there is a `url` to put in it, and the far commoner intent
+  // behind pressing it is "put this picture (or file) in my note" — so a
+  // selected address becomes a Markdown image, and everything else opens the
+  // device's browser. Where nothing can be attached (the browser backend, the
+  // plain editor, a sealed note) it writes the `![](url)` placeholder instead,
+  // which is still better than doing nothing.
   function runFormat(action: ToolbarAction) {
     unlock("stylist");
     if (action.kind === "attach") {
-      void pickAndAttach(action.images === true);
-      return;
-    }
-    if (action.kind === "link" && action.image === true && attachable) {
-      const selected = markdownEditorRef.current?.selection() ?? "";
-      if (!isUrlText(selected)) {
-        void pickAndAttach(true);
+      const selected = attachable
+        ? (markdownEditorRef.current?.selection() ?? "")
+        : "";
+      if (attachable && !isUrlText(selected)) {
+        void pickAndAttach();
         return;
       }
+      action = { kind: "link", image: true };
     }
     if (editor.renderMarkdown) markdownEditorRef.current?.format(action);
     else plainEditorRef.current?.format(action);

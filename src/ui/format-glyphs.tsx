@@ -196,20 +196,6 @@ export function ImageGlyph({ className }: IconProps) {
   );
 }
 
-/**
- * A paperclip: the Insert menu's **File** entry, which attaches a file to the
- * note rather than writing a Markdown construct. The clip rather than a sheet
- * of paper, because the row's verb is "attach" — the sheet is what the
- * attachment itself is drawn as in the note (see `file-icons.tsx`).
- */
-export function FileGlyph({ className }: IconProps) {
-  return (
-    <Svg className={className}>
-      <path d="M20 11.5 12.3 19.2a4.5 4.5 0 0 1-6.4-6.4l7.8-7.7a3 3 0 0 1 4.3 4.3l-7.8 7.7a1.5 1.5 0 0 1-2.1-2.1l7.1-7.1" />
-    </Svg>
-  );
-}
-
 /** A `---` rule: the divider itself, between two faded lines of text. */
 export function RuleGlyph({ className }: IconProps) {
   return (

@@ -19,7 +19,6 @@ import {
   BulletListGlyph,
   ChecklistGlyph,
   CodeBlockGlyph,
-  FileGlyph,
   FormatIcon,
   HeadingGlyph,
   ImageGlyph,
@@ -45,7 +44,7 @@ import { ChevronDownIcon } from "./icons.tsx";
 // Twenty constructs would be twenty buttons, which wraps to three rows on a
 // phone. So the ones that form a natural family collapse into a **menu**: the
 // six heading levels, the five block styles (bullet / numbered / checklist,
-// quote, code block), and the four inserts (link, image, file, divider). Each menu's trigger
+// quote, code block), and the three inserts (link, image/file, divider). Each menu's trigger
 // wears the glyph of whichever member is currently applied — so a caret on an H2
 // line shows `H2`, lit — and its rows carry both the glyph and its name, which
 // the bare icon buttons never could. That takes the row to nine controls, which
@@ -69,15 +68,19 @@ import { ChevronDownIcon } from "./icons.tsx";
 
 /**
  * A press that reaches for a file instead of writing Markdown: the Insert
- * menu's **File** entry opens the file browser and attaches whatever comes
- * back at the caret, the same way a paste or a drop does. `images` narrows the
- * browser to pictures (on a phone, the photo library).
+ * menu's **Image/file** entry opens the device's browser — on a phone, the
+ * photo library and the camera alongside the files — and attaches whatever
+ * comes back at the caret, the same way a paste or a drop does. A picture
+ * lands as an image, anything else as a file chip; the picker is not narrowed
+ * to either, which is what makes one row enough.
  *
  * It is deliberately not a `FormatAction`: nothing about it is a construct the
- * parser understands, and the host — not the pure formatter — is what owns the
- * picker and the note's attachment list.
+ * parser understands, and the host — not the pure formatter — owns the picker
+ * and the note's attachment list. The host also decides what the press means
+ * where nothing can be attached, or when the selection is already an address
+ * (see `runFormat` in `NoteEditor`).
  */
-export type AttachAction = { kind: "attach"; images?: boolean };
+export type AttachAction = { kind: "attach" };
 
 /** Everything a toolbar press can ask the host for. */
 export type ToolbarAction = FormatAction | AttachAction;
@@ -254,26 +257,20 @@ function buildGroups(t: TFunction, canAttach: boolean): ToolbarGroup[] {
           label: t("app.format.link"),
           glyph: <LinkGlyph className={ICON} />,
         },
+        // One row for pictures and files alike: the browser it opens offers
+        // both, and what comes back is told apart by its type, not by which
+        // row was pressed. Where the backend can't hold attachments at all (the
+        // browser backend has nowhere for the bytes to go) the row reads plain
+        // "Image" and the host writes the `![](url)` placeholder instead — the
+        // label promises no browser it can't open.
         {
-          id: "image",
-          action: { kind: "link", image: true },
-          label: t("app.format.image"),
+          id: "attach",
+          action: { kind: "attach" },
+          label: canAttach
+            ? t("app.format.imageOrFile")
+            : t("app.format.image"),
           glyph: <ImageGlyph className={ICON} />,
         },
-        // Only where the backend can hold attachments at all — on the browser
-        // backend there is nowhere for the bytes to go, and a row that silently
-        // does nothing is worse than an absent one. (Image stays either way:
-        // without attachments it still writes `![](url)`.)
-        ...(canAttach
-          ? [
-              {
-                id: "file",
-                action: { kind: "attach" } as const,
-                label: t("app.format.file"),
-                glyph: <FileGlyph className={ICON} />,
-              },
-            ]
-          : []),
         {
           id: "rule",
           action: { kind: "rule" },
@@ -296,7 +293,10 @@ export function FormatToolbar({
   onAction: (action: ToolbarAction) => void;
   /** The writing column's width, so the toolbar lines up with the text. */
   maxWidth: string;
-  /** Whether this surface can attach a file — what puts **File** in the menu. */
+  /**
+   * Whether this surface can attach a file — what makes the Insert menu's
+   * picture row read **Image/file** rather than plain **Image**.
+   */
   canAttach?: boolean;
 }) {
   const t = useT();

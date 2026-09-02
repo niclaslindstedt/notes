@@ -2036,7 +2036,7 @@ govern the note body's own canonical form.)
 ### Attachments
 
 Paste (`Ctrl`/`Cmd`+`V`) or drag-and-drop a file into the editor — or reach for
-**Image** / **File** in the [styling toolbar](#styling-toolbar)'s Insert menu,
+**Image/file** in the [styling toolbar](#styling-toolbar)'s Insert menu,
 which opens the device's photo or file browser and lands the choice at the caret
 — and it becomes a note **attachment**. Two kinds, told apart by MIME
 (`isImageAttachment`): an **image** shows inline as a small thumbnail you click
@@ -2419,7 +2419,7 @@ controls, which fits one line down to a 360px viewport:
 | inline        | buttons — **bold**, *italic*, ~~strikethrough~~, `inline code`     |
 | Block style ▾ | menu — bullet list, numbered list, checklist, quote, fenced code block |
 | nesting       | buttons — outdent, indent (how a bullet becomes a **child**)       |
-| Insert ▾      | menu — link, image, file, divider                                  |
+| Insert ▾      | menu — link, image/file, divider                                   |
 
 The two most-reached-for families stay one tap: inline emphasis, and the
 indent pair the nesting of list children depends on. A menu's trigger wears the
@@ -2475,25 +2475,31 @@ word under a bare caret, and unwraps when it is already wrapped. A link press ma
 the selection the label and hands back the `url` placeholder *selected*, ready to
 type over — unless the selection is itself a URL, in which case it becomes the href.
 
-**Two of the Insert entries reach for a file rather than for the formatter.**
+**One Insert entry reaches for a file rather than for the formatter.**
 `![alt](url)` is only useful when there is a `url` to put in it, and the far
-commoner intent behind pressing **Image** is "put this picture in my note" — so
-Image writes Markdown only when the selection *is* an address (`isUrlText`), and
-otherwise opens the device's photo browser; **File** always opens the file
-browser. What comes back goes through the very route a paste or a drop takes
+commoner intent behind pressing **Image/file** is "put this picture (or file)
+in my note" — so it writes Markdown only when the selection *is* an address
+(`isUrlText`), and otherwise opens the device's browser. That browser is
+deliberately **not narrowed** to pictures: on a phone it then offers the photo
+library and the camera alongside the files, and on a computer the one dialog
+takes either, which is why pictures and files share a row rather than each
+having their own — what comes back is told apart by its type
+(`isImageAttachment`), a picture landing as an image and anything else as a
+file chip. What comes back goes through the very route a paste or a drop takes
 ([attachments](#attachments)): `fileToAttachment` mints the `Attachment` and the
 editor drops its Markdown reference **at the caret** — `insertAttachments` falls
 back to `lastCaret`, since the picker blurs the editor and there is no active
 line left by the time the files arrive. The press is an `AttachAction`
-(`{ kind: "attach"; images? }`) rather than a `FormatAction`, because nothing
+(`{ kind: "attach" }`) rather than a `FormatAction`, because nothing
 about it is a construct the parser understands and the host, not the pure
 formatter, owns the picker (`pickFiles`, `src/ui/attachments/pick-files.ts`).
 
-File is in the menu only where a file can actually land: the backend has to
-carry the `attachments` capability (the folder and cloud backends — not
+The row reads **Image/file** only where a file can actually land: the backend
+has to carry the `attachments` capability (the folder and cloud backends — not
 `localStorage`), the note must be unsealed, and the live-preview editor is the
-only surface with an attach path. Where it can't, the row is absent rather than
-inert, and Image falls back to writing the `![](url)` placeholder as before.
+only surface with an attach path. Where it can't, the same row reads plain
+**Image** — the label promises no browser it can't open — and the press writes
+the `![](url)` placeholder instead.
 
 `MarkdownEditor` applies the result through its own commit path and then installs
 the selection: a same-line result comes back ranged (`placeRange` in

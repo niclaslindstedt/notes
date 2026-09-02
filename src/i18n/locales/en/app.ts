@@ -165,7 +165,7 @@ const app = {
     outdent: "Outdent",
     link: "Link",
     image: "Image",
-    file: "File",
+    imageOrFile: "Image/file",
     rule: "Divider",
   },
   // The find bar: the header toggle that raises it, the field's chrome, and

@@ -1,6 +1,6 @@
 ---
 type: Added
-title: Attach a file from the formatting bar
+title: Attach an image or a file from the formatting bar
 ---
 
-The formatting bar's Insert menu gains a **File** entry that opens your file browser and attaches what you pick at the cursor, and **Image** now opens the photo browser unless an actual link is selected.
+The formatting bar's Insert menu gains an **Image/file** entry — one row for both, since the browser it opens offers photos and files alike — that attaches what you pick at the cursor, unless an actual link is selected, in which case it becomes a Markdown image.

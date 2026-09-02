@@ -82,23 +82,25 @@ describe("FormatToolbar — checklist", () => {
   });
 });
 
-// Open the Insert menu (link / image / file / divider).
+// Open the Insert menu (link / image-or-file / divider).
 function openInsertMenu() {
   fireEvent.click(screen.getByRole("button", { name: "Insert" }));
 }
 
 describe("FormatToolbar — the Insert menu", () => {
-  it("offers File between Image and Divider where files can be attached", () => {
+  it("offers one Image/file row between Link and Divider where files can be attached", () => {
+    // Pictures and files share a row: the browser it opens offers both, and
+    // what comes back is told apart by its type.
     renderToolbar(null, true);
     openInsertMenu();
     expect(screen.getAllByRole("menuitem").map((el) => el.textContent)).toEqual(
-      ["Link", "Image", "File", "Divider"],
+      ["Link", "Image/file", "Divider"],
     );
   });
 
-  it("leaves File out where the backend cannot hold an attachment", () => {
-    // Nowhere for the bytes to go on the browser backend, so a row that did
-    // nothing would be worse than an absent one — Image still writes Markdown.
+  it("calls the row plain Image where the backend cannot hold an attachment", () => {
+    // Nowhere for the bytes to go on the browser backend, so the label must
+    // not promise a browser — the press writes the `![](url)` Markdown there.
     renderToolbar(null, false);
     openInsertMenu();
     expect(screen.getAllByRole("menuitem").map((el) => el.textContent)).toEqual(
@@ -106,17 +108,17 @@ describe("FormatToolbar — the Insert menu", () => {
     );
   });
 
-  it("fires the attach action when File is pressed", () => {
+  it("fires the attach action — the host decides what it means", () => {
     const { onAction } = renderToolbar(null, true);
     openInsertMenu();
-    fireEvent.click(screen.getByRole("menuitem", { name: "File" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Image/file" }));
     expect(onAction).toHaveBeenCalledWith({ kind: "attach" });
   });
 
-  it("still fires the image action for Image — the host decides what it means", () => {
-    const { onAction } = renderToolbar(null, true);
+  it("fires the same attach action from the plain Image row", () => {
+    const { onAction } = renderToolbar(null, false);
     openInsertMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: "Image" }));
-    expect(onAction).toHaveBeenCalledWith({ kind: "link", image: true });
+    expect(onAction).toHaveBeenCalledWith({ kind: "attach" });
   });
 });
