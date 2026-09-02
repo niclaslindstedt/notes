@@ -1277,7 +1277,14 @@ function TitleField({
   // Focus the title on mount for a fresh note (without the a11y-flagged
   // focusOnMount attribute) and select its default title, so the first
   // keystroke replaces it — a new note opens ready to be named.
-  useEffect(() => {
+  //
+  // A *layout* effect, so the focus still lands inside the tap that asked for
+  // the note: the host creates it and routes to it through `flushSync` (see
+  // `openNew` in `App`), and a programmatic focus only raises the soft keyboard
+  // while the browser is still handling that gesture. A passive effect runs
+  // after it has finished, which on a phone means a focused title and no
+  // keyboard. Same pairing as the find bar and the search modal.
+  useLayoutEffect(() => {
     if (!focusOnMount) return;
     const el = ref.current;
     if (!el) return;
@@ -1285,13 +1292,20 @@ function TitleField({
     el.select();
   }, [focusOnMount, ref]);
 
-  // Clicking (or tabbing) into the title selects the whole thing, so it can be
+  // Clicking (or tapping) into the title selects the whole thing, so it can be
   // renamed by just typing — no manual drag-select or erase first. The browser
-  // otherwise collapses the focus-time selection to the caret on the click's
-  // mouseup, so we suppress that one mouseup (only the click that *gained*
-  // focus, leaving later clicks free to reposition the caret as usual). A fresh
-  // note's mount-focus selects the default title the same way, so it opens
-  // ready to be typed over.
+  // collapses the focus-time selection to the caret as the mouseup's default
+  // action, so the selection is re-taken on the `click` that follows it (only
+  // for the press that *gained* focus, leaving later presses free to reposition
+  // the caret as usual). A fresh note's mount-focus selects the default title
+  // the same way, so it opens ready to be typed over.
+  //
+  // Deliberately *not* done by cancelling that mouseup, which is the shorter
+  // spelling and the one that broke the field on a phone: a tap whose
+  // compatibility mouse events are cancelled is exactly how the rest of this
+  // app keeps the soft keyboard down (see the select-mode press in
+  // `MarkdownEditor`), so the title kept the caret and never raised a keyboard
+  // to type with.
   const focusingClick = useRef(false);
 
   // Settle the buffered title when the editor unmounts — the Back button and
@@ -1314,15 +1328,15 @@ function TitleField({
       onChange={(e) => setDraft(e.currentTarget.value)}
       onBlur={settle}
       onMouseDown={(e) => {
-        if (document.activeElement !== e.currentTarget)
-          focusingClick.current = true;
+        // Assigned rather than only set, so a press that never becomes a click
+        // (released outside the field) can't leave the flag armed for the next.
+        focusingClick.current = document.activeElement !== e.currentTarget;
       }}
       onFocus={(e) => e.currentTarget.select()}
-      onMouseUp={(e) => {
-        if (focusingClick.current) {
-          e.preventDefault();
-          focusingClick.current = false;
-        }
+      onClick={(e) => {
+        if (!focusingClick.current) return;
+        focusingClick.current = false;
+        e.currentTarget.select();
       }}
       onKeyDown={(e) => {
         // Tab leaves for the note itself, not the header's buttons: naming a

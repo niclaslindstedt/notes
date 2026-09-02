@@ -181,6 +181,37 @@ describe("Editor", () => {
     expect(onTitleSettle).toHaveBeenCalled();
   });
 
+  it("selects the whole title on the press that focuses it, tap intact", () => {
+    renderEditor();
+    const title = screen.getByDisplayValue("My note") as HTMLTextAreaElement;
+
+    // The press must reach the browser uncancelled: a tap whose compatibility
+    // mouse events are cancelled is how this app keeps the soft keyboard
+    // *down*, and pressing the title is a request to type in it.
+    fireEvent.mouseDown(title);
+    title.focus();
+    expect(fireEvent.mouseUp(title)).toBe(true);
+
+    // The browser collapses the focus-time selection as that mouseup's default
+    // action; the click behind it takes the whole title back, so the first
+    // keystroke renames the note instead of inserting into its name.
+    title.setSelectionRange(3, 3);
+    fireEvent.click(title);
+    expect([title.selectionStart, title.selectionEnd]).toEqual([0, 7]);
+  });
+
+  it("leaves a press on the already-focused title free to place the caret", () => {
+    renderEditor();
+    const title = screen.getByDisplayValue("My note") as HTMLTextAreaElement;
+    title.focus();
+
+    fireEvent.mouseDown(title);
+    title.setSelectionRange(3, 3);
+    fireEvent.click(title);
+    expect(title.selectionStart).toBe(3);
+    expect(title.selectionEnd).toBe(3);
+  });
+
   it("pushes body edits up on each keystroke", () => {
     const { onChange } = renderEditor();
     const body = screen.getByDisplayValue("the body");

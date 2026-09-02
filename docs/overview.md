@@ -400,6 +400,17 @@ blank line is held locally and is **not** pushed through `onChange`: placing the
 caret is not an edit, so it never bumps `updatedAt` or jumps the note to the top
 of the list — the line joins the document only once the user types onto it.
 
+**The press is answered at a different event per pointer.** A *mouse* press is
+answered at `mousedown` and cancelled: a click on a non-editable container
+otherwise ends with the browser moving focus to the nearest focusable ancestor,
+straight back off the surface the handler just focused. A *touch* press must not
+be cancelled — a cancelled tap is precisely how [select mode](#select-mode) keeps
+the soft keyboard down — so it is answered at the `click` behind it instead, once
+the browser has finished its own focus handling and there is nothing left to undo
+the focus. On an **empty** note that empty space is the whole note, so cancelling
+the tap there left a finger with no way to raise the keyboard at all, and no way
+to take the focus off the [title field](#title-field) by pressing into the note.
+
 The scroll region ends **on the last line**: its content carries a bottom pad of
 `max(1rem, env(safe-area-inset-bottom))` so the final line clears the iOS home
 indicator (the shell fills the visual viewport down to the physical edge), and
@@ -898,6 +909,24 @@ newline. Edits route through `useNotes().retitle` → `retitleNote`
 (`src/domain/note.ts`). On file/cloud backends the [save hold](#save-hold) keeps
 the file from being created under the throwaway default title until the real
 title settles.
+
+**Pressing the title selects the whole title**, so the note can be renamed by
+just typing. The browser collapses that focus-time selection as the default
+action of the press's `mouseup`, so the field takes it back on the `click`
+behind it — and only for the press that *gained* focus, leaving a later press
+free to reposition the caret. It is deliberately **not** done by cancelling that
+`mouseup`, which is the shorter spelling and the one that broke the field on a
+phone: a tap whose compatibility mouse events are cancelled is exactly how the
+app keeps the soft keyboard *down* (see [select mode](#select-mode)), so the
+title took the caret and never raised a keyboard to type with.
+
+**A new note raises the keyboard on a phone.** The mount-time focus is a
+*layout* effect, and `openNew` (`src/app/App.tsx`) creates the note and routes to
+it inside a `flushSync`, so the editor mounts — and the title focuses itself —
+while the browser is still handling the tap that asked for the note. That
+pairing is the only context in which a programmatic focus raises the soft
+keyboard; the same one the find bar and the [search modal](#search) use. Without
+it a new note opened with its title focused and nothing to type with.
 
 ### Editor tab order
 

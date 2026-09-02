@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import { unlock, useAchievementWatcher } from "../achievements/index.ts";
 import { useDevSeed } from "../dev/useDevSeed.ts";
@@ -562,9 +563,18 @@ export function App() {
     // it loses focus. The local browser backend has no per-note filename, so it
     // keeps saving immediately.
     if (storage.backend !== "browser") sync.holdSaves();
-    const id = create(title, folderId);
-    pristineNew.current = { id, title };
-    go({ kind: "note", ns: storage.activeNamespace, id });
+    // Create the note and route to it synchronously *inside this tap*: the
+    // editor's title field focuses itself in a layout effect on mount, and a
+    // programmatic focus only raises the soft keyboard while the browser is
+    // still handling the gesture that asked for it. Without the flush the
+    // editor mounts after the tap is over, so on a phone a new note opened with
+    // its title focused and no keyboard to name it with. The same trick opens
+    // the find bar and the cross-note search modal.
+    flushSync(() => {
+      const id = create(title, folderId);
+      pristineNew.current = { id, title };
+      go({ kind: "note", ns: storage.activeNamespace, id });
+    });
   }
 
   // Land a batch of dropped markdown files in the library, then surface them:

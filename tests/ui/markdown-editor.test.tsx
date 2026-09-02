@@ -1971,6 +1971,48 @@ describe("MarkdownEditor", () => {
       // not an edit — the unchanged document is never pushed through onChange.
       expect(onChange).not.toHaveBeenCalled();
     });
+
+    it("cancels a mouse press, so focus stays on the surface it just took", () => {
+      const { container } = renderEditor("alpha", { focusOnMount: false });
+      const scroll = container.firstElementChild as HTMLElement;
+      act(() => {
+        fireEvent.pointerDown(scroll, {
+          target: scroll,
+          pointerId: 1,
+          pointerType: "mouse",
+        });
+        // Cancelled: the browser would otherwise answer the press by moving
+        // focus to the nearest focusable ancestor, straight back off the host.
+        expect(fireEvent.mouseDown(scroll, { target: scroll })).toBe(false);
+      });
+      expect(document.activeElement).toBe(surface());
+    });
+
+    it("leaves a touch tap uncancelled and answers it at the click", () => {
+      // Cancelling the tap is what the select-mode press does to keep the soft
+      // keyboard down, so the empty space below an empty note must not do it —
+      // that space is the whole note, and a finger has nowhere else to press.
+      // A touch press arms the caret reveal, which jsdom has no layout for.
+      const originalScroll = HTMLElement.prototype.scrollIntoView;
+      HTMLElement.prototype.scrollIntoView = vi.fn();
+      const { container } = renderEditor("", { focusOnMount: false });
+      const scroll = container.firstElementChild as HTMLElement;
+      act(() => {
+        fireEvent.pointerDown(scroll, {
+          target: scroll,
+          pointerId: 1,
+          pointerType: "touch",
+        });
+        expect(fireEvent.mouseDown(scroll, { target: scroll })).toBe(true);
+      });
+      expect(document.activeElement).not.toBe(surface());
+
+      act(() => {
+        fireEvent.click(scroll, { target: scroll });
+      });
+      expect(document.activeElement).toBe(surface());
+      HTMLElement.prototype.scrollIntoView = originalScroll;
+    });
   });
   describe("find-in-note highlights", () => {
     it("marks every hit and singles out the active one", () => {

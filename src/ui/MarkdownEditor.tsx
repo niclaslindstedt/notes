@@ -3452,7 +3452,12 @@ export function MarkdownEditor({
       note={note}
       placement={placement}
     >
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+      {/* The scroller's handlers are all pointer plumbing for the editing host
+          it wraps — placing a caret, painting a line sweep — and the host is
+          the focusable, keyboard-driven element that answers for them; a
+          keyboard reaches the note through it, never through the padding
+          around it. */}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
         ref={scrollerRef}
         className={`relative min-h-0 flex-1 overscroll-contain ${wordWrap ? "overflow-y-auto" : "overflow-auto"}`}
@@ -3514,11 +3519,28 @@ export function MarkdownEditor({
             return;
           }
           // A click in the empty space below the text lands the caret at the end
-          // of the note rather than doing nothing.
-          if (e.target === e.currentTarget) {
+          // of the note rather than doing nothing. Cancelling the press is what
+          // keeps the browser from doing its own thing with a click on a
+          // non-editable container — moving focus to the nearest focusable
+          // ancestor, straight back off the surface we just focused.
+          //
+          // A *tap*, though, must not be cancelled: a cancelled tap is exactly
+          // how the select-mode branch above keeps the soft keyboard down, so
+          // cancelling here left a finger unable to open the keyboard on the one
+          // note that is all empty space — an empty one — and unable to take the
+          // focus off the title field by pressing into the note. So a touch is
+          // answered at `click` instead, once the browser has finished its own
+          // focus handling and there is nothing left to undo our focus.
+          if (e.target === e.currentTarget && !touchPress.current) {
             e.preventDefault();
             placeCaretAtEnd();
           }
+        }}
+        onClick={(e) => {
+          if (selectMode) return;
+          // The touch half of the empty-space press above.
+          if (e.target === e.currentTarget && touchPress.current)
+            placeCaretAtEnd();
         }}
         onDrop={onDrop}
         onDragOver={(e) => {
