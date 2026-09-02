@@ -27,6 +27,7 @@ function deps(over: Partial<BackendSelectionDeps> = {}): BackendSelectionDeps {
     dropboxRefresh: null,
     gdriveToken: null,
     rememberDropboxAccessToken: vi.fn(),
+    nextcloudConfig: null,
     notesdConfig: null,
     folderHandle: null,
     folderHandleLoaded: false,
@@ -39,6 +40,13 @@ function deps(over: Partial<BackendSelectionDeps> = {}): BackendSelectionDeps {
 }
 
 const fakeHandle = {} as FileSystemDirectoryHandle;
+
+const NEXTCLOUD = {
+  endpoint: "https://cloud.test",
+  username: "alice",
+  appPassword: "app-password",
+  folder: "notes",
+};
 
 beforeEach(() => {
   localStorage.clear();
@@ -94,6 +102,24 @@ describe("useBackendSelection — selection resolution", () => {
     expect(
       renderHook(() =>
         useBackendSelection(deps({ backend: "gdrive", gdriveToken: null })),
+      ).result.current.selection.kind,
+    ).toBe("browser");
+  });
+
+  it("resolves nextcloud only when a connection is stored", () => {
+    expect(
+      renderHook(() =>
+        useBackendSelection(
+          deps({ backend: "nextcloud", nextcloudConfig: NEXTCLOUD }),
+        ),
+      ).result.current.selection,
+    ).toEqual({ kind: "nextcloud", config: NEXTCLOUD });
+
+    expect(
+      renderHook(() =>
+        useBackendSelection(
+          deps({ backend: "nextcloud", nextcloudConfig: null }),
+        ),
       ).result.current.selection.kind,
     ).toBe("browser");
   });
@@ -158,6 +184,15 @@ describe("useBackendSelection — makeInner dispatch", () => {
       useBackendSelection(deps({ backend: "gdrive", gdriveToken: "g" })),
     );
     expect(result.current.makeInner("default").id).toBe("gdrive");
+  });
+
+  it("builds a nextcloud adapter (offline-cache wrapped) that keeps its id", () => {
+    const { result } = renderHook(() =>
+      useBackendSelection(
+        deps({ backend: "nextcloud", nextcloudConfig: NEXTCLOUD }),
+      ),
+    );
+    expect(result.current.makeInner("default").id).toBe("nextcloud");
   });
 
   it("builds a folder adapter for the folder selection", () => {

@@ -451,8 +451,9 @@ export function HomePage() {
             </li>
             <li>
               Optionally sync your notes to a location you control: a local
-              folder on your computer, your own Dropbox, or your own Google
-              Drive (see below).
+              folder on your computer, your own Dropbox, your own Google Drive,
+              or a <span className="text-fg-bright">Nextcloud you run</span>{" "}
+              (see below).
             </li>
             <li>
               In the installed app, optionally sync to your own{" "}
@@ -542,6 +543,20 @@ export function HomePage() {
               dedicated folder — never the rest of your Dropbox.
             </li>
           </ul>
+          <p>
+            One backend is not a cloud provider at all:{" "}
+            <span className="text-fg-bright">Nextcloud</span> is server software
+            you host yourself, so there is no third party in the middle and
+            nothing to authorise with anyone. You give the app your server
+            address, your user name, and an <em>app password</em> — the
+            single-purpose credential Nextcloud creates for you under Settings →
+            Security, which you can revoke there at any time without changing
+            your account password. It is kept on your device only, sent to your
+            own server and nowhere else, and used to read and write one folder
+            of markdown notes in your account. Reaching a Nextcloud from a web
+            page needs that server to allow this site&apos;s address to use its
+            WebDAV API — a setting you make once, on your own server.
+          </p>
           <p>
             In every case the data the app reads or writes is{" "}
             <span className="text-fg-bright">your notes and nothing else</span>,

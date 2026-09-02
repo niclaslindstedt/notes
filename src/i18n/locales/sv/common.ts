@@ -9,6 +9,7 @@ const common: CommonCatalog = {
   create: "Skapa",
   confirm: "Bekräfta",
   back: "Tillbaka",
+  change: "Ändra",
   connect: "Anslut",
   disconnect: "Koppla från",
   connected: "Ansluten",

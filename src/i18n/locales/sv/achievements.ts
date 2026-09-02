@@ -433,6 +433,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Anslut Dropbox eller Google Drive så synkas dina anteckningar till din egen molnlagring, så att de följer dig till varje enhet du loggar in på.",
     },
+    homeCloud: {
+      name: "Eget moln",
+      condition: "Anslut din egen Nextcloud.",
+      learnMore:
+        "Peka appen mot en Nextcloud du kör själv, så synkas dina anteckningar dit som vanliga markdown-filer och nås från varje enhet som kontot loggar in på — utan något tredjepartsmoln emellan. Appen loggar in med ett återkallningsbart applösenord, aldrig ditt kontolösenord.",
+    },
     selfHoster: {
       name: "Egen värd",
       condition: "Parkoppla med din egen notesd-server.",

@@ -4479,8 +4479,10 @@ Save.
 ### Storage settings
 
 `StorageSection` (`src/ui/settings/StorageSection.tsx`) — the radio picker for
-the backend (This device / Local folder / Dropbox / Google Drive) with connect
-buttons, plus the at-rest-encryption toggle. Driven entirely by the
+the backend (This device / Local folder / Dropbox / Google Drive / Nextcloud,
+plus Self-hosted in the app) with connect buttons — Nextcloud's is an inline
+form (server, user name, app password, folder) rather than a button, since it
+points at a server the user runs, plus the at-rest-encryption toggle. Driven entirely by the
 [storage backend hook](#storage-backend-hook). How heavy turning encryption on
 or off is depends on the backend:
 
@@ -4644,7 +4646,7 @@ sibling of the pull-based `getEncryptionStatus`. The set clears in a `finally`,
 so a failed write (conflict, offline, throttle) never leaves a note stuck
 spinning. `watchUploads` is forwarded through the offline-cache wrapper
 (`src/storage/cache/index.ts`) and carried verbatim by the Dropbox / Drive /
-folder adapters (each returns the directory adapter directly); the local browser
+Nextcloud / folder adapters (each returns the directory adapter directly); the local browser
 backend doesn't implement it (one synchronous blob, nothing to watch).
 `useUploadStatus` (`src/app/use-upload-status.ts`) subscribes to the active
 adapter and returns the `ReadonlySet<string>` of uploading ids, which `App`
@@ -4680,8 +4682,8 @@ operations. The adapter is memoised so it doesn't churn each render.
 ### Backend preference
 
 `src/storage/backend-preference.ts` — per-device localStorage keys for the
-chosen `BackendId` (`browser` / `folder` / `dropbox` / `gdrive`), the cloud
-tokens, and the encryption mode. These are device-local (never in the synced
+chosen `BackendId` (`browser` / `folder` / `dropbox` / `gdrive` / `nextcloud` /
+`notesd`), the cloud tokens, the Nextcloud connection, and the encryption mode. These are device-local (never in the synced
 document, which would create a bootstrap loop) and read on boot before any
 backend resolves.
 
@@ -4753,6 +4755,49 @@ authenticates via a Google Identity Services popup (short-lived access token, no
 refresh token — expiry forces re-auth), caches folder ids in memory, and treats
 most rate limits as 403-with-reason (quota exhaustion is not transient). Built
 on the [directory adapter](#directory-adapter).
+
+### Nextcloud backend
+
+`createNextcloudAdapter` (`src/storage/nextcloud/index.ts`) — notes as `.md`
+files under an app folder (`notes` by default, or any path the user names) in a
+**Nextcloud the user runs**, reached over plain WebDAV at
+`remote.php/dav/files/<user>/…`. Built on the
+[directory adapter](#directory-adapter) like the other file backends, and it
+writes the same layout the folder backend does (`<ns>/notes/*.md`,
+`<ns>/attachments/<stem>/*`), so a folder synced down by the Nextcloud desktop
+client opens directly in the [folder backend](#folder-backend). Attachments are
+real files, and at-rest encryption composes **per file inside** the directory
+adapter via the injected `DirectoryCrypto`. Being a network backend it is
+wrapped in the [offline cache](#offline-cache) in `useBackendSelection`, exactly
+like Dropbox and Drive.
+
+There is **no OAuth**: the credential is an **app password** — the per-client
+secret Nextcloud mints under Settings → Security, revocable on its own — sent as
+HTTP Basic on every request and stored per device
+(`getNextcloudConfig` / `setNextcloudConfig`, `notes:nextcloud:config`). Because
+it never expires there is no silent-refresh path, so a 401 becomes an
+`AuthError` and the UI sends the user back to the connect form
+(`NextcloudConnectForm`, `src/ui/settings/NextcloudConnectForm.tsx`) rather than
+offering a Reconnect that could do nothing.
+
+The protocol details live in `nextcloud/webdav.ts`: a listing is a
+`PROPFIND` with `Depth: 1` (SabreDAV refuses `infinity`, so a recursive listing
+is a breadth-first walk, one request per collection), the per-file revision is
+the `getetag`, and the multistatus body is parsed with namespace-agnostic
+regexes rather than `DOMParser` — the storage layer is tested under vitest's
+`node` environment and the app ships no XML dependency. A `PUT` into a folder
+that doesn't exist yet answers 409, so the client creates the missing parents
+(`MKCOL`, deduped by an in-flight map so one first save doesn't walk the same
+chain per note) and retries once.
+
+`verifyNextcloudConnection` runs on the connect gesture — a `PROPFIND` against
+the account's WebDAV root, then a `MKCOL` of the app folder — so the two
+failures that are really *setup* problems are explained in the form: a rejected
+app password, and a server that won't answer this origin's cross-origin
+request. (Nextcloud sends no CORS headers for WebDAV by default; allowing the
+app's origin is a one-off server-side setting the user, who administers the
+server, makes.) Without that probe the first sign of either would be a silent
+"offline" on a backend the user believes is connected.
 
 ### notesd backend
 

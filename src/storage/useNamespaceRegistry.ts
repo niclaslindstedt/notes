@@ -25,6 +25,7 @@ import { createPinnedFetch } from "../platform/native-bridge.ts";
 import {
   clearEncryption,
   type BackendId,
+  type NextcloudConfig,
   type NotesdConfig,
 } from "./backend-preference.ts";
 import { deleteLocalNamespace } from "./local/index.ts";
@@ -114,6 +115,8 @@ export interface NamespaceRegistryDeps {
   dropboxToken: string | null;
   gdriveToken: string | null;
   folderHandle: FileSystemDirectoryHandle | null;
+  /** The stored Nextcloud connection, null unless it is the active backend. */
+  nextcloudConfig: NextcloudConfig | null;
   /** The paired notesd daemon config, null unless a daemon is the active backend. */
   notesdConfig: NotesdConfig | null;
   /**
@@ -135,6 +138,7 @@ export function useNamespaceRegistry(
     dropboxToken,
     gdriveToken,
     folderHandle,
+    nextcloudConfig,
     notesdConfig,
     activeNamespace,
     setActiveNamespace: setActiveNamespaceState,
@@ -267,6 +271,9 @@ export function useNamespaceRegistry(
         } else if (backend === "gdrive" && gdriveToken) {
           const remote = await import("./remote-backends.ts");
           await remote.deleteGdriveNamespace(gdriveToken, slug);
+        } else if (backend === "nextcloud" && nextcloudConfig) {
+          const remote = await import("./remote-backends.ts");
+          await remote.deleteNextcloudNamespace(nextcloudConfig, slug);
         } else if (backend === "notesd" && notesdConfig) {
           const remote = await import("./remote-backends.ts");
           await remote.deleteNotesdNamespace(
@@ -297,6 +304,7 @@ export function useNamespaceRegistry(
       backend,
       dropboxToken,
       gdriveToken,
+      nextcloudConfig,
       notesdConfig,
       activeNamespace,
       folderHandle,

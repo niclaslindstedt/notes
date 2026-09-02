@@ -25,6 +25,7 @@ import { bytesToDataUrl } from "./attachment-store.ts";
 import {
   type BackendId,
   type EncryptionMode,
+  type NextcloudConfig,
   getBackend,
   setBackend as persistBackend,
 } from "./backend-preference.ts";
@@ -48,6 +49,10 @@ import {
 } from "./useEncryption.ts";
 import { type FolderActiveRef, useFolderBackend } from "./useFolderBackend.ts";
 import { useCloudBackend } from "./useCloudBackend.ts";
+import {
+  type NextcloudConnectRequest,
+  useNextcloudBackend,
+} from "./useNextcloudBackend.ts";
 import { useNotesdBackend } from "./useNotesdBackend.ts";
 import { useNotesdDiscovery } from "./useNotesdDiscovery.ts";
 import { useNamespaceMigration } from "./useNamespaceMigration.ts";
@@ -187,6 +192,14 @@ export interface UseStorageBackend {
   disconnectDropbox: () => void;
   connectGdrive: () => Promise<void>;
   disconnectGdrive: () => void;
+  /** Whether a Nextcloud connection is stored and active. */
+  nextcloudConnected: boolean;
+  /** The stored Nextcloud connection, so the UI can show what it points at. */
+  nextcloudConfig: NextcloudConfig | null;
+  /** Verify a Nextcloud server + app password and switch to it. */
+  connectNextcloud: (request: NextcloudConnectRequest) => Promise<void>;
+  /** Forget the Nextcloud connection and fall back to the browser store. */
+  disconnectNextcloud: () => void;
   /**
    * Whether the self-hosted (notesd) backend is offerable here — only inside
    * the native wrapper, whose pinned fetch can reach a self-signed daemon.
@@ -396,6 +409,12 @@ export function useStorageBackend(): UseStorageBackend {
     disconnectGdrive,
   } = useCloudBackend({ selectBackend });
 
+  // The Nextcloud concern: the stored server connection + connect / disconnect
+  // verbs. No OAuth — the credential is an app password the user pastes, so the
+  // connect verb verifies it against the server before storing it.
+  const { nextcloudConfig, connectNextcloud, disconnectNextcloud } =
+    useNextcloudBackend({ selectBackend });
+
   // The notesd (self-hosted daemon) concern: the paired config + pair / unpair
   // verbs. Native-only — the pinned fetch it rides rejects on the plain web.
   const {
@@ -444,6 +463,7 @@ export function useStorageBackend(): UseStorageBackend {
     dropboxRefresh,
     gdriveToken,
     rememberDropboxAccessToken,
+    nextcloudConfig,
     notesdConfig,
     folderHandle,
     folderHandleLoaded,
@@ -470,6 +490,8 @@ export function useStorageBackend(): UseStorageBackend {
         return remote.createDropboxNamespaceStore(selection.auth);
       case "gdrive":
         return remote.createGdriveNamespaceStore(selection.token);
+      case "nextcloud":
+        return remote.createNextcloudNamespaceStore(selection.config);
       case "folder":
         return remote.createFolderNamespaceStore(
           selection.handle,
@@ -513,6 +535,7 @@ export function useStorageBackend(): UseStorageBackend {
     dropboxToken,
     gdriveToken,
     folderHandle,
+    nextcloudConfig,
     notesdConfig,
     activeNamespace,
     setActiveNamespace: setActiveNamespaceState,
@@ -538,6 +561,8 @@ export function useStorageBackend(): UseStorageBackend {
         return remote.createDropboxSettingsStore(selection.auth);
       case "gdrive":
         return remote.createGdriveSettingsStore(selection.token);
+      case "nextcloud":
+        return remote.createNextcloudSettingsStore(selection.config);
       case "folder":
         return remote.createFolderSettingsStore(
           selection.handle,
@@ -572,6 +597,11 @@ export function useStorageBackend(): UseStorageBackend {
       case "gdrive":
         return remote.createGdriveNamespaceSettingsStore(
           selection.token,
+          activeNamespace,
+        );
+      case "nextcloud":
+        return remote.createNextcloudNamespaceSettingsStore(
+          selection.config,
           activeNamespace,
         );
       case "folder":
@@ -724,6 +754,10 @@ export function useStorageBackend(): UseStorageBackend {
     disconnectDropbox,
     connectGdrive,
     disconnectGdrive,
+    nextcloudConnected: backend === "nextcloud" && nextcloudConfig !== null,
+    nextcloudConfig,
+    connectNextcloud,
+    disconnectNextcloud,
     notesdAvailable: platformCapabilities.pinnedFetch,
     notesdConnected: backend === "notesd" && notesdConfig !== null,
     pairNotesd,

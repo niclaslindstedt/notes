@@ -193,6 +193,19 @@ export function ServerGlyph({ className }: IconProps) {
   );
 }
 
+// A cloud sheltering a house: a cloud you host yourself. Distinct from
+// `CloudGlyph` (someone else's cloud — Dropbox, Drive) and `ServerGlyph` (a
+// bare daemon on your own network) on purpose; a Nextcloud is both at once.
+export function HomeCloudGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M6.6 12.5a3.4 3.4 0 0 1 .6-6.75 5 5 0 0 1 9.4 1.05 3.4 3.4 0 0 1 .8 5.7" />
+      <path d="m7.5 17.5 4.5-3.5 4.5 3.5" />
+      <path d="M9 16.8V21h6v-4.2" />
+    </Svg>
+  );
+}
+
 export function LayersGlyph({ className }: IconProps) {
   return (
     <Svg className={className}>

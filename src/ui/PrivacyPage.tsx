@@ -56,10 +56,11 @@ export function PrivacyPage() {
           <p>
             You may <span className="text-fg-bright">optionally</span> turn on
             sync to a storage location <em>you</em> control — a local folder on
-            your computer, your own Dropbox, or your own Google Drive — so the
-            same notes appear on more than one device. Even then your notes go
-            only to that location in your own account; the project authors never
-            receive your notes in any configuration. The{" "}
+            your computer, your own Dropbox, your own Google Drive, or a
+            Nextcloud you run yourself — so the same notes appear on more than
+            one device. Even then your notes go only to that location in your
+            own account; the project authors never receive your notes in any
+            configuration. The{" "}
             <a className="text-link hover:underline" href="#cloud-sync">
               Optional sync
             </a>{" "}
@@ -160,7 +161,9 @@ export function PrivacyPage() {
             If you opt in to Dropbox or Google Drive sync, the app additionally
             talks directly from your browser to that provider&apos;s own API to
             sign you in and to read and write your notes. Those requests go to
-            the provider, not to us. See <em>Optional sync</em> below.
+            the provider, not to us. If you opt in to Nextcloud sync, the same
+            is true of the server address you enter: the app talks to that
+            server and to no one else. See <em>Optional sync</em> below.
           </p>
         </Section>
 
@@ -245,6 +248,20 @@ export function PrivacyPage() {
               <code className="text-fg-bright">127.0.0.1</code>, reachable from
               nowhere else) for the moment the sign-in takes; it receives the
               sign-in result and nothing else, and closes immediately after.
+            </li>
+            <li>
+              <span className="text-fg-bright">Nextcloud.</span> You enter the
+              address of a Nextcloud <em>you</em> run, your user name, and an{" "}
+              <span className="text-fg-bright">app password</span> — the
+              single-purpose credential Nextcloud creates under Settings →
+              Security, which you can revoke there at any time without changing
+              your account password. It is stored only in this browser and sent
+              only to that server, over its own HTTPS connection, to read and
+              write one folder of markdown notes in your account. No third-party
+              provider is involved and there is no sign-in flow through anyone
+              else. Reaching a Nextcloud from a web page also requires that
+              server to permit this site&apos;s address to use its WebDAV API,
+              which is a setting you make on your own server.
             </li>
             <li>
               <span className="text-fg-bright">Self-hosted (app only).</span> In

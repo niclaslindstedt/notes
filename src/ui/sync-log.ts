@@ -14,6 +14,7 @@ export const SYNC_LOG_SCOPES: ReadonlySet<string> = new Set([
   "notes-sync",
   "dropbox",
   "gdrive",
+  "nextcloud",
   "folder",
   "folder-handle",
   "cache",
