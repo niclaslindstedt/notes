@@ -941,6 +941,16 @@ describe("MarkdownEditor", () => {
       expect(copyButtons()).toHaveLength(0);
     });
 
+    it("keeps an empty block's fences on screen", () => {
+      // Folding both delimiters of a block with nothing between them draws
+      // nothing in their place: the block would disappear from the note, and
+      // in a note that is only the block there would be no line left to type
+      // into at all.
+      renderEditor("```\n```", { focusOnMount: false });
+      expect(renderedIndices()).toEqual(["0", "1"]);
+      expect(surface().textContent).toContain("```");
+    });
+
     it("copies the block's code without its fences", async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
@@ -1955,6 +1965,64 @@ describe("MarkdownEditor", () => {
     expect(container.contains(block)).toBe(true);
     // Nothing non-editable is left parked at the end of the document.
     expect(surface().querySelector("[contenteditable=false]")).toBeNull();
+  });
+
+  // A line the preview folds away takes its number with it — but folding
+  // *every* line would leave the host with no `[data-line-index]` at all, and
+  // a host with no line is not an editor: there is nowhere for a caret to go,
+  // so nothing typed reaches the note until it is reopened.
+  describe("a note whose every line would fold away", () => {
+    const relocated = {
+      canAttach: true,
+      focusOnMount: false,
+      placement: { imagesAtEnd: true, filesAtEnd: true },
+      attachments: [{ filename: "a.png", mime: "image/png" }],
+    } as const;
+
+    function renderedIndices(): string[] {
+      return [...surface().querySelectorAll("[data-line-index]")].map(
+        (el) => el.getAttribute("data-line-index") ?? "",
+      );
+    }
+
+    it("still draws its last line", () => {
+      // The reference renders in the collected block and the blank line after
+      // it is absorbed with it, so both lines of this note are folded.
+      renderEditor("![img](attachments/a.png)\n", relocated);
+      expect(renderedIndices()).toEqual(["1"]);
+    });
+
+    it("gives that line a number of its own", () => {
+      renderEditor("![img](attachments/a.png)\n", {
+        ...relocated,
+        lineNumbers: true,
+      });
+      expect(
+        [...surface().querySelectorAll("[data-line-gutter]")].map(
+          (el) => el.textContent,
+        ),
+      ).toEqual(["2"]);
+    });
+
+    it("takes the text typed into it", () => {
+      const { onChange } = renderEditor("![img](attachments/a.png)\n", {
+        ...relocated,
+      });
+      const line = surface().querySelector<HTMLElement>(
+        '[data-line-index="1"]',
+      )!;
+      caretIn(line, 0);
+      act(() => {
+        document.dispatchEvent(new Event("selectionchange"));
+      });
+      beforeInput("insertText", "a");
+      expect(onChange).toHaveBeenLastCalledWith("![img](attachments/a.png)\nA");
+    });
+
+    it("folds it again once another line can be drawn", () => {
+      renderEditor("text\n![img](attachments/a.png)\n", relocated);
+      expect(renderedIndices()).toEqual(["0"]);
+    });
   });
 
   describe("clicking the empty space below", () => {

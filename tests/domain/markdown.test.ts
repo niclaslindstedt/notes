@@ -141,6 +141,19 @@ describe("hiddenFenceLines", () => {
     const open = classifyLines("a\n```\ncode");
     expect(hiddenFenceLines(open, 0).size).toBe(0);
   });
+
+  it("never hides an empty block's fences", () => {
+    // Nothing between the delimiters, so folding them draws nothing in their
+    // place — the block would vanish from the note rather than read as code.
+    const empty = classifyLines("a\n```\n```\nb");
+    expect(hiddenFenceLines(empty, 0).size).toBe(0);
+    expect(hiddenFenceLines(empty, null).size).toBe(0);
+  });
+
+  it("hides the other blocks' fences around an empty one", () => {
+    const mixed = classifyLines("```\n```\ntext\n```\ncode\n```");
+    expect([...hiddenFenceLines(mixed, null)]).toEqual([3, 5]);
+  });
 });
 
 describe("codeBlockEdges", () => {
@@ -175,11 +188,12 @@ describe("codeBlockEdges", () => {
     });
   });
 
-  it("gives a folded-away empty block no edges at all", () => {
-    // Both fences hidden and nothing between them — nothing is drawn.
-    expect(edges("a\n```\n```\nb", null)).toEqual({ top: [], bottom: [] });
-    // With the caret inside, the fences are back and they are the edges.
+  it("closes an empty block's box around its own fences", () => {
+    // An empty block never folds (there is nothing to draw in the fences'
+    // place), so its delimiters are its edges whether the caret is in it…
     expect(edges("a\n```\n```\nb", 1)).toEqual({ top: [1], bottom: [2] });
+    // …or away from it.
+    expect(edges("a\n```\n```\nb", null)).toEqual({ top: [1], bottom: [2] });
   });
 
   it("closes every block's box independently", () => {

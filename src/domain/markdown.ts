@@ -132,6 +132,15 @@ export function fencedRanges(blocks: readonly LineBlock[]): FencedRange[] {
  * hidden: with no closing line, hiding the opener would silently swallow the
  * only marker saying the rest of the note is code.
  *
+ * An **empty** block — its two delimiters adjacent, nothing between them — is
+ * never hidden either, for the same reason. There is no code to draw in the
+ * fences' place, so folding them away doesn't leave a block of code behind: it
+ * erases the block from the note altogether. Two lines of source then draw
+ * nothing, take their line numbers with them, and — in a note that is only
+ * that block — leave the editor with no line at all to put a caret in, so the
+ * note can't be typed into. The fences stay visible until the block has
+ * content to stand in for them.
+ *
  * `activeLine` is the source line the caret sits on, or null when the note has
  * no active line (nothing focused) — then every closed block hides its fences.
  */
@@ -143,6 +152,7 @@ export function hiddenFenceLines(
   for (const { open, close } of fencedRanges(blocks)) {
     if (activeLine !== null && activeLine >= open && activeLine <= close)
       continue;
+    if (close === open + 1) continue;
     hidden.add(open);
     hidden.add(close);
   }
@@ -196,8 +206,9 @@ export function codeBlockEdges(
       if (first === null) first = i;
       last = i;
     }
-    // Every line of the block is hidden — an empty block whose two fences are
-    // folded away. Nothing is drawn, so there are no edges.
+    // Nothing of the block survived the fold, so there is no drawn line to
+    // carry its corners. `hiddenFenceLines` keeps at least one line of every
+    // block visible, so this is a floor rather than a state to expect.
     if (first === null || last === null) return;
     top.add(first);
     bottom.add(last);

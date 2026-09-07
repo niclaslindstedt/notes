@@ -721,6 +721,25 @@ export function MarkdownEditor({
     [blocks, clampedIndex],
   );
 
+  // The lines the editing host doesn't draw at all — both folds above, and the
+  // one rule they must never add up to: **the host always draws a line**.
+  //
+  // A line that isn't drawn takes its number with it, which is the point of
+  // the fold. But a note whose *every* line is folded renders an empty host,
+  // and an empty host is not an editor: there is no `[data-line-index]` for a
+  // caret to land in, so the browser has no editable position, `beforeinput`
+  // stops arriving, and nothing the user types reaches the note — it reads as
+  // dead until it is reopened. A note holding nothing but a relocated
+  // attachment reference (and the blank line the editor leaves after it) is
+  // exactly that shape. So the last line — where writing resumes, and usually
+  // that blank one — is drawn regardless, and folds again as soon as there is
+  // another line to draw in its place.
+  const hiddenLines = useMemo(() => {
+    const all = new Set([...hidden, ...hiddenFences]);
+    if (all.size >= blocks.length) all.delete(blocks.length - 1);
+    return all;
+  }, [hidden, hiddenFences, blocks.length]);
+
   // Which drawn lines carry a code block's copy button, and the code each one
   // copies. Keyed by the block's first *visible* line so the button rides the
   // top-right corner of the block as drawn (see `codeBlockCopyAnchors`).
@@ -3716,12 +3735,14 @@ export function MarkdownEditor({
                 </LineRow>
               );
             }
-            // An at-end attachment reference is drawn in the collected block, not
-            // in place; skip its line here. It stays in the source (so indices
-            // and structural edits are unaffected) and reveals its raw markdown
-            // when the caret lands on it (making it the active line). A hidden
-            // line takes its number with it, the way a folded region does.
-            if (hidden.has(index) || hiddenFences.has(index)) return null;
+            // A folded line — an at-end attachment reference drawn in the
+            // collected block, or a fence delimiter the caret is away from — is
+            // skipped here. It stays in the source (so indices and structural
+            // edits are unaffected) and reveals its raw markdown when the caret
+            // lands on it (making it the active line). A hidden line takes its
+            // number with it, the way a folded region does; `hiddenLines` is
+            // what keeps that from folding the note away entirely.
+            if (hiddenLines.has(index)) return null;
             const code = copyAnchors.get(index);
             return (
               <LineRow
