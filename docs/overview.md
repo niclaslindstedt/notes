@@ -1062,7 +1062,10 @@ user has to undo by hand.
 Numbers are the *source* line numbers, so a line hidden from the preview — an
 [at-end attachment](#attachments-at-the-end) reference, or a
 [fence](#code-block) the caret is outside of — takes its number with it, leaving
-a gap the way a folded region does. The Markdown-off
+a gap the way a folded region does. What the fold can never do is take the
+*whole* note: the editor's `hiddenLines` set always leaves one line drawn (see
+[attachments at the end](#attachments-at-the-end)), because a note with no line
+in it has no number to show and no caret to type at. The Markdown-off
 [plain textarea](#markdown-editor) has no per-line elements to hang a gutter on
 and ignores the setting, which the toggle's hint says outright.
 
@@ -1570,6 +1573,15 @@ hiding something the user needs:
   block has no end, and hiding the opener would swallow the only marker saying
   the rest of the note is code — so a half-typed block keeps its fence on
   screen.
+- An **empty** block — its two delimiters adjacent, nothing between them — is
+  never hidden either, for the same reason: there is no code to draw in the
+  fences' place, so folding them doesn't leave a block behind, it erases the
+  block from the note. Two lines of source would draw nothing, take their
+  [line numbers](#line-numbers) with them, and — in a note that is *only* that
+  block — leave the editor with no line at all to put a caret in, so the note
+  couldn't be typed into until it was reopened. Erasing a one-line block's
+  code down past its last character is how a note gets that shape. The fences
+  come back the moment the block has content to stand in for them.
 - A block stays **visible as a block** without its delimiters: `lineTextClass`
   (`src/ui/markdown-line-class.ts`) gives every `code` and `fence` line a
   `bg-surface-2` slab and horizontal padding. The editor renders one element
@@ -2120,6 +2132,17 @@ this through the `placement` they pass `AttachmentsProvider`; navigating the
 caret onto a hidden line in the editor reveals its raw source (it becomes the
 active line), so the reference stays editable. Turning either toggle on unlocks
 the **Appendix** achievement.
+
+**Hiding a line never hides the whole note.** A note holding nothing but a
+relocated reference and the blank line absorbed with it would fold away
+completely, and an editing host with no line drawn in it is not an editor: with
+no `[data-line-index]` element there is nowhere for a caret to go, so the
+browser stops sending `beforeinput` and nothing typed reaches the note — it
+reads as dead until it is reopened, [line numbers](#line-numbers) and all. So
+`MarkdownEditor` combines both folds — this one and the [code
+block](#code-block) fences — into one `hiddenLines` set that always leaves the
+**last** line drawn: the line where writing resumes, usually that same blank
+one. It folds again as soon as there is another line to draw in its place.
 
 ### Export
 
