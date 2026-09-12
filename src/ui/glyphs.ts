@@ -48,7 +48,7 @@ export const NAMESPACE_GLYPH_NAMES: readonly string[] = [
 
 // Background matching the bundled `public/favicon.svg` so a namespace
 // favicon reads as the same app, just re-badged.
-const FAVICON_BG = "#1f2933";
+const FAVICON_BG = "#0e1116";
 
 /**
  * Serialise a glyph to a self-contained 64×64 SVG string: the app's dark

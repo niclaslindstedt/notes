@@ -9,9 +9,10 @@
        fully opaque on purpose: each surface that wants a rounded icon
        rounds it itself (iOS, Android masks, the macOS 26 Dock), and a
        transparent margin is exactly what makes macOS read the artwork as a
-       small legacy icon and inset it onto a light backdrop. `#1f2933`
-       matches `theme_color` and `FAVICON_BG` in `src/ui/glyphs.ts`. -->
-  <rect width="64" height="64" fill="#1f2933" />
+       small legacy icon and inset it onto a light backdrop. `#0e1116` is
+       one of nine copies of the plate colour that move together — see the
+       table in `docs/overview.md`'s "App icon" section before retoning. -->
+  <rect width="64" height="64" fill="#0e1116" />
   <!-- Scaled about the STROKED mark's centre, not the viewBox's: the fold
        makes the page 1 unit wider to the right of x=32, so centring on 32
        leaves the mark visibly off to the right at icon sizes.

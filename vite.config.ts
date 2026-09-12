@@ -280,8 +280,8 @@ export default defineConfig({
         short_name: PWA_SHORT_NAME,
         description:
           "A local-first PWA for taking notes that works great on mobile and desktop.",
-        theme_color: "#1f2933",
-        background_color: "#1f2933",
+        theme_color: "#0e1116",
+        background_color: "#0e1116",
         display: "standalone",
         orientation: "any",
         lang: "en",

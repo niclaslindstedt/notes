@@ -78,7 +78,7 @@ the repo root regenerates them):
 - `assets/icon.png` — full-bleed mark, opaque RGB (Apple rejects alpha in the
   marketing icon).
 - `assets/adaptive-icon.png` — mark padded into the Android safe zone over the
-  `#1f2933` theme background.
+  `#0e1116` theme background.
 - `assets/splash.png` — centered mark on `#1d2027`.
 
 If the brand mark in `favicon.svg` changes, re-run the script to keep these in

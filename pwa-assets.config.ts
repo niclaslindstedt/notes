@@ -13,7 +13,7 @@ import {
 // white border around the SVG — iOS renders it as a white frame on the
 // home-screen tile, Android reveals it under launcher masks, and the macOS
 // Dock reads it as a legacy icon and pads it out further still. The SVG
-// paints `#1f2933` edge-to-edge itself (matches `manifest.theme_color`) and
+// paints `#0e1116` edge-to-edge itself (matches `manifest.theme_color`) and
 // sizes its own mark, so the generator only has to not add a margin:
 //   - transparent + apple: padding 0 → the SVG lands on the canvas 1:1,
 //     full-bleed and opaque. iOS and Windows round or square it themselves.
@@ -35,7 +35,7 @@ import {
 // 1024 is the largest slice an `.icns` holds, so anything smaller leaves
 // the Dock upscaling on a Retina display.
 
-const THEME_BACKGROUND = "#1f2933";
+const THEME_BACKGROUND = "#0e1116";
 
 export default defineConfig({
   preset: {

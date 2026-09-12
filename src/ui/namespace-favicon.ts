@@ -16,7 +16,7 @@ export { applyFaviconHref } from "@niclaslindstedt/oss-framework/namespaces";
 const DEFAULT_GLYPH_COLOR = "#34d399";
 
 // Background matching the bundled `public/favicon.svg`.
-const FAVICON_BG = "#1f2933";
+const FAVICON_BG = "#0e1116";
 
 /**
  * The favicon `href` for a namespace: its glyph as a data URI when one is

@@ -42,7 +42,7 @@ const STROKE = 4;
 // Gradient stops (top -> bottom of the mark's bounding box).
 const TOP = [0x6e, 0xe7, 0xb7]; // #6ee7b7
 const BOT = [0x34, 0xd3, 0x99]; // #34d399
-const THEME = [0x1f, 0x29, 0x33]; // #1f2933 — icon / adaptive background (favicon rect)
+const THEME = [0x0e, 0x11, 0x16]; // #0e1116 — icon / adaptive background (favicon rect)
 const SPLASH_BG = [0x1d, 0x20, 0x27]; // #1d2027 — splash background (One Dark page-bg)
 
 function hexlerp(a, b, t) {

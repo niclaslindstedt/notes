@@ -69,7 +69,7 @@ module.exports = {
       package: BUNDLE_ID,
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#1f2933",
+        backgroundColor: "#0e1116",
       },
     },
     web: {
