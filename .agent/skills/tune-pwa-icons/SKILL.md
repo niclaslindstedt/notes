@@ -14,7 +14,7 @@ notes derives its whole PWA icon set from **one source SVG** with
 - **The generator config**, `pwa-assets.config.ts` at the repo root. It
   extends `@vite-pwa/assets-generator`'s `minimal2023Preset` and
   overrides all three variants' padding + background (via
-  `THEME_BACKGROUND`) so the dark `theme_color` (`#1f2933`) bleeds
+  `THEME_BACKGROUND`) so the dark `theme_color` (`#0e1116`) bleeds
   edge-to-edge instead of the preset's default white frame. Note that
   `padding: p` resizes the **whole SVG** to `size * (1 - p)` and centres
   it on the background — it does not inset the glyph within its plate,
@@ -143,13 +143,13 @@ the legacy `apple-touch-icon` web rules: iOS uses the PNG you provide
 at 180×180 verbatim for home-screen install, rounds the corners
 (~22.5% radius "squircle"), and paints **no** background behind alpha.
 That gives you these rules — which the generator's `apple` override
-(padding 0, opaque `#1f2933` background) is tuned to satisfy:
+(padding 0, opaque `#0e1116` background) is tuned to satisfy:
 
 [hig-app-icons]: https://developer.apple.com/design/human-interface-guidelines/app-icons
 
 | Rule                                                                                  | Why                                                                                                                                                                      |
 | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Opaque, full-bleed background.** The source SVG fills the canvas edge-to-edge.      | iOS paints transparent regions white. notes' dark `theme_color` (`#1f2933`) is painted by the `<rect>` in `favicon.svg` and the generator's `apple` background.         |
+| **Opaque, full-bleed background.** The source SVG fills the canvas edge-to-edge.      | iOS paints transparent regions white. notes' dark `theme_color` (`#0e1116`) is painted by the `<rect>` in `favicon.svg` and the generator's `apple` background.         |
 | **Foreground fills 60–80% of the canvas.** Centered.                                  | Below 60% reads as a postage stamp; above 80% gets nibbled by the corner rounding. The surrounding icons on a stock home screen sit in this band.                       |
 | **No drop shadows, gloss, or system chrome.** iOS adds rounded corners; that's all.   | Pre-iOS-7 advice (round corners yourself, add gloss) is now wrong — modern iOS double-rounds and double-glosses if you do.                                              |
 | **No transparency in the foreground glyph.** Use solid fills, not strokes-on-nothing. | iOS antialiasing on the rounded mask makes semi-transparent edges look fuzzy at common scales. (notes' glyph is stroked, not filled — see the note below.)              |
@@ -157,17 +157,26 @@ That gives you these rules — which the generator's `apple` override
 
 Colour coherence: the SVG background and the generator's `apple` /
 `maskable` `background` should match the manifest `theme_color`
-(`#1f2933`) so the install transition (browser tab → home-screen tile →
+(`#0e1116`) so the install transition (browser tab → home-screen tile →
 splash screen, which `vite-plugin-pwa` derives from `background_color`,
-also `#1f2933`) stays visually continuous. If a future redesign retones
-the app, retone all four literals in the same change: the `<rect>` fill
-in `favicon.svg`, `THEME_BACKGROUND` in `pwa-assets.config.ts`, and
-`theme_color` / `background_color` in `vite.config.ts`.
+also `#0e1116`) stays visually continuous. If a future redesign retones
+the app, the colour is **nine literals**, not one, and they all move in
+the same change — `docs/overview.md`'s "App icon" section holds the
+table. Get them all with a repo-wide sweep rather than by memory:
+
+```sh
+grep -rn "0e1116\|0x0e, 0x11, 0x16" --exclude-dir=node_modules --exclude-dir=.git .
+```
+
+Retoning `favicon.svg` also means rerunning **both** generators —
+`make icons` for `public/`, and `node scripts/gen-native-icons.mjs` for
+`native/assets/{icon,adaptive-icon,splash}.png`, which render from the
+same source mark and are just as easy to leave stale.
 
 The current `public/favicon.svg` is a **document / note glyph** — a page
 outline with a folded-over top-right corner and two horizontal text
 lines, stroked in a green vertical gradient (`#6ee7b7` → `#34d399`, the
-`ink` gradient) on a full-bleed `#1f2933` `<rect>`. It's a workable
+`ink` gradient) on a full-bleed `#0e1116` `<rect>`. It's a workable
 template for the apple-touch / `purpose: "any"` icon (opaque rect under
 a single centred glyph). Because the glyph is **stroked, not filled**,
 its 4px strokes thin out at the smaller raster sizes — keep the strokes
@@ -183,7 +192,7 @@ with `"purpose": "maskable"` per the
 icon under a shape the OEM / theme picks at runtime (circle, squircle,
 teardrop, rounded square, …), so the icon must survive **any** of
 those masks. The generator's `maskable` override (padding 0.1 → the
-glyph shrinks into the safe zone, opaque `#1f2933` background → it
+glyph shrinks into the safe zone, opaque `#0e1116` background → it
 bleeds to the edges) is tuned for this; the rules it satisfies:
 
 [maskable-spec]: https://w3c.github.io/manifest/#icon-masks
@@ -273,7 +282,7 @@ Before declaring the icon set "done", walk this list against the
 current files:
 
 - [ ] `apple-touch-icon-180x180.png` has an opaque background that
-      matches the manifest `theme_color` (`#1f2933`).
+      matches the manifest `theme_color` (`#0e1116`).
 - [ ] The foreground glyph in apple-touch sits between roughly
       `(15%, 15%)` and `(85%, 85%)` of the canvas — visible margin on
       all four sides, no kissing the edges.
@@ -337,8 +346,10 @@ After a run:
    so the next contributor starts from current truth.
 3. If a new icon size or purpose was added to the manifest, extend the
    pipeline diagram and add a row to the **Quality criteria checklist**.
-4. If the manifest `theme_color` / `background_color`, the SVG `<rect>`
-   fill, or `THEME_BACKGROUND` were retoned, update every colour literal
-   and call out the link so retones travel atomically.
+4. If the plate colour was retoned, update every literal in this file and
+   re-check the table in `docs/overview.md`'s "App icon" section against
+   a fresh repo-wide grep — the list has gone stale before (it claimed
+   four literals when there were nine), and a colour the list forgets is
+   a colour the next retone leaves behind.
 5. Commit the skill edit alongside the icon/manifest edit so the next
    loop starts from current truth.

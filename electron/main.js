@@ -128,7 +128,7 @@ const LOOPBACK_TIMEOUT_MS = 5 * 60_000;
 const LOOPBACK_DONE_PAGE = `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><title>Signed in</title>
 <style>html{color-scheme:dark light}body{margin:0;min-height:100vh;display:flex;
-align-items:center;justify-content:center;background:#1f2933;color:#e6edf3;
+align-items:center;justify-content:center;background:#0e1116;color:#e6edf3;
 font:16px/1.5 system-ui,sans-serif}p{text-align:center;padding:2rem}</style>
 </head><body><p>You&rsquo;re connected.<br>You can close this tab.</p></body></html>`;
 
@@ -344,7 +344,7 @@ function createWindow() {
     minHeight: 420,
     // Matches the PWA manifest's background_color so the first frame is the
     // app's own dark rather than a white flash.
-    backgroundColor: "#1f2933",
+    backgroundColor: "#0e1116",
     autoHideMenuBar: true,
     webPreferences: {
       // The renderer is the whole app, so it gets no privileges it does not

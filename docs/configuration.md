@@ -51,7 +51,7 @@ there rather than shipping under the wrong identity.
 
 The web app manifest is defined inline in `vite.config.ts` (the `VitePWA`
 plugin's `manifest` block): name (the project name, suffixed per deploy slot),
-theme color (`#1f2933`), icons, and the `id`/`scope`/`start_url` (all
+theme color (`#0e1116`), icons, and the `id`/`scope`/`start_url` (all
 derived from `VITE_BASE`). Edit it there.
 
 ## Icons

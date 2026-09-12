@@ -5936,7 +5936,7 @@ Every icon the app is *represented by* — browser tab, iOS home screen, Android
 launcher, Windows taskbar, the macOS Dock — is generated from **one** file,
 `public/favicon.svg`: a document glyph (a page with a folded top-right corner
 and two text lines, stroked in the green `ink` gradient) on a full-bleed
-`#1f2933` `<rect>` matching `theme_color`. `make icons` runs
+`#0e1116` `<rect>` matching `theme_color`. `make icons` runs
 `@vite-pwa/assets-generator` over it with `pwa-assets.config.ts` and rewrites
 every raster in `public/`; the outputs are committed, and **no CI job checks
 that they match the SVG**, so regenerating in the same change as an artwork
@@ -5972,12 +5972,25 @@ mask, draw it as a literal square.
 Two follow-on notes. The mark is **stroked, not filled**, so its real extent is
 half a `stroke-width` past the path coordinates on every side, scaled by the
 group's `scale()` — reason about the raster, not the `d` attribute. And the
-dark `#1f2933` is written in four places that must be retoned together: the
-`<rect>` fill in `favicon.svg`, `THEME_BACKGROUND` in `pwa-assets.config.ts`,
-`theme_color` / `background_color` in `vite.config.ts`, and `FAVICON_BG` in
-`src/ui/glyphs.ts`, which paints the same plate behind a
-[namespace's glyph](#namespace-favicon) so a re-badged tab icon still reads as
-the same app.
+dark `#0e1116` is not one literal but nine, spread across the web app, both
+wrappers and the two icon generators, all of which must be retoned in the same
+change or the brand splits:
+
+| Literal                                                       | Paints                                               |
+| ------------------------------------------------------------- | ---------------------------------------------------- |
+| the `<rect>` fill in `public/favicon.svg`                      | every generated raster                               |
+| `THEME_BACKGROUND` in `pwa-assets.config.ts`                   | the generator's own canvas under each variant        |
+| `theme_color` / `background_color` in `vite.config.ts`         | the manifest: UA chrome and the install splash       |
+| the dark `theme-color` `<meta>` in `index.html`                | the browser's chrome before the manifest is read     |
+| `FAVICON_BG` in `src/ui/glyphs.ts`                             | the plate behind a [namespace's glyph](#namespace-favicon), so a re-badged tab icon still reads as the same app |
+| `FAVICON_BG` in `src/ui/namespace-favicon.ts`                  | the same plate on the favicon path                   |
+| `THEME` in `scripts/gen-native-icons.mjs`                      | `native/assets/{icon,adaptive-icon}.png`             |
+| `android.adaptiveIcon.backgroundColor` in `native/app.config.js` | the Android launcher plate behind the adaptive icon |
+| the two `#0e1116` in `electron/main.js`                        | the desktop window background and its loading screen |
+
+Retoning the SVG means rerunning **both** generators — `make icons` for
+`public/`, `node scripts/gen-native-icons.mjs` for `native/assets/` — and
+committing their output alongside.
 
 ### Standalone detection
 
