@@ -309,4 +309,30 @@ describe("SwipeToRemove", () => {
     expect(onArchive).toHaveBeenCalledTimes(1);
     expect(onRemove).not.toHaveBeenCalled();
   });
+
+  it("leads the desktop menu with unstarring when the note is favorited", () => {
+    stubMatchMedia(true);
+    const onUnfavorite = vi.fn();
+    render(
+      <SwipeToRemove
+        actionLabel="Delete note"
+        archiveLabel="Archive"
+        onRemove={vi.fn()}
+        onArchive={vi.fn()}
+        onUnfavorite={onUnfavorite}
+      >
+        <div>Groceries</div>
+      </SwipeToRemove>,
+    );
+    fireEvent.contextMenu(screen.getByText("Groceries"));
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+      "Remove from favorites",
+      "Archive",
+      "Delete note",
+    ]);
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Remove from favorites" }),
+    );
+    expect(onUnfavorite).toHaveBeenCalledTimes(1);
+  });
 });
