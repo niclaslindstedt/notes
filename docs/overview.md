@@ -2087,12 +2087,10 @@ drags the neighbouring image into place and the release animates the rest of the
 way — a real slide, not a snap-back-and-swap.
 
 Deleting an attachment's `![](attachments/…)` / `[file](attachments/…)`
-reference from the body **prunes its attachment**: `editNote`
-(`src/domain/note.ts`) drops any attachment the new body no longer references
-(via `referencedAttachments`, which matches both reference forms), so an erased
-attachment sheds its bytes from the document on every backend — and on the file
-backends the next save reconciles the now-orphaned file off disk
-([directory adapter](#directory-adapter)).
+reference from the body **stops it rendering** — every view narrows to
+`referencedAttachments` (which matches both reference forms) — but does **not**
+by itself delete the file the backend holds. That is a second question, and the
+app asks it: see [the attachment removal prompt](#attachment-removal-prompt).
 
 In memory an attachment's `data` (`data:` URL) is **optional**: on the
 file/cloud backends a note loads with its attachments' metadata (`filename` +
@@ -2113,6 +2111,57 @@ gzip-compressed, AES-GCM blob at a flat opaque keyed-HMAC name (the binary
 container carries the real MIME/filename *inside* the ciphertext), so nothing
 leaks — never folded into the note. The local "This device" backend has no
 `AttachmentStore`, so it never accepts an attachment.
+
+### Attachment removal prompt
+
+An attachment is two things: a reference in the note's text, and a real file in
+the user's own Dropbox / Drive / Nextcloud / notes folder. Erasing the reference
+is an edit and lands at once — the thumbnail or chip stops rendering the moment
+the body stops linking to it. Deleting *the file* is somebody else's data, and
+a keystroke is not consent for it, so the app asks:
+
+> **Remove the attachment from Dropbox too?**
+
+`useAttachmentErasure` (`src/app/use-attachment-erasure.ts`) raises it.
+`useNotes` reports every body edit to its `observe`, which records the
+attachments *that edit* stopped referencing (`unreferencedAttachments`,
+`src/domain/attachment.ts`). Two things then keep the question civil:
+
+- **It waits.** A reference is erased character by character, and the moment the
+  closing `)` goes it stops matching — a modal thrown over someone mid-backspace
+  would be intolerable. The question is held until the note has been quiet for
+  `SETTLE_MS` (1.5s) and is then re-derived against the body *as it stands*, so
+  erase-and-retype, or an undo, never asks at all. A second answer is likewise
+  re-checked before anything is deleted.
+- **It only asks where there is a file.** On the local "This device" backend
+  (no `"attachments"` capability) there is nothing to keep, so the record is
+  dropped straight away without a dialog.
+
+`AttachmentRemovalModal` (`src/ui/AttachmentRemovalModal.tsx`), hosted in `App`,
+puts it. The destructive answer is the secondary button and every dismissal —
+backdrop, Escape — keeps the file, because the safe answer must be the easy one.
+The backend is named in the question in its **in-sentence** form
+(`app.attachmentRemoval.backend.*`), not the storage picker's label: "your notes
+folder", not "Local folder".
+
+**Keeping the file is not a deferral.** The attachment record stays on the note,
+unreferenced, and the app never asks about it again: `keptAttachments`
+(`src/storage/attachment-reconcile.ts`) desires every attachment a note
+declares, so the reconcile pass leaves the file alone, and the encrypted note
+JSON / note index carry the metadata across a reload (a plaintext vault
+re-derives it from the `attachments/` listing anyway). So **pasting the
+reference back into the body brings the attachment straight back** — resolved
+from the note in the same keystroke, with its bytes fetched on demand from the
+file that was never deleted. Answering "no" unlocks the **Safekeeping**
+achievement.
+
+Answering **yes** is the only thing that takes an attachment off a note:
+`dropAttachments` (`src/domain/note.ts`) removes the records, and the next
+save's reconcile pass deletes the files ([directory adapter](#directory-adapter)).
+It is applied outside the undo timeline and leaves `updatedAt` alone — answering
+a question about a file is not an edit of the text, and must not jump the note
+to the top of the list. Deleting a whole note still sheds its attachment files
+with it, unasked: the note contributes no desired paths at all.
 
 ### Attachments at the end
 

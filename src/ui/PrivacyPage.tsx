@@ -96,7 +96,10 @@ export function PrivacyPage() {
               individually encrypted blobs under opaque names. They are read
               from your device when you paste or drop them, fetched back only
               when you open the note that shows them, and are never sent
-              anywhere other than the sync backend you chose.
+              anywhere other than the sync backend you chose. Removing an
+              attachment&apos;s link from a note does not by itself delete the
+              file: the app asks first, and the file is only deleted from your
+              folder or cloud if you say so.
             </li>
             <li>
               Your <em>namespaces</em> — the named buckets you group notes into,

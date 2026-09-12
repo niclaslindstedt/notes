@@ -153,6 +153,7 @@ export function ReadOnlyNote({
           {blocks ? (
             <AttachmentsProvider
               attachments={note.attachments}
+              body={note.body ?? ""}
               note={note}
               placement={placement}
             >

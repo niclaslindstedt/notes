@@ -25,11 +25,7 @@ import type { SessionKeys } from "./crypto.ts";
 import { sealBytes } from "./crypto-binary.ts";
 import { noteFileStem } from "./markdown/codec.ts";
 import { parse, serialize } from "./serialize.ts";
-import {
-  type Attachment,
-  mimeForFilename,
-  referencedAttachments,
-} from "../domain/attachment.ts";
+import { type Attachment, mimeForFilename } from "../domain/attachment.ts";
 import type { Note, Snapshot } from "../domain/note.ts";
 import { createLogger } from "../dev/logger.ts";
 
@@ -59,16 +55,16 @@ export function isPlaintextAttachmentPath(path: string): boolean {
   return path.includes("/");
 }
 
-// The attachments a note keeps on disk. The body is the source of truth for
-// which attachments are still referenced, so for a loaded note we intersect the
-// declared attachments with those the body actually links — orphan pruning. A
-// **deferred** note (body not loaded, lazy backend) was not edited this session,
-// so its attachments can't have changed; we keep every declared one rather than
-// re-deriving from a body we don't have — this is what stops a save triggered by
-// editing one note from pruning an unopened note's attachment blobs.
+// The attachments a note keeps on disk: every one it declares. Deliberately
+// **not** intersected with the body's references — a reference the user erased
+// raises the "remove it from <backend> too?" prompt instead, and answering
+// "keep the file" is expressed by the attachment staying on the note. Deleting
+// a file out of someone's Dropbox is only ever the result of that explicit
+// answer (`dropAttachments` takes the record off, and this pass then reconciles
+// the file away), never of a keystroke. A note deleted outright still sheds its
+// files, because it contributes no desired paths at all.
 export function keptAttachments(note: Note): readonly Attachment[] {
-  if (note.body === undefined) return note.attachments ?? [];
-  return referencedAttachments(note.body, note.attachments);
+  return note.attachments ?? [];
 }
 
 // The opaque ref deriver the adapter owns (a keyed HMAC over the crypto

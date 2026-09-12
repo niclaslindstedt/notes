@@ -3,7 +3,7 @@
 // reuse the exact same logic (the eslint config enforces the no-ui /
 // no-storage / no-DOM boundary). Storage and UI build on top of it.
 
-import { type Attachment, referencedAttachments } from "./attachment.ts";
+import type { Attachment } from "./attachment.ts";
 
 // A single note. `title` is a short heading the user edits in its own field
 // (it is *not* the first body line); `body` is the plain text / Markdown
@@ -64,7 +64,10 @@ export type Note = {
   // externalises it to a real image file under `attachments/<note-name>/` (see
   // `domain/attachment.ts`). Absent on a note with no images rather than an
   // empty array, so an older document needs no migration and a JSON note with
-  // none stays minimal.
+  // none stays minimal. An entry the body no longer references is **not** a
+  // bug: erasing the reference asks whether the file should go from the
+  // backend too, and "keep it" leaves the record here so a re-pasted reference
+  // resolves again. Only `dropAttachments` takes one off.
   attachments?: Attachment[];
   // The folder this note sits in within the namespace, by `Folder.id`. A note
   // with no `folderId` lives at the top level (ungrouped). Folders group notes
@@ -109,11 +112,13 @@ export function createNote(now: number = Date.now()): Note {
 
 // Return a copy of `note` with a new body and a bumped `updatedAt`. Erasing an
 // attachment's `![](attachments/…)` / `[file](attachments/…)` reference from
-// the body orphans its attachment, so any attachment the new body no longer
-// references is dropped here — the body is the source of truth for which
-// attachments the note keeps. This is what makes a deleted attachment shed its
-// bytes from the document (and, on the file backends, lets the next save
-// reconcile the on-disk file away).
+// the body leaves the attachment on the note **deliberately**: the file lives
+// on the user's own Dropbox / Drive / folder, and deleting it there is not
+// something a keystroke gets to decide. The app asks instead (see
+// `app/use-attachment-erasure.ts`), and only an explicit "yes" reaches
+// `dropAttachments`. An attachment the body no longer references simply stops
+// rendering (`referencedAttachments` is what the views narrow to), so pasting
+// the reference back brings the picture straight back.
 export function editNote(
   note: Note,
   body: string,
@@ -125,13 +130,28 @@ export function editNote(
   // it keeps its place in the most-recently-edited ordering instead of jumping
   // to the top of the list.
   if (body === note.body) return note;
-  const next: Note = { ...note, body, updatedAt: now };
-  if (note.attachments && note.attachments.length > 0) {
-    const kept = referencedAttachments(body, note.attachments);
-    if (kept.length !== note.attachments.length) {
-      next.attachments = kept.length > 0 ? kept : undefined;
-    }
-  }
+  return { ...note, body, updatedAt: now };
+}
+
+/**
+ * Return a copy of `note` without the named attachments — the answer to the
+ * "remove it from <backend> too?" prompt, and the only thing that takes an
+ * attachment off a note. Dropping the record is what makes the next save
+ * reconcile the file off the backend. `updatedAt` is left alone: answering a
+ * question about a file is not an edit of the text, and must not jump the note
+ * to the top of the most-recently-edited list.
+ */
+export function dropAttachments(
+  note: Note,
+  filenames: readonly string[],
+): Note {
+  if (!note.attachments || note.attachments.length === 0) return note;
+  const drop = new Set(filenames);
+  const kept = note.attachments.filter((a) => !drop.has(a.filename));
+  if (kept.length === note.attachments.length) return note;
+  const next: Note = { ...note };
+  if (kept.length > 0) next.attachments = kept;
+  else delete next.attachments;
   return next;
 }
 

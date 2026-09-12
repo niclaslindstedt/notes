@@ -475,6 +475,12 @@ const achievements = {
       learnMore:
         "On a local folder or cloud backend you can paste or drag any file — a PDF, an archive, a spreadsheet — straight into the editor. It's saved as a real file under an attachments folder beside your notes and shows as a chip with its type icon you can click to download.",
     },
+    safekeeping: {
+      name: "Safekeeping",
+      condition: "Keep an attachment's file after erasing it from a note.",
+      learnMore:
+        "Deleting an attachment's link out of a note doesn't reach into your Dropbox, Drive or notes folder and delete the file — the app asks first. Keep it and nothing is deleted: the note simply stops showing it, and pasting the link back brings the picture or file straight back.",
+    },
     liveSync: {
       name: "Telepathy",
       condition: "Watch an edit from another device arrive on its own.",

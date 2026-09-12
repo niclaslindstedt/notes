@@ -19,6 +19,7 @@ import {
   setActiveNote,
 } from "../storage/active-note-preference.ts";
 import { unlockAchievements, useApplyAppearance } from "../theme/useTheme.ts";
+import { AttachmentRemovalModal } from "../ui/AttachmentRemovalModal.tsx";
 import { ConflictModal } from "../ui/ConflictModal.tsx";
 import { DropzoneKeepModal } from "../ui/DropzoneKeepModal.tsx";
 import { OrphanFilesModal } from "../ui/OrphanFilesModal.tsx";
@@ -237,6 +238,8 @@ export function App() {
     update,
     replaceBody,
     attach,
+    erasedAttachments,
+    resolveErasedAttachments,
     retitle,
     remove,
     archive,
@@ -891,6 +894,13 @@ export function App() {
                   keepDeclined.current.add(keepPromptNote.id);
                   setKeepPromptId(null);
                 }}
+              />
+            )}
+            {erasedAttachments && (
+              <AttachmentRemovalModal
+                attachments={erasedAttachments.attachments}
+                backend={storage.backend}
+                onResolve={resolveErasedAttachments}
               />
             )}
             <OrphanFilesModal orphans={orphans} />

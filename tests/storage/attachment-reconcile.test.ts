@@ -86,13 +86,15 @@ describe("attachment path helpers", () => {
     expect(isPlaintextAttachmentPath("a1b2c3opaqueref")).toBe(false);
   });
 
-  it("prunes a loaded note's unreferenced attachments but keeps a deferred note's", () => {
+  it("keeps every declared attachment, referenced by the body or not", () => {
     const { note, attachment } = noteWithImage();
-    // Loaded note: body references the attachment → kept.
     expect(keptAttachments(note)).toEqual([attachment]);
-    // Loaded note whose body dropped the reference → pruned as an orphan.
-    expect(keptAttachments({ ...note, body: "intro only" })).toEqual([]);
-    // Deferred note (no body): every declared attachment kept, un-pruned.
+    // The body dropping the reference is not what deletes the file — the user
+    // is asked, and "keep it" is expressed by the record staying on the note.
+    expect(keptAttachments({ ...note, body: "intro only" })).toEqual([
+      attachment,
+    ]);
+    // Deferred note (no body): every declared attachment kept, as before.
     expect(keptAttachments({ ...note, body: undefined })).toEqual([attachment]);
   });
 });

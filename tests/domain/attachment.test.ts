@@ -14,6 +14,7 @@ import {
   mimeForFilename,
   referencedAttachments,
   relocatedAttachments,
+  unreferencedAttachments,
   withAttachment,
   type Attachment,
 } from "../../src/domain/attachment.ts";
@@ -157,6 +158,33 @@ describe("referencedAttachments", () => {
 
   it("returns nothing for a body with no attachment references", () => {
     expect(referencedAttachments("just text", [att("a.png")])).toEqual([]);
+  });
+});
+
+describe("unreferencedAttachments", () => {
+  it("is the complement — what the body stopped linking to", () => {
+    const list = [att("a.png"), fileAtt("b.pdf"), att("c.png")];
+    const body = "intro\n![a](attachments/a.png)";
+    expect(unreferencedAttachments(body, list).map((a) => a.filename)).toEqual([
+      "b.pdf",
+      "c.png",
+    ]);
+    // Every attachment referenced → nothing to ask about.
+    expect(
+      unreferencedAttachments("![a](attachments/a.png)", [att("a.png")]),
+    ).toEqual([]);
+    expect(unreferencedAttachments("anything", undefined)).toEqual([]);
+  });
+
+  it("counts a reference anywhere in the body, not just on its own line", () => {
+    const list = [att("a.png")];
+    expect(
+      unreferencedAttachments("see ![a](attachments/a.png) here", list),
+    ).toEqual([]);
+    // The on-disk reference shape resolves to the same attachment.
+    expect(
+      unreferencedAttachments("![a](../attachments/my-note/a.png)", list),
+    ).toEqual([]);
   });
 });
 

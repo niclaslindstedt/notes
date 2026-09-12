@@ -19,6 +19,28 @@ const app: AppCatalog = {
   },
   titlePlaceholder: "Titel",
   attachments: "Bilagor",
+  attachmentRemoval: {
+    title: "Vill du ta bort bilagan från {backend} också?",
+    titleMany: "Vill du ta bort bilagorna från {backend} också?",
+    body: "”{name}” används inte längre av den här anteckningen, men filen ligger kvar i {backend}.",
+    bodyMany:
+      "{count} bilagor används inte längre av den här anteckningen, men filerna ligger kvar i {backend}.",
+    hint: "Behåll den så raderas ingenting — klistra tillbaka länken i anteckningen så fungerar bilagan igen.",
+    hintMany:
+      "Behåll dem så raderas ingenting — klistra tillbaka länkarna i anteckningen så fungerar bilagorna igen.",
+    remove: "Radera filen",
+    removeMany: "Radera filerna",
+    keep: "Behåll filen",
+    keepMany: "Behåll filerna",
+    backend: {
+      browser: "den här enheten",
+      folder: "din anteckningsmapp",
+      dropbox: "Dropbox",
+      gdrive: "Google Drive",
+      nextcloud: "Nextcloud",
+      notesd: "din egen server",
+    },
+  },
   dropTitle: "Släpp för att importera",
   dropHint:
     "Släpp för att lägga till dina Markdown-filer som anteckningar — varje filnamn blir anteckningens titel.",

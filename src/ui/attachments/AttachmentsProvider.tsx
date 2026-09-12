@@ -5,6 +5,7 @@ import {
   type AttachmentPlacement,
   INLINE_PLACEMENT,
   isImageAttachment,
+  referencedAttachments,
 } from "../../domain/attachment.ts";
 import type { Note } from "../../domain/note.ts";
 import { AttachmentsContext, resolveAttachment } from "./context.ts";
@@ -21,6 +22,15 @@ import { ImageViewer } from "./ImageViewer.tsx";
 
 type Props = {
   attachments: readonly Attachment[] | undefined;
+  /**
+   * The body being rendered — the live source in the editor, the note's own in
+   * the read-only view. Given, only the attachments this text actually
+   * references are resolvable, shown in the end-of-note block, or reachable in
+   * the viewer. A note may legitimately declare one its body no longer links
+   * to (the reference was erased and the user kept the file — see
+   * `app/use-attachment-erasure.ts`), and that one has nothing to draw.
+   */
+  body?: string;
   /** The note these attachments belong to, for fetching bytes on demand. */
   note?: Note | null;
   /** Where images / files render — inline (default) or at the note's foot. */
@@ -30,11 +40,18 @@ type Props = {
 
 export function AttachmentsProvider({
   attachments,
+  body,
   note = null,
   placement = INLINE_PLACEMENT,
   children,
 }: Props) {
-  const list = useMemo(() => attachments ?? [], [attachments]);
+  const list = useMemo(
+    () =>
+      body === undefined
+        ? (attachments ?? [])
+        : referencedAttachments(body, attachments),
+    [attachments, body],
+  );
   // The viewer is an image gallery, so it steps through the images only.
   const images = useMemo(() => list.filter(isImageAttachment), [list]);
   const [viewingIndex, setViewingIndex] = useState<number | null>(null);
