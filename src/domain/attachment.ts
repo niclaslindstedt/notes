@@ -226,16 +226,40 @@ const ATTACHMENT_REF_RE = /!?\[[^\]]*\]\(([^)]+)\)/g;
 const ATTACHMENT_LINE_RE = /^(!?)\[[^\]]*\]\(([^)]+)\)$/;
 
 /**
- * The attachments actually referenced by a body, in body order. Used to prune
- * attachments whose reference was deleted from the text so an orphaned file
- * doesn't linger on disk. An attachment referenced more than once appears
- * once.
+ * The attachments actually referenced by a body, in attachment order. This is
+ * what a note *renders* — an attachment the body no longer links to is kept on
+ * the note (its file is still on the backend) but has nothing to draw, so the
+ * editor, the read-only view and the PDF export all narrow to this set. An
+ * attachment referenced more than once appears once.
  */
 export function referencedAttachments(
   body: string,
   attachments: readonly Attachment[] | undefined,
 ): Attachment[] {
   if (!attachments || attachments.length === 0) return [];
+  const referenced = referencedFilenames(body);
+  return attachments.filter((a) => referenced.has(a.filename));
+}
+
+/**
+ * The attachments a body does **not** reference — the complement of
+ * `referencedAttachments`, in attachment order. Erasing a reference from the
+ * text is what raises the "remove it from the backend too?" prompt, and this
+ * is the question that prompt is asked about: a note may legitimately keep an
+ * unreferenced attachment (the user answered "keep the file"), so this is not
+ * a list of things to delete — only of things to ask about.
+ */
+export function unreferencedAttachments(
+  body: string,
+  attachments: readonly Attachment[] | undefined,
+): Attachment[] {
+  if (!attachments || attachments.length === 0) return [];
+  const referenced = referencedFilenames(body);
+  return attachments.filter((a) => !referenced.has(a.filename));
+}
+
+// The attachment filenames a body links to, by either reference form.
+function referencedFilenames(body: string): Set<string> {
   const referenced = new Set<string>();
   let m: RegExpExecArray | null;
   ATTACHMENT_REF_RE.lastIndex = 0;
@@ -243,7 +267,7 @@ export function referencedAttachments(
     const filename = attachmentFilenameFromHref(m[1]!);
     if (filename) referenced.add(filename);
   }
-  return attachments.filter((a) => referenced.has(a.filename));
+  return referenced;
 }
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@
 import {
   attachmentFilenameFromHref,
   isImageAttachment,
+  referencedAttachments,
   type Attachment,
 } from "../../domain/attachment.ts";
 import type { PdfSettings } from "../../domain/pdf.ts";
@@ -119,16 +120,22 @@ export async function exportPdf(
   }
 }
 
-// Every image attachment of the note, as bytes plus the pixel size the layout
-// needs to scale it to the column. Attachments that already carry their data
-// cost nothing; the rest are fetched in parallel, and anything that fails to
-// fetch or decode is left out of the map — the layout prints its alt text.
+// Every image attachment the note's body actually references, as bytes plus the
+// pixel size the layout needs to scale it to the column. An attachment the body
+// no longer links to prints nothing, so it is left out rather than fetched (a
+// kept-but-erased attachment would otherwise cost a round-trip per export).
+// Attachments that already carry their data cost nothing; the rest are fetched
+// in parallel, and anything that fails to fetch or decode is left out of the
+// map — the layout prints its alt text.
 async function resolveImages(
   note: Note,
   fetchAttachment?: AttachmentFetcher | null,
 ): Promise<Map<string, LoadedImage>> {
   const out = new Map<string, LoadedImage>();
-  const images = (note.attachments ?? []).filter(isImageAttachment);
+  const images = referencedAttachments(
+    note.body ?? "",
+    note.attachments,
+  ).filter(isImageAttachment);
   await Promise.all(
     images.map(async (attachment: Attachment) => {
       let data = attachment.data;

@@ -476,6 +476,13 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Med en lokal mapp eller molnbackend kan du klistra in eller dra vilken fil som helst — en PDF, ett arkiv, ett kalkylark — rakt in i redigeraren. Den sparas som en riktig fil i en attachments-mapp bredvid dina anteckningar och visas som en bricka med sin typikon som du kan klicka på för att ladda ner.",
     },
+    safekeeping: {
+      name: "Förvaring",
+      condition:
+        "Behåll en bilagas fil efter att ha raderat den ur en anteckning.",
+      learnMore:
+        "Att radera en bilagas länk ur en anteckning går inte in i din Dropbox, Drive eller anteckningsmapp och tar bort filen — appen frågar först. Behåll den så raderas ingenting: anteckningen slutar bara visa den, och klistrar du tillbaka länken är bilden eller filen där igen.",
+    },
     liveSync: {
       name: "Telepati",
       condition: "Se en redigering från en annan enhet dyka upp av sig själv.",

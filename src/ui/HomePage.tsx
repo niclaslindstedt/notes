@@ -265,6 +265,10 @@ export function HomePage() {
               available when you sync to a local folder, Dropbox, or Google
               Drive (see below). You can choose in Settings to collect images
               and files in a block at the end of the note instead of inline.
+              Deleting an attachment&apos;s link out of a note never quietly
+              deletes the file: the app asks whether it should be removed from
+              your folder or cloud too, and if you keep it, pasting the link
+              back into the note brings the attachment straight back.
             </li>
             <li>
               Set up your own <em>transform rules</em> in Settings and the app

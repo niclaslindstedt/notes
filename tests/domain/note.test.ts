@@ -7,6 +7,7 @@ import {
   createNote,
   defaultNoteTitle,
   DEFAULT_SAVE_FORMATTING,
+  dropAttachments,
   editNote,
   formatBody,
   formatSnapshotForSave,
@@ -100,7 +101,7 @@ describe("note domain", () => {
     expect(notePreview(inline)).toBe("see here");
   });
 
-  it("prunes attachments whose body reference was erased", () => {
+  it("keeps attachments whose body reference was erased", () => {
     const withImage = editNote(
       { ...createNote(0), attachments: [attach("a.png"), attach("b.png")] },
       "![a](attachments/a.png)\n![b](attachments/b.png)",
@@ -111,11 +112,37 @@ describe("note domain", () => {
       "b.png",
     ]);
 
+    // Erasing the reference is an edit of the text, not permission to delete
+    // the file the backend holds — the app asks about that separately, so the
+    // record survives the keystroke and a re-pasted reference resolves again.
     const afterDelete = editNote(withImage, "![a](attachments/a.png)", 2);
-    expect(afterDelete.attachments?.map((a) => a.filename)).toEqual(["a.png"]);
+    expect(afterDelete.attachments?.map((a) => a.filename)).toEqual([
+      "a.png",
+      "b.png",
+    ]);
 
     const afterClear = editNote(afterDelete, "just text", 3);
-    expect(afterClear.attachments).toBeUndefined();
+    expect(afterClear.attachments?.map((a) => a.filename)).toEqual([
+      "a.png",
+      "b.png",
+    ]);
+  });
+
+  it("drops only the named attachments, leaving updatedAt alone", () => {
+    const note = editNote(
+      { ...createNote(0), attachments: [attach("a.png"), attach("b.png")] },
+      "![a](attachments/a.png)\n![b](attachments/b.png)",
+      1,
+    );
+
+    const one = dropAttachments(note, ["b.png"]);
+    expect(one.attachments?.map((a) => a.filename)).toEqual(["a.png"]);
+    expect(one.updatedAt).toBe(note.updatedAt);
+
+    // The last one leaves the field absent rather than an empty array.
+    expect(dropAttachments(one, ["a.png"]).attachments).toBeUndefined();
+    // Nothing to drop is the same note, so no save is churned.
+    expect(dropAttachments(note, ["missing.png"])).toBe(note);
   });
 
   it("falls back to a placeholder title for a title-less note", () => {

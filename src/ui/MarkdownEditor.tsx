@@ -3501,6 +3501,7 @@ export function MarkdownEditor({
   return (
     <AttachmentsProvider
       attachments={attachments}
+      body={value}
       note={note}
       placement={placement}
     >

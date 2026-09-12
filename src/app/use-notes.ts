@@ -16,6 +16,7 @@ import {
   createDropzoneNote,
   createNote,
   createFolder as createFolderRecord,
+  dropAttachments,
   dropzoneNotes,
   editNote,
   isBlank,
@@ -36,6 +37,10 @@ import {
 import { importedNote } from "../domain/import.ts";
 import { sentenceBoundaryCount } from "../domain/sentence.ts";
 import type { StorageAdapter } from "../storage/adapter.ts";
+import {
+  useAttachmentErasure,
+  type AttachmentErasurePrompt,
+} from "./use-attachment-erasure.ts";
 import { useNotesSync, type NotesSync } from "./use-notes-sync.ts";
 import {
   DOC_SCOPE,
@@ -93,6 +98,18 @@ export type NotesStore = {
   replaceBody: (id: string, body: string) => void;
   /** Attach a pasted / dropped file (its bytes) to a note. */
   attach: (id: string, attachment: Attachment) => void;
+  /**
+   * The attachments an edit stopped referencing, waiting on "remove them from
+   * the backend too?" — null when there is nothing to ask. Raised only once the
+   * note has fallen quiet, and only on a backend that keeps attachment files.
+   */
+  erasedAttachments: AttachmentErasurePrompt | null;
+  /**
+   * Answer that question: `true` takes the files off the backend, `false`
+   * leaves them there (and leaves the attachments on the note, so pasting the
+   * reference back works).
+   */
+  resolveErasedAttachments: (remove: boolean) => void;
   retitle: (id: string, title: string) => void;
   remove: (id: string) => void;
   /** Move a note to the archive (hidden from the overview, not destroyed). */
@@ -159,6 +176,10 @@ export function useNotes(
   // Break the cycle with a ref the engine reads and the timeline fills once
   // it exists.
   const resetHistory = useRef<(seed: Snapshot) => void>(() => {});
+  // Same shape of cycle for the erased-attachment questions: they are dropped
+  // on a reseed, but the hook that owns them is built further down (it needs
+  // the document ref). A ref the reseed reads and the hook fills breaks it.
+  const forgetErasures = useRef<() => void>(() => {});
 
   const sync = useNotesSync({
     active: adapter,
@@ -243,6 +264,9 @@ export function useNotes(
   resetHistory.current = useCallback(() => {
     editRuns.current.clear();
     reset();
+    // A reseed replaces the document wholesale (load, reload, conflict adopt,
+    // namespace switch), so any question about the old one is moot.
+    forgetErasures.current();
   }, [reset]);
 
   // Apply a producer over the latest snapshot, render it immediately, queue
@@ -324,6 +348,46 @@ export function useNotes(
     },
     [sync],
   );
+
+  // Take the named attachments off a note without touching the text or the undo
+  // timeline — the "yes, remove them from the backend too" answer. Dropping the
+  // records is what lets the next save's reconcile pass delete the files; the
+  // body already stopped referencing them, so nothing on screen changes.
+  const pruneAttachments = useCallback(
+    (id: string, filenames: readonly string[]): void => {
+      const cur = docRef.current;
+      const target = cur.notes.find((n) => n.id === id);
+      if (!target) return;
+      const pruned = dropAttachments(target, filenames);
+      if (pruned === target) return;
+      const next: Snapshot = {
+        ...cur,
+        notes: cur.notes.map((n) => (n.id === id ? pruned : n)),
+      };
+      docRef.current = next;
+      sync.setDoc(next);
+      sync.scheduleSave(next);
+    },
+    [sync],
+  );
+
+  // The "remove it from <backend> too?" question an erased attachment reference
+  // raises. Held until the note falls quiet, so a mid-backspace body never gets
+  // a modal thrown over it, and answered against the text as it stands then.
+  const {
+    prompt: erasedAttachments,
+    observe: observeErasure,
+    resolve: resolveErasedAttachments,
+    forget: forgetErasure,
+  } = useAttachmentErasure({
+    stores: adapter.capabilities.has("attachments"),
+    noteById: useCallback(
+      (id: string) => docRef.current.notes.find((n) => n.id === id),
+      [],
+    ),
+    prune: pruneAttachments,
+  });
+  forgetErasures.current = forgetErasure;
 
   const ensureBody = useCallback(
     async (id: string): Promise<void> => {
@@ -428,8 +492,9 @@ export function useNotes(
         id,
         bodyEditKey(id, body),
       );
+      if (existing) observeErasure(existing, body);
     },
-    [commit, bodyEditKey],
+    [commit, bodyEditKey, observeErasure],
   );
 
   // The find bar's replace, landing as its own undo step (no merge key) — see
@@ -444,8 +509,9 @@ export function useNotes(
         `Replaced text in “${title}”`,
         id,
       );
+      if (existing) observeErasure(existing, body);
     },
-    [commit],
+    [commit, observeErasure],
   );
 
   // Attach a pasted / dropped file to a note. The editor inserts the body
@@ -501,8 +567,11 @@ export function useNotes(
         `Deleted note “${title}”`,
         DOC_SCOPE,
       );
+      // The note (and so every one of its attachment files) is going; there is
+      // nothing left to ask about.
+      forgetErasure(id);
     },
-    [commit],
+    [commit, forgetErasure],
   );
 
   const archive = useCallback(
@@ -735,6 +804,8 @@ export function useNotes(
     update,
     replaceBody,
     attach,
+    erasedAttachments,
+    resolveErasedAttachments,
     retitle,
     remove,
     archive,

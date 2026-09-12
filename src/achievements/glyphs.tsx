@@ -388,6 +388,21 @@ export function PaperclipGlyph({ className }: IconProps) {
   );
 }
 
+// A paperclip with a tick — the attachment file kept on the backend after its
+// reference was erased from the note ("keep the file" at the removal prompt).
+// The clip is the same one `PaperclipGlyph` draws, scaled down into the top-left
+// so the tick has a corner of its own.
+export function PaperclipKeptGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <g transform="translate(-1 -1.6) scale(0.8)" strokeWidth={2.5}>
+        <path d="M13.234 20.252 21 12.3a4.243 4.243 0 0 0-6-6L5.764 15.7a2.829 2.829 0 0 0 4 4l7.07-7.071a1.414 1.414 0 0 0-2-2L7.93 17.5" />
+      </g>
+      <path d="M14.5 18.5 17 21l4.5-4.5" />
+    </Svg>
+  );
+}
+
 // A panel with a filled foot — the "attachments at the end" glyph (collect a
 // note's images / files into a block at the bottom rather than inline).
 export function PanelBottomGlyph({ className }: IconProps) {

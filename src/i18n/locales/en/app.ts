@@ -39,6 +39,37 @@ const app = {
   // Heading of the collected attachments block at the foot of a note, shown
   // when images / files are set to render at the end rather than inline.
   attachments: "Attachments",
+  // The prompt raised when an edit erases an attachment's reference out of a
+  // note on a backend that keeps attachment files. The note stops showing the
+  // attachment either way; the question is only ever about the file itself,
+  // which lives in the user's own cloud or folder — so the copy says where it
+  // is and what keeping it buys, and never implies the note still holds it.
+  // `backend.*` are the in-sentence names of the backends, deliberately not
+  // the storage picker's labels (settings.storage.backend*): "Local folder"
+  // and "Self-hosted" are list entries, these have to read inside "…remove it
+  // from ___ too?".
+  attachmentRemoval: {
+    title: "Remove the attachment from {backend} too?",
+    titleMany: "Remove the attachments from {backend} too?",
+    body: "“{name}” is no longer used by this note, but the file is still in {backend}.",
+    bodyMany:
+      "{count} attachments are no longer used by this note, but the files are still in {backend}.",
+    hint: "Keep it and nothing is deleted — paste the link back into the note and the attachment works again.",
+    hintMany:
+      "Keep them and nothing is deleted — paste the links back into the note and the attachments work again.",
+    remove: "Delete the file",
+    removeMany: "Delete the files",
+    keep: "Keep the file",
+    keepMany: "Keep the files",
+    backend: {
+      browser: "this device",
+      folder: "your notes folder",
+      dropbox: "Dropbox",
+      gdrive: "Google Drive",
+      nextcloud: "Nextcloud",
+      notesd: "your own server",
+    },
+  },
   // Drag-and-drop import overlay (desktop): shown while Markdown files are
   // dragged over the window.
   dropTitle: "Drop to import",

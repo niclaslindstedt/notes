@@ -70,6 +70,7 @@ import {
   PanelLeftGlyph,
   PdfGlyph,
   PaperclipGlyph,
+  PaperclipKeptGlyph,
   PlusGlyph,
   PreviewGlyph,
   QuoteGlyph,
@@ -930,6 +931,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
       predicate: (prev, next) =>
         !hasFileAttachment(prev.snapshot) && hasFileAttachment(next.snapshot),
     },
+  },
+  {
+    id: "safekeeping",
+    tier: "pro",
+    glyph: PaperclipKeptGlyph,
+    learnMore: true,
+    // Fired by the erased-attachment prompt when the answer is "keep the file"
+    // — the trophy is for discovering that the note and the file are two
+    // separate things, so only the decline unlocks it.
+    trigger: { kind: "manual" },
   },
   {
     id: "liveSync",

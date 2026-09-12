@@ -4,7 +4,11 @@ import {
   attachmentMarkdown,
   type Attachment,
 } from "../../src/domain/attachment.ts";
-import { createNote, type Note } from "../../src/domain/note.ts";
+import {
+  createNote,
+  dropAttachments,
+  type Note,
+} from "../../src/domain/note.ts";
 import {
   bytesToDataUrl,
   dataUrlToBytes,
@@ -168,7 +172,7 @@ describe("directory adapter attachments", () => {
     expect(bytesToDataUrl(got!.mime, got!.bytes)).toBe(DATA_URL);
   });
 
-  it("removes the image file when its reference is deleted from the body", async () => {
+  it("keeps the image file when only its body reference is deleted", async () => {
     const store = memoryStore();
     const attachments = memoryAttachments();
     const a = createDirectoryAdapter(
@@ -180,9 +184,31 @@ describe("directory adapter attachments", () => {
     await a.save(serialize({ notes: [note] }));
     expect(attachments.files.size).toBe(1);
 
-    // The user deletes the image line; the attachment record may linger but the
-    // file is reconciled away because the body no longer references it.
+    // The user deletes the image line. The note stops showing it, but the file
+    // is theirs: it survives until they answer the removal prompt, which is
+    // what takes the attachment record off the note.
     const edited: Note = { ...note, body: "intro" };
+    await a.save(serialize({ notes: [edited] }));
+    expect(attachments.files.size).toBe(1);
+  });
+
+  it("removes the image file once the attachment is dropped from the note", async () => {
+    const store = memoryStore();
+    const attachments = memoryAttachments();
+    const a = createDirectoryAdapter(
+      store,
+      { id: "folder", label: "T" },
+      attachments,
+    );
+    const { note } = noteWithImage();
+    await a.save(serialize({ notes: [note] }));
+    expect(attachments.files.size).toBe(1);
+
+    // "Yes, remove it from the backend too" — the record goes, and this save
+    // reconciles the file away with it.
+    const edited: Note = dropAttachments({ ...note, body: "intro" }, [
+      "abcd1234-pic.png",
+    ]);
     await a.save(serialize({ notes: [edited] }));
     expect(attachments.files.size).toBe(0);
   });
