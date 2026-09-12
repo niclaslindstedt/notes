@@ -22,6 +22,7 @@ import {
   FolderOpenIcon,
   PencilIcon,
   PlusIcon,
+  StarIcon,
   TrashIcon,
 } from "./icons.tsx";
 import { NOTE_DROP_ATTR } from "./note-drag-context.ts";
@@ -482,6 +483,7 @@ export function SwipeToRemove({
   onRemove,
   onArchive,
   onCopyLink,
+  onUnfavorite,
   children,
 }: {
   /** Accessible label for the trash button. */
@@ -490,7 +492,7 @@ export function SwipeToRemove({
   archiveLabel: string;
   onRemove: () => void | Promise<void>;
   /**
-   * Archive this note — the right swipe, and the first entry of the desktop
+   * Archive this note — the right swipe, and an entry of the desktop
    * right-click menu. Omitted for a row where archiving is meaningless (a
    * [dropzone note](../../docs/overview.md#dropzone), which is ticked off and
    * deleted rather than filed away): the right swipe is then inert and the
@@ -500,6 +502,13 @@ export function SwipeToRemove({
   /** Copy this note's link — desktop right-click menu only, since the swipe
    * layout has no room for a third outcome. Omitted, the entry isn't shown. */
   onCopyLink?: () => void;
+  /**
+   * Drop this note out of Favorites — desktop right-click menu only, and only
+   * passed for a row whose note is starred, so the entry reads as a statement
+   * about the note rather than a toggle. Starring still happens in the editor
+   * header; this is the way back out without opening the note first.
+   */
+  onUnfavorite?: () => void;
   children: ReactNode;
 }) {
   const t = useT();
@@ -518,6 +527,15 @@ export function SwipeToRemove({
       <RowActionMenu
         ariaLabel={t("app.noteActions")}
         actions={[
+          ...(onUnfavorite
+            ? [
+                {
+                  label: t("app.unfavorite"),
+                  icon: <StarIcon className="h-5 w-5" filled />,
+                  onSelect: onUnfavorite,
+                },
+              ]
+            : []),
           ...(onArchive
             ? [
                 {

@@ -3368,6 +3368,17 @@ while nothing is starred (an empty heading is noise in a drawer this dense, and
 the star button is where the feature is discovered). Each row is a full note
 row, so swipe, right-click and drag behave exactly as they do in the list below.
 
+A starred row's [right-click menu](#right-click-menu) leads with **Remove from
+favorites** (`onUnfavorite` on `SwipeToRemove`, wired to the same
+`toggleFavorite`, so unstarring is one undoable step on the shared timeline like
+any other). It is the only way out of Favorites that doesn't go through opening
+the note to reach the header's star, which is what pruning the section needs:
+the entry is passed only for a row whose note is starred, so it reads as a
+statement about that note rather than a toggle that means different things on
+different rows, and it sits first because it is the one action of the three that
+neither files the note away nor destroys it. Starring still happens only in the
+editor header — the menu is the way back, not a second front door.
+
 By default the section flattens the folder hierarchy away — a favorite is a
 shortcut, and where it is filed is precisely what the section sets aside. The
 `favoritesShowFolders` appearance setting (default **off**, Settings →
@@ -4082,7 +4093,9 @@ card (`SwipeableNoteCard`) and the side-menu row (`SwipeToRemove`) wrap their
 content in this component instead of arming a swipe: right-clicking the row
 opens a menu of the same actions — archive/restore and delete — plus
 **Copy link**, which puts the note's own address on the clipboard (see
-[route / note link](#route--note-link--browser-back--forward)); a plain click
+[route / note link](#route--note-link--browser-back--forward)), and, on a
+side-menu row whose note is starred, **Remove from favorites** (see
+[favorites](#favorites)); a plain click
 still opens/selects the note. It is built on the same
 [`FloatingPanel`](#custom-dropdown) the custom dropdown uses (anchored to the
 row, portalled to `document.body` so it escapes the drawer's `translateX`,

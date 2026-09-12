@@ -169,6 +169,12 @@ type Props = {
   onArchiveNote: (id: string) => void;
   /** Copy a note's link — desktop right-click menu only. */
   onCopyNoteLink?: (id: string) => void;
+  /**
+   * Drop a note out of Favorites — offered on a starred note's right-click
+   * menu so the Favorites section can be pruned without opening each note to
+   * reach the editor header's star.
+   */
+  onUnfavoriteNote?: (id: string) => void;
   /** How many notes are archived — shown as a count on the Archive entry. */
   archivedCount: number;
   /** Open the archive page (the list of archived notes). */
@@ -212,6 +218,9 @@ type Props = {
   uploadingIds?: ReadonlySet<string>;
 };
 
+/** The container's full prop surface — exported so tests can extend it. */
+export type SideMenuProps = Props;
+
 export function SideMenu({
   notes,
   loading = false,
@@ -225,6 +234,7 @@ export function SideMenu({
   onRemoveNote,
   onArchiveNote,
   onCopyNoteLink,
+  onUnfavoriteNote,
   archivedCount,
   onOpenArchive,
   archiveActive,
@@ -604,6 +614,11 @@ export function SideMenu({
           onCopyLink={
             onCopyNoteLink ? () => onCopyNoteLink(note.id) : undefined
           }
+          onUnfavorite={
+            onUnfavoriteNote && note.favorite
+              ? () => onUnfavoriteNote(note.id)
+              : undefined
+          }
         >
           {row}
         </SwipeToRemove>
@@ -779,7 +794,10 @@ export function SideMenu({
           empty heading would be noise in a drawer this dense, and the star
           button is where the feature is discovered. Each row is a full note row
           (swipe / right-click / drag all behave as they do below), so a
-          favorite can be archived or refiled straight from here. */}
+          favorite can be archived, refiled or unstarred straight from here —
+          the right-click menu of a starred row leads with "Remove from
+          favorites", which is the only way back out that doesn't go through
+          opening the note. */}
         {favorites.length > 0 && (
           <>
             <SectionHeader label={t("nav.favorites")} border />

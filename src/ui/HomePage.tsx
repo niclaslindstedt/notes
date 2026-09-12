@@ -397,7 +397,8 @@ export function HomePage() {
               top of the side menu, so it is one tap away wherever it is filed.
               The note itself does not move; Favorites lists them flat by
               default, and a setting can reproduce their folder structure there
-              instead.
+              instead. On a computer, right-clicking a favorite in the side menu
+              offers to remove it from favorites without opening it.
             </li>
             <li>
               <em>Lock a note</em> so it cannot be edited — the eye button

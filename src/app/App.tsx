@@ -784,6 +784,7 @@ export function App() {
                   onRemoveNote={removeNote}
                   onArchiveNote={archiveNote}
                   onCopyNoteLink={copyNoteLink}
+                  onUnfavoriteNote={toggleFavorite}
                   archivedCount={archived.length}
                   onOpenArchive={openArchive}
                   archiveActive={view === "archive" && !editing}
