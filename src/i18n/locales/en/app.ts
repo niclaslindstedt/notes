@@ -76,6 +76,7 @@ const app = {
   // have asked for, so the file goes without a second question.
   imageActions: "Image actions",
   copyImage: "Copy image",
+  cutImage: "Cut image",
   deleteImage: "Delete image",
   imageCopied: "Image copied",
   imageCopyFailed: "This browser wouldn’t let the image onto the clipboard.",

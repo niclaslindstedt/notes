@@ -43,6 +43,7 @@ const app: AppCatalog = {
   },
   imageActions: "Bildåtgärder",
   copyImage: "Kopiera bild",
+  cutImage: "Klipp ut bild",
   deleteImage: "Radera bild",
   imageCopied: "Bilden kopierad",
   imageCopyFailed: "Webbläsaren släppte inte in bilden i urklipp.",

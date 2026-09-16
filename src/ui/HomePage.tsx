@@ -279,9 +279,9 @@ export function HomePage() {
               anything; cut it (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>X</kbd>) to
               move it to another note, and <kbd>Delete</kbd> removes it from the
               note and from storage. Right-click — or hold, on a touchscreen —
-              for the same actions in a menu. Paste a picture&apos;s link into a
-              note it doesn&apos;t belong to and the app goes and finds the
-              file, or tells you it is no longer stored here.
+              for all three in a menu. Paste a picture&apos;s link into a note
+              it doesn&apos;t belong to and the app goes and finds the file, or
+              tells you it is no longer stored here.
             </li>
             <li>
               Set up your own <em>transform rules</em> in Settings and the app

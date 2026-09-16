@@ -20,7 +20,7 @@ import {
 import type { Note } from "../../domain/note.ts";
 import { useT } from "../../i18n/index.ts";
 import { useFlashMessage } from "../hooks/useFlashMessage.ts";
-import { CopyIcon, TrashIcon } from "../icons.tsx";
+import { CopyIcon, CutIcon, TrashIcon } from "../icons.tsx";
 import { Toast } from "../Toast.tsx";
 import { copyImageToClipboard } from "./clipboard.ts";
 import { AttachmentsContext, resolveAttachment } from "./context.ts";
@@ -74,8 +74,8 @@ type Props = {
   onDelete?: (filename: string) => void;
   /**
    * Cut an image: its reference leaves the body while the file stays put, so a
-   * paste puts it straight back. Omitted with `onDelete` given, the menu simply
-   * has no Cut.
+   * paste puts it straight back. Omitted, the menu simply has no Cut and
+   * Ctrl/Cmd+X falls through to the editor.
    */
   onCut?: (filename: string) => void;
   children: ReactNode;
@@ -261,6 +261,15 @@ export function AttachmentsProvider({
               icon: <CopyIcon className="h-4 w-4" />,
               onSelect: () => void copy(menuFor),
             },
+            ...(onCut
+              ? [
+                  {
+                    label: t("app.cutImage"),
+                    icon: <CutIcon className="h-4 w-4" />,
+                    onSelect: () => void cut(menuFor.filename),
+                  },
+                ]
+              : []),
             ...(onDelete
               ? [
                   {

@@ -2161,10 +2161,11 @@ three gestures then mean what they mean everywhere else:
 | Escape, a click away, typing | The selection is dropped and the caret goes back to being the caret      |
 | A click on the selected image | Opens it full-size in the [viewer](#attachments)                       |
 
-Right-click (or a hold on a touchscreen) puts **Copy image** and **Delete
-image** in a menu over the picture instead — the framework's `ContextMenu`,
-hosted by `AttachmentsProvider` so a picture inside a rendered line never has a
-floating panel nested in it.
+Right-click (or a hold on a touchscreen) puts **Copy image**, **Cut image** and
+**Delete image** in a menu over the picture instead — the framework's
+`ContextMenu`, hosted by `AttachmentsProvider` so a picture inside a rendered
+line never has a floating panel nested in it. The menu is the only way to cut
+one on a touchscreen, where there is no Ctrl/Cmd+X to press.
 
 **Selection only exists where the note can be changed.** The provider is given
 `onDelete` / `onCut` by the live-preview editor and by nothing else, and

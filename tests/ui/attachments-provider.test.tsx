@@ -80,6 +80,12 @@ function SelectionProbe() {
       <button type="button" onClick={() => ctx?.select("pic.png")}>
         select
       </button>
+      <button
+        type="button"
+        onClick={() => ctx?.openMenu(PIC, { x: 10, y: 10 })}
+      >
+        menu
+      </button>
     </>
   );
 }
@@ -87,22 +93,26 @@ function SelectionProbe() {
 function mountSelectable(opts: {
   body?: string;
   onDelete?: (filename: string) => void;
+  onCut?: (filename: string) => void;
 }) {
   const view = render(
     <AttachmentsProvider
       attachments={[PIC, DOC]}
       body={opts.body ?? "![pic](attachments/pic.png)"}
       onDelete={opts.onDelete}
+      onCut={opts.onCut}
     >
       <SelectionProbe />
     </AttachmentsProvider>,
   );
   const select = () => fireEvent.click(screen.getByText("select"));
+  const openMenu = () => fireEvent.click(screen.getByText("menu"));
   const press = (key: string, init: KeyboardEventInit = {}) =>
     fireEvent.keyDown(document, { key, ...init });
   return {
     view,
     select,
+    openMenu,
     press,
     selected: () => screen.getByTestId("selected").textContent,
     editable: () => screen.getByTestId("editable").textContent,
@@ -149,6 +159,22 @@ describe("AttachmentsProvider — the selected image", () => {
     view.select();
     view.press("a");
     expect(view.selected()).toBe("—");
+  });
+
+  it("offers Cut only where the note can supply one", () => {
+    const view = mountSelectable({ onDelete: vi.fn() });
+    view.openMenu();
+    expect(screen.queryByText("Copy image")).not.toBeNull();
+    expect(screen.queryByText("Cut image")).toBeNull();
+    cleanup();
+
+    const full = mountSelectable({ onDelete: vi.fn(), onCut: vi.fn() });
+    full.openMenu();
+    expect(
+      ["Copy image", "Cut image", "Delete image"].map((label) =>
+        screen.queryByText(label) === null ? `missing:${label}` : label,
+      ),
+    ).toEqual(["Copy image", "Cut image", "Delete image"]);
   });
 
   it("stops holding a picture the note no longer shows", () => {
