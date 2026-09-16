@@ -34,6 +34,7 @@ import {
   CommentGlyph,
   CopyGlyph,
   CutGlyph,
+  ImageSelectedGlyph,
   ExportGlyph,
   EyeGlyph,
   EyeOffGlyph,
@@ -958,6 +959,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     // Fired by the erased-attachment prompt when the answer is "keep the file"
     // — the trophy is for discovering that the note and the file are two
     // separate things, so only the decline unlocks it.
+    trigger: { kind: "manual" },
+  },
+  {
+    id: "cutout",
+    tier: "pro",
+    glyph: ImageSelectedGlyph,
+    learnMore: true,
+    // Fired when an image actually reaches the system clipboard (a copy or a
+    // cut). Nothing in the document records that it happened — a copy changes
+    // nothing at all — so it can only be a manual unlock.
     trigger: { kind: "manual" },
   },
   {

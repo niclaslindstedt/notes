@@ -94,6 +94,20 @@ const app = {
       notesd: "your own server",
     },
   },
+  // The right-click / long-press menu on an image in a note, and the two
+  // outcomes a *selected* image reports. "Delete" here is deliberately final —
+  // picking it out of a menu is already the answer `attachmentRemoval` would
+  // have asked for, so the file goes without a second question.
+  imageActions: "Image actions",
+  copyImage: "Copy image",
+  cutImage: "Cut image",
+  deleteImage: "Delete image",
+  imageCopied: "Image copied",
+  imageCopyFailed: "This browser wouldn’t let the image onto the clipboard.",
+  // Pasting a reference to an attachment whose file is nowhere in this
+  // document — the note it was cut out of is gone, or the file was deleted.
+  attachmentGone: "“{name}” is no longer stored here",
+  attachmentGoneMany: "{count} attachments are no longer stored here",
   // Drag-and-drop import overlay (desktop): shown while Markdown files are
   // dragged over the window.
   dropTitle: "Drop to import",

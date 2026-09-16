@@ -291,6 +291,17 @@ export function HomePage() {
               back into the note brings the attachment straight back.
             </li>
             <li>
+              Click an image in a note to <em>select</em> it, the way you select
+              a word. Copy it (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>C</kbd>) and
+              the picture itself goes to your clipboard, ready to paste into
+              anything; cut it (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>X</kbd>) to
+              move it to another note, and <kbd>Delete</kbd> removes it from the
+              note and from storage. Right-click — or hold, on a touchscreen —
+              for all three in a menu. Paste a picture&apos;s link into a note
+              it doesn&apos;t belong to and the app goes and finds the file, or
+              tells you it is no longer stored here.
+            </li>
+            <li>
               Set up your own <em>transform rules</em> in Settings and the app
               rewrites what a note shows without touching what it stores. A rule
               matches part of a note with a regular expression and displays

@@ -487,6 +487,12 @@ const achievements = {
       learnMore:
         "Deleting an attachment's link out of a note doesn't reach into your Dropbox, Drive or notes folder and delete the file — the app asks first. Keep it and nothing is deleted: the note simply stops showing it, and pasting the link back brings the picture or file straight back.",
     },
+    cutout: {
+      name: "Cutout",
+      condition: "Copy or cut an image straight out of a note.",
+      learnMore:
+        "Click a picture in a note and it takes a selection of its own. Copy it and the picture itself goes to the clipboard, ready to paste into anything; cut it and it leaves the note without the usual \u201cdelete the file too?\u201d question, because you are moving it, not throwing it away. Right-click (or hold) a picture for the same actions in a menu.",
+    },
     liveSync: {
       name: "Telepathy",
       condition: "Watch an edit from another device arrive on its own.",

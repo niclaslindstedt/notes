@@ -66,3 +66,24 @@ export function useAttachmentData(
 
   return data;
 }
+
+/**
+ * The same resolution as {@link useAttachmentData}, for the callbacks that
+ * can't ask a hook: a copy or a cut has to have the bytes in hand before it
+ * can write them to the clipboard, and the picture it acts on is whichever one
+ * the user selected. Shares the session cache, so an image already on screen
+ * costs nothing to copy.
+ */
+export async function loadAttachmentData(
+  note: Note | null | undefined,
+  attachment: Attachment,
+  fetcher: AttachmentFetcher | null,
+): Promise<string | null> {
+  if (attachment.data) return attachment.data;
+  const hit = cache.get(attachment.filename);
+  if (hit) return hit;
+  if (!note || !fetcher) return null;
+  const url = await fetcher(note, attachment.filename);
+  if (url) cache.set(attachment.filename, url);
+  return url;
+}

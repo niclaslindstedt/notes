@@ -7,10 +7,15 @@
 // the sync state back up for the header indicator and the unlock / conflict
 // surfaces.
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { unlock } from "../achievements/bus.ts";
-import { type Attachment, withAttachment } from "../domain/attachment.ts";
+import {
+  type Attachment,
+  referencedAttachmentNames,
+  withAttachment,
+  withoutAttachmentRef,
+} from "../domain/attachment.ts";
 import {
   archivedNotes,
   createDropzoneNote,
@@ -39,6 +44,13 @@ import type { LineComment } from "../domain/note-comment.ts";
 import { importedNote } from "../domain/import.ts";
 import { sentenceBoundaryCount } from "../domain/sentence.ts";
 import type { StorageAdapter } from "../storage/adapter.ts";
+import {
+  clearCut,
+  clearCuts,
+  markCut,
+  pendingCuts,
+  type AttachmentCut,
+} from "./attachment-cuts.ts";
 import {
   useAttachmentErasure,
   type AttachmentErasurePrompt,
@@ -100,6 +112,21 @@ export type NotesStore = {
   replaceBody: (id: string, body: string) => void;
   /** Attach a pasted / dropped file (its bytes) to a note. */
   attach: (id: string, attachment: Attachment) => void;
+  /**
+   * Delete an attachment outright — its references leave the body **and** its
+   * record leaves the note (so the next save takes the file off the backend),
+   * in one undoable step and with no question asked. This is the "Delete" on a
+   * selected image: choosing it *is* the answer the erasure prompt would have
+   * asked for.
+   */
+  deleteAttachment: (id: string, filename: string) => void;
+  /**
+   * Cut an attachment: its references leave the body, its record and file stay
+   * put so a paste puts it straight back, and it is marked as a cut
+   * (`attachment-cuts.ts`) so the next start deletes it if the paste never
+   * came. No question is asked — the clipboard is holding the answer.
+   */
+  cutAttachment: (id: string, filename: string) => void;
   /**
    * The attachments an edit stopped referencing, waiting on "remove them from
    * the backend too?" — null when there is nothing to ask. Raised only once the
@@ -378,6 +405,43 @@ export function useNotes(
     [sync],
   );
 
+  // Finish the cuts a previous session left open. An image that was cut and
+  // never pasted back is a delete the user already asked for — the app simply
+  // had no moment on the way out in which to carry it out (see
+  // `attachment-cuts.ts`), so it carries it out on the way back in, once the
+  // document this namespace's marks describe is actually loaded.
+  const cutsDrained = useRef<StorageAdapter | null>(null);
+  useEffect(() => {
+    if (!sync.loaded) return;
+    if (cutsDrained.current === adapter) return;
+    cutsDrained.current = adapter;
+    const cuts = pendingCuts();
+    if (cuts.length === 0) return;
+    const settled: AttachmentCut[] = [];
+    const byNote = new Map<string, string[]>();
+    for (const cut of cuts) {
+      // A cut *this* session made is still live — the clipboard is holding it
+      // and the paste may be one keystroke away. Its mark is for the next
+      // start, not for the load that happened to finish after it.
+      if (cutMarks.current.get(cut.noteId)?.has(cut.filename)) continue;
+      const note = docRef.current.notes.find((n) => n.id === cut.noteId);
+      // A note this document doesn't hold belongs to another namespace: leave
+      // its mark for whoever opens that one (or for the age limit to lapse).
+      if (!note) continue;
+      settled.push(cut);
+      // The paste did land — from another device, or from a mark that outlived
+      // the edit that claimed it. A referenced attachment is never deleted.
+      const live =
+        note.body !== undefined &&
+        referencedAttachmentNames(note.body).includes(cut.filename);
+      if (live) continue;
+      byNote.set(cut.noteId, [...(byNote.get(cut.noteId) ?? []), cut.filename]);
+    }
+    for (const [noteId, filenames] of byNote)
+      pruneAttachments(noteId, filenames);
+    clearCuts(settled);
+  }, [adapter, sync.loaded, pruneAttachments]);
+
   // The "remove it from <backend> too?" question an erased attachment reference
   // raises. Held until the note falls quiet, so a mid-backspace body never gets
   // a modal thrown over it, and answered against the text as it stands then.
@@ -385,6 +449,7 @@ export function useNotes(
     prompt: erasedAttachments,
     observe: observeErasure,
     resolve: resolveErasedAttachments,
+    ignore: ignoreErasure,
     forget: forgetErasure,
   } = useAttachmentErasure({
     stores: adapter.capabilities.has("attachments"),
@@ -395,6 +460,25 @@ export function useNotes(
     prune: pruneAttachments,
   });
   forgetErasures.current = forgetErasure;
+
+  // The cuts this session has made, mirrored in memory so the common case — a
+  // note with no cut pending — costs a `Map` lookup rather than a localStorage
+  // read on every keystroke. The persisted marks (`attachment-cuts.ts`) are
+  // what survive the tab closing; this is only the fast path into them.
+  const cutMarks = useRef<Map<string, Set<string>>>(new Map());
+
+  // A body that mentions a cut attachment again is the paste landing: the cut
+  // has been claimed, so the mark that would have deleted it at the next start
+  // comes off.
+  const claimCuts = useCallback((id: string, body: string): void => {
+    const marks = cutMarks.current.get(id);
+    if (!marks || marks.size === 0) return;
+    for (const filename of referencedAttachmentNames(body)) {
+      if (!marks.delete(filename)) continue;
+      clearCut(id, filename);
+    }
+    if (marks.size === 0) cutMarks.current.delete(id);
+  }, []);
 
   const ensureBody = useCallback(
     async (id: string): Promise<void> => {
@@ -500,8 +584,9 @@ export function useNotes(
         bodyEditKey(id, body),
       );
       if (existing) observeErasure(existing, body);
+      claimCuts(id, body);
     },
-    [commit, bodyEditKey, observeErasure],
+    [commit, bodyEditKey, observeErasure, claimCuts],
   );
 
   // The find bar's replace, landing as its own undo step (no merge key) — see
@@ -517,8 +602,9 @@ export function useNotes(
         id,
       );
       if (existing) observeErasure(existing, body);
+      claimCuts(id, body);
     },
-    [commit, observeErasure],
+    [commit, observeErasure, claimCuts],
   );
 
   // Attach a pasted / dropped file to a note. The editor inserts the body
@@ -549,6 +635,58 @@ export function useNotes(
       );
     },
     [commit, currentBodyEditKey],
+  );
+
+  // Take an attachment's references out of a note's body, with or without the
+  // attachment itself. The two gestures a selected image offers — Delete and
+  // Cut — are the same text edit over a different answer to "and the file?",
+  // so they share one seam. Both tell the erasure watcher to stand down: the
+  // question it exists to ask has already been answered by which gesture was
+  // used (see `use-attachment-erasure.ts`).
+  const eraseAttachment = useCallback(
+    (id: string, filename: string, keepRecord: boolean): void => {
+      const target = docRef.current.notes.find((n) => n.id === id);
+      // A deferred body isn't in memory to rewrite — and a note whose body
+      // hasn't loaded has no image on screen to have acted on.
+      if (!target || target.body === undefined) return;
+      const body = withoutAttachmentRef(target.body, filename);
+      ignoreErasure(id, [filename]);
+      const title = noteTitle(target);
+      commit(
+        (prev) =>
+          prev.map((n) => {
+            if (n.id !== id) return n;
+            const edited = editNote(n, body);
+            return keepRecord ? edited : dropAttachments(edited, [filename]);
+          }),
+        keepRecord
+          ? `Cut an attachment from “${title}”`
+          : `Deleted an attachment from “${title}”`,
+        id,
+      );
+    },
+    [commit, ignoreErasure],
+  );
+
+  const deleteAttachment = useCallback(
+    (id: string, filename: string): void => {
+      // Whatever an earlier cut promised about this file, the delete overrules.
+      clearCut(id, filename);
+      cutMarks.current.get(id)?.delete(filename);
+      eraseAttachment(id, filename, false);
+    },
+    [eraseAttachment],
+  );
+
+  const cutAttachment = useCallback(
+    (id: string, filename: string): void => {
+      markCut(id, filename);
+      const marks = cutMarks.current.get(id) ?? new Set<string>();
+      marks.add(filename);
+      cutMarks.current.set(id, marks);
+      eraseAttachment(id, filename, true);
+    },
+    [eraseAttachment],
   );
 
   const retitle = useCallback(
@@ -834,6 +972,8 @@ export function useNotes(
     update,
     replaceBody,
     attach,
+    deleteAttachment,
+    cutAttachment,
     erasedAttachments,
     resolveErasedAttachments,
     retitle,

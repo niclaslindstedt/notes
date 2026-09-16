@@ -24,12 +24,19 @@
 //   - **It only asks where there is a file.** The local "This device" backend
 //     stores no attachment files, so there is nothing to keep and nothing to
 //     ask about; the record is dropped straight away, as it always was.
+//   - **It only asks about an erasure it wasn't told about.** Deleting an
+//     image outright already means "and the file too", and cutting one means
+//     "hold on to it, I'm moving it" (see `attachment-cuts.ts`) — both are
+//     answers, so both call `ignore` and the question never comes. The
+//     exemption lapses the moment the body references the attachment again, so
+//     erasing it *by hand* after a paste-back asks as it always did.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { unlock } from "../achievements/bus.ts";
 import {
   type Attachment,
+  referencedAttachments,
   unreferencedAttachments,
 } from "../domain/attachment.ts";
 import type { Note } from "../domain/note.ts";
@@ -59,6 +66,13 @@ export type AttachmentErasure = {
   /** Answer the open question — `true` removes the files, `false` keeps them. */
   resolve: (remove: boolean) => void;
   /**
+   * Stand down over these attachments of `noteId`: the erasure about to reach
+   * `observe` is one the user already decided (a delete, a cut), so it must not
+   * raise the question. Lapses per attachment as soon as the body references it
+   * again.
+   */
+  ignore: (noteId: string, filenames: readonly string[]) => void;
+  /**
    * Drop every pending candidate and question for a note (it was deleted), or
    * for all notes when called with no id (the document was reseeded).
    */
@@ -82,6 +96,9 @@ export function useAttachmentErasure(opts: {
   // noteId → the filenames whose references this session's edits erased, still
   // waiting for the note to fall quiet.
   const candidates = useRef<Map<string, Set<string>>>(new Map());
+  // noteId → the filenames whose erasure was already answered for (a delete, a
+  // cut), and so must not raise the question.
+  const ignored = useRef<Map<string, Set<string>>>(new Map());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [queue, setQueue] = useState<AttachmentErasurePrompt[]>([]);
   // The queue as the callbacks see it, so answering reads the open question
@@ -109,10 +126,10 @@ export function useAttachmentErasure(opts: {
     for (const [noteId, filenames] of pending) {
       const note = latest.current.noteById(noteId);
       if (!note || note.body === undefined) continue;
-      const erased = unreferencedAttachments(
-        note.body,
-        note.attachments,
-      ).filter((a) => filenames.has(a.filename));
+      const exempt = ignored.current.get(noteId);
+      const erased = unreferencedAttachments(note.body, note.attachments)
+        .filter((a) => filenames.has(a.filename))
+        .filter((a) => !exempt?.has(a.filename));
       if (erased.length === 0) continue;
       if (!latest.current.stores) {
         // No file behind the record — nothing to keep, so nothing to ask.
@@ -139,9 +156,19 @@ export function useAttachmentErasure(opts: {
           (a) => a.filename,
         ),
       );
-      const erased = unreferencedAttachments(body, attachments).filter(
-        (a) => !already.has(a.filename),
-      );
+      // An attachment the body references again is being used, not erased: the
+      // paste landed, so the exemption its cut earned has served its purpose.
+      const exempt = ignored.current.get(before.id);
+      if (exempt && exempt.size > 0) {
+        const live = new Set(
+          referencedAttachments(body, attachments).map((a) => a.filename),
+        );
+        for (const filename of live) exempt.delete(filename);
+        if (exempt.size === 0) ignored.current.delete(before.id);
+      }
+      const erased = unreferencedAttachments(body, attachments)
+        .filter((a) => !already.has(a.filename))
+        .filter((a) => !ignored.current.get(before.id)?.has(a.filename));
       const waiting = candidates.current.get(before.id);
       if (erased.length === 0 && !waiting) return;
       if (erased.length > 0) {
@@ -183,15 +210,34 @@ export function useAttachmentErasure(opts: {
     setQueue((q) => (q[0] === head ? q.slice(1) : q));
   }, []);
 
+  const ignore = useCallback(
+    (noteId: string, filenames: readonly string[]): void => {
+      if (filenames.length === 0) return;
+      const set = ignored.current.get(noteId) ?? new Set<string>();
+      for (const filename of filenames) set.add(filename);
+      ignored.current.set(noteId, set);
+      // A candidate already banked by an earlier keystroke would otherwise
+      // still surface at the settle pass.
+      const waiting = candidates.current.get(noteId);
+      if (waiting) {
+        for (const filename of filenames) waiting.delete(filename);
+        if (waiting.size === 0) candidates.current.delete(noteId);
+      }
+    },
+    [],
+  );
+
   const forget = useCallback(
     (noteId?: string): void => {
       if (noteId === undefined) {
         candidates.current.clear();
+        ignored.current.clear();
         clearTimer();
         setQueue((q) => (q.length === 0 ? q : []));
         return;
       }
       candidates.current.delete(noteId);
+      ignored.current.delete(noteId);
       setQueue((q) =>
         q.some((p) => p.noteId === noteId)
           ? q.filter((p) => p.noteId !== noteId)
@@ -201,5 +247,5 @@ export function useAttachmentErasure(opts: {
     [clearTimer],
   );
 
-  return { prompt: queue[0] ?? null, observe, resolve, forget };
+  return { prompt: queue[0] ?? null, observe, resolve, ignore, forget };
 }

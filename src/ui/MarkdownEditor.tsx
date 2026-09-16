@@ -19,6 +19,7 @@ import {
   type Attachment,
   type AttachmentPlacement,
   attachmentMarkdown,
+  referencedAttachmentNames,
   hiddenAttachmentLines,
   INLINE_PLACEMENT,
 } from "../domain/attachment.ts";
@@ -99,6 +100,7 @@ import { writeClipboard } from "./clipboard.ts";
 import { getEditorPosition, setEditorPosition } from "./editor-position.ts";
 import { AttachmentsEndBlock } from "./attachments/AttachmentsEndBlock.tsx";
 import { AttachmentsProvider } from "./attachments/AttachmentsProvider.tsx";
+import { useAttachmentLookup } from "./attachments/lookup-context.ts";
 import {
   attachableFilesFrom,
   fileToAttachment,
@@ -212,6 +214,23 @@ type Props = {
   canAttach?: boolean;
   /** Persist a pasted / dropped file onto the note. */
   onAttach?: (attachment: Attachment) => void;
+  /**
+   * Delete a selected image outright — its reference out of the body, its file
+   * off the backend, no question asked. Omitted (or with the note locked),
+   * images aren't selectable and a click opens the viewer as before.
+   */
+  onDeleteAttachment?: (filename: string) => void;
+  /**
+   * Cut a selected image: its reference leaves the body, the file stays so a
+   * paste puts it straight back (see `app/attachment-cuts.ts`).
+   */
+  onCutAttachment?: (filename: string) => void;
+  /**
+   * A paste named attachments that aren't stored anywhere in this document —
+   * the note they were cut from is gone, or the files were deleted. The host
+   * says so; the text itself still lands, so the reference stays editable.
+   */
+  onMissingAttachments?: (filenames: readonly string[]) => void;
   /** Render images / files inline (default) or collected at the note's foot. */
   placement?: AttachmentPlacement;
   /** Trim bare URLs in the preview to this many characters either side (0 = off). */
@@ -503,6 +522,9 @@ export function MarkdownEditor({
   attachments,
   canAttach = false,
   onAttach,
+  onDeleteAttachment,
+  onCutAttachment,
+  onMissingAttachments,
   placement = INLINE_PLACEMENT,
   shortenLinkChars = 0,
   transforms = NO_TRANSFORMS,
@@ -527,6 +549,7 @@ export function MarkdownEditor({
   const [saved] = useState(() => (noteId ? getEditorPosition(noteId) : null));
   // Local source of truth, seeded from the note. App keys the editor by note
   // id, so a different note remounts rather than reconciling mid-edit.
+  const lookupAttachment = useAttachmentLookup();
   const [value, setValue] = useState(body);
   const lines = useMemo(() => value.split("\n"), [value]);
   const blocks = useMemo(() => classifyLines(value), [value]);
@@ -2815,13 +2838,52 @@ export function MarkdownEditor({
   const attachFilesRef = useRef(attachFiles);
   attachFilesRef.current = attachFiles;
 
+  // A paste whose text names attachments this note doesn't have — an image cut
+  // out of another note, a line of Markdown copied across — is only half a
+  // picture: the reference is text, but the file belongs to whichever note
+  // owns it. Adopt each one this document can still produce, and report the
+  // rest, so a reference to something that is simply gone says so rather than
+  // leaving a thumbnail that never loads.
+  async function adoptPastedAttachments(text: string): Promise<void> {
+    const names = referencedAttachmentNames(text);
+    if (names.length === 0) return;
+    const held = new Set((attachments ?? []).map((a) => a.filename));
+    const wanted = names.filter((name) => !held.has(name));
+    if (wanted.length === 0) return;
+    const found = await Promise.all(
+      wanted.map(
+        async (name) => [name, await lookupRef.current?.(name)] as const,
+      ),
+    );
+    const missing: string[] = [];
+    for (const [name, attachment] of found) {
+      if (attachment) onAttach?.(attachment);
+      else missing.push(name);
+    }
+    if (missing.length > 0) onMissingAttachmentsRef.current?.(missing);
+  }
+
+  const lookupRef = useRef(lookupAttachment);
+  lookupRef.current = lookupAttachment;
+  const onMissingAttachmentsRef = useRef(onMissingAttachments);
+  onMissingAttachmentsRef.current = onMissingAttachments;
+
   function onPaste(e: ReactClipboardEvent<HTMLDivElement>) {
     // Nothing lands in a locked note — not text, not a file.
     if (locked) {
       e.preventDefault();
       return;
     }
-    const files = canAttach ? attachableFilesFrom(e.clipboardData) : [];
+    // A clipboard holding an attachment reference is taken as *that* reference,
+    // even when the picture's own bytes rode along with it (a cut puts both on
+    // the clipboard): re-using the file the document already has keeps the
+    // image's name and leaves one copy of it, where re-attaching the bytes
+    // would quietly make a second.
+    const referenced =
+      referencedAttachmentNames(e.clipboardData?.getData("text/plain") ?? "")
+        .length > 0;
+    const files =
+      canAttach && !referenced ? attachableFilesFrom(e.clipboardData) : [];
     if (files.length > 0) {
       e.preventDefault();
       void attachFiles(files);
@@ -2837,6 +2899,7 @@ export function MarkdownEditor({
     // declared it always present); a paste event without one carries nothing
     // to insert, so an empty string is the right degradation.
     const text = e.clipboardData?.getData("text/plain") ?? "";
+    void adoptPastedAttachments(text);
     // A paste with a run taken lands over the whole of it, the same as typing.
     if (selectModeRef.current && lineSelRef.current) {
       replaceLineSelection(text);
@@ -3609,6 +3672,8 @@ export function MarkdownEditor({
       body={value}
       note={note}
       placement={placement}
+      onDelete={locked ? undefined : onDeleteAttachment}
+      onCut={locked ? undefined : onCutAttachment}
     >
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div
