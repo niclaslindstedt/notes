@@ -41,6 +41,7 @@ import {
   replaceOne,
   type PreviewLine,
 } from "../domain/note-replace.ts";
+import type { LineComment } from "../domain/note-comment.ts";
 import { isBlank, isDropzone, isLocked, type Note } from "../domain/note.ts";
 import type { CompiledTransform } from "../domain/transform.ts";
 import { useT } from "../i18n/index.ts";
@@ -48,6 +49,7 @@ import { haptics } from "../platform/native-bridge.ts";
 import { editorMarginMaxWidth, type EditorSettings } from "../theme/themes.ts";
 import { CipherGlyph } from "./CipherGlyph.tsx";
 import { writeClipboard } from "./clipboard.ts";
+import { CommentButton } from "./CommentButton.tsx";
 import { CopyButton } from "./CopyButton.tsx";
 import { DeleteLinesButton } from "./DeleteLinesButton.tsx";
 import { CutButton } from "./CutButton.tsx";
@@ -75,6 +77,7 @@ import {
   MarkdownEditor,
   type MarkdownEditorHandle,
 } from "./MarkdownEditor.tsx";
+import { LineCommentModal } from "./LineCommentModal.tsx";
 import { pickFiles } from "./attachments/pick-files.ts";
 import { NoteFindBar, NoteFindButton } from "./NoteFindBar.tsx";
 import { SelectModeButton } from "./SelectModeButton.tsx";
@@ -120,15 +123,16 @@ const COLLAPSE_QUERY = "(max-width: 639px)";
 const ACTIONS_MAX_WIDTH = "26rem";
 
 // The same cap for the selection actions (formatting, the two line-move
-// chevrons, cut, copy — and delete, for the whole of select mode), which unfold
-// out of the ⋯ on their own when text is selected, or when the mode is entered
-// — real width ~13.75rem, or ~16.5rem with the delete.
+// chevrons, cut, copy — and, for the whole of select mode, the comment bubble
+// and delete), which unfold out of the ⋯ on their own when text is selected, or
+// when the mode is entered — real width ~13.75rem, or ~19.25rem with select
+// mode's own pair.
 // Both caps are upper bounds, so a row carrying fewer than the full set — a
 // desktop pointer gets no cut button (see `desktopPointer`), a selection that
 // isn't whole lines gets no chevrons (see `canMoveLines`), and a locked note
 // folds its cut and formatting buttons to zero width (see `WriteAction`) —
 // simply travels to a stop it doesn't reach.
-const SELECTION_MAX_WIDTH = "18rem";
+const SELECTION_MAX_WIDTH = "20.75rem";
 
 // A stable empty hit list for the closed find bar, so the editing surfaces keep
 // seeing the identical reference and their per-line memos bail out.
@@ -190,6 +194,10 @@ function lineSpanOf(
   };
 }
 
+// A stable empty comment list, so a note with none hands the dialog and the
+// editor the identical reference on every render.
+const NO_COMMENTS: LineComment[] = [];
+
 export function Editor({
   note,
   editor,
@@ -209,6 +217,7 @@ export function Editor({
   onAttach,
   onDeleteAttachment,
   onCutAttachment,
+  onCommentsChange,
 }: {
   note: Note;
   editor: EditorSettings;
@@ -262,6 +271,13 @@ export function Editor({
   onDeleteAttachment?: (filename: string) => void;
   /** Cut a selected image — reference out, file kept for the paste. */
   onCutAttachment?: (filename: string) => void;
+  /**
+   * Replace the note's [line comments](../../docs/overview.md#line-comments).
+   * Omitted (in tests, and on a surface that doesn't write) the comment button
+   * and the gutter's bubbles stand down, so the note is read with its comments
+   * invisible rather than editable-but-dropped.
+   */
+  onCommentsChange?: (comments: LineComment[]) => void;
 }) {
   const t = useT();
   const maxWidth = editorMarginMaxWidth(editor.margin);
@@ -450,6 +466,13 @@ export function Editor({
   // press lands in must not shuffle under the finger between one pick and the
   // next. Outside it they come and go with the selection that earns them.
   const canMoveLines = (wholeLineSelection || picking) && !locked && !loading;
+  // Whether the comment button is out. Select mode's own row carries it, for
+  // the whole of the mode — picking the lines is how the feature is reached
+  // (see `docs/overview.md#line-comments`). It folds away with the rest of the
+  // writing tools on a locked note: the lock's promise is that nothing about
+  // the note changes by accident, and a comment is something written.
+  const canComment =
+    picking && !locked && !loading && onCommentsChange !== undefined;
   // Which set the cluster carries, and whether it is out at all. The ⋯ always
   // wins: pressing it unfolds the whole row, the way it always has — except in
   // select mode, where the row it would unfold is already out and there is
@@ -750,6 +773,24 @@ export function Editor({
     else plainEditorRef.current?.moveLines(direction);
   }
 
+  // The comment dialog's target: which lines it is about, and whether it was
+  // opened to write something (the header) or to read what is there (a gutter
+  // bubble). Null when it is closed.
+  const [commenting, setCommenting] = useState<{
+    lines: number[];
+    compose: boolean;
+  } | null>(null);
+
+  // The header's comment button. It anchors the comment to the lines select
+  // mode is holding — which is what the button is offered for — so a press with
+  // nothing picked has nothing to comment on and does nothing, exactly like the
+  // delete and the chevrons beside it.
+  function runComment() {
+    const lines = markdownEditorRef.current?.pickedLines();
+    if (!lines || lines.length === 0) return;
+    setCommenting({ lines, compose: true });
+  }
+
   async function runCopy(): Promise<boolean> {
     const text = editor.renderMarkdown
       ? markdownEditorRef.current?.selection()
@@ -933,6 +974,16 @@ export function Editor({
                 only thing a selection can be used for. They *slide* away rather
                 than disappearing, so pressing the eye reads as the row folding
                 the writing tools up (see `WriteAction`). */}
+              {/* Left of the formatting toggle, where the row's writing half
+                begins: the comment is the one thing you write that leaves the
+                lines themselves alone (see `CommentButton`). Offered for the
+                whole of select mode rather than only once a line is taken, for
+                the same reason its neighbours are — the row a press lands in
+                must not shuffle under the finger between one pick and the
+                next. */}
+              <WriteAction shown={canComment}>
+                <CommentButton onComment={runComment} />
+              </WriteAction>
               <WriteAction shown={!locked}>
                 <FormatToolbarButton
                   open={toolbarOpen}
@@ -1134,6 +1185,12 @@ export function Editor({
             transforms={transforms}
             lineNumbers={editor.lineNumbers}
             selectMode={selectMode}
+            comments={note.comments}
+            onOpenComments={
+              onCommentsChange
+                ? (lines) => setCommenting({ lines, compose: false })
+                : undefined
+            }
             onSelectModeChange={setSelectMode}
             onTabOut={onBodyTab}
             onLineFormat={toolbarUp ? setLineFormat : undefined}
@@ -1194,6 +1251,19 @@ export function Editor({
         </button>
       )}
       {missing.message && <Toast message={missing.message} />}
+
+      {/* The comment dialog, opened by the header's bubble (to write one about
+          the picked lines) or by a line's own bubble (to read what is there).
+          One dialog for both, because it is one list — see
+          `LineCommentModal`. */}
+      <LineCommentModal
+        open={commenting !== null && onCommentsChange !== undefined}
+        lines={commenting?.lines ?? []}
+        compose={commenting?.compose ?? false}
+        comments={note.comments ?? NO_COMMENTS}
+        onChange={(next) => onCommentsChange?.(next)}
+        onClose={() => setCommenting(null)}
+      />
     </div>
   );
 }

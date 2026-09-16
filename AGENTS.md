@@ -522,7 +522,9 @@ The source tree under `src/` is organized by concern, not by file type:
 - `src/domain/` — pure functions over the note model (`note.ts`), a
   dependency-free Markdown parser (`markdown.ts`) the live-preview editor
   renders from, the multi-cursor engine (`multi-cursor.ts`) that turns one
-  keystroke into an edit at N carets, and the PDF typesetter (`pdf-layout.ts`)
+  keystroke into an edit at N carets, the line-comment model
+  (`note-comment.ts`) that anchors a remark to a set of lines and re-bases it
+  across every edit, and the PDF typesetter (`pdf-layout.ts`)
   that paginates a note into pages of drawing operations. No DOM, no I/O,
   trivially testable. The boundary is enforced by eslint.
 - `src/assets/` — binaries the build emits as hashed files rather than bundles.
@@ -702,6 +704,7 @@ would take the whole app down for everyone, including their own namespaces.
 | Adding…                                  | Put it in…                         |
 | ---------------------------------------- | ---------------------------------- |
 | A pure transform over the note model     | `src/domain/note.ts`               |
+| A line comment / how one is anchored     | `src/domain/note-comment.ts`       |
 | A new persistence backend                | `src/storage/<backend>/index.ts`   |
 | Attachment behaviour (image / file)      | `src/domain/attachment.ts`, `src/storage/attachment-store.ts`, `src/ui/attachments/` |
 | How an exported PDF looks on the page    | `src/domain/pdf-layout.ts` (never the writer) |

@@ -252,6 +252,7 @@ export function App() {
     restore,
     toggleFavorite,
     toggleLock,
+    setComments,
     moveNote,
     createFolder,
     renameFolder,
@@ -876,6 +877,9 @@ export function App() {
                         }
                         onCutAttachment={(filename) =>
                           cutAttachment(editing.id, filename)
+                        }
+                        onCommentsChange={(comments) =>
+                          setComments(editing.id, comments)
                         }
                       />
                     ) : reading ? (

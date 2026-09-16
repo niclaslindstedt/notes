@@ -10,6 +10,7 @@
 // guarantee cheap to verify.
 
 import type { Attachment } from "../domain/attachment.ts";
+import { parseComments } from "../domain/note-comment.ts";
 import type { Note } from "../domain/note.ts";
 
 // Minimal per-note JSON stored inside an encrypted note file: the note minus
@@ -41,6 +42,10 @@ export function noteToEncJson(note: Note): string {
   if (note.locked) obj.locked = true;
   if (note.dropzone) obj.dropzone = true;
   if (note.folderId) obj.folderId = note.folderId;
+  // The line comments ride along whole: they are the user's own words, and an
+  // encrypted note is the one representation where "the file" and "the note"
+  // are the same thing, so leaving them out would drop them on every save.
+  if (note.comments && note.comments.length > 0) obj.comments = note.comments;
   if (meta.length > 0) obj.attachments = meta;
   return JSON.stringify(obj);
 }
@@ -80,6 +85,8 @@ export function encJsonToNote(json: string): Note | null {
   if (typeof n.folderId === "string" && n.folderId.length > 0) {
     note.folderId = n.folderId;
   }
+  const comments = parseComments(n.comments);
+  if (comments.length > 0) note.comments = comments;
   if (Array.isArray(n.attachments)) {
     const meta: Attachment[] = [];
     for (const a of n.attachments) {

@@ -31,6 +31,7 @@ import {
   setDropzone,
   setFavorite,
   setLocked,
+  setNoteComments,
   setNoteFolder,
   sortByUpdated,
   sortFoldersByCreated,
@@ -39,6 +40,7 @@ import {
   type SaveFormatting,
   type Snapshot,
 } from "../domain/note.ts";
+import type { LineComment } from "../domain/note-comment.ts";
 import { importedNote } from "../domain/import.ts";
 import { sentenceBoundaryCount } from "../domain/sentence.ts";
 import type { StorageAdapter } from "../storage/adapter.ts";
@@ -147,6 +149,11 @@ export type NotesStore = {
   toggleFavorite: (id: string) => void;
   /** Lock / unlock a note — a locked note is read-only in the editor. */
   toggleLock: (id: string) => void;
+  /**
+   * Replace a note's [line comments](../../docs/overview.md#line-comments) —
+   * the whole list at once, as the comment dialog hands it over when it closes.
+   */
+  setComments: (id: string, comments: LineComment[]) => void;
   /** Move a note into `folderId`, or out of any folder when `null`. */
   moveNote: (id: string, folderId: string | null) => void;
   /** Create a folder and return its id. */
@@ -786,6 +793,29 @@ export function useNotes(
     [commit, withBody],
   );
 
+  // Replace a note's line comments. Not structural — a comment is something the
+  // user wrote, so it lands on the *note's* own timeline beside its text edits
+  // — but it is one step per dialog rather than one per keystroke, because the
+  // dialog hands the whole list over once, when it closes. On the encrypted
+  // backends a deferred note is promoted first, the same as every other edit
+  // that has to reach its `.enc` file.
+  const setComments = useCallback(
+    (id: string, comments: LineComment[]): void => {
+      const target = docRef.current.notes.find((n) => n.id === id);
+      if (!target) return;
+      const title = noteTitle(target);
+      withBody(id, () =>
+        commit(
+          (prev) =>
+            prev.map((n) => (n.id === id ? setNoteComments(n, comments) : n)),
+          `Commented on note “${title}”`,
+          id,
+        ),
+      );
+    },
+    [commit, withBody],
+  );
+
   // Move a note into a folder (or out of every folder when `folderId` is null).
   // Not coalesced with edits — a move is its own undo step.
   const moveNote = useCallback(
@@ -952,6 +982,7 @@ export function useNotes(
     restore,
     toggleFavorite,
     toggleLock,
+    setComments,
     moveNote,
     createFolder,
     renameFolder,

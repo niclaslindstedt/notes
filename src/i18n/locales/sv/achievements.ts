@@ -345,6 +345,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Varje stängt kodblock har en liten kopieringsknapp uppe till höger. Ett tryck lägger koden — allt mellan ```-staketen, och inget annat — på urklipp, utan att du behöver placera markören i anteckningen eller markera en enda rad för hand.",
     },
+    redPen: {
+      name: "Rödpennan",
+      condition: "Skriv en kommentar på en rad i en anteckning.",
+      learnMore:
+        "V\u00e4lj raderna du vill s\u00e4ga n\u00e5got om \u2014 tryck p\u00e5 ett radnummer, eller sl\u00e5 p\u00e5 v\u00e4ljl\u00e4get \u2014 och tryck sedan p\u00e5 pratbubblan till v\u00e4nster i r\u00e4ckan. Kommentaren sparas *med* anteckningen i st\u00e4llet f\u00f6r i den: den ligger i markdown-filens frontmatter, s\u00e5 den synkas och exporteras med allt annat men syns aldrig som en del av texten. En rad med en kommentar f\u00e5r en liten bubbla i en egen ficka till h\u00f6ger om radnumret; tryck p\u00e5 den f\u00f6r att l\u00e4sa, skriva om, l\u00e4gga till eller ta bort. Redigerar du anteckningen f\u00f6ljer kommentarerna med sina rader.",
+    },
     sweepingStatement: {
       name: "Svepande formulering",
       condition: "Ta fler än en rad samtidigt i markeringsläge.",
