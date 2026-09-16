@@ -246,6 +246,7 @@ export function App() {
     restore,
     toggleFavorite,
     toggleLock,
+    setComments,
     moveNote,
     createFolder,
     renameFolder,
@@ -835,6 +836,9 @@ export function App() {
                         "attachments",
                       )}
                       onAttach={(attachment) => attach(editing.id, attachment)}
+                      onCommentsChange={(comments) =>
+                        setComments(editing.id, comments)
+                      }
                     />
                   ) : reading ? (
                     <ReadOnlyNote

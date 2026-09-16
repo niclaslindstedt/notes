@@ -28,6 +28,30 @@ const app = {
     exit: "Leave select mode",
     delete: "Delete selected lines",
   },
+  // The editor's **line comments**: a note about a line, kept out of the line.
+  // `add` is the header bubble that writes one against the lines select mode
+  // has picked; `open` labels the gutter bubble that says a line already
+  // carries one. The dialog behind both is the same list — the `lines` value is
+  // the one-based line numbers the gutter shows, already formatted ("3", or
+  // "3,5-7"), so the copy never has to build it.
+  comments: {
+    add: "Comment on the selected lines",
+    open: "Read the comment on line {n}",
+    title: "Comment on line {lines}",
+    titleMany: "Comments on lines {lines}",
+    new: "Write a comment",
+    another: "Add another comment",
+    on: "On line {lines}",
+    onMany: "On lines {lines}",
+    edit: "Comment",
+    placeholder: "What needs saying here?",
+    delete: "Delete this comment",
+    done: "Done",
+    // Says where a comment lives, because that is the thing about the feature
+    // worth knowing: it rides the note's frontmatter, so it syncs and exports
+    // with the note but never renders as part of its text.
+    hint: "Comments are stored with the note, never inside its text.",
+  },
   // The pair of chevrons right of the formatting button, shown whenever the
   // selection covers whole lines and nothing else: they shuffle those lines up
   // or down the note, the same edit Alt+↑ / Alt+↓ makes.

@@ -346,6 +346,12 @@ const achievements = {
       learnMore:
         "Every closed code block wears a small copy button in its top-right corner. One press puts the code — everything between the ``` fences, and nothing else — on your clipboard, without placing the caret in the note or selecting a single line by hand.",
     },
+    redPen: {
+      name: "Red pen",
+      condition: "Write a comment on a line of a note.",
+      learnMore:
+        "Pick the lines you want to say something about \u2014 press a line number, or turn select mode on \u2014 then press the speech bubble at the left of the header and write what needs saying. The comment is stored *with* the note rather than in it: it rides the markdown file's frontmatter, so it syncs and exports with everything else and never renders as part of the text, never prints, and never lands in a copied note's body. A line carrying a comment grows a small bubble in a gutter of its own, right of the line numbers; press it to read what was said, rewrite it, add another, or delete it. Edit the note and the comments follow their lines \u2014 insert a paragraph above and they move down with the text they were about, delete the line and the comment goes with it.",
+    },
     sweepingStatement: {
       name: "Sweeping statement",
       condition: "Take more than one line at once in select mode.",

@@ -14,11 +14,25 @@
 // title, and the created / updated timestamps). The title is its own field —
 // edited separately from the body — so it rides the frontmatter rather than
 // being recovered from the first body line.
+//
+// The frontmatter is flat `key: value` pairs with one exception: `comments:`,
+// which carries a block sequence of the note's
+// [line comments](../../domain/note-comment.ts). That is where an annotation
+// belongs — the frontmatter is the one part of a markdown file every renderer
+// drops and every editor shows, so a comment travels with the note without
+// printing, exporting, or rendering as part of the text it is about.
 
 import {
   ATTACHMENT_REF_PREFIX,
   attachmentFilenameFromHref,
 } from "../../domain/attachment.ts";
+import {
+  formatCommentLines,
+  newCommentId,
+  parseCommentLines,
+  sortComments,
+  type LineComment,
+} from "../../domain/note-comment.ts";
 import { type Folder, type Note, type Snapshot } from "../../domain/note.ts";
 
 /** A single markdown document keyed by its path relative to the app root. */
@@ -189,33 +203,36 @@ export function snapshotToFiles(snapshot: Snapshot): MarkdownFile[] {
  * sibling `attachments/` tree.
  */
 export function noteToMarkdown(note: Note, depth = 0): string {
-  const front = renderFrontmatter({
-    id: note.id,
-    // Only written when set, so a title-less note's frontmatter stays minimal.
-    ...(note.title ? { title: note.title } : {}),
-    created: String(note.createdAt),
-    updated: String(note.updatedAt),
-    // Only written when the note is archived, so an active note's frontmatter
-    // stays minimal and an older file (no flag) round-trips as active.
-    ...(note.archived ? { archived: "true" } : {}),
-    // Only written when the note is starred, on the same terms as `archived`:
-    // an unstarred note's frontmatter stays minimal, and an older file (no
-    // flag) round-trips unstarred.
-    ...(note.favorite ? { favorite: "true" } : {}),
-    // Only written when the note is locked, on the same terms: an unlocked
-    // note's frontmatter stays minimal, and an older file (no flag) round-trips
-    // unlocked.
-    ...(note.locked ? { locked: "true" } : {}),
-    // Only written when the note is a temporary dropzone note, on the same
-    // terms: an ordinary note's frontmatter stays minimal, and a file written
-    // before the dropzone existed round-trips as an ordinary note.
-    ...(note.dropzone ? { dropzone: "true" } : {}),
-    // The folder the note belongs to, by id. Only written when set, so an
-    // ungrouped note's frontmatter stays minimal. The folder's display name
-    // lives in the `folders.json` sidecar the directory adapter keeps, so this
-    // is just the link — renaming a folder never rewrites every note file.
-    ...(note.folderId ? { folder: note.folderId } : {}),
-  });
+  const front = renderFrontmatter(
+    {
+      id: note.id,
+      // Only written when set, so a title-less note's frontmatter stays minimal.
+      ...(note.title ? { title: note.title } : {}),
+      created: String(note.createdAt),
+      updated: String(note.updatedAt),
+      // Only written when the note is archived, so an active note's frontmatter
+      // stays minimal and an older file (no flag) round-trips as active.
+      ...(note.archived ? { archived: "true" } : {}),
+      // Only written when the note is starred, on the same terms as `archived`:
+      // an unstarred note's frontmatter stays minimal, and an older file (no
+      // flag) round-trips unstarred.
+      ...(note.favorite ? { favorite: "true" } : {}),
+      // Only written when the note is locked, on the same terms: an unlocked
+      // note's frontmatter stays minimal, and an older file (no flag) round-trips
+      // unlocked.
+      ...(note.locked ? { locked: "true" } : {}),
+      // Only written when the note is a temporary dropzone note, on the same
+      // terms: an ordinary note's frontmatter stays minimal, and a file written
+      // before the dropzone existed round-trips as an ordinary note.
+      ...(note.dropzone ? { dropzone: "true" } : {}),
+      // The folder the note belongs to, by id. Only written when set, so an
+      // ungrouped note's frontmatter stays minimal. The folder's display name
+      // lives in the `folders.json` sidecar the directory adapter keeps, so this
+      // is just the link — renaming a folder never rewrites every note file.
+      ...(note.folderId ? { folder: note.folderId } : {}),
+    },
+    note.comments,
+  );
   // Point image references at the on-disk sibling layout
   // (`../attachments/<stem>/<file>`, with an extra `../` per folder level) so
   // the file opens with working images in any markdown viewer; the in-memory
@@ -275,11 +292,40 @@ function refsFromDisk(body: string): string {
   );
 }
 
-function renderFrontmatter(fields: Record<string, string>): string {
+function renderFrontmatter(
+  fields: Record<string, string>,
+  comments?: readonly LineComment[],
+): string {
   const body = Object.entries(fields)
     .map(([k, v]) => `${k}: ${v}`)
     .join("\n");
-  return `---\n${body}\n---\n`;
+  const block =
+    comments && comments.length > 0
+      ? `comments:\n${renderComments(comments)}`
+      : "";
+  return `---\n${body}\n${block}---\n`;
+}
+
+// The `comments:` block sequence, one entry per comment.
+//
+// `lines` is written the way the gutter shows it — one-based, ranges collapsed
+// — so someone reading the file in another editor can act on the number they
+// see. `text` is always JSON-quoted, even when it needs no escaping: that is a
+// valid YAML double-quoted scalar, it is the one form that survives a colon, a
+// leading `-`, or a newline in what the user typed, and it guarantees the
+// entry stays on one line — which is what keeps a `---` typed into a comment
+// from looking like the end of the frontmatter.
+function renderComments(comments: readonly LineComment[]): string {
+  return sortComments(comments)
+    .map(
+      (c) =>
+        `  - lines: ${formatCommentLines(c.lines)}\n` +
+        `    text: ${JSON.stringify(c.text)}\n` +
+        `    id: ${c.id}\n` +
+        `    created: ${String(c.createdAt)}\n` +
+        `    updated: ${String(c.updatedAt)}\n`,
+    )
+    .join("");
 }
 
 // -- Parse ------------------------------------------------------------
@@ -313,7 +359,7 @@ export function filesToSnapshot(files: readonly MarkdownFile[]): Snapshot {
 }
 
 export function parseNote(text: string): Note | null {
-  const { front, body } = splitFrontmatter(text);
+  const { front, comments, body } = splitFrontmatter(text);
   if (!front) return null;
   const id = front.id ?? "";
   if (!id) return null;
@@ -342,6 +388,8 @@ export function parseNote(text: string): Note | null {
   if (front.dropzone === "true") note.dropzone = true;
   // Carry the folder link only when present, mirroring how it's written.
   if (front.folder) note.folderId = front.folder;
+  // And the line comments, only when the block held something readable.
+  if (comments.length > 0) note.comments = comments;
   return note;
 }
 
@@ -355,20 +403,108 @@ function toEpoch(value: string | undefined): number {
 
 function splitFrontmatter(text: string): {
   front: Record<string, string> | null;
+  comments: LineComment[];
   body: string;
 } {
   const normalized = text.replace(/\r\n/g, "\n");
   const match = /^---\n([\s\S]*?)\n---\n?/.exec(normalized);
-  if (!match) return { front: null, body: normalized };
+  if (!match) return { front: null, comments: [], body: normalized };
   const front: Record<string, string> = {};
-  for (const line of match[1]!.split("\n")) {
+  const comments: LineComment[] = [];
+  const rows = match[1]!.split("\n");
+  for (let i = 0; i < rows.length; i += 1) {
+    const line = rows[i]!;
+    // Only a flush-left row opens a field. An indented one belongs to the
+    // block above it — and one with no block above it is a stray the load
+    // steps over rather than reading as a field called `- lines`.
+    if (/^\s/.test(line)) continue;
     const idx = line.indexOf(":");
     if (idx === -1) continue;
     const key = line.slice(0, idx).trim();
     const value = line.slice(idx + 1).trim();
-    if (key) front[key] = value;
+    if (!key) continue;
+    // The one nested field: `comments:` with nothing after it opens a block
+    // sequence, which runs until the frontmatter's next flush-left row.
+    if (key === "comments" && value === "") {
+      const block: string[] = [];
+      while (i + 1 < rows.length && /^\s+\S/.test(rows[i + 1]!)) {
+        i += 1;
+        block.push(rows[i]!);
+      }
+      comments.push(...parseCommentBlock(block));
+      continue;
+    }
+    front[key] = value;
   }
   // The body starts after the frontmatter block; `noteToMarkdown` inserts one
   // blank line there, so drop a single leading newline to recover the body.
-  return { front, body: normalized.slice(match[0].length).replace(/^\n/, "") };
+  return {
+    front,
+    comments: sortComments(comments),
+    body: normalized.slice(match[0].length).replace(/^\n/, ""),
+  };
+}
+
+// Read the `comments:` block sequence back into `LineComment`s.
+//
+// Every failure here is local: an entry with no readable `lines`, or with no
+// text left after unquoting, is dropped and the rest are kept — a hand-edited
+// file with one mangled comment must still load every other comment, and the
+// note itself above all (which is the same stance `parseFiles` takes for a
+// whole file). A missing `id` is minted rather than dropped, so a comment
+// somebody wrote by hand in their synced folder is a real comment the app can
+// then edit and delete.
+function parseCommentBlock(block: readonly string[]): LineComment[] {
+  const out: LineComment[] = [];
+  let fields: Record<string, string> | null = null;
+  const flush = () => {
+    const comment = fields && toComment(fields);
+    if (comment) out.push(comment);
+    fields = null;
+  };
+  for (const line of block) {
+    const item = /^\s*-\s*(.*)$/.exec(line);
+    if (item) {
+      flush();
+      fields = {};
+    }
+    if (!fields) continue;
+    // A sequence entry's first pair rides the `- ` that opened it.
+    const rest = item ? item[1]! : line;
+    const idx = rest.indexOf(":");
+    if (idx === -1) continue;
+    const key = rest.slice(0, idx).trim();
+    if (key) fields[key] = rest.slice(idx + 1).trim();
+  }
+  flush();
+  return out;
+}
+
+function toComment(fields: Record<string, string>): LineComment | null {
+  const lines = parseCommentLines(fields.lines ?? "");
+  if (lines.length === 0) return null;
+  const text = unquote(fields.text ?? "").trim();
+  if (!text) return null;
+  const createdAt = toEpoch(fields.created);
+  return {
+    id: fields.id || newCommentId(),
+    lines,
+    text,
+    createdAt,
+    updatedAt: fields.updated ? toEpoch(fields.updated) : createdAt,
+  };
+}
+
+// A double-quoted scalar is read as JSON — which is what `renderComments`
+// writes, and the only form that can carry a newline or a leading `-`. Anything
+// else (a hand-written plain scalar) is taken verbatim, and so is a quoted one
+// that doesn't parse, rather than losing the comment to a stray backslash.
+function unquote(value: string): string {
+  if (!value.startsWith('"')) return value;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return typeof parsed === "string" ? parsed : value;
+  } catch {
+    return value;
+  }
 }

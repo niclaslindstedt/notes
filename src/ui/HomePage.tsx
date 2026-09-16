@@ -131,6 +131,24 @@ export function HomePage() {
               over as an ordinary selection.
             </li>
             <li>
+              Say something about a line without putting it in the line. Pick
+              the lines you want to comment on &mdash; press a line number, or
+              turn select mode on &mdash; then press the speech bubble at the
+              left of the header and write what needs saying: a question for
+              whoever reads it next, a reminder that a paragraph needs a source,
+              a note to yourself that you don&rsquo;t want printed. The comment
+              is stored <em>with</em> the note rather than in it. It rides the
+              markdown file&rsquo;s front matter, so it syncs, exports and backs
+              up with everything else, and never renders as part of the text,
+              never prints, and never lands in a copied note&rsquo;s body. A
+              line carrying a comment grows a small bubble in a gutter of its
+              own, right of the line numbers; press it to read what was said,
+              rewrite it, add another, or delete it. Edit the note afterwards
+              and the comments follow their lines &mdash; write a paragraph
+              above them and they move down with the text they were about;
+              delete the line and its comment goes with it.
+            </li>
+            <li>
               On a computer, edit at more than one place at once — the same
               multiple cursors a code editor gives you. <kbd>⌘</kbd>/
               <kbd>Ctrl</kbd>+<kbd>D</kbd> selects the word under the cursor,

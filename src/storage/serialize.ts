@@ -10,6 +10,7 @@
 // `Snapshot` shape.
 
 import type { Attachment } from "../domain/attachment.ts";
+import { parseComments } from "../domain/note-comment.ts";
 import {
   emptySnapshot,
   type Folder,
@@ -119,6 +120,12 @@ export function parse(text: string | null | undefined): Snapshot {
         }
         if (attachments.length > 0) note.attachments = attachments;
         else delete note.attachments;
+        // The line comments are re-read the same defensive way — a malformed
+        // entry is dropped rather than riding through via the `...n` spread as
+        // a comment the gutter can't draw.
+        const comments = parseComments((n as { comments?: unknown }).comments);
+        if (comments.length > 0) note.comments = comments;
+        else delete note.comments;
         // Keep a folder reference only when it's a non-empty string; a junk
         // value (or a stray `null`) drops to "ungrouped" rather than riding
         // through via the `...n` spread.
