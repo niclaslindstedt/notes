@@ -871,7 +871,7 @@ describe("Editor (selection actions)", () => {
 
     selectBody(0, 3);
 
-    expect(cluster().style.maxWidth).toBe("18rem");
+    expect(cluster().style.maxWidth).toBe("20.75rem");
     expect(cluster().dataset.cluster).toBe("open");
     expect(screen.getByRole("button", { name: "Copy selection" })).toBeTruthy();
     // Only the three that act on a selection: the star, the export menu and
@@ -886,7 +886,7 @@ describe("Editor (selection actions)", () => {
     stubNarrow(true);
     renderEditor();
     selectBody(0, 3);
-    expect(cluster().style.maxWidth).toBe("18rem");
+    expect(cluster().style.maxWidth).toBe("20.75rem");
 
     selectBody(3, 3);
 
@@ -1337,5 +1337,85 @@ describe("Editor (locked)", () => {
     } finally {
       localStorage.removeItem("notes/format-toolbar");
     }
+  });
+});
+
+// The header's comment bubble: the way a line comment is written. It rides
+// select mode's own row, left of the formatting toggle, and anchors what is
+// written to the lines the mode is holding.
+describe("the comment button", () => {
+  function renderMarkdown(over: Partial<Parameters<typeof Editor>[0]> = {}) {
+    return renderEditor({
+      editor: DEFAULT_EDITOR_SETTINGS,
+      note: note({ body: "alpha\nbravo\ncharlie" }),
+      onCommentsChange: vi.fn(),
+      ...over,
+    });
+  }
+
+  function button() {
+    return screen.queryByRole("button", {
+      name: "Comment on the selected lines",
+    });
+  }
+
+  it("stays out of the header until select mode is on", () => {
+    renderMarkdown();
+    expect(writeAction("Comment on the selected lines").className).toContain(
+      "max-w-0",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select lines" }));
+
+    expect(
+      writeAction("Comment on the selected lines").className,
+    ).not.toContain("max-w-0");
+  });
+
+  it("opens the dialog against the lines the mode is holding", () => {
+    renderMarkdown();
+    fireEvent.click(screen.getByRole("button", { name: "Select lines" }));
+    pickLine(1);
+
+    fireEvent.click(button()!);
+
+    // Titled by the one-based line the gutter shows.
+    expect(screen.getByText("Comment on line 2")).toBeTruthy();
+  });
+
+  it("does nothing with no lines picked", () => {
+    renderMarkdown();
+    fireEvent.click(screen.getByRole("button", { name: "Select lines" }));
+
+    fireEvent.click(button()!);
+
+    expect(screen.queryByText(/Comment on line/)).toBeNull();
+  });
+
+  it("hands the written comment back to the host", () => {
+    const onCommentsChange = vi.fn();
+    renderMarkdown({ onCommentsChange });
+    fireEvent.click(screen.getByRole("button", { name: "Select lines" }));
+    pickLine(1);
+    fireEvent.click(button()!);
+
+    fireEvent.input(screen.getByPlaceholderText(/what needs saying/i), {
+      target: { value: "is this still true?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(onCommentsChange).toHaveBeenCalledTimes(1);
+    const [next] = onCommentsChange.mock.calls[0] as [
+      { lines: number[]; text: string }[],
+    ];
+    expect(next[0]!.lines).toEqual([1]);
+    expect(next[0]!.text).toBe("is this still true?");
+  });
+
+  it("folds away on a locked note, with the rest of the writing tools", () => {
+    renderMarkdown({ note: note({ body: "alpha\nbravo", locked: true }) });
+    expect(writeAction("Comment on the selected lines").className).toContain(
+      "max-w-0",
+    );
   });
 });

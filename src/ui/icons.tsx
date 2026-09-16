@@ -379,6 +379,54 @@ export function LineSelectIcon({ className }: IconProps) {
 }
 
 /**
+ * A speech bubble — a [line comment](../../docs/overview.md#line-comments).
+ * The header button that writes one, and the gutter bubble that says a line
+ * already carries one, are the same glyph at two sizes, because they are the
+ * same thing said twice: this line has something to say about it.
+ *
+ * Deliberately a *rounded* bubble with a tail rather than the framework's
+ * square note glyph — the note glyph is already the app's word for "a note",
+ * and a comment is the one mark on screen that is explicitly not part of the
+ * note it sits beside.
+ */
+export function CommentIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.7 8.7 0 0 1-3.8-.9L3 21l1.9-5.7a8.7 8.7 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3a8.38 8.38 0 0 1 8.5 8.5z" />
+    </svg>
+  );
+}
+
+/**
+ * The same bubble, filled — the gutter's mark for a line that already carries a
+ * comment. Filled rather than outlined because it is drawn at 12px in a column
+ * a finger has to find at a glance, where an outline at that size is a smudge.
+ */
+export function CommentFilledIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+      focusable="false"
+      className={className}
+    >
+      <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.7 8.7 0 0 1-3.8-.9L3 21l1.9-5.7a8.7 8.7 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3a8.38 8.38 0 0 1 8.5 8.5z" />
+    </svg>
+  );
+}
+
+/**
  * A solid play triangle — the inline YouTube player's press-to-play affordance.
  * Filled rather than stroked like the rest of the set: it sits at 28px on top
  * of a video poster frame, where an outlined triangle disappears into the

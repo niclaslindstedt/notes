@@ -31,6 +31,7 @@ import {
   CloudGlyph,
   HomeCloudGlyph,
   CodeGlyph,
+  CommentGlyph,
   CopyGlyph,
   CutGlyph,
   ExportGlyph,
@@ -110,6 +111,11 @@ const hasMultiLineNote = (snap: Snapshot) =>
       (n.body ?? "").split("\n").filter((line) => line.trim() !== "").length >=
       2,
   );
+
+// A note carrying a line comment — the point where someone starts annotating
+// their own text rather than only writing it.
+const hasCommentedNote = (snap: Snapshot) =>
+  snap.notes.some((n) => (n.comments ?? []).length > 0);
 
 // A note starred with the editor header's star button — the point where
 // someone starts curating the drawer instead of scrolling it.
@@ -608,6 +614,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     glyph: CodeGlyph,
     learnMore: true,
     trigger: { kind: "manual" },
+  },
+  {
+    id: "redPen",
+    tier: "intermediate",
+    glyph: CommentGlyph,
+    learnMore: true,
+    trigger: {
+      kind: "derived",
+      slices: (s) => [s.snapshot.notes],
+      predicate: (prev, next) =>
+        !hasCommentedNote(prev.snapshot) && hasCommentedNote(next.snapshot),
+    },
   },
   {
     id: "sweepingStatement",

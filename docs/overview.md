@@ -1362,6 +1362,107 @@ selection holds more than one line — one line is what a single press already
 gives you, and more than one is the thing the mode is for.
 
 
+### Line comments
+
+A **line comment** is something said *about* a line rather than added to it: the
+reviewer's "is this still true?", the reminder that a paragraph needs a source,
+the note to yourself you don't want printed. The whole feature exists because
+the alternative — typing the remark into the note — changes the thing being
+remarked on: it exports, it prints, it renders, and every tool that opens the
+markdown reads it as text.
+
+**Writing one.** Pick the lines first: press a line number (which opens
+[select mode](#select-mode) with that line taken) or turn the mode on and pick a
+run. The header's `CommentButton` (`src/ui/CommentButton.tsx`) — the speech
+bubble immediately *left* of the formatting toggle, where the row's writing half
+begins — opens the dialog against the lines the mode is holding
+(`runComment` → `pickedLines()` on `MarkdownEditorHandle`). Like the delete and
+the chevrons beside it, the button rides the header for the whole of the mode
+rather than appearing once a line is taken, so the row never shuffles under the
+finger between one pick and the next; pressing it with nothing picked does
+nothing. It folds away with the rest of the writing tools on a
+[locked note](#lock-a-note).
+
+**Reading one.** A line carrying a comment grows a small filled bubble in a
+**second gutter** of its own, between the line numbers and the text
+(`COMMENT_COL` / `COMMENT_GAP`, drawn by `LineRow` in
+`src/ui/MarkdownEditor.tsx`). Two columns rather than one mark, because the two
+answer different presses — the numbers select the line, the bubble opens what
+was said about it — and a target that means two things depending on which half
+of a digit it lands in means neither. The column is reserved only on a note that
+actually carries a comment, so every other note's writing column is exactly as
+wide as it always was, and it is reserved whether or not the numbers are on. The
+bubble carries `data-line-comment`, which every gesture the surface owns — the
+sweep, the gutter press, the caret — stands down for (`onCommentBubble`, checked
+first in the surface's `onPointerDown`).
+
+**The dialog** (`src/ui/LineCommentModal.tsx`) is one dialog for both halves,
+because it is one question: what is said about these lines? It lists every
+comment anchored to any of them (a comment spanning a run is reachable from each
+of its lines, listed once), each in a textarea with a delete beside it, and an
+empty composer under them — focused when the dialog was opened to write. **Every
+edit commits once, as the dialog closes**, by whichever route closes it (Done,
+the backdrop, Escape, the sheet's swipe-down): the textareas are local drafts
+until then, because the alternative is one entry on the note's undo timeline per
+keystroke typed into a comment. Deleting is the exception — there is nothing
+left to be in a draft about, so it takes effect on the press.
+
+**The model** is `LineComment` (`src/domain/note-comment.ts`), carried on the
+note as `Note.comments`. A comment holds the **set** of lines it is anchored to
+rather than a range, because what select mode hands over need not be one
+unbroken run. `setNoteComments` (`src/domain/note.ts`) puts a new list on the
+note and *does* bump `updatedAt` — unlike starring or filing, a comment is
+something the user wrote — and the store's `setComments`
+(`src/app/use-notes.ts`) records it on the note's own undo timeline, one step
+per dialog.
+
+**Anchors follow the text.** `remapComments` re-bases every anchor across a body
+edit, and it runs inside `editNote` — the one chokepoint every body edit passes
+through — so no caller has to remember. The diff is the cheap one (common
+prefix, common suffix, the rewritten region between): a comment above the edit
+is untouched, one below it shifts by the change in line count, one on a line the
+edit deleted loses that line, and a comment that loses every line it had is
+dropped, because a comment on text that no longer exists has nothing to say.
+Typing *inside* a line never moves an anchor, since the line count didn't
+change. **Moving lines leaves comments where they were**, for the same reason —
+a deliberate limit, since a remap that chased content would have to guess which
+of two identical lines is "the" one.
+
+**On disk** the comments ride the markdown file's frontmatter — the one part of
+a markdown file every renderer drops and every editor shows — as the single
+nested block the otherwise-flat frontmatter carries:
+
+```
+---
+id: 0f1c…
+title: Release notes
+created: 1758000000000
+updated: 1758000000000
+comments:
+  - lines: 3,5-7
+    text: "Is this still true after the 5.2 rollback?"
+    id: c1a2…
+    created: 1758000000000
+    updated: 1758000000000
+---
+```
+
+`lines` is written **one-based**, ranges collapsed, so it reads as the numbers
+the gutter shows (`formatCommentLines` / `parseCommentLines`); `text` is always
+JSON-quoted, which is the one form that survives a colon, a leading `-`, or a
+newline — and which keeps a `---` typed into a comment from looking like the end
+of the frontmatter. The parse is local-failure-tolerant in the same way
+`parseFiles` is: an entry with no readable anchor or no text is dropped and the
+rest are kept, and a comment somebody hand-wrote without an `id:` is minted one
+rather than discarded. `parseComments` (`src/domain/note-comment.ts`) is the
+shared defensive reader the JSON snapshot (`src/storage/serialize.ts`) and the
+encrypted per-note codec (`src/storage/enc-note-codec.ts`) both run entries
+through; it rebuilds each entry in a fixed key order, which is what keeps the
+encrypted backends' content hash stable across a reload.
+
+The trophy is **Red pen**, derived the first time any note in the document
+carries a comment.
+
 ### Shorten links
 
 `shortenUrl` (`src/domain/markdown.ts`) trims a long **bare URL** for *display*

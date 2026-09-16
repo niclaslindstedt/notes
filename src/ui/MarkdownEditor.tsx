@@ -89,6 +89,7 @@ import {
   type LineFormat,
 } from "../domain/markdown-format.ts";
 import { matchLineSpans, type NoteMatch } from "../domain/note-find.ts";
+import { commentedLines, type LineComment } from "../domain/note-comment.ts";
 import type { Note } from "../domain/note.ts";
 import { doubleSpacePeriod, sentenceCapital } from "../domain/sentence.ts";
 import type { CompiledTransform } from "../domain/transform.ts";
@@ -128,6 +129,7 @@ import { useDesktopPointer } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { codeBlockEdgeClass, lineTextClass } from "./markdown-line-class.ts";
 import { CodeCopyButton } from "./CodeCopyButton.tsx";
+import { CommentFilledIcon } from "./icons.tsx";
 import {
   RawLine,
   RenderedLine,
@@ -232,6 +234,18 @@ type Props = {
    */
   selectMode?: boolean;
   /**
+   * The note's [line comments](../../docs/overview.md#line-comments). The lines
+   * they are anchored to get a bubble in a gutter of their own, right of the
+   * numbers; pressing one opens the dialog through `onOpenComments`.
+   */
+  comments?: readonly LineComment[];
+  /**
+   * Open the comment dialog for `lines` — the gutter bubble hands over the one
+   * line it was pressed on. The editor only ever asks: the note's comments
+   * belong to the host, which owns the note.
+   */
+  onOpenComments?: (lines: number[]) => void;
+  /**
    * Turn select mode off from inside the editor — Escape, a press on the lines
    * already taken, or an edit that consumed them. The host owns the flag (its
    * header button reports it), so the editor asks rather than sets.
@@ -294,6 +308,10 @@ const NO_MATCHES: readonly NoteMatch[] = [];
 // line the identical reference and each `RenderedLine` memo bails out.
 const NO_TRANSFORMS: readonly CompiledTransform[] = [];
 
+// And for the line comments, so a note with none re-runs neither the memo that
+// collects the commented lines nor the gutter reservation that reads it.
+const NO_COMMENTS: readonly LineComment[] = [];
+
 // The editor's own channel into the in-app log. It only ever reports an edit it
 // had to refuse — the one failure mode that is otherwise completely silent on a
 // phone, where the console is out of reach (see `dev/logger.ts`).
@@ -303,6 +321,22 @@ const log = createLogger("editor");
 // One constant because two places must agree on it: the surface reserves it in
 // its left padding, and the number pushes itself back out of the text by it.
 const GUTTER_GAP = "1rem";
+
+// The comment gutter: a column of its own between the line numbers and the
+// text, holding the bubble that says a line carries a
+// [comment](../../docs/overview.md#line-comments).
+//
+// It is a *second* gutter rather than a mark in the first because the two
+// columns answer different presses — the numbers select the line, the bubble
+// opens what was said about it — and a press target that means two things
+// depending on which half of a digit it lands in is a press target that means
+// neither. It is reserved only on a note that actually carries a comment, so
+// the writing column of every other note is exactly as wide as it always was.
+const COMMENT_COL = "1.125rem";
+
+// The breathing room between the numbers and the bubbles, so the two columns
+// read as two rather than as one crowded one.
+const COMMENT_GAP = "0.25rem";
 
 // The keys that walk the caret from line to line, and so aim at the remembered
 // goal column (see `goalCol`). Only unmodified: Alt / Ctrl / Cmd turn the same
@@ -408,6 +442,15 @@ function onGutter(target: EventTarget | null): boolean {
   );
 }
 
+/** Whether an event landed on a line's comment bubble, which answers its own
+ *  press: it opens the dialog rather than picking, scrolling, or placing a
+ *  caret, so every gesture the surface owns stands down for it. */
+function onCommentBubble(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element && target.closest("[data-line-comment]") !== null
+  );
+}
+
 /** What the editor exposes to its parent: a way to start editing from outside. */
 export type MarkdownEditorHandle = {
   /** Place the caret at the end of the note and start editing there. */
@@ -434,6 +477,9 @@ export type MarkdownEditorHandle = {
   /** Hold the caret's line open across a trip out of the surface, and put the
    *  caret back when the trip ends — see `holdCaret` in the editor. */
   holdCaret: (hold: boolean) => void;
+  /** The lines select mode is holding, or null when it is holding none (or is
+   *  off) — what the header's comment button anchors a new comment to. */
+  pickedLines: () => number[] | null;
 };
 
 // The active line's identity: which source line is being edited as raw text, and
@@ -462,6 +508,8 @@ export function MarkdownEditor({
   transforms = NO_TRANSFORMS,
   lineNumbers = false,
   selectMode = false,
+  comments = NO_COMMENTS,
+  onOpenComments,
   onSelectModeChange,
   noteId,
   onTabOut,
@@ -3492,6 +3540,10 @@ export function MarkdownEditor({
       moveLines: (direction: -1 | 1) => moveSelectedLinesRef.current(direction),
       attach: (files: readonly File[]) => void attachFilesRef.current(files),
       holdCaret: (hold: boolean) => holdCaretRef.current(hold),
+      pickedLines: () => {
+        const sel = lineSelRef.current;
+        return selectModeRef.current && sel ? [...sel.lines] : null;
+      },
     }),
     [],
   );
@@ -3501,6 +3553,11 @@ export function MarkdownEditor({
   // read-back can't interpret. Firefox falls back to plain `true`, where our
   // beforeinput interception keeps edits line-clean.
   const editableMode = useMemo(() => supportsPlaintextOnly(), []);
+
+  // The lines carrying a comment, asked once per render rather than walking the
+  // comment list per line — and the answer the gutter reservation below keys
+  // off, so a note with no comments never reserves the column at all.
+  const commented = useMemo(() => commentedLines(comments), [comments]);
 
   const widthStyle =
     maxWidth === "none" ? undefined : { maxWidth, margin: "0 auto" };
@@ -3517,8 +3574,20 @@ export function MarkdownEditor({
   // sweep rail is drawn in it (see `LineRow`), and a rail painted over the
   // first characters of every line would be a rail you can't read the note
   // through. With numbers on, the gutter they already reserve *is* the rail.
-  const gutterWidth = lineNumbers
-    ? `calc(1rem + ${String(blocks.length).length} * 0.75ch + ${GUTTER_GAP})`
+  //
+  // A note carrying comments reserves one more column for their bubbles, right
+  // of the numbers (see `COMMENT_COL`) — and reserves it whether or not the
+  // numbers are on, because a comment has to be reachable either way.
+  const numbersWidth = lineNumbers
+    ? `${String(blocks.length).length} * 0.75ch`
+    : null;
+  const bubblesWidth = commented.size > 0 ? COMMENT_COL : null;
+  const columns =
+    numbersWidth && bubblesWidth
+      ? `${numbersWidth} + ${COMMENT_GAP} + ${bubblesWidth}`
+      : (numbersWidth ?? bubblesWidth);
+  const gutterWidth = columns
+    ? `calc(1rem + ${columns} + ${GUTTER_GAP})`
     : selectMode
       ? `calc(1rem + ${SWEEP_RAIL_GAP})`
       : null;
@@ -3551,6 +3620,10 @@ export function MarkdownEditor({
           lastScrollTop.current = e.currentTarget.scrollTop;
         }}
         onPointerDown={(e) => {
+          // The comment bubble is the one thing in the note that answers its
+          // own press — before select mode's sweep, before the gutter's, and
+          // before the caret. Its button takes it from here.
+          if (onCommentBubble(e.target)) return;
           // Select mode takes the press whole: it picks lines, not carets.
           if (selectMode) {
             onSweepDown(e);
@@ -3734,6 +3807,10 @@ export function MarkdownEditor({
                   selectable={selectMode}
                   selected={false}
                   label={t("app.selectLine", { n: index + 1 })}
+                  commentColumn={commented.size > 0}
+                  commented={commented.has(index)}
+                  commentLabel={t("app.comments.open", { n: index + 1 })}
+                  onComment={onOpenComments}
                 >
                   <ActiveLine
                     key={`active-${active.key}`}
@@ -3761,6 +3838,10 @@ export function MarkdownEditor({
                   selectable={selectMode}
                   selected={false}
                   label={t("app.selectLine", { n: index + 1 })}
+                  commentColumn={commented.size > 0}
+                  commented={commented.has(index)}
+                  commentLabel={t("app.comments.open", { n: index + 1 })}
+                  onComment={onOpenComments}
                 >
                   <div
                     data-line-index={index}
@@ -3790,6 +3871,10 @@ export function MarkdownEditor({
                 selectable={selectMode}
                 selected={selectedLines?.has(index) === true}
                 label={t("app.selectLine", { n: index + 1 })}
+                commentColumn={commented.size > 0}
+                commented={commented.has(index)}
+                commentLabel={t("app.comments.open", { n: index + 1 })}
+                onComment={onOpenComments}
               >
                 <div
                   data-line-index={index}
@@ -3889,6 +3974,10 @@ function LineRow({
   selectable,
   selected,
   label,
+  commentColumn,
+  commented,
+  commentLabel,
+  onComment,
   children,
 }: {
   index: number;
@@ -3901,9 +3990,17 @@ function LineRow({
   /** This line is part of the run select mode has taken. */
   selected: boolean;
   label: string;
+  /** The note carries comments somewhere, so every row leaves the column open
+   *  — a bubble that only some rows reserved room for would step the text of
+   *  the commented lines sideways out of the column of everything else. */
+  commentColumn: boolean;
+  /** *This* line carries one, so the bubble is drawn. */
+  commented: boolean;
+  commentLabel: string;
+  onComment?: (lines: number[]) => void;
   children: ReactNode;
 }) {
-  if (!numbered && !selectable) return children;
+  if (!numbered && !selectable && !commentColumn) return children;
   // The tint goes on *both* boxes — the number's and the text's — because they
   // are siblings, not one inside the other: the number hangs out in the
   // surface's left padding (`right-full`), so a background on the row alone
@@ -3934,13 +4031,53 @@ function LineRow({
               ? "text-fg-bright"
               : "text-muted/50 hover:text-muted"
           }`}
-          style={{ paddingRight: GUTTER_GAP }}
+          style={{
+            paddingRight: commentColumn
+              ? `calc(${GUTTER_GAP} + ${COMMENT_COL} + ${COMMENT_GAP})`
+              : GUTTER_GAP,
+          }}
         >
           {/* One text row tall at the surface's font — not the smaller one the
             digit is drawn at — so the number centres against the line's first
             row wherever that row's own text sits. */}
           <span className="flex h-[1lh] items-center">
             <span className="text-[0.75em] tabular-nums">{index + 1}</span>
+          </span>
+        </button>
+      )}
+      {/* The comment bubble, in its own column between the numbers and the
+          text. Only drawn for a line that carries a comment — an empty column
+          of faint bubbles down a note would be a row of buttons that mostly do
+          nothing, and the gesture that *writes* a comment is the header's, not
+          this one's. It hangs in the reserved inset the way the number does,
+          `GUTTER_GAP` clear of the first character, and carries
+          `data-line-comment` so every gesture the surface owns (the sweep, the
+          gutter press, the caret) stands down and lets the button answer. */}
+      {commented && (
+        <button
+          type="button"
+          data-line-comment=""
+          // Out of the tab order for the same reason the line number is: the
+          // editor hands focus on via `onTabOut`, and one tab stop per
+          // commented line would make tabbing out of a note impossible.
+          tabIndex={-1}
+          contentEditable={false}
+          aria-label={commentLabel}
+          title={commentLabel}
+          onMouseDown={(e) => {
+            // Keep the browser from landing a caret (and raising the soft
+            // keyboard) with the press — the click is what opens the dialog.
+            e.preventDefault();
+          }}
+          onClick={() => onComment?.([index])}
+          className="absolute inset-y-0 right-full flex cursor-pointer touch-none items-start justify-center text-accent select-none hover:text-accent-bright"
+          style={{ width: COMMENT_COL, marginRight: GUTTER_GAP }}
+        >
+          {/* One text row tall at the surface's own font, so the bubble
+              centres against the line's first row exactly as the number does
+              (a line that wraps to five rows is still one line). */}
+          <span className="flex h-[1lh] items-center">
+            <CommentFilledIcon className="h-3 w-3" />
           </span>
         </button>
       )}

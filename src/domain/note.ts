@@ -4,6 +4,7 @@
 // no-storage / no-DOM boundary). Storage and UI build on top of it.
 
 import type { Attachment } from "./attachment.ts";
+import { remapComments, type LineComment } from "./note-comment.ts";
 
 // A single note. `title` is a short heading the user edits in its own field
 // (it is *not* the first body line); `body` is the plain text / Markdown
@@ -69,6 +70,14 @@ export type Note = {
   // backend too, and "keep it" leaves the record here so a re-pasted reference
   // resolves again. Only `dropAttachments` takes one off.
   attachments?: Attachment[];
+  // Notes *about* the note's lines rather than part of them — the reviewer's
+  // margin, kept out of the text it annotates. Each entry names the lines it is
+  // anchored to and the words the user wrote (see `domain/note-comment.ts`); on
+  // the file backends they ride the markdown frontmatter, so the annotation
+  // travels with the note without ever rendering as part of it. Absent on a
+  // note with no comments rather than an empty array, so an older document
+  // needs no migration and a note with none stays minimal.
+  comments?: LineComment[];
   // The folder this note sits in within the namespace, by `Folder.id`. A note
   // with no `folderId` lives at the top level (ungrouped). Folders group notes
   // *inside* a namespace (a namespace's "Login feature", "Vacation 2025", …);
@@ -130,7 +139,43 @@ export function editNote(
   // it keeps its place in the most-recently-edited ordering instead of jumping
   // to the top of the list.
   if (body === note.body) return note;
-  return { ...note, body, updatedAt: now };
+  const next: Note = { ...note, body, updatedAt: now };
+  // Every line the edit added or removed moves the lines below it, and a line
+  // comment names a line by its index — so the anchors are re-based here, at
+  // the one chokepoint every body edit runs through, rather than at each of the
+  // callers. A comment whose lines the edit deleted goes with them.
+  const comments = remapComments(note.body ?? "", body, note.comments);
+  if (comments && comments.length > 0) next.comments = comments;
+  else delete next.comments;
+  return next;
+}
+
+/**
+ * Return a copy of `note` carrying `comments` (see `domain/note-comment.ts`).
+ * `updatedAt` moves with it: unlike starring or filing, a comment is something
+ * the user *wrote*, it changes what the note's file contains, and it belongs at
+ * the top of the most-recently-edited list with every other thing they typed.
+ * The field is dropped rather than written as an empty array when the last
+ * comment goes, so a note with none round-trips as minimally as one that never
+ * had any. The same note comes back when the list is unchanged, so a modal
+ * opened and closed without an edit churns nothing.
+ */
+export function setNoteComments(
+  note: Note,
+  comments: readonly LineComment[],
+  now: number = Date.now(),
+): Note {
+  const before = note.comments ?? [];
+  if (
+    before.length === comments.length &&
+    before.every((c, i) => c === comments[i])
+  ) {
+    return note;
+  }
+  const next: Note = { ...note, updatedAt: now };
+  if (comments.length > 0) next.comments = [...comments];
+  else delete next.comments;
+  return next;
 }
 
 /**

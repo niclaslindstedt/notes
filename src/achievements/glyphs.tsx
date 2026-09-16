@@ -516,6 +516,17 @@ export function TextSearchGlyph({ className }: IconProps) {
   );
 }
 
+// A speech bubble beside a line — a line comment: something said *about* the
+// text rather than added to it. The line is drawn short and plain so the bubble
+// is what the glyph is about.
+export function CommentGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M2 11.5a7 7 0 0 1 7-7h4a7 7 0 0 1 0 14H9l-5 4 1.4-4.4A7 7 0 0 1 2 11.5z" />
+    </Svg>
+  );
+}
+
 // A run of lines swept up whole: three rows boxed together, one row left plain
 // above and below them. The picture of select mode — the selection has no
 // columns in it, so the glyph shows none either.
