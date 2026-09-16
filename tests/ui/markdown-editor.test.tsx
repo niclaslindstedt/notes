@@ -1647,6 +1647,12 @@ describe("MarkdownEditor", () => {
     function selectedText(): string {
       return window.getSelection()?.toString() ?? "";
     }
+    // Grow a column from a bare caret. A plain Ctrl/Cmd+Up / Down over one of
+    // those is the platform's "go to top" / "go to bottom" (below), so the press
+    // that adds a caret above / below is VS Code's own, with Alt riding along.
+    function addCaret(key: "ArrowUp" | "ArrowDown") {
+      press(key, { metaKey: true, altKey: true });
+    }
 
     it("takes the word under the caret on the first Ctrl/Cmd+D", () => {
       renderEditor("alpha beta");
@@ -1681,35 +1687,67 @@ describe("MarkdownEditor", () => {
       expect(onChange).toHaveBeenLastCalledWith("K\nwidth\nK");
     });
 
-    it("grows a column of bare carets with Ctrl/Cmd+Down", () => {
+    it("grows a column of bare carets with Ctrl/Cmd+Alt+Down", () => {
       const { onChange } = renderEditor("aa\nbb\ncc");
       caretIn(surface().querySelector('[data-line-index="0"]')!, 0);
-      press("ArrowDown", { metaKey: true });
-      press("ArrowDown", { metaKey: true });
+      addCaret("ArrowDown");
+      addCaret("ArrowDown");
       expect(rawLines()).toHaveLength(3);
       // Bare carets, so nothing is selected and nothing is replaced.
       beforeInput("insertText", "-");
       expect(onChange).toHaveBeenLastCalledWith("-aa\n-bb\n-cc");
     });
 
-    it("also answers VS Code's own Ctrl/Cmd+Alt+Down", () => {
-      renderEditor("aa\nbb");
+    // The press over a bare caret means what it means in every other text
+    // field on the platform, and grows nothing.
+    it("jumps to the top of the note on a bare Ctrl/Cmd+Up", () => {
+      const { onChange } = renderEditor("aa\nbb\ncc");
+      caretIn(surface().querySelector('[data-line-index="2"]')!, 2);
+      press("ArrowUp", { metaKey: true });
+      expect(rawLines()).toHaveLength(1);
+      beforeInput("insertText", "!");
+      expect(onChange).toHaveBeenLastCalledWith("!aa\nbb\ncc");
+    });
+
+    it("jumps to the end of the note on a bare Ctrl/Cmd+Down", () => {
+      const { onChange } = renderEditor("aa\nbb\ncc");
       caretIn(surface().querySelector('[data-line-index="0"]')!, 0);
-      press("ArrowDown", { metaKey: true, altKey: true });
+      press("ArrowDown", { metaKey: true });
+      expect(rawLines()).toHaveLength(1);
+      beforeInput("insertText", "!");
+      expect(onChange).toHaveBeenLastCalledWith("aa\nbb\ncc!");
+    });
+
+    // …but a press with something selected still grows the column: there is
+    // something to grow it from, which is what the bare caret lacked.
+    it("still grows the column from a selection", () => {
+      renderEditor("aa\nbb");
+      selectRange(surface().querySelector('[data-line-index="0"]')!, 0, 1);
+      press("ArrowDown", { metaKey: true });
       expect(rawLines()).toHaveLength(2);
+    });
+
+    // And a column already standing keeps growing on the plain press, so the
+    // Alt is only needed to start one.
+    it("keeps growing a column already up", () => {
+      renderEditor("aa\nbb\ncc");
+      caretIn(surface().querySelector('[data-line-index="0"]')!, 0);
+      addCaret("ArrowDown");
+      press("ArrowDown", { metaKey: true });
+      expect(rawLines()).toHaveLength(3);
     });
 
     it("stops at the note's edge", () => {
       renderEditor("aa\nbb");
       caretIn(surface().querySelector('[data-line-index="0"]')!, 0);
-      press("ArrowUp", { metaKey: true });
+      addCaret("ArrowUp");
       expect(rawLines()).toHaveLength(1);
     });
 
     it("deletes at every caret", () => {
       const { onChange } = renderEditor("aXb\ncXd");
       caretIn(surface().querySelector('[data-line-index="0"]')!, 2);
-      press("ArrowDown", { metaKey: true });
+      addCaret("ArrowDown");
       beforeInput("deleteContentBackward");
       expect(onChange).toHaveBeenLastCalledWith("ab\ncd");
     });
@@ -1717,7 +1755,7 @@ describe("MarkdownEditor", () => {
     it("splits at every caret on Enter", () => {
       const { onChange } = renderEditor("ab\ncd");
       caretIn(surface().querySelector('[data-line-index="0"]')!, 1);
-      press("ArrowDown", { metaKey: true });
+      addCaret("ArrowDown");
       beforeInput("insertParagraph");
       expect(onChange).toHaveBeenLastCalledWith("a\nb\nc\nd");
     });
@@ -1725,7 +1763,7 @@ describe("MarkdownEditor", () => {
     it("walks every caret with an arrow key", () => {
       const { onChange } = renderEditor("abc\ndef");
       caretIn(surface().querySelector('[data-line-index="0"]')!, 1);
-      press("ArrowDown", { metaKey: true });
+      addCaret("ArrowDown");
       press("ArrowRight");
       beforeInput("insertText", ".");
       expect(onChange).toHaveBeenLastCalledWith("ab.c\nde.f");
@@ -1734,7 +1772,7 @@ describe("MarkdownEditor", () => {
     it("drops back to the caret it started from on Escape", () => {
       const { onChange } = renderEditor("aa\nbb");
       caretIn(surface().querySelector('[data-line-index="0"]')!, 0);
-      press("ArrowDown", { metaKey: true });
+      addCaret("ArrowDown");
       expect(rawLines()).toHaveLength(2);
       press("Escape");
       expect(rawLines()).toHaveLength(1);
@@ -1745,7 +1783,7 @@ describe("MarkdownEditor", () => {
     it("ends the column when the note is pressed", () => {
       renderEditor("aa\nbb");
       caretIn(surface().querySelector('[data-line-index="0"]')!, 0);
-      press("ArrowDown", { metaKey: true });
+      addCaret("ArrowDown");
       act(() => {
         fireEvent.pointerDown(surface().parentElement!, {
           pointerType: "mouse",
@@ -1763,7 +1801,7 @@ describe("MarkdownEditor", () => {
     it("deletes forwards at every caret too", () => {
       const { onChange } = renderEditor("aXb\ncXd");
       caretIn(surface().querySelector('[data-line-index="0"]')!, 1);
-      press("ArrowDown", { metaKey: true });
+      addCaret("ArrowDown");
       beforeInput("deleteContentForward");
       expect(onChange).toHaveBeenLastCalledWith("ab\ncd");
     });
@@ -1771,7 +1809,7 @@ describe("MarkdownEditor", () => {
     it("deletes the word behind every caret", () => {
       const { onChange } = renderEditor("one two\nsix four");
       caretIn(surface().querySelector('[data-line-index="0"]')!, 4);
-      press("ArrowDown", { metaKey: true });
+      addCaret("ArrowDown");
       beforeInput("deleteWordBackward");
       expect(onChange).toHaveBeenLastCalledWith("two\nfour");
     });
@@ -1828,7 +1866,7 @@ describe("MarkdownEditor", () => {
       function twoCarets(body: string, col = 0) {
         const rendered = renderEditor(body);
         caretIn(surface().querySelector('[data-line-index="0"]')!, col);
-        press("ArrowDown", { metaKey: true });
+        addCaret("ArrowDown");
         return rendered;
       }
 

@@ -576,6 +576,27 @@ Moving *within* one wrapped line — down from its row 2 to its row 3 — is lef
 entirely to the browser, which already keeps the caret's x across a row step and
 never has its work undone, since no line changes and nothing re-renders.
 
+### Go to top / go to bottom
+
+`caretToNoteEdge` (`src/ui/MarkdownEditor.tsx`) — `Ctrl/Cmd+↑` / `↓` over a bare
+caret puts it at the note's very first column, or at the end of its last line,
+which is what the press does in every other editor and text field on the
+platform. The [live-preview editor](#markdown-editor) has to answer it itself:
+the same press is also [multi-cursor](#multiple-cursors)'s "add a caret above /
+below", so the column handler reads it first and hands it here whenever there is
+nothing to grow a column *from* — no column already standing, nothing selected,
+and no `Alt` riding along. A [locked note](#lock-a-note) has no caret to move, so
+the press falls through to the browser and simply scrolls.
+
+The jump is placed through `focusCursor` rather than `activate`, because it has
+to land even when it stays on the line already active — a caret halfway down the
+only line of a note still has a top and a bottom to reach — and that is the
+placer that remounts the line unconditionally. The [caret-placement
+effect](#caret-placement-on-press) then scrolls the line it lands on into view,
+and the [goal column](#goal-column) is dropped: a jump is not a vertical run.
+The [plain-textarea fallback](#markdown-editor) needs none of this either — the
+browser moves the caret itself there.
+
 ### Multiple cursors
 
 `src/domain/multi-cursor.ts` (the pure half) + the multi-cursor block in
@@ -588,7 +609,8 @@ the [live-preview editor](#markdown-editor).
 | Press                                     | Does                                                                      |
 | ----------------------------------------- | ------------------------------------------------------------------------- |
 | `Ctrl/Cmd+D`                              | Takes the word under the caret; each press after that adds a caret over the next occurrence of it |
-| `Ctrl/Cmd+↑` / `↓` (`Alt` may ride along) | Adds a bare caret on the line above / below, growing a column a line at a time |
+| `Ctrl/Cmd+Alt+↑` / `↓`                    | Adds a bare caret on the line above / below, growing a column a line at a time |
+| `Ctrl/Cmd+↑` / `↓`                        | The same, once there is a column standing or something selected — over a bare caret it is [go to top / bottom](#go-to-top--go-to-bottom) instead |
 | `Escape`                                  | Back to one caret — the **primary**, the one the run started from, still holding whatever it had selected |
 | A press in the note                       | Ends the column, the same way it does in VS Code                          |
 
@@ -599,9 +621,19 @@ only** (`Ctrl/Cmd+D` on `id` steps over `width`); a run seeded from a selection
 the user drew themselves matches anywhere, which is the same distinction VS Code
 draws. Either way the search is case-sensitive and wraps through the top of the
 note, and stops once every occurrence is taken — a press too far costs nothing.
-`Ctrl/Cmd+↑` / `↓` is deliberately **not** a selection: it is the shortcut for
-typing the same thing down the edge of a list. Both unlock the **Many hands**
-achievement the moment a second caret appears.
+Growing a column downwards is deliberately **not** a selection: it is the
+shortcut for typing the same thing down the edge of a list. Both unlock the
+**Many hands** achievement the moment a second caret appears.
+
+**A column needs something to grow from.** `Ctrl/Cmd+↑` / `↓` over a *bare*
+caret with no column standing is [go to top / go to
+bottom](#go-to-top--go-to-bottom), not a second caret: that is what the press
+means in every other editor and text field on the platform, and sprouting a
+caret out of a press someone made to reach the end of a long note is a surprise
+rather than a feature. Nothing is lost by it — a column still starts from a
+selection, from `Ctrl/Cmd+D`, or from `Ctrl/Cmd+Alt+↑` / `↓`, which is the
+binding VS Code gives "add cursor above / below" in the first place — and once
+the column is up the plain press goes on growing it.
 
 **Everything answers at every caret.** Typing, Backspace / Delete (by character,
 by word, by line), Enter, the arrow keys with and without Shift, Home / End,

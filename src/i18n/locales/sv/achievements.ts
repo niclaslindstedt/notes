@@ -367,7 +367,7 @@ const achievements: AchievementsCatalog = {
       name: "Många händer",
       condition: "Redigera vid fler än en markör samtidigt.",
       learnMore:
-        "Ctrl/Cmd+D markerar ordet under markören, och varje tryck därefter lägger till ännu en markör vid nästa förekomst av det \u2014 skriv en gång och alla ändras. Ctrl/Cmd+\u2191 / \u2193 bygger i stället en rak kolumn av markörer, en rad i taget, för att skriva samma sak längs kanten av en lista. Piltangenter, backsteg, retur, kopiera och klistra in svarar vid varje markör; Escape tar dig tillbaka till den du började vid.",
+        "Ctrl/Cmd+D markerar ordet under markören, och varje tryck därefter lägger till ännu en markör vid nästa förekomst av det \u2014 skriv en gång och alla ändras. Ctrl/Cmd+Alt+\u2191 / \u2193 bygger i stället en rak kolumn av markörer, en rad i taget, för att skriva samma sak längs kanten av en lista (utan Alt går de två i stället till början och slutet av anteckningen, och när en kolumn väl står växer den vidare med båda). Piltangenter, backsteg, retur, kopiera och klistra in svarar vid varje markör; Escape tar dig tillbaka till den du började vid.",
     },
     seeker: {
       name: "Sökare",

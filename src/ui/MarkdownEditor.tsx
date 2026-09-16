@@ -846,6 +846,20 @@ export function MarkdownEditor({
     }));
   }
 
+  // "Go to top" / "go to bottom": the note's very first column, or the end of
+  // its last line. What Ctrl/Cmd+Up / Down mean everywhere else on the platform,
+  // and so what they mean here too whenever there is no column to grow (see
+  // `onColumnKeyDown`). Placed through `focusCursor` rather than `activate`
+  // because the jump has to land even when it stays on the line already active
+  // — a caret sitting halfway down the only line of a note still has a top and a
+  // bottom to reach — and that one remounts the line unconditionally.
+  function caretToNoteEdge(direction: -1 | 1) {
+    const lines = linesRef.current;
+    const line = direction < 0 ? 0 : lines.length - 1;
+    const col = direction < 0 ? 0 : (lines[line]?.length ?? 0);
+    focusCursor(collapsedCursor({ line, col }));
+  }
+
   // The surface is about to lose focus to something the user has not actually
   // left the note for — the Insert menu's file browser is the only one — so the
   // active line must survive the trip. It is the line the attachment will land
@@ -2925,9 +2939,31 @@ export function MarkdownEditor({
     }
     // Ctrl/Cmd+Up / Down — a caret on the line above / below. Alt may ride
     // along, so VS Code's own Ctrl/Cmd+Alt+Up / Down lands here too.
+    //
+    // Except over a bare caret with no column standing: there the press means
+    // what it means in every other editor and text field on the platform — jump
+    // to the top / bottom of the note. Sprouting a second caret from a press
+    // someone made to reach the end of a long note is a surprise, and nothing is
+    // lost by it: a column still starts from a selection (Ctrl/Cmd+D), from a
+    // column already up, or from Alt riding along, which is the binding VS Code
+    // gives "add cursor above / below" in the first place.
     if (mod && !e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      const direction = e.key === "ArrowUp" ? -1 : 1;
+      // No column standing, nothing selected, no Alt — and a selection that
+      // can't be resolved at all is as bare as a collapsed one.
+      const bare =
+        !e.altKey &&
+        !cursorsRef.current &&
+        (selectionPoints()?.collapsed ?? true);
+      if (bare) {
+        // A locked note has no caret to move; let the browser scroll instead.
+        if (locked) return false;
+        e.preventDefault();
+        caretToNoteEdge(direction);
+        return true;
+      }
       e.preventDefault();
-      addCursorLine(e.key === "ArrowUp" ? -1 : 1);
+      addCursorLine(direction);
       return true;
     }
     const cur = cursorsRef.current;

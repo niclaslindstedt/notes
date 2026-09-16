@@ -368,7 +368,7 @@ const achievements = {
       name: "Many hands",
       condition: "Edit at more than one caret at once.",
       learnMore:
-        "Ctrl/Cmd+D takes the word under the caret, and each press after that adds a second, third, fourth caret over the next occurrence of it \u2014 type once and every one of them changes. Ctrl/Cmd+\u2191 / \u2193 grow a plain column of carets instead, a line at a time, for typing the same thing down the edge of a list. Arrow keys, Backspace, Enter, copy and paste all answer at every caret; Escape drops back to the one you started from.",
+        "Ctrl/Cmd+D takes the word under the caret, and each press after that adds a second, third, fourth caret over the next occurrence of it \u2014 type once and every one of them changes. Ctrl/Cmd+Alt+\u2191 / \u2193 grow a plain column of carets instead, a line at a time, for typing the same thing down the edge of a list (without the Alt those two go to the top and the bottom of the note, and once a column is up it keeps growing on either). Arrow keys, Backspace, Enter, copy and paste all answer at every caret; Escape drops back to the one you started from.",
     },
     seeker: {
       name: "Seeker",
