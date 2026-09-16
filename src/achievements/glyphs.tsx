@@ -340,6 +340,27 @@ export function ImageGlyph({ className }: IconProps) {
   );
 }
 
+// A framed picture inside a dashed marquee — the selected image. Clicking a
+// picture in a note takes a selection of its own, the way clicking words takes
+// a selection of text, and Copy / Cut / Delete then act on the picture.
+export function ImageSelectedGlyph({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect
+        x="2.5"
+        y="2.5"
+        width="19"
+        height="19"
+        rx="2.5"
+        strokeDasharray="3 3"
+      />
+      <rect x="6" y="6" width="12" height="12" rx="1.5" />
+      <circle cx="9.5" cy="10" r="1.2" />
+      <path d="M6.5 16.5 10 13l3 3 2-1.5 2.5 2" />
+    </Svg>
+  );
+}
+
 // A screen with a play triangle — the inline video glyph (a YouTube link in a
 // note renders as a player you can watch without leaving the note).
 export function VideoGlyph({ className }: IconProps) {

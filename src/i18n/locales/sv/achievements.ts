@@ -483,6 +483,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Att radera en bilagas länk ur en anteckning går inte in i din Dropbox, Drive eller anteckningsmapp och tar bort filen — appen frågar först. Behåll den så raderas ingenting: anteckningen slutar bara visa den, och klistrar du tillbaka länken är bilden eller filen där igen.",
     },
+    cutout: {
+      name: "Urklipp",
+      condition: "Kopiera eller klipp ut en bild direkt ur en anteckning.",
+      learnMore:
+        "Klickar du p\u00e5 en bild i en anteckning markeras den, precis som text. Kopierar du den hamnar sj\u00e4lva bilden i urklipp och kan klistras in var som helst; klipper du ut den l\u00e4mnar den anteckningen utan den vanliga fr\u00e5gan om filen ska raderas \u2014 du flyttar den ju, sl\u00e4nger den inte. H\u00f6gerklicka (eller h\u00e5ll in) p\u00e5 en bild f\u00f6r samma \u00e5tg\u00e4rder i en meny.",
+    },
     liveSync: {
       name: "Telepati",
       condition: "Se en redigering från en annan enhet dyka upp av sig själv.",

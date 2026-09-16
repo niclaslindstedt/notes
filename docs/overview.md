@@ -2109,8 +2109,10 @@ Rendering goes through `AttachmentsProvider` (`src/ui/attachments/`): an `image`
 `InlineImage` thumbnail (`useThumbnail` downscales via canvas, cached by
 filename); a `link` node whose href points into `attachments/` resolves to a
 `FileAttachment` chip (`FileTypeIcon`, `file-icons.tsx`, maps the extension to
-one of a handful of type glyphs). `ImageViewer` shows the original image on
-click — the provider tracks the **index** of the open image into the note's
+one of a handful of type glyphs). `ImageViewer` shows the original image — on a click
+where the note can't be edited, and on a click of the already-[selected
+image](#image-selection) where it can — the provider tracks the **index** of the
+open image into the note's
 *images* (the gallery is images-only; a file chip never opens it), so the close
 button (X), Escape, a backdrop click, or a swipe up/down dismisses it, and the
 on-screen arrows, the arrow keys, or a left/right swipe step through the note's
@@ -2144,6 +2146,81 @@ container carries the real MIME/filename *inside* the ciphertext), so nothing
 leaks — never folded into the note. The local "This device" backend has no
 `AttachmentStore`, so it never accepts an attachment.
 
+### Image selection
+
+A picture in a note is a thing you act on, and acting on it needs somewhere to
+hang the act — so **clicking an image in an editable note selects it**, the way
+clicking a word selects text. The selected picture wears an accent ring, and
+three gestures then mean what they mean everywhere else:
+
+| Gesture                 | What happens                                                                |
+| ----------------------- | --------------------------------------------------------------------------- |
+| Ctrl/Cmd + C            | The **picture itself** goes to the system clipboard                          |
+| Ctrl/Cmd + X            | The same copy, then the reference leaves the note — a **cut**                |
+| Delete / Backspace      | The reference **and** the file go, with no question asked                     |
+| Escape, a click away, typing | The selection is dropped and the caret goes back to being the caret      |
+| A click on the selected image | Opens it full-size in the [viewer](#attachments)                       |
+
+Right-click (or a hold on a touchscreen) puts **Copy image** and **Delete
+image** in a menu over the picture instead — the framework's `ContextMenu`,
+hosted by `AttachmentsProvider` so a picture inside a rendered line never has a
+floating panel nested in it.
+
+**Selection only exists where the note can be changed.** The provider is given
+`onDelete` / `onCut` by the live-preview editor and by nothing else, and
+publishes that as `editable`; in the archive's read-only view and in a locked
+note there is nothing to select *for*, so a click opens the picture exactly as
+it always did. `MarkdownEditor` withholds both handlers while the note is
+locked, which is what makes a locked note behave like the read-only one.
+
+The keyboard is answered at the **document, in the capture phase**
+(`AttachmentsProvider`), not on the thumbnail. Two reasons, both load-bearing:
+the surface underneath is a `contenteditable` that would otherwise answer
+Backspace by eating a character, and a click on an image inside it leaves focus
+on the editing host rather than on the picture, so there is no element of ours
+reliably in the key's path.
+
+**What goes on the clipboard** is both the picture and its reference
+(`src/ui/attachments/clipboard.ts`): an `image/png` flavour for everything
+outside the app — re-encoded through a canvas when the attachment is a JPEG,
+WebP or AVIF, because PNG is the one image type every browser's clipboard
+accepts — and a `text/plain` flavour holding the attachment's own
+`![…](attachments/…)` Markdown. The `ClipboardItem` is built **synchronously
+from promises**, because Safari ties a clipboard write to the gesture that asked
+for it and an `await` before the write loses that tie. Where the image flavour
+can't be produced at all (an SVG with no intrinsic size, a browser with no
+`ClipboardItem`) the write falls back to the reference alone — outside the app
+that is a line of Markdown, but inside it, it still pastes the picture.
+
+**Pasting checks that the attachment still exists.** A clipboard whose text
+names an attachment is taken as *that reference* even when the picture's bytes
+rode along with it, because re-using the file the document already has keeps the
+image's name and leaves one copy of it where re-attaching the bytes would
+quietly make a second. `MarkdownEditor`'s paste path reads
+`referencedAttachmentNames` off the text and asks `AttachmentLookup`
+(`src/ui/attachments/lookup-context.ts`, provided by `App`) for every name the
+target note doesn't already hold: found — in any note of the document, bytes
+fetched from the backend if they aren't in memory — the attachment is
+re-attached to this note and the picture appears; not found, the reference names
+something that is gone and a toast says so. The text lands either way, so a
+dangling reference stays visible and editable rather than silently disappearing.
+
+**A cut is a deferred delete** (`src/app/attachment-cuts.ts`). Its reference
+leaves the body at once, but the record — and so the file — deliberately stays,
+because the whole point of a cut is that the picture is on the clipboard and
+about to be pasted back. So the cut suppresses the [removal
+prompt](#attachment-removal-prompt) and leaves a **mark** instead: `{noteId,
+filename, at}` in localStorage, dropped as soon as the note references the
+attachment again (`claimCuts` in `use-notes.ts`), and lapsing unread after a
+week. The promise the mark makes good is that **a cut nobody pasted back is
+deleted** — carried out at the *next* start rather than on the way out, because
+the moment a cut has to survive is precisely the one where no code of ours gets
+to run (a closed tab, a killed PWA, a crash). `useNotes` drains the marks once
+the document is loaded, skipping any cut this session made (the clipboard is
+still holding it) and any the body references after all.
+
+Copying or cutting an image unlocks the **Cutout** achievement.
+
 ### Attachment removal prompt
 
 An attachment is two things: a reference in the note's text, and a real file in
@@ -2168,6 +2245,11 @@ attachments *that edit* stopped referencing (`unreferencedAttachments`,
 - **It only asks where there is a file.** On the local "This device" backend
   (no `"attachments"` capability) there is nothing to keep, so the record is
   dropped straight away without a dialog.
+- **It only asks about an erasure nobody already answered.** Deleting or
+  cutting a [selected image](#image-selection) is itself an answer, so both call
+  the hook's `ignore` and the question never comes. The exemption lapses per
+  attachment the moment the body references it again, so erasing a pasted-back
+  reference by hand asks exactly as it always did.
 
 `AttachmentRemovalModal` (`src/ui/AttachmentRemovalModal.tsx`), hosted in `App`,
 puts it. The destructive answer is the secondary button and every dismissal —
@@ -2187,7 +2269,9 @@ from the note in the same keystroke, with its bytes fetched on demand from the
 file that was never deleted. Answering "no" unlocks the **Safekeeping**
 achievement.
 
-Answering **yes** is the only thing that takes an attachment off a note:
+Answering **yes** is one of the two ways an attachment comes off a note (the
+other is [deleting a selected image](#image-selection), which *is* this answer,
+given up front):
 `dropAttachments` (`src/domain/note.ts`) removes the records, and the next
 save's reconcile pass deletes the files ([directory adapter](#directory-adapter)).
 It is applied outside the undo timeline and leaves `updatedAt` alone — answering

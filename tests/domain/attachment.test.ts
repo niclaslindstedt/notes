@@ -12,10 +12,12 @@ import {
   isImageAttachment,
   isRelocatedAttachmentLine,
   mimeForFilename,
+  referencedAttachmentNames,
   referencedAttachments,
   relocatedAttachments,
   unreferencedAttachments,
   withAttachment,
+  withoutAttachmentRef,
   type Attachment,
 } from "../../src/domain/attachment.ts";
 
@@ -235,5 +237,63 @@ describe("attachment placement", () => {
       images: [att("a.png"), att("c.png")],
       files: [fileAtt("b.pdf")],
     });
+  });
+});
+
+describe("referencedAttachmentNames", () => {
+  it("names each referenced attachment once, in order", () => {
+    const body =
+      "![a](attachments/a.png)\nsee [b.pdf](attachments/b.pdf) and\n![a](attachments/a.png)";
+    expect(referencedAttachmentNames(body)).toEqual(["a.png", "b.pdf"]);
+  });
+
+  it("ignores ordinary links and images", () => {
+    expect(
+      referencedAttachmentNames("[docs](https://example.com) ![x](x.png)"),
+    ).toEqual([]);
+  });
+
+  it("reads the on-disk reference form too", () => {
+    expect(
+      referencedAttachmentNames("![a](../attachments/My note/a.png)"),
+    ).toEqual(["a.png"]);
+  });
+});
+
+describe("withoutAttachmentRef", () => {
+  it("takes a lone reference line and the blank line after it", () => {
+    const body = "intro\n![a](attachments/a.png)\n\nend";
+    expect(withoutAttachmentRef(body, "a.png")).toBe("intro\nend");
+  });
+
+  it("keeps the rest of a line the reference shared", () => {
+    const body = "before ![a](attachments/a.png) after";
+    expect(withoutAttachmentRef(body, "a.png")).toBe("before  after");
+  });
+
+  it("takes every reference to the same attachment", () => {
+    const body = "![a](attachments/a.png)\n![a](attachments/a.png)\nend";
+    expect(withoutAttachmentRef(body, "a.png")).toBe("end");
+  });
+
+  it("leaves other attachments alone", () => {
+    const body = "![a](attachments/a.png)\n\n[b.pdf](attachments/b.pdf)\n";
+    expect(withoutAttachmentRef(body, "a.png")).toBe(
+      "[b.pdf](attachments/b.pdf)\n",
+    );
+  });
+
+  it("leaves a body that never mentioned it untouched", () => {
+    expect(withoutAttachmentRef("just words", "a.png")).toBe("just words");
+  });
+
+  it("empties a note that was nothing but the one image", () => {
+    expect(withoutAttachmentRef("![a](attachments/a.png)", "a.png")).toBe("");
+  });
+
+  it("trims the whitespace a stripped reference left behind", () => {
+    expect(withoutAttachmentRef("words ![a](attachments/a.png)", "a.png")).toBe(
+      "words",
+    );
   });
 });

@@ -20,6 +20,28 @@ export type AttachmentsContextValue = {
   resolve: (href: string) => Attachment | null;
   /** Open an image attachment full-size in the viewer overlay. */
   open: (attachment: Attachment) => void;
+  /**
+   * The filename of the image the note currently has *selected*, or null. A
+   * selected image is the one Copy, Cut and Delete act on — the picture's
+   * answer to a text selection (see `docs/overview.md#image-selection`). Only
+   * ever set where `editable` is true.
+   */
+  selected: string | null;
+  /** Select an image (or clear the selection with null). */
+  select: (filename: string | null) => void;
+  /**
+   * Whether the surface showing these attachments can change the note. False
+   * in the read-only archive view and in a locked note, where an image has no
+   * Cut or Delete to offer — and so nothing to be selected *for*, which is why
+   * a plain click there opens the picture as it always did.
+   */
+  editable: boolean;
+  /** Open the image's action menu at a point in the viewport (right-click,
+   *  long press). */
+  openMenu: (attachment: Attachment, at: { x: number; y: number }) => void;
+  /** Copy an image to the system clipboard. Resolves false if nothing could
+   *  be written at all. */
+  copy: (attachment: Attachment) => Promise<boolean>;
   /** The note's attachments, for the collected end-of-note block. */
   attachments: readonly Attachment[];
   /** Whether images / files render inline or collected at the note's foot. */

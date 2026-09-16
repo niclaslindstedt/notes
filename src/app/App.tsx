@@ -41,6 +41,10 @@ import {
   type DragItem,
 } from "../ui/note-drag-context.ts";
 import { AttachmentFetchContext } from "../ui/attachments/fetch-context.ts";
+import {
+  type AttachmentLookup,
+  AttachmentLookupContext,
+} from "../ui/attachments/lookup-context.ts";
 import { ModalBusProvider } from "../ui/ModalBusProvider.tsx";
 import {
   applyFaviconHref,
@@ -238,6 +242,8 @@ export function App() {
     update,
     replaceBody,
     attach,
+    deleteAttachment,
+    cutAttachment,
     erasedAttachments,
     resolveErasedAttachments,
     retitle,
@@ -705,6 +711,33 @@ export function App() {
     dropHandlerRef.current(item, key);
   }, []);
 
+  // "Does this attachment still exist?", asked of the whole document. A pasted
+  // `![…](attachments/…)` reference names a file that belongs to whichever note
+  // owns it, so before such a paste lands in a note that never had it, the
+  // editor asks this: found, the attachment is re-attached (its bytes fetched
+  // from the backend if they aren't already in memory) and the picture appears;
+  // not found, the user is told the reference names something that is gone.
+  // Bytes we can't read are the same answer as gone — an attachment that can't
+  // be produced can't be adopted into another note.
+  const fetchAttachment = storage.fetchAttachment;
+  // Read through a ref so the lookup keeps one identity across every edit — it
+  // is handed down through a context the whole editor hangs off.
+  const docNotes = useRef(sync.doc.notes);
+  docNotes.current = sync.doc.notes;
+  const lookupAttachment: AttachmentLookup = useCallback(
+    async (filename) => {
+      for (const note of docNotes.current) {
+        const held = note.attachments?.find((a) => a.filename === filename);
+        if (!held) continue;
+        if (held.data) return held;
+        const data = await fetchAttachment(note, filename);
+        return data ? { ...held, data } : null;
+      }
+      return null;
+    },
+    [fetchAttachment],
+  );
+
   // Restore from the archive page's swipe gesture: the note leaves the archive
   // list and reappears in the overview, but we stay on the archive page.
   function restoreNote(id: string) {
@@ -756,9 +789,10 @@ export function App() {
   return (
     <ReportDragActivityContext.Provider value={setDragActive}>
       <AttachmentFetchContext.Provider value={storage.fetchAttachment}>
-        <NavContext.Provider value={nav}>
-          <ModalBusProvider>
-            {/* Pin the whole shell to the *visual* viewport (the band actually on
+        <AttachmentLookupContext.Provider value={lookupAttachment}>
+          <NavContext.Provider value={nav}>
+            <ModalBusProvider>
+              {/* Pin the whole shell to the *visual* viewport (the band actually on
             screen) rather than the layout viewport (`h-dvh`). On iOS the soft
             keyboard shrinks the visual viewport and scrolls the layout viewport
             up to keep the caret in view — with an `h-dvh` shell that drag
@@ -766,154 +800,165 @@ export function App() {
             appears to scroll away with the note. Sizing the shell to
             `--app-height`/`--app-top` (the vars `useViewportHeight` mirrors)
             keeps it filling the visible band, so the header stays frozen. */}
-            <div
-              className="fixed flex overflow-hidden"
-              style={APP_VIEWPORT_RECT}
-            >
-              <NoteDragProvider
-                onDrop={handleNoteDrop}
-                aborted={sync.conflict !== null}
+              <div
+                className="fixed flex overflow-hidden"
+                style={APP_VIEWPORT_RECT}
               >
-                <SideMenu
-                  notes={notes}
-                  loading={notesLoading}
-                  activeNoteId={editingId}
-                  onSelectNote={(id) => switchTo(id)}
-                  onShowAll={showAll}
-                  showAllActive={view === "notes" && !editing && !reading}
-                  onAddNote={openNew}
-                  dropzone={dropzone}
-                  onAddDropzone={dropzoneEnabled ? openDropzone : undefined}
-                  onRemoveNote={removeNote}
-                  onArchiveNote={archiveNote}
-                  onCopyNoteLink={copyNoteLink}
-                  onUnfavoriteNote={toggleFavorite}
-                  archivedCount={archived.length}
-                  onOpenArchive={openArchive}
-                  archiveActive={view === "archive" && !editing}
-                  onUndo={undo}
-                  onRedo={redo}
-                  canUndo={canUndo}
-                  canRedo={canRedo}
-                  folders={folders}
-                  onMoveNote={moveNote}
-                  onMoveNoteToNamespace={moveToNamespace}
-                  onMoveFolderToNamespace={moveFolderToNamespace}
-                  onCreateFolder={createFolder}
-                  onRenameFolder={renameFolder}
-                  onRemoveFolder={removeFolder}
-                  namespaces={storage.namespaces}
-                  activeNamespace={storage.activeNamespace}
-                  onSwitchNamespace={switchNamespace}
-                  encStatus={encStatus}
-                  uploadingIds={uploadingIds}
-                  syncSlot={syncSlot}
-                />
-                <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-                  {editing ? (
-                    <Editor
-                      key={editing.id}
-                      note={editing}
-                      editor={editor}
-                      transforms={transforms}
-                      onBack={showAll}
-                      onChange={(body) => update(editing.id, body)}
-                      onReplace={(body) => replaceBody(editing.id, body)}
-                      onTitleChange={(title) => retitle(editing.id, title)}
-                      onTitleSettle={settleTitle}
-                      onDropzoneDone={
-                        editing.dropzone
-                          ? () => dropzoneDone(editing.id)
-                          : undefined
-                      }
-                      onToggleFavorite={() => toggleFavorite(editing.id)}
-                      onToggleLock={() => toggleLock(editing.id)}
-                      undoScrollSeq={undoScrollSeq}
-                      uploading={uploadingIds.has(editing.id)}
-                      loading={editingDeferred}
-                      canAttach={storage.adapter.capabilities.has(
-                        "attachments",
-                      )}
-                      onAttach={(attachment) => attach(editing.id, attachment)}
-                    />
-                  ) : reading ? (
-                    <ReadOnlyNote
-                      key={reading.id}
-                      note={reading}
-                      editor={editor}
-                      transforms={transforms}
-                      onBack={() => backTo(ARCHIVE_ROUTE)}
-                      onRestore={() => restoreAndEdit(reading.id)}
-                      onDelete={() => removeNote(reading.id)}
-                    />
-                  ) : view === "archive" ? (
-                    <ArchiveList
-                      notes={archived}
-                      onOpen={openRead}
-                      onRestore={restoreNote}
-                      onDelete={removeNote}
-                      onCopyLink={copyNoteLink}
-                      onBack={() => backTo(LIST_ROUTE)}
-                    />
-                  ) : (
-                    <NoteList
-                      notes={notes}
-                      loading={notesLoading}
-                      folders={folders}
-                      onOpen={(id) => switchTo(id)}
-                      onNew={openNew}
-                      onNewDropzone={dropzoneEnabled ? openDropzone : undefined}
-                      onArchive={archiveNote}
-                      onDelete={removeNote}
-                      onCopyLink={copyNoteLink}
-                      onMoveNote={moveNote}
-                      onRenameFolder={renameFolder}
-                      onRemoveFolder={removeFolder}
-                      encStatus={encStatus}
-                      uploadingIds={uploadingIds}
-                    />
-                  )}
-                </main>
-              </NoteDragProvider>
-            </div>
+                <NoteDragProvider
+                  onDrop={handleNoteDrop}
+                  aborted={sync.conflict !== null}
+                >
+                  <SideMenu
+                    notes={notes}
+                    loading={notesLoading}
+                    activeNoteId={editingId}
+                    onSelectNote={(id) => switchTo(id)}
+                    onShowAll={showAll}
+                    showAllActive={view === "notes" && !editing && !reading}
+                    onAddNote={openNew}
+                    dropzone={dropzone}
+                    onAddDropzone={dropzoneEnabled ? openDropzone : undefined}
+                    onRemoveNote={removeNote}
+                    onArchiveNote={archiveNote}
+                    onCopyNoteLink={copyNoteLink}
+                    onUnfavoriteNote={toggleFavorite}
+                    archivedCount={archived.length}
+                    onOpenArchive={openArchive}
+                    archiveActive={view === "archive" && !editing}
+                    onUndo={undo}
+                    onRedo={redo}
+                    canUndo={canUndo}
+                    canRedo={canRedo}
+                    folders={folders}
+                    onMoveNote={moveNote}
+                    onMoveNoteToNamespace={moveToNamespace}
+                    onMoveFolderToNamespace={moveFolderToNamespace}
+                    onCreateFolder={createFolder}
+                    onRenameFolder={renameFolder}
+                    onRemoveFolder={removeFolder}
+                    namespaces={storage.namespaces}
+                    activeNamespace={storage.activeNamespace}
+                    onSwitchNamespace={switchNamespace}
+                    encStatus={encStatus}
+                    uploadingIds={uploadingIds}
+                    syncSlot={syncSlot}
+                  />
+                  <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+                    {editing ? (
+                      <Editor
+                        key={editing.id}
+                        note={editing}
+                        editor={editor}
+                        transforms={transforms}
+                        onBack={showAll}
+                        onChange={(body) => update(editing.id, body)}
+                        onReplace={(body) => replaceBody(editing.id, body)}
+                        onTitleChange={(title) => retitle(editing.id, title)}
+                        onTitleSettle={settleTitle}
+                        onDropzoneDone={
+                          editing.dropzone
+                            ? () => dropzoneDone(editing.id)
+                            : undefined
+                        }
+                        onToggleFavorite={() => toggleFavorite(editing.id)}
+                        onToggleLock={() => toggleLock(editing.id)}
+                        undoScrollSeq={undoScrollSeq}
+                        uploading={uploadingIds.has(editing.id)}
+                        loading={editingDeferred}
+                        canAttach={storage.adapter.capabilities.has(
+                          "attachments",
+                        )}
+                        onAttach={(attachment) =>
+                          attach(editing.id, attachment)
+                        }
+                        onDeleteAttachment={(filename) =>
+                          deleteAttachment(editing.id, filename)
+                        }
+                        onCutAttachment={(filename) =>
+                          cutAttachment(editing.id, filename)
+                        }
+                      />
+                    ) : reading ? (
+                      <ReadOnlyNote
+                        key={reading.id}
+                        note={reading}
+                        editor={editor}
+                        transforms={transforms}
+                        onBack={() => backTo(ARCHIVE_ROUTE)}
+                        onRestore={() => restoreAndEdit(reading.id)}
+                        onDelete={() => removeNote(reading.id)}
+                      />
+                    ) : view === "archive" ? (
+                      <ArchiveList
+                        notes={archived}
+                        onOpen={openRead}
+                        onRestore={restoreNote}
+                        onDelete={removeNote}
+                        onCopyLink={copyNoteLink}
+                        onBack={() => backTo(LIST_ROUTE)}
+                      />
+                    ) : (
+                      <NoteList
+                        notes={notes}
+                        loading={notesLoading}
+                        folders={folders}
+                        onOpen={(id) => switchTo(id)}
+                        onNew={openNew}
+                        onNewDropzone={
+                          dropzoneEnabled ? openDropzone : undefined
+                        }
+                        onArchive={archiveNote}
+                        onDelete={removeNote}
+                        onCopyLink={copyNoteLink}
+                        onMoveNote={moveNote}
+                        onRenameFolder={renameFolder}
+                        onRemoveFolder={removeFolder}
+                        encStatus={encStatus}
+                        uploadingIds={uploadingIds}
+                      />
+                    )}
+                  </main>
+                </NoteDragProvider>
+              </div>
 
-            <SettingsModalHost storage={storage} conversion={encConversion} />
-            <NamespacesModalHost storage={storage} />
-            <SearchModalHost snapshot={sync.doc} onOpen={switchTo} />
-            <ChangelogModalHost />
-            <AchievementsModalHost />
-            <AchievementsUnlockModalHost />
-            <ConflictModal sync={sync} />
-            {keepPromptNote && (
-              <DropzoneKeepModal
-                title={noteTitle(keepPromptNote)}
-                onKeep={() => {
-                  keepDropzoneNote(keepPromptNote.id);
-                  setKeepPromptId(null);
-                }}
-                onDismiss={() => {
-                  keepDeclined.current.add(keepPromptNote.id);
-                  setKeepPromptId(null);
-                }}
+              <SettingsModalHost storage={storage} conversion={encConversion} />
+              <NamespacesModalHost storage={storage} />
+              <SearchModalHost snapshot={sync.doc} onOpen={switchTo} />
+              <ChangelogModalHost />
+              <AchievementsModalHost />
+              <AchievementsUnlockModalHost />
+              <ConflictModal sync={sync} />
+              {keepPromptNote && (
+                <DropzoneKeepModal
+                  title={noteTitle(keepPromptNote)}
+                  onKeep={() => {
+                    keepDropzoneNote(keepPromptNote.id);
+                    setKeepPromptId(null);
+                  }}
+                  onDismiss={() => {
+                    keepDeclined.current.add(keepPromptNote.id);
+                    setKeepPromptId(null);
+                  }}
+                />
+              )}
+              {erasedAttachments && (
+                <AttachmentRemovalModal
+                  attachments={erasedAttachments.attachments}
+                  backend={storage.backend}
+                  onResolve={resolveErasedAttachments}
+                />
+              )}
+              <OrphanFilesModal orphans={orphans} />
+              <PullToRefreshIndicator
+                state={ptr.state}
+                pullDistance={ptr.pullDistance}
               />
-            )}
-            {erasedAttachments && (
-              <AttachmentRemovalModal
-                attachments={erasedAttachments.attachments}
-                backend={storage.backend}
-                onResolve={resolveErasedAttachments}
-              />
-            )}
-            <OrphanFilesModal orphans={orphans} />
-            <PullToRefreshIndicator
-              state={ptr.state}
-              pullDistance={ptr.pullDistance}
-            />
-            <DropOverlay visible={drop.dragging} />
-            <UpdateToast />
-            <DropzoneDeletedToast seq={dropzoneDeletedSeq} onUndo={undo} />
-          </ModalBusProvider>
-        </NavContext.Provider>
+              <DropOverlay visible={drop.dragging} />
+              <UpdateToast />
+              <DropzoneDeletedToast seq={dropzoneDeletedSeq} onUndo={undo} />
+            </ModalBusProvider>
+          </NavContext.Provider>
+        </AttachmentLookupContext.Provider>
       </AttachmentFetchContext.Provider>
     </ReportDragActivityContext.Provider>
   );

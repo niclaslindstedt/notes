@@ -258,6 +258,57 @@ export function unreferencedAttachments(
   return attachments.filter((a) => !referenced.has(a.filename));
 }
 
+/**
+ * The attachment filenames a text links to, in the order the references
+ * appear, each named once. The paste path asks this of the clipboard's text so
+ * it can check that every attachment the text names still exists before the
+ * reference lands in a note that has never heard of it (see
+ * `docs/overview.md#attachments`).
+ */
+export function referencedAttachmentNames(body: string): string[] {
+  return [...referencedFilenames(body)];
+}
+
+/**
+ * The body with every reference to `filename` taken out — what deleting or
+ * cutting an attachment does to the text. A line that was *only* that
+ * reference goes entirely, taking the blank line the insert put after it, so
+ * removing an image leaves no gap where it stood; a reference sitting among
+ * other words is simply cut out of its line.
+ */
+export function withoutAttachmentRef(body: string, filename: string): string {
+  const lines = body.split("\n");
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (isSoleReferenceLine(line, filename)) {
+      // The insert writes the reference on its own line followed by a blank
+      // one; take that blank with it so a removed image leaves no hole.
+      if (lines[i + 1]?.trim() === "") i++;
+      continue;
+    }
+    const stripped = stripReferences(line, filename);
+    out.push(stripped === line ? line : stripped.replace(/[ \t]+$/, ""));
+  }
+  // A note that was nothing but the one image still needs a line to type on.
+  return out.length === 0 ? "" : out.join("\n");
+}
+
+// Whether a line is exactly one reference to `filename` and nothing else.
+function isSoleReferenceLine(line: string, filename: string): boolean {
+  const m = ATTACHMENT_LINE_RE.exec(line.trim());
+  if (!m) return false;
+  return attachmentFilenameFromHref(m[2]!) === filename;
+}
+
+// Cut every reference to `filename` out of one line, leaving the rest of it.
+function stripReferences(line: string, filename: string): string {
+  ATTACHMENT_REF_RE.lastIndex = 0;
+  return line.replace(ATTACHMENT_REF_RE, (whole, href: string) =>
+    attachmentFilenameFromHref(href) === filename ? "" : whole,
+  );
+}
+
 // The attachment filenames a body links to, by either reference form.
 function referencedFilenames(body: string): Set<string> {
   const referenced = new Set<string>();

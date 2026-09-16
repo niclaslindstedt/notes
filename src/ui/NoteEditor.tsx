@@ -67,6 +67,7 @@ import {
 import { LockButton } from "./LockButton.tsx";
 import { MoveLinesButton } from "./MoveLinesButton.tsx";
 import { useFindShortcut } from "./hooks/useFindShortcuts.ts";
+import { useFlashMessage } from "./hooks/useFlashMessage.ts";
 import { useDesktopPointer, useMediaQuery } from "./hooks/useMediaQuery.ts";
 import { useSelectAllShortcut } from "./hooks/useSelectAllShortcut.ts";
 import { ArrowLeftIcon, CheckIcon, MoreIcon, SpinnerIcon } from "./icons.tsx";
@@ -77,6 +78,7 @@ import {
 import { pickFiles } from "./attachments/pick-files.ts";
 import { NoteFindBar, NoteFindButton } from "./NoteFindBar.tsx";
 import { SelectModeButton } from "./SelectModeButton.tsx";
+import { Toast } from "./Toast.tsx";
 
 // What counts as a tab stop inside the header's action cluster — enough to find
 // the leftmost one, which is where the body hands focus to (and takes it back
@@ -205,6 +207,8 @@ export function Editor({
   loading = false,
   canAttach,
   onAttach,
+  onDeleteAttachment,
+  onCutAttachment,
 }: {
   note: Note;
   editor: EditorSettings;
@@ -253,6 +257,11 @@ export function Editor({
   loading?: boolean;
   canAttach: boolean;
   onAttach: (attachment: Attachment) => void;
+  /** Delete a selected image outright — reference and file, no question asked.
+   *  Omitted, images can't be selected and a click opens the viewer. */
+  onDeleteAttachment?: (filename: string) => void;
+  /** Cut a selected image — reference out, file kept for the paste. */
+  onCutAttachment?: (filename: string) => void;
 }) {
   const t = useT();
   const maxWidth = editorMarginMaxWidth(editor.margin);
@@ -629,6 +638,24 @@ export function Editor({
       return next;
     });
   }
+
+  // A paste whose text names attachments no note in this document holds — the
+  // note they belonged to was deleted, or the files were. The reference lands
+  // as text either way (it stays editable, and reads as plain Markdown), so the
+  // only thing missing is somebody saying why no picture appeared.
+  const missing = useFlashMessage();
+  const sayMissing = missing.say;
+  const reportMissingAttachments = useCallback(
+    (filenames: readonly string[]) => {
+      if (filenames.length === 0) return;
+      sayMissing(
+        filenames.length === 1
+          ? t("app.attachmentGone", { name: filenames[0]! })
+          : t("app.attachmentGoneMany", { count: String(filenames.length) }),
+      );
+    },
+    [sayMissing, t],
+  );
 
   // Whether this surface can put a file in the note at all: the backend has to
   // store attachments, the note must not be sealed, and the live-preview editor
@@ -1096,6 +1123,9 @@ export function Editor({
             attachments={note.attachments}
             canAttach={canAttach}
             onAttach={onAttach}
+            onDeleteAttachment={onDeleteAttachment}
+            onCutAttachment={onCutAttachment}
+            onMissingAttachments={reportMissingAttachments}
             placement={{
               imagesAtEnd: editor.imagesAtEnd,
               filesAtEnd: editor.filesAtEnd,
@@ -1163,6 +1193,7 @@ export function Editor({
           <CheckIcon className="h-7 w-7" />
         </button>
       )}
+      {missing.message && <Toast message={missing.message} />}
     </div>
   );
 }
