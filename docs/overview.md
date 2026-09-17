@@ -1405,7 +1405,11 @@ edit commits once, as the dialog closes**, by whichever route closes it (Done,
 the backdrop, Escape, the sheet's swipe-down): the textareas are local drafts
 until then, because the alternative is one entry on the note's undo timeline per
 keystroke typed into a comment. Deleting is the exception — there is nothing
-left to be in a draft about, so it takes effect on the press.
+left to be in a draft about, so it takes effect on the press. **A close also
+empties the drafts**, because the host keeps the dialog mounted and only gates
+its render on `open`: text left in the composer would otherwise be flushed a
+second time by the next close, so merely opening a line's bubble to *read* a
+comment and dismissing it would write another copy.
 
 **The model** is `LineComment` (`src/domain/note-comment.ts`), carried on the
 note as `Note.comments`. A comment holds the **set** of lines it is anchored to

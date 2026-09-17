@@ -96,8 +96,25 @@ export function LineCommentModal({
 
   function close() {
     flushRef.current();
+    // The drafts die with the dialog. The host mounts this component
+    // unconditionally and only gates the render on `open`, so the state
+    // outlives a close — without clearing it, the text just committed would
+    // still be sitting in the composer, and the *next* close (opening a line's
+    // bubble to read what is there, then dismissing it) would flush it a second
+    // time as a fresh comment.
+    setDrafts({});
+    setFresh("");
     onClose();
   }
+
+  // The same clear, for a close that never went through `close()`. Nothing does
+  // today, but a leftover draft is a duplicate comment rather than a cosmetic
+  // slip, so the open transition guarantees an empty composer.
+  useEffect(() => {
+    if (!open) return;
+    setDrafts({});
+    setFresh("");
+  }, [open]);
 
   // The composer takes focus when the dialog was opened to write something. A
   // frame late, so the modal's own focus trap has settled first.
