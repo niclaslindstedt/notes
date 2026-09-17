@@ -150,6 +150,44 @@ describe("the comment dialog", () => {
     expect(onChange).toHaveBeenCalledWith([]);
   });
 
+  it("clears the composer on Done, so the next close writes nothing", () => {
+    // The host keeps the dialog mounted and only toggles `open`, so state that
+    // survives a close comes back on the next one: reading a comment and
+    // dismissing the dialog used to commit the previous composer's text again.
+    const onChange = vi.fn();
+    const onClose = vi.fn();
+    const props = {
+      lines: [1],
+      comments: [] as LineComment[],
+      compose: true,
+      onChange,
+      onClose,
+    };
+    const { rerender } = render(<LineCommentModal open {...props} />);
+    fireEvent.input(screen.getByPlaceholderText(/what needs saying/i), {
+      target: { value: "check this" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    // Reopened — on the comment that was just written — and dismissed untouched.
+    rerender(<LineCommentModal open={false} {...props} />);
+    rerender(
+      <LineCommentModal
+        open
+        {...props}
+        compose={false}
+        comments={[comment()]}
+      />,
+    );
+    expect(
+      (screen.getByPlaceholderText(/what needs saying/i) as HTMLTextAreaElement)
+        .value,
+    ).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
   it("renders nothing while closed", () => {
     const { container } = render(
       <LineCommentModal
