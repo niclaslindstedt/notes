@@ -2430,7 +2430,14 @@ It opens a menu of the three ways a note leaves the app:
   note opens in any Markdown app and round-trips back into notes unchanged. The
   filename is `exportFileStem` — a slug of the title, deliberately *without* the
   id suffix `noteFileStem` adds, since that noise has no place in a file you are
-  about to send someone. Unlocks the **Takeaway** achievement.
+  about to send someone. The slug keeps **every letter the title has**, not just
+  ASCII: "Åka hem" downloads as `åka-hem.md`, and a Japanese or Cyrillic title
+  keeps its script. The title is composed (NFC) first so a decomposed "Å" slugs
+  as one letter, only what a path genuinely cannot carry collapses to a dash
+  (separators, control characters, punctuation, the bidi overrides that would
+  let a title disguise its own extension), and the 64-character clip counts code
+  points so it can never cut a surrogate pair in half. Unlocks the **Takeaway**
+  achievement.
 - **Copy to clipboard** puts the note on the clipboard, as much of it as the
   `copyScope` [editor setting](#editor-settings) says — see
   [copy scope](#copy-scope). This is the only way to copy a note: the menu is

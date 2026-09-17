@@ -27,15 +27,28 @@ import type { LoadedImage } from "./pdf-document.ts";
  * `noteFileStem` — that suffixes a slice of the note id so two same-titled
  * notes can share a directory, which is exactly the noise you don't want in a
  * file you're about to email someone.
+ *
+ * The slug keeps **every letter the title actually has**, not just ASCII:
+ * "Åka hem" exports as `åka-hem`, not `ka-hem`. Every filesystem the app can
+ * download to has been Unicode-capable for two decades, and a Swedish title
+ * that arrives with its vowels eaten reads as a bug, not as tidying. Only the
+ * characters a path genuinely cannot carry — separators, control characters,
+ * punctuation, the bidi overrides that would let a title disguise its own
+ * extension — collapse to a dash.
  */
 export function exportFileStem(note: Note): string {
   const slug = note.title
+    // Composed first, so a decomposed "Å" (A + combining ring) slugs as one
+    // letter rather than as a letter and a mark that survive separately.
+    .normalize("NFC")
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64);
-  return slug || "note";
+    .replace(/[^\p{L}\p{N}\p{M}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  // Clipped by code point: slicing UTF-16 units can cut a surrogate pair in
+  // half and leave a lone surrogate in the filename.
+  const clipped = [...slug].slice(0, 64).join("").replace(/-+$/g, "");
+  return clipped || "note";
 }
 
 /**
