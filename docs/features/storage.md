@@ -64,8 +64,6 @@ built in. Set them at build time (see `.env.example`):
 - `VITE_DROPBOX_APP_FOLDER` — the folder name on that app's "App folder"
   permission (Dropbox creates `Apps/<this>/`). Optional; defaults to
   `free-notes`.
-- `VITE_GOOGLE_CLIENT_ID` — a Google OAuth client id with the Drive API
-  enabled.
 
 Unset, each backend is simply hidden from the picker; This device, Local folder,
 and encryption work without any configuration.

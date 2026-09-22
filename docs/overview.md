@@ -5109,15 +5109,6 @@ and lists the namespace's notes folder recursively so notes filed into a
 [folder subdirectory](#folders-sidecar) are found. Built on the
 [directory adapter](#directory-adapter).
 
-### Google Drive backend
-
-`createGdriveAdapter` (`src/storage/gdrive/index.ts`) — notes under a `notes`
-app folder in the user's My Drive, scoped to `drive.file` (`GDRIVE_SCOPE`). It
-authenticates via a Google Identity Services popup (short-lived access token, no
-refresh token — expiry forces re-auth), caches folder ids in memory, and treats
-most rate limits as 403-with-reason (quota exhaustion is not transient). Built
-on the [directory adapter](#directory-adapter).
-
 ### Nextcloud backend
 
 `createNextcloudAdapter` (`src/storage/nextcloud/index.ts`) — notes as `.md`
@@ -6384,7 +6375,7 @@ four things that actually differ:
 rather than re-deriving each at its own call site. That centralisation is the
 point: before it, the desktop build offered no cloud sync and the reason looked
 like the packaging job not passing `VITE_DROPBOX_APP_KEY` /
-`VITE_GOOGLE_CLIENT_ID`, when the real one was that the redirect could never
+a missing client id, when the real reason was that the redirect could never
 land. The module lives in `src/`, not in a wrapper: the page works its surface
 out from what it can observe, and no shell tells it anything.
 
