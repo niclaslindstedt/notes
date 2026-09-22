@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Code only. The request needs INTERNET, which the app's own manifest
+       already declares; a library re-declaring it would merge to the same
+       permission. -->
+</manifest>

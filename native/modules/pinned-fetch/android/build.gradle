@@ -1,0 +1,33 @@
+// The local Expo module behind pinned HTTPS requests, Android side (see
+// ../index.ts). Autolinked from ../expo-module.config.json; there is no npm
+// package and nothing to publish — `expo prebuild` wires it into the generated
+// Gradle project.
+//
+// The package name carries no app identifier on purpose: this module is about
+// TLS, not about Notes, and nothing here has to change when the app's bundle
+// id does.
+
+apply plugin: 'com.android.library'
+
+group = 'expo.modules.pinnedfetch'
+version = '1.0.0'
+
+def expoModulesCorePlugin = new File(
+  project(":expo-modules-core").projectDir.absolutePath,
+  "ExpoModulesCorePlugin.gradle"
+)
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useDefaultAndroidSdkVersions()
+
+android {
+  namespace "expo.modules.pinnedfetch"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}

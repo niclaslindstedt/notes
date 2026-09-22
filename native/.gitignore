@@ -6,8 +6,8 @@ package-lock.json
 .expo/
 dist/
 web-build/
-ios/
-android/
+/ios/
+/android/
 
 # The embedded web bundle, produced by `make build-native` (relative-base,
 # service-worker-free copy of the web app) and copied into the binary at
