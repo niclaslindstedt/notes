@@ -63,7 +63,6 @@ export function SyncIndicator({
   // surface it.
   const reconnect = (): Promise<void> => {
     if (storage.backend === "dropbox") return storage.connectDropbox();
-    if (storage.backend === "gdrive") return storage.connectGdrive();
     // Nextcloud has no grant to re-issue: the credential is an app password
     // the user pastes, so a rejected one is re-entered in Settings. Rejecting
     // with that instruction is what the modal has room to show.

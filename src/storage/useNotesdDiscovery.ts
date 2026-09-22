@@ -27,7 +27,6 @@ export interface UseNotesdDiscoveryOptions {
   dropboxToken: string | null;
   dropboxRefresh: string | null;
   rememberDropboxAccessToken: (token: string) => void;
-  gdriveToken: string | null;
   /** Only read/publish when the self-hosted backend is usable (native). */
   enabled: boolean;
 }
@@ -36,7 +35,7 @@ export interface NotesdDiscovery {
   /** Daemons found in the connected cloud's `notesd.json`. */
   discoveredDaemons: PublishedDaemon[];
   /** Human name of the cloud discovery reads from, or null when none. */
-  discoverySource: "Dropbox" | "Google Drive" | null;
+  discoverySource: "Dropbox" | null;
   /** Re-read the config plane (after a pair, or on demand). */
   refreshDiscovery: () => void;
   /** Publish (insert-or-update) a daemon into the connected cloud, if any. */
@@ -47,10 +46,8 @@ export interface NotesdDiscovery {
 // the render path can label the source without loading a backend.
 function resolveSource(
   opts: UseNotesdDiscoveryOptions,
-): "Dropbox" | "Google Drive" | null {
-  if (opts.dropboxToken) return "Dropbox";
-  if (opts.gdriveToken) return "Google Drive";
-  return null;
+): "Dropbox" | null {
+  return opts.dropboxToken ? "Dropbox" : null;
 }
 
 // The store itself needs the connected cloud's config-plane code, which is
@@ -59,7 +56,7 @@ function resolveSource(
 // one. Both callers already run inside an effect or an async verb.
 async function resolveStore(opts: UseNotesdDiscoveryOptions): Promise<{
   store: ConfigPlaneStore;
-  source: "Dropbox" | "Google Drive";
+  source: "Dropbox";
 } | null> {
   if (opts.dropboxToken) {
     const auth: DropboxAuth = {
@@ -71,20 +68,13 @@ async function resolveStore(opts: UseNotesdDiscoveryOptions): Promise<{
       await import("./dropbox/index.ts");
     return { store: createDropboxConfigPlaneStore(auth), source: "Dropbox" };
   }
-  if (opts.gdriveToken) {
-    const { createGdriveConfigPlaneStore } = await import("./gdrive/index.ts");
-    return {
-      store: createGdriveConfigPlaneStore(opts.gdriveToken),
-      source: "Google Drive",
-    };
-  }
   return null;
 }
 
 export function useNotesdDiscovery(
   opts: UseNotesdDiscoveryOptions,
 ): NotesdDiscovery {
-  const { enabled, dropboxToken, gdriveToken } = opts;
+  const { enabled, dropboxToken } = opts;
   const [discoveredDaemons, setDiscovered] = useState<PublishedDaemon[]>([]);
   const [nonce, setNonce] = useState(0);
 
@@ -118,7 +108,7 @@ export function useNotesdDiscovery(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, dropboxToken, gdriveToken, nonce]);
+  }, [enabled, dropboxToken, nonce]);
 
   const publishDaemon = useCallback(
     async (daemon: PublishedDaemon) => {
@@ -136,7 +126,7 @@ export function useNotesdDiscovery(
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [dropboxToken, gdriveToken, refreshDiscovery],
+    [dropboxToken, refreshDiscovery],
   );
 
   return {

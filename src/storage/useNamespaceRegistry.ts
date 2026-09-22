@@ -113,7 +113,6 @@ export interface NamespaceRegistryDeps {
   namespaceStore: NamespaceRegistryStore | null;
   backend: BackendId;
   dropboxToken: string | null;
-  gdriveToken: string | null;
   folderHandle: FileSystemDirectoryHandle | null;
   /** The stored Nextcloud connection, null unless it is the active backend. */
   nextcloudConfig: NextcloudConfig | null;
@@ -136,7 +135,6 @@ export function useNamespaceRegistry(
     namespaceStore,
     backend,
     dropboxToken,
-    gdriveToken,
     folderHandle,
     nextcloudConfig,
     notesdConfig,
@@ -268,9 +266,6 @@ export function useNamespaceRegistry(
           // cannot be on one of these backends without it having loaded.
           const remote = await import("./remote-backends.ts");
           await remote.deleteDropboxNamespace(dropboxToken, slug);
-        } else if (backend === "gdrive" && gdriveToken) {
-          const remote = await import("./remote-backends.ts");
-          await remote.deleteGdriveNamespace(gdriveToken, slug);
         } else if (backend === "nextcloud" && nextcloudConfig) {
           const remote = await import("./remote-backends.ts");
           await remote.deleteNextcloudNamespace(nextcloudConfig, slug);
@@ -303,7 +298,6 @@ export function useNamespaceRegistry(
     [
       backend,
       dropboxToken,
-      gdriveToken,
       nextcloudConfig,
       notesdConfig,
       activeNamespace,

@@ -18,13 +18,10 @@ import {
   type BackendId,
   clearDropboxRefreshToken,
   clearDropboxToken,
-  clearGdriveToken,
   getDropboxRefreshToken,
   getDropboxToken,
-  getGdriveToken,
   setDropboxRefreshToken,
   setDropboxToken,
-  setGdriveToken,
 } from "./backend-preference.ts";
 // Only the pending-redirect probe is static — it runs on every boot. The auth
 // flows themselves are fetched when a connect actually happens, so the cloud
@@ -69,7 +66,6 @@ export interface CloudBackend {
   /** The Dropbox refresh token, or null. Threaded into the adapter's auth. */
   dropboxRefresh: string | null;
   /** The Google Drive access token, or null when not connected. */
-  gdriveToken: string | null;
   /**
    * Persist + remember a silently-refreshed Dropbox access token. Wired into
    * the selection memo's `onAccessTokenRefreshed` so a token the adapter
@@ -87,10 +83,7 @@ export interface CloudBackend {
   connectDropbox: () => Promise<void>;
   /** Forget the Dropbox tokens and fall back to the browser store. */
   disconnectDropbox: () => void;
-  /** Run the Google Drive OAuth popup and switch to the gdrive backend. */
-  connectGdrive: () => Promise<void>;
   /** Forget the Google Drive token and fall back to the browser store. */
-  disconnectGdrive: () => void;
 }
 
 export function useCloudBackend({
@@ -101,9 +94,6 @@ export function useCloudBackend({
   );
   const [dropboxRefresh, setDropboxRefreshState] = useState<string | null>(
     getDropboxRefreshToken,
-  );
-  const [gdriveToken, setGdriveTokenState] = useState<string | null>(
-    getGdriveToken,
   );
 
   const rememberDropboxAccessToken = useCallback((token: string) => {
@@ -179,29 +169,11 @@ export function useCloudBackend({
     selectBackend("browser");
   }, [selectBackend]);
 
-  const connectGdrive = useCallback(async () => {
-    const { startGdriveAuth } = await import("./gdrive/index.ts");
-    const token = await startGdriveAuth();
-    setGdriveToken(token);
-    setGdriveTokenState(token);
-    selectBackend("gdrive");
-    unlockAchievement("cloudWalker");
-  }, [selectBackend]);
-
-  const disconnectGdrive = useCallback(() => {
-    clearGdriveToken();
-    setGdriveTokenState(null);
-    selectBackend("browser");
-  }, [selectBackend]);
-
   return {
     dropboxToken,
     dropboxRefresh,
-    gdriveToken,
     rememberDropboxAccessToken,
     connectDropbox,
     disconnectDropbox,
-    connectGdrive,
-    disconnectGdrive,
   };
 }

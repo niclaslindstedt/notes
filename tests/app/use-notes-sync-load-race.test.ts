@@ -33,7 +33,7 @@ describe("useNotesSync mount-load race", () => {
     });
     let saved: string | null = null;
     const adapter: StorageAdapter = {
-      id: "gdrive",
+      id: "dropbox",
       label: "mem-cloud",
       capabilities: new Set(["loadSync"]),
       loadSync: (): StoredSnapshot => ({ text: seed, revision: "r1" }),
@@ -82,7 +82,7 @@ describe("useNotesSync mount-load race", () => {
       releaseLoad = res;
     });
     const adapter: StorageAdapter = {
-      id: "gdrive",
+      id: "dropbox",
       label: "mem-cloud",
       capabilities: new Set(["loadSync"]),
       loadSync: (): StoredSnapshot => ({ text: seed, revision: "r1" }),

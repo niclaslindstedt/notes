@@ -36,9 +36,14 @@ const MAC_IDENTITY =
   process.env.CSC_LINK || process.env.CSC_NAME ? undefined : "-";
 const MAC_ADHOC = MAC_IDENTITY === "-";
 
-/** Shared with the mobile wrapper (native/app.config.js) — one identity for
- * the app wherever it ships. */
-const BUNDLE_ID = "se.niclaslindstedt.notes";
+/** Shared with the mobile wrapper (native/identifiers.js) — one identity for
+ * the app wherever it ships, so it reads the same build variable rather than
+ * spelling the id out where the mobile side deliberately does not.
+ *
+ * The desktop archives are the project's own build, so a plain checkout is
+ * signed ad-hoc under the development id; a release sets APP_BUNDLE_ID like
+ * every other target in the fleet. */
+const BUNDLE_ID = process.env.APP_BUNDLE_ID?.trim() || "dev.local.notes";
 
 /** What the executable is called where it is a COMMAND: one lowercase word.
  * It also names the release archives. */

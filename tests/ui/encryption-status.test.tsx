@@ -12,9 +12,7 @@ function stubStorage(over: Partial<UseStorageBackend> = {}): UseStorageBackend {
   return {
     backend: "folder",
     dropboxAvailable: false,
-    gdriveAvailable: false,
     dropboxConnected: false,
-    gdriveConnected: false,
     folderAvailable: true,
     folderConnected: true,
     folderReconnectNeeded: false,
@@ -25,8 +23,6 @@ function stubStorage(over: Partial<UseStorageBackend> = {}): UseStorageBackend {
     disconnectFolder: vi.fn(() => Promise.resolve()),
     connectDropbox: vi.fn(),
     disconnectDropbox: vi.fn(),
-    connectGdrive: vi.fn(() => Promise.resolve()),
-    disconnectGdrive: vi.fn(),
     enableEncryption: vi.fn(() => Promise.resolve()),
     disableEncryption: vi.fn(() => Promise.resolve()),
     // Both protections are per namespace now, so the section names the active

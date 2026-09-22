@@ -9,7 +9,7 @@ import { createLogger } from "../dev/logger.ts";
 const log = createLogger("backend-pref");
 
 export type BackendId =
-  "browser" | "folder" | "dropbox" | "gdrive" | "nextcloud" | "notesd";
+  "browser" | "folder" | "dropbox" | "nextcloud" | "notesd";
 
 // Everything needed to reach and trust a paired notesd daemon, stored
 // per-device (like the cloud tokens). `spkiPin` validates the daemon's
@@ -51,7 +51,9 @@ const DROPBOX_TOKEN_KEY = "notes:dropbox:token";
 // Long-lived companion to the short-lived access token. Stored under its own
 // key so a legacy install (access token only) round-trips unchanged.
 const DROPBOX_REFRESH_KEY = "notes:dropbox:refresh";
-const GDRIVE_TOKEN_KEY = "notes:gdrive:token";
+// Google Drive is gone as a backend. The key stays named so a token a device
+// may still hold can be cleared rather than left sitting in storage.
+const RETIRED_GDRIVE_TOKEN_KEY = "notes:gdrive:token";
 const NEXTCLOUD_CONFIG_KEY = "notes:nextcloud:config";
 const NOTESD_CONFIG_KEY = "notes:notesd:config";
 // The account-wide encryption flag written before encryption became a
@@ -91,7 +93,6 @@ function clear(key: string): void {
 export function getBackend(): BackendId {
   const raw = read(BACKEND_KEY);
   if (raw === "dropbox") return "dropbox";
-  if (raw === "gdrive") return "gdrive";
   if (raw === "folder") return "folder";
   if (raw === "nextcloud") return "nextcloud";
   if (raw === "notesd") return "notesd";
@@ -144,16 +145,8 @@ export function clearDropboxRefreshToken(): void {
   clear(DROPBOX_REFRESH_KEY);
 }
 
-export function getGdriveToken(): string | null {
-  return read(GDRIVE_TOKEN_KEY);
-}
-
-export function setGdriveToken(token: string): void {
-  write(GDRIVE_TOKEN_KEY, token);
-}
-
-export function clearGdriveToken(): void {
-  clear(GDRIVE_TOKEN_KEY);
+export function clearRetiredGdriveToken(): void {
+  clear(RETIRED_GDRIVE_TOKEN_KEY);
 }
 
 export function getNextcloudConfig(): NextcloudConfig | null {

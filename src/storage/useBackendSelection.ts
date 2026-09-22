@@ -31,7 +31,6 @@ import type { RemoteBackends } from "./remote-backends.ts";
 // branch instead of re-deriving the `backend && token` chain several times.
 export type BackendSelection =
   | { kind: "dropbox"; auth: DropboxAuth }
-  | { kind: "gdrive"; token: string }
   | { kind: "nextcloud"; config: NextcloudConfig }
   | { kind: "folder"; handle: FileSystemDirectoryHandle }
   | { kind: "notesd"; config: NotesdConfig }
@@ -50,7 +49,6 @@ export interface BackendSelectionDeps {
   /** The cloud tokens, null until each backend is connected. */
   dropboxToken: string | null;
   dropboxRefresh: string | null;
-  gdriveToken: string | null;
   /** Persist a silently-refreshed Dropbox access token back to storage. */
   rememberDropboxAccessToken: (accessToken: string) => void;
   /** The stored Nextcloud connection, null until one is set up. */
@@ -93,7 +91,6 @@ export function useBackendSelection(
     remote,
     dropboxToken,
     dropboxRefresh,
-    gdriveToken,
     rememberDropboxAccessToken,
     nextcloudConfig,
     notesdConfig,
@@ -122,9 +119,6 @@ export function useBackendSelection(
         },
       };
     }
-    if (backend === "gdrive" && gdriveToken) {
-      return { kind: "gdrive", token: gdriveToken };
-    }
     if (backend === "nextcloud" && nextcloudConfig) {
       return { kind: "nextcloud", config: nextcloudConfig };
     }
@@ -143,7 +137,6 @@ export function useBackendSelection(
     remote,
     dropboxToken,
     dropboxRefresh,
-    gdriveToken,
     rememberDropboxAccessToken,
     nextcloudConfig,
     notesdConfig,
@@ -177,21 +170,6 @@ export function useBackendSelection(
             {
               storage: globalThis.localStorage,
               key: remote.localCacheKey("dropbox", namespace),
-              seal: sealFor(namespace),
-              unseal: unsealFor(namespace),
-            },
-          );
-        case "gdrive":
-          return remote.withLocalCache(
-            remote.createGdriveAdapter(
-              selection.token,
-              fetch,
-              namespace,
-              cryptoFor(namespace),
-            ),
-            {
-              storage: globalThis.localStorage,
-              key: remote.localCacheKey("gdrive", namespace),
               seal: sealFor(namespace),
               unseal: unsealFor(namespace),
             },

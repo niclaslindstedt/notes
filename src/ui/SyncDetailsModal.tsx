@@ -18,10 +18,6 @@ import type {
 import { getLogs, subscribeToLogs, type LogLevel } from "../dev/logger.ts";
 import { DROPBOX_APP_FOLDER, dropboxWebUrl } from "../storage/dropbox/index.ts";
 import {
-  GDRIVE_APP_FOLDER_NAME,
-  gdriveWebUrl,
-} from "../storage/gdrive/index.ts";
-import {
   nextcloudNotesPath,
   nextcloudWebUrl,
 } from "../storage/nextcloud/index.ts";
@@ -143,14 +139,6 @@ function providerView(
     return {
       path: `Apps/${DROPBOX_APP_FOLDER}/${notesFolder}`,
       url: dropboxWebUrl(namespace),
-    };
-  }
-  if (backend === "gdrive") {
-    return {
-      path: `My Drive/${GDRIVE_APP_FOLDER_NAME}/${notesFolder}`,
-      // Drive home — the folder id isn't threaded here, so the user scrolls to
-      // the folder from My Drive.
-      url: gdriveWebUrl(null),
     };
   }
   if (backend === "nextcloud" && nextcloudConfig) {

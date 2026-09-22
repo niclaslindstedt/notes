@@ -534,7 +534,7 @@ The source tree under `src/` is organized by concern, not by file type:
   (`adapter.ts`). The serialize/migrate pipeline (`serialize.ts`,
   `migrations.ts`) runs on every load/save so backends only move bytes.
   Backends: `local/` (localStorage, default), `folder/` (a picked directory
-  of markdown files via the File System Access API), `dropbox/` and `gdrive/`
+  of markdown files via the File System Access API) and `dropbox/`
   (each note a markdown file in the user's own cloud), and `nextcloud/` (the
   same, over WebDAV to a Nextcloud the user runs, reached with a revocable app
   password rather than OAuth). `encrypting/` and
@@ -731,12 +731,12 @@ each its own component in `src/ui/` mounted by the path switch in
 - **`/privacy`** (`PrivacyPage.tsx`) — the privacy policy. This is the URL
   given on the Google OAuth consent screen.
 - **`/home`** (`HomePage.tsx`) — the public **showcase / landing page**. It is
-  the homepage Google's OAuth verification requires for the Google Drive
+  the homepage the Dropbox app listing points at for the Dropbox
   scope, so it must keep meeting that bar: accurately identify the app and the
   verified domain it is served from (read off `window.location.hostname` at
   runtime, never written down), **fully describe what the app does**, **transparently explain every reason the app requests user data**
   (today: the opt-in cloud-sync backends and the exact scopes they ask for —
-  Google Drive `drive.file`, the Dropbox app folder), and link to the privacy
+  the Dropbox app folder), and link to the privacy
   policy.
 
 > **Keep `/home` in sync with the product.** Whenever you add, remove, or

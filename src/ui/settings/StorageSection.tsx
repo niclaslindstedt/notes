@@ -29,7 +29,7 @@ import { NextcloudConnectForm } from "./NextcloudConnectForm.tsx";
 import { Section } from "./shared.tsx";
 
 // Storage settings: pick the backend that persists the notes (this device /
-// local folder / Dropbox / Google Drive) and toggle at-rest encryption.
+// local folder / Dropbox) and toggle at-rest encryption.
 // Ported from checklist's storage tab, adapted to notes' account-less,
 // single-document model and inlined English strings (notes has no i18n layer).
 
@@ -43,9 +43,7 @@ export function StorageSection({ storage, conversion }: Props) {
   const {
     backend,
     dropboxAvailable,
-    gdriveAvailable,
     dropboxConnected,
-    gdriveConnected,
     folderAvailable,
     folderConnected,
     folderReconnectNeeded,
@@ -66,8 +64,6 @@ export function StorageSection({ storage, conversion }: Props) {
     disconnectFolder,
     connectDropbox,
     disconnectDropbox,
-    connectGdrive,
-    disconnectGdrive,
     enableEncryption,
     disableEncryption,
     namespaces,
@@ -79,7 +75,6 @@ export function StorageSection({ storage, conversion }: Props) {
   const activeNamespaceName =
     namespaces.find((n) => n.slug === activeNamespace)?.name ?? activeNamespace;
 
-  const [gdriveError, setGdriveError] = useState<string | null>(null);
   // Dropbox only reports anything here on the desktop. On the web the connect
   // navigates away, so there is no failure left to show and no wait to sit
   // through; on the desktop the sign-in happens in the user's browser and this
@@ -107,11 +102,6 @@ export function StorageSection({ storage, conversion }: Props) {
       value: "dropbox",
       label: t("settings.storage.backendDropbox"),
       disabled: !dropboxAvailable,
-    },
-    {
-      value: "gdrive",
-      label: t("settings.storage.backendGoogleDrive"),
-      disabled: !gdriveAvailable,
     },
     // Nextcloud needs no build-time key and no OAuth redirect — it is a server
     // the user runs, reached with credentials they paste — so it is offered on
@@ -144,23 +134,12 @@ export function StorageSection({ storage, conversion }: Props) {
     }
   };
 
-  const connectGdriveWithCapture = async () => {
-    setGdriveError(null);
-    try {
-      await connectGdrive();
-    } catch (err) {
-      setGdriveError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
   const onPickBackend = (next: BackendId) => {
-    setGdriveError(null);
     setDropboxError(null);
     if (next === backend) return;
     if (next === "browser") selectBrowser();
     else if (next === "folder") void connectFolder();
     else if (next === "dropbox") void connectDropboxWithCapture();
-    else if (next === "gdrive") void connectGdriveWithCapture();
     // Nextcloud doesn't auto-connect on pick either: with nothing stored it
     // reveals the connect form, and only switches backend once the server has
     // accepted the credentials.
@@ -282,41 +261,6 @@ export function StorageSection({ storage, conversion }: Props) {
                 className="rounded-[var(--radius)] border border-danger/50 px-2 py-1.5 text-xs break-words text-danger"
               >
                 {dropboxError}
-              </p>
-            )}
-          </div>
-        )}
-
-        {backend === "gdrive" && (
-          <div className="flex flex-col gap-2">
-            <p className="text-xs text-muted">
-              {gdriveConnected
-                ? t("settings.storage.gdriveConnected")
-                : t("settings.storage.gdriveUnconnected")}
-            </p>
-            {gdriveConnected ? (
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" onClick={disconnectGdrive}>
-                  {t("common.disconnect")}
-                </Button>
-                <span className="text-xs text-accent">
-                  {t("common.connected")}
-                </span>
-              </div>
-            ) : (
-              <Button
-                variant="primary"
-                onClick={() => void connectGdriveWithCapture()}
-              >
-                {t("common.connect")}
-              </Button>
-            )}
-            {gdriveError && (
-              <p
-                role="alert"
-                className="rounded-[var(--radius)] border border-danger/50 px-2 py-1.5 text-xs break-words text-danger"
-              >
-                {gdriveError}
               </p>
             )}
           </div>

@@ -34,7 +34,7 @@ describe("orphan ignore list", () => {
     ignoreOrphanPath("dropbox", "default", "readme.md", s);
 
     expect([...readIgnoredOrphans("dropbox", "work", s)]).toEqual([]);
-    expect([...readIgnoredOrphans("gdrive", "default", s)]).toEqual([]);
+    expect([...readIgnoredOrphans("nextcloud", "default", s)]).toEqual([]);
   });
 
   it("forgets a path so a file that later lands there is flagged again", () => {

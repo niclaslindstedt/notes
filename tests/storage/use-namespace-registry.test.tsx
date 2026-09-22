@@ -25,16 +25,9 @@ vi.mock("../../src/achievements/index.ts", () => ({
 const deleteDropboxNamespace = vi.fn(
   async (_token: string, _slug: string) => {},
 );
-const deleteGdriveNamespace = vi.fn(
-  async (_token: string, _slug: string) => {},
-);
 vi.mock("../../src/storage/dropbox/index.ts", () => ({
   deleteDropboxNamespace: (token: string, slug: string) =>
     deleteDropboxNamespace(token, slug),
-}));
-vi.mock("../../src/storage/gdrive/index.ts", () => ({
-  deleteGdriveNamespace: (token: string, slug: string) =>
-    deleteGdriveNamespace(token, slug),
 }));
 
 // An in-memory `namespaces.json` store that records every save.
@@ -63,7 +56,6 @@ const browserDeps = (
   namespaceStore: null,
   backend: "browser",
   dropboxToken: null,
-  gdriveToken: null,
   folderHandle: null,
   nextcloudConfig: null,
   notesdConfig: null,
@@ -195,7 +187,6 @@ describe("useNamespaceRegistry", () => {
       await result.current.removeNamespace("work");
     });
     expect(deleteDropboxNamespace).toHaveBeenCalledWith("tok", "work");
-    expect(deleteGdriveNamespace).not.toHaveBeenCalled();
   });
 
   it("reconcile effect seeds an empty backend with the local registry", async () => {

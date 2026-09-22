@@ -9,7 +9,7 @@ import {
   useBackendSelection,
 } from "../../src/storage/useBackendSelection.ts";
 
-// makeInner's dropbox/gdrive branches build real cloud adapters, which only log
+// makeInner's dropbox branch builds a real cloud adapter, which only logs
 // on construction (no network until load/save), so they're safe to build here;
 // the folder branch only stashes the handle. A minimal crypto/seal/unseal is
 // enough — none of it runs at construction time.
@@ -25,7 +25,6 @@ function deps(over: Partial<BackendSelectionDeps> = {}): BackendSelectionDeps {
     remote: remoteBackends,
     dropboxToken: null,
     dropboxRefresh: null,
-    gdriveToken: null,
     rememberDropboxAccessToken: vi.fn(),
     nextcloudConfig: null,
     notesdConfig: null,
@@ -90,20 +89,6 @@ describe("useBackendSelection — selection resolution", () => {
     expect(sel.auth.refreshToken).toBe("ref");
     sel.auth.onAccessTokenRefreshed("fresh");
     expect(rememberDropboxAccessToken).toHaveBeenCalledWith("fresh");
-  });
-
-  it("resolves gdrive only when the token is present", () => {
-    expect(
-      renderHook(() =>
-        useBackendSelection(deps({ backend: "gdrive", gdriveToken: "g" })),
-      ).result.current.selection,
-    ).toEqual({ kind: "gdrive", token: "g" });
-
-    expect(
-      renderHook(() =>
-        useBackendSelection(deps({ backend: "gdrive", gdriveToken: null })),
-      ).result.current.selection.kind,
-    ).toBe("browser");
   });
 
   it("resolves nextcloud only when a connection is stored", () => {
@@ -177,13 +162,6 @@ describe("useBackendSelection — makeInner dispatch", () => {
       useBackendSelection(deps({ backend: "dropbox", dropboxToken: "tok" })),
     );
     expect(result.current.makeInner("default").id).toBe("dropbox");
-  });
-
-  it("builds a gdrive adapter (offline-cache wrapped) that keeps its id", () => {
-    const { result } = renderHook(() =>
-      useBackendSelection(deps({ backend: "gdrive", gdriveToken: "g" })),
-    );
-    expect(result.current.makeInner("default").id).toBe("gdrive");
   });
 
   it("builds a nextcloud adapter (offline-cache wrapped) that keeps its id", () => {

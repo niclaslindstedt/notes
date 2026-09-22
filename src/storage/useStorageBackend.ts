@@ -1,6 +1,6 @@
 // Top-level storage wiring, as a hook. Selects the active `StorageAdapter`
 // from the per-device backend preference and layers optional at-rest
-// encryption on top. The cloud (Dropbox / Google Drive) OAuth tokens and the
+// encryption on top. The cloud (Dropbox) OAuth tokens and the
 // boot-redirect completion live in `useCloudBackend`; the picked-folder
 // lifecycle in `useFolderBackend`; the encryption state machine in
 // `useEncryption`; the namespace registry in `useNamespaceRegistry`. Collapsed
@@ -29,7 +29,7 @@ import {
   getBackend,
   setBackend as persistBackend,
 } from "./backend-preference.ts";
-import { isDropboxConfigured, isGdriveConfigured } from "./cloud-configured.ts";
+import { isDropboxConfigured } from "./cloud-configured.ts";
 import { withEncryption } from "./encrypting/index.ts";
 import type { NamespaceRegistryStore } from "./namespace-store.ts";
 import type { Namespace, NamespaceAppearance } from "./namespaces.ts";
@@ -122,10 +122,8 @@ export interface UseStorageBackend {
    * desktop shell cannot — see `platform/capabilities.ts`).
    */
   dropboxAvailable: boolean;
-  gdriveAvailable: boolean;
   /** Whether each cloud backend currently holds a usable token. */
   dropboxConnected: boolean;
-  gdriveConnected: boolean;
   /** Whether this surface exposes the File System Access directory picker. */
   folderAvailable: boolean;
   /** Whether a picked folder is connected and usable right now. */
@@ -190,8 +188,6 @@ export interface UseStorageBackend {
   disconnectFolder: () => Promise<void>;
   connectDropbox: () => Promise<void>;
   disconnectDropbox: () => void;
-  connectGdrive: () => Promise<void>;
-  disconnectGdrive: () => void;
   /** Whether a Nextcloud connection is stored and active. */
   nextcloudConnected: boolean;
   /** The stored Nextcloud connection, so the UI can show what it points at. */
@@ -217,8 +213,8 @@ export interface UseStorageBackend {
    * cloud backend is connected and this is the native app.
    */
   notesdDiscovered: PublishedDaemon[];
-  /** The cloud discovery reads from ("Dropbox" / "Google Drive"), or null. */
-  notesdDiscoverySource: "Dropbox" | "Google Drive" | null;
+  /** The cloud discovery reads from ("Dropbox"), or null. */
+  notesdDiscoverySource: "Dropbox" | null;
   /** Re-read the config plane on demand. */
   refreshNotesdDiscovery: () => void;
   /**
@@ -401,12 +397,9 @@ export function useStorageBackend(): UseStorageBackend {
   const {
     dropboxToken,
     dropboxRefresh,
-    gdriveToken,
     rememberDropboxAccessToken,
     connectDropbox,
     disconnectDropbox,
-    connectGdrive,
-    disconnectGdrive,
   } = useCloudBackend({ selectBackend });
 
   // The Nextcloud concern: the stored server connection + connect / disconnect
@@ -434,7 +427,6 @@ export function useStorageBackend(): UseStorageBackend {
     dropboxToken,
     dropboxRefresh,
     rememberDropboxAccessToken,
-    gdriveToken,
     enabled: platformCapabilities.pinnedFetch,
   });
 
@@ -461,7 +453,6 @@ export function useStorageBackend(): UseStorageBackend {
     remote,
     dropboxToken,
     dropboxRefresh,
-    gdriveToken,
     rememberDropboxAccessToken,
     nextcloudConfig,
     notesdConfig,
@@ -488,8 +479,6 @@ export function useStorageBackend(): UseStorageBackend {
     switch (selection.kind) {
       case "dropbox":
         return remote.createDropboxNamespaceStore(selection.auth);
-      case "gdrive":
-        return remote.createGdriveNamespaceStore(selection.token);
       case "nextcloud":
         return remote.createNextcloudNamespaceStore(selection.config);
       case "folder":
@@ -533,7 +522,6 @@ export function useStorageBackend(): UseStorageBackend {
     namespaceStore,
     backend,
     dropboxToken,
-    gdriveToken,
     folderHandle,
     nextcloudConfig,
     notesdConfig,
@@ -559,8 +547,6 @@ export function useStorageBackend(): UseStorageBackend {
     switch (selection.kind) {
       case "dropbox":
         return remote.createDropboxSettingsStore(selection.auth);
-      case "gdrive":
-        return remote.createGdriveSettingsStore(selection.token);
       case "nextcloud":
         return remote.createNextcloudSettingsStore(selection.config);
       case "folder":
@@ -592,11 +578,6 @@ export function useStorageBackend(): UseStorageBackend {
       case "dropbox":
         return remote.createDropboxNamespaceSettingsStore(
           selection.auth,
-          activeNamespace,
-        );
-      case "gdrive":
-        return remote.createGdriveNamespaceSettingsStore(
-          selection.token,
           activeNamespace,
         );
       case "nextcloud":
@@ -724,13 +705,7 @@ export function useStorageBackend(): UseStorageBackend {
       (platformCapabilities.redirectOauth ||
         platformCapabilities.loopbackOauth) &&
       isDropboxConfigured(),
-    // Drive stays redirect-only: it signs in through Google Identity Services'
-    // popup rather than `oauth-pkce`, and the loopback flow would need a
-    // Google OAuth client of the "Desktop app" type, which is a separate
-    // registration from the web one this key belongs to.
-    gdriveAvailable: platformCapabilities.redirectOauth && isGdriveConfigured(),
     dropboxConnected: dropboxToken !== null,
-    gdriveConnected: gdriveToken !== null,
     folderAvailable: platformCapabilities.folderPicker,
     folderConnected: backend === "folder" && folderHandle !== null,
     folderReconnectNeeded,
@@ -752,8 +727,6 @@ export function useStorageBackend(): UseStorageBackend {
     disconnectFolder,
     connectDropbox,
     disconnectDropbox,
-    connectGdrive,
-    disconnectGdrive,
     nextcloudConnected: backend === "nextcloud" && nextcloudConfig !== null,
     nextcloudConfig,
     connectNextcloud,

@@ -13,15 +13,11 @@ vi.mock("../../src/achievements/index.ts", () => ({ unlock: vi.fn() }));
 // the get/set/clear functions are controllable, spyable seams.
 let dropboxTokenStore: string | null = null;
 let dropboxRefreshStore: string | null = null;
-let gdriveTokenStore: string | null = null;
 const setDropboxToken = vi.fn((t: string) => {
   dropboxTokenStore = t;
 });
 const setDropboxRefreshToken = vi.fn((t: string) => {
   dropboxRefreshStore = t;
-});
-const setGdriveToken = vi.fn((t: string) => {
-  gdriveTokenStore = t;
 });
 const clearDropboxToken = vi.fn(() => {
   dropboxTokenStore = null;
@@ -29,22 +25,16 @@ const clearDropboxToken = vi.fn(() => {
 const clearDropboxRefreshToken = vi.fn(() => {
   dropboxRefreshStore = null;
 });
-const clearGdriveToken = vi.fn(() => {
-  gdriveTokenStore = null;
-});
 vi.mock("../../src/storage/backend-preference.ts", () => ({
   getDropboxToken: () => dropboxTokenStore,
   getDropboxRefreshToken: () => dropboxRefreshStore,
-  getGdriveToken: () => gdriveTokenStore,
   setDropboxToken: (t: string) => setDropboxToken(t),
   setDropboxRefreshToken: (t: string) => setDropboxRefreshToken(t),
-  setGdriveToken: (t: string) => setGdriveToken(t),
   clearDropboxToken: () => clearDropboxToken(),
   clearDropboxRefreshToken: () => clearDropboxRefreshToken(),
-  clearGdriveToken: () => clearGdriveToken(),
 }));
 
-// Dropbox / Google Drive OAuth performs real redirects / network I/O; stub each
+// Dropbox OAuth performs real redirects / network I/O; stub each
 // entry point so the verbs and the boot effect can be driven deterministically.
 const startDropboxAuth = vi.fn(async () => {});
 const hasPendingDropboxAuth = vi.fn(() => false);
@@ -73,10 +63,6 @@ vi.mock("../../src/storage/dropbox/pending.ts", () => ({
   hasPendingDropboxAuth: () => hasPendingDropboxAuth(),
 }));
 
-const startGdriveAuth = vi.fn();
-vi.mock("../../src/storage/gdrive/index.ts", () => ({
-  startGdriveAuth: () => startGdriveAuth(),
-}));
 
 // Drive `?code=` boot redirects without navigating: rewrite the search string
 // and capture the replaceState the URL-cleaning helper issues.
@@ -88,7 +74,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   dropboxTokenStore = null;
   dropboxRefreshStore = null;
-  gdriveTokenStore = null;
   hasPendingDropboxAuth.mockReturnValue(false);
   loopbackOauth = false;
   setSearch("");
@@ -101,12 +86,10 @@ describe("useCloudBackend", () => {
   it("seeds token state from the persisted preference", () => {
     dropboxTokenStore = "dbx-tok";
     dropboxRefreshStore = "dbx-ref";
-    gdriveTokenStore = "gd-tok";
     const selectBackend = vi.fn();
     const { result } = renderHook(() => useCloudBackend({ selectBackend }));
     expect(result.current.dropboxToken).toBe("dbx-tok");
     expect(result.current.dropboxRefresh).toBe("dbx-ref");
-    expect(result.current.gdriveToken).toBe("gd-tok");
   });
 
   it("connectDropbox kicks off the OAuth redirect and switches nothing yet", async () => {
@@ -172,29 +155,6 @@ describe("useCloudBackend", () => {
     expect(clearDropboxRefreshToken).toHaveBeenCalled();
     expect(result.current.dropboxToken).toBeNull();
     expect(result.current.dropboxRefresh).toBeNull();
-    expect(selectBackend).toHaveBeenCalledWith("browser");
-  });
-
-  it("connectGdrive stores the popup token, switches, and unlocks the achievement", async () => {
-    startGdriveAuth.mockResolvedValue("gd-fresh");
-    const selectBackend = vi.fn();
-    const { result } = renderHook(() => useCloudBackend({ selectBackend }));
-    await act(async () => {
-      await result.current.connectGdrive();
-    });
-    expect(setGdriveToken).toHaveBeenCalledWith("gd-fresh");
-    expect(result.current.gdriveToken).toBe("gd-fresh");
-    expect(selectBackend).toHaveBeenCalledWith("gdrive");
-    expect(unlock).toHaveBeenCalledWith("cloudWalker");
-  });
-
-  it("disconnectGdrive clears the token and falls back to the browser store", () => {
-    gdriveTokenStore = "gd-tok";
-    const selectBackend = vi.fn();
-    const { result } = renderHook(() => useCloudBackend({ selectBackend }));
-    act(() => result.current.disconnectGdrive());
-    expect(clearGdriveToken).toHaveBeenCalled();
-    expect(result.current.gdriveToken).toBeNull();
     expect(selectBackend).toHaveBeenCalledWith("browser");
   });
 

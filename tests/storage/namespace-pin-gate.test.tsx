@@ -23,7 +23,6 @@ function renderRegistry() {
       namespaceStore: null,
       backend: "browser",
       dropboxToken: null,
-      gdriveToken: null,
       folderHandle: null,
       notesdConfig: null,
       activeNamespace,

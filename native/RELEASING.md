@@ -124,7 +124,7 @@ the `preview` profile (Android APK / iOS simulator build) instead.
    1024×500 feature graphic, ≥2 phone screenshots, content-rating
    questionnaire, and the **Data safety** form. Declare: no data collected by
    us; notes live on-device by default, and cloud sync happens only when the
-   user opts into a backend (their own Dropbox / Google Drive, or a
+   user opts into a backend (their own Dropbox, or a
    self-hosted notesd server). Point the privacy-policy URL at the deployed
    app's `/privacy` page (the host is the `PAGES_CNAME` repository secret —
    see `docs/configuration.md`).
@@ -143,7 +143,7 @@ the `preview` profile (Android APK / iOS simulator build) instead.
 3. Complete the App Store Connect listing: description, keywords, screenshots
    for the required device sizes (6.7", 6.5", and iPad since
    `ios.supportsTablet` is true), the **App Privacy** "nutrition label" (no
-   tracking; any cloud sync is into the user's own Dropbox / Google Drive or
+   tracking; any cloud sync is into the user's own Dropbox or
    self-hosted server), and the privacy-policy URL above. Then submit for
    review.
 
