@@ -12,7 +12,7 @@
 // are encrypted — a namespace's name/icon isn't secret, and the list has to
 // be readable before the unlock gate can render.
 //
-// Each file-based backend (local folder, Dropbox, Dropbox) builds one
+// Each file-based backend (local folder, Dropbox) builds one
 // over a root-scoped `FileStore` via `fileNamespaceStore`. The browser
 // backend has no folders, so it keeps the registry in localStorage and
 // exposes no store (the hook keeps the local copy as-is).

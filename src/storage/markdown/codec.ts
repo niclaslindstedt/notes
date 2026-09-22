@@ -1,6 +1,6 @@
 // Markdown codec: turns a domain `Snapshot` into a set of individual
 // markdown files (one per note) and back. This is what makes the file-based
-// backends (local folder, Dropbox, Dropbox) store human-readable,
+// backends (local folder, Dropbox) store human-readable,
 // tool-interoperable `.md` files instead of one opaque JSON blob — open a
 // note in any editor, render it on GitHub, or commit it to git and it reads
 // as plain text.

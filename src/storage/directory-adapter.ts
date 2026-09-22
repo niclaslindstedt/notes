@@ -1,6 +1,6 @@
 // Wraps any `FileStore` into a `StorageAdapter`, storing the document as a
 // folder of individual files (one per note). This is the single place the
-// file-based backends — local folder, Dropbox, Dropbox — share, so the
+// file-based backends — local folder and Dropbox — share, so the
 // representation, conflict detection, and incremental sync are implemented once
 // rather than per backend.
 //

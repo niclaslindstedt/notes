@@ -141,7 +141,7 @@ _(none)_
   the tokens/handle/crypto the orchestrator already produced and returning
   `{ selection, makeInner }`. This also moved the six adapter-construction
   imports (`withLocalCache`/`localCacheKey`, `createDropboxAdapter`,
-  `createGdriveAdapter`, `createFolderAdapter`, `BrowserLocalStorageAdapter`)
+  `createFolderAdapter`, `BrowserLocalStorageAdapter`)
   and the `BackendSelection` union out of the orchestrator, which dropped
   600 → 507 lines. The dispatch had **no** direct coverage; it now ships
   `tests/storage/use-backend-selection.test.tsx` (10 cases: selection
