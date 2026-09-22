@@ -19,7 +19,7 @@ keeping the layering honest so new surfaces stay cheap to add:
   the React Native app under `native/`. Any violation is an architectural
   blocker.
 - **Interchangeable storage backends.** Every backend (local default,
-  folder, Dropbox, Google Drive) is a `StorageAdapter` moving bytes
+  folder, Dropbox) is a `StorageAdapter` moving bytes
   (`src/storage/adapter.ts`), optionally behind the `encrypting/` and
   `cache/` higher-order wrappers. Logic that should be shared but lives in
   one adapter, or a contract one adapter quietly diverges from, breaks the
@@ -58,7 +58,7 @@ doesn't re-derive):
   candidate. Severity tracks how far over the cap and how many distinct
   concerns are tangled — multi-concern files near 2× the cap land in the
   7–8 band; a modestly-over file with clean internal seams sits at 5–6.
-- A **cloud-backend dedup** (Dropbox / Google Drive) reads as
+- A **cloud-backend dedup** (Dropbox) reads as
   "manual-smoke-test-only, no automated coverage" but is landable in this
   sandbox without live OAuth: pin the request sequence with a scripted
   `fetch` through the backend's **public** store factory
@@ -200,7 +200,7 @@ _(none)_
   test against a real Drive account with >100 files in one folder.
 - **2026-07 — gdrive folder-plumbing dedup (was severity 6, slightly
   wider than catalogued).** The ~130 lines of folder bookkeeping
-  duplicated between the Google Drive file store and attachment store
+  duplicated between the file store and attachment store
   (`authHeader`, `search`, `createFolder`, `resolveDirId`, `dirAndName`)
   now live once in `src/storage/gdrive/drive-fs.ts`
   (`createDriveFolderFs`, per-store folder-id caches preserved);

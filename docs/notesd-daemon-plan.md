@@ -17,9 +17,6 @@
 
 The two cloud backends are correct but unpleasant:
 
-- **Google Drive** — GIS popup tokens are short-lived and ship no refresh
-  token, so the app raises `AuthError` and forces a **Reconnect** constantly
-  (see `src/storage/adapter.ts`, `gdrive/`).
 - **Dropbox** — works, but every note is a separate file request against a
   rate-limited remote, so it is *slow* and coalesces saves behind a ~1s
   debounce.

@@ -254,7 +254,7 @@ export class ConflictError extends Error {
 
 // Thrown by cloud adapters when an HTTP 401 surfaces after any silent
 // refresh has already been attempted (Dropbox) or when the access token has
-// expired with no refresh path (Google Drive — GIS popup tokens are
+// expired with no refresh path (Dropbox — GIS popup tokens are
 // short-lived and don't ship a refresh token). The UI turns this into a
 // "Reconnect" affordance instead of a generic "Try again".
 export class AuthError extends Error {

@@ -3,7 +3,7 @@
 **notesd** is a tiny server you run on a computer you own. Pair the app to it
 and your notes sync privately over your own network — no cloud provider, no
 accounts, and nothing of ours in the middle. It is the self-hosted alternative
-to the Dropbox and Google Drive backends, for people who would rather trust
+to the Dropbox backends, for people who would rather trust
 their own machine than a third party.
 
 This backend is available **only in the installed app**, not on the website —
@@ -50,7 +50,7 @@ website, and it is one of the reasons to install the app.
 ## Finding your server on your other devices
 
 Pairing once is enough per device, but you shouldn't have to hunt down the QR
-again for each one. If you also have Dropbox or Google Drive connected, pairing
+again for each one. If you also have Dropbox connected, pairing
 publishes your server's **address and certificate fingerprint** (never a key) to
 a small `notesd.json` in that cloud folder. Your other devices read it and show
 the server in **Settings → Self-hosted** ready to pair — you just supply a fresh

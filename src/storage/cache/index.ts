@@ -10,7 +10,7 @@
 // write-through on every successful load / save, fall back to the cache on a
 // *network* failure, and leave the typed errors (auth / conflict / rate-limit)
 // alone so their upstream handling still fires — is identical for Dropbox and
-// Google Drive. So it lives once in this wrapper the way `withEncryption`
+// Dropbox. So it lives once in this wrapper the way `withEncryption`
 // wraps the byte boundary once.
 //
 // Layering (assembled in `useStorageBackend`):

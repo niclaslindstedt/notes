@@ -1,6 +1,6 @@
 # Live note sync
 
-When you've connected a **folder, Dropbox, or Google Drive** backend, notes
+When you've connected a **folder, Dropbox,** backend, notes
 keeps itself up to date with that backend on its own. Every few seconds it
 checks the backend for changes and pulls in anything new — so an edit you make
 on one device shows up on your others without a manual refresh, even while you

@@ -126,7 +126,7 @@ candidate site for "step 7: insufficient diagnostics".
 Other silent gaps to look for:
 
 - An `await` missing on a Promise-returning call (common in the
-  on-demand `dropbox` / `gdrive` storage adapters and the `cache`
+  on-demand `dropbox` storage adapter and the `cache`
   wrapper around them), so a rejection becomes an unhandled
   rejection that never reaches the console.
 - A `catch` that swallows a non-`Error` value (a string, a rejected

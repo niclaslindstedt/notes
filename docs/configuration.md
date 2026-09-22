@@ -41,7 +41,6 @@ there rather than shipping under the wrong identity.
 | `APP_DISPLAY_NAME`        | variable | `native-build.yml` — the store listing's name.       |
 | `APP_BUNDLE_ID`           | variable | `native-build.yml` — iOS bundle identifier / Android package name. |
 | `EAS_PROJECT_ID`          | variable | `native-build.yml` — the Expo project to build against. |
-| `VITE_GOOGLE_CLIENT_ID`   | secret   | Google Drive backend (public PKCE client id).       |
 | `VITE_DROPBOX_APP_KEY`    | secret   | Dropbox backend (public PKCE app key).              |
 | `VITE_DROPBOX_APP_FOLDER` | variable | Dropbox app-folder name.                            |
 | `VITE_DONATE_URL`         | variable | Optional donate row in the side menu.               |

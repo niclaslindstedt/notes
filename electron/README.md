@@ -117,16 +117,6 @@ to notarize — and the same job signs for real and the prompt goes away.
 
 ## Known limitations
 
-- **Google Drive is not offered here.** It signs in through Google Identity
-  Services' popup rather than the shared PKCE helpers, and moving it to the
-  loopback flow needs a Google OAuth client of the **Desktop app** type — a
-  separate registration from the web client the app's key belongs to. Dropbox,
-  local storage and the picked-folder backend all work as they do on the web;
-  use the browser build for Drive.
-  That decision is made in the web app, not in this shell — see
-  `../src/platform/capabilities.ts`, which resolves the surface to `desktop`
-  from the `notes:` scheme, and `dropboxAvailable` / `gdriveAvailable` in
-  `../src/storage/useStorageBackend.ts`.
 
 - **Dropbox sign-in needs the loopback URIs on the app registration.** The
   three ports the shell may bind (`LOOPBACK_PORTS` in `main.js`) each have to

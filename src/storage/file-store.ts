@@ -1,7 +1,7 @@
 // The small contract a file-based backend implements so the shared
 // directory adapter (`./directory-adapter.ts`) can store a document as a
 // folder of individual markdown files. Each backend (local folder, Dropbox,
-// Google Drive) only has to move bytes for a single relative path; the
+// Dropbox) only has to move bytes for a single relative path; the
 // markdown <-> snapshot conversion, the encrypted-blob fallback, and conflict
 // detection all live once in the directory adapter.
 //

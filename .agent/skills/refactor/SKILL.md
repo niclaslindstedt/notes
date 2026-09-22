@@ -12,7 +12,7 @@ this codebase considers a code smell worth fixing. It carries:
   goal is to keep the codebase clean and the layering honest so new
   UI surfaces, new storage backends (the `StorageAdapter` byte
   contract must stay interchangeable across local / folder / Dropbox /
-  Google Drive, plus the `encrypting/` and `cache/` wrappers), and new
+  plus the `encrypting/` and `cache/` wrappers), and new
   namespace / Markdown features stay easy to add;
 - a **severity rubric** (1–10, with **3** as the fix threshold and
   an "easy wins" carve-out for mechanical zero-risk transforms);
@@ -113,7 +113,7 @@ session can plausibly land in one PR. Tie-break:
    touching the file for other reasons.
 
 If you can't pick one — e.g. every remaining 9-band item requires
-smoke-testing a cloud backend (Dropbox / Google Drive OAuth) you
+smoke-testing a cloud backend (Dropbox OAuth) you
 can't reach in this environment — tell the user, surface the
 constraint, and ask whether to drop to a lower band or do an
 Explore-mode sweep instead.
@@ -211,7 +211,7 @@ Refactor rules:
   under the tests that were pinning it — is a regression, not a
   cleanup.
 - **Smoke-test the storage hot path manually for storage-layer
-  refactors.** The OAuth / cloud flows (Dropbox, Google Drive) have
+  refactors.** The OAuth / cloud flow (Dropbox) has
   **no automated coverage**, so any refactor touching the
   `StorageAdapter` backends or the `encrypting/` / `cache/` wrappers
   must be exercised by hand against the local (this-device) default
@@ -300,7 +300,7 @@ to it:
     `src/domain/`.
   - `src/storage/` — **interchangeability.** Anything added to one
     backend must work for every backend (local default in
-    `src/storage/local/`, folder, Dropbox, Google Drive — all over
+    `src/storage/local/`, folder, Dropbox — all over
     the byte-level `StorageAdapter` in `src/storage/adapter.ts`,
     optionally behind the `encrypting/` and `cache/` wrappers) or be
     expressed as a capability the UI can feature-detect. Logic that
@@ -335,7 +335,7 @@ to it:
 - **AGENTS.md rule sweep.** Pick one cross-cutting rule and grep
   for violations: domain/ purity; storage interchangeability across
   every backend; **no third-party network calls** beyond the app's
-  own origin and the opt-in Dropbox / Google Drive APIs (grep for
+  own origin and the opt-in Dropbox APIs (grep for
   `fetch(` / URLs and confirm every call is to an allowed origin and
   gated on the user choosing that backend); the 1000-line cap.
 

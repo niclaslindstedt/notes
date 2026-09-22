@@ -1,7 +1,7 @@
 // Higher-order adapter that wraps any `StorageAdapter` and applies
 // password-based encryption at the byte boundary. The underlying adapter
 // still sees opaque bytes, so the same wrapper works whether the bytes
-// ultimately live in localStorage, a Dropbox app folder, or a Google Drive
+// ultimately live in localStorage, a Dropbox app folder, or a Dropbox
 // file.
 //
 // The password is held by reference so it can change at runtime (enable /

@@ -310,7 +310,7 @@ const settings: SettingsCatalog = {
     backendBrowser: "Den här enheten",
     backendFolder: "Lokal mapp",
     backendDropbox: "Dropbox",
-    backendGoogleDrive: "Google Drive",
+    backendGoogleDrive: "Dropbox",
     browserHint:
       "Anteckningar finns bara i den här webbläsaren. De stannar på den här enheten och delas inte med dina andra enheter.",
     folderConnected:
@@ -327,9 +327,9 @@ const settings: SettingsCatalog = {
     dropboxWaiting:
       "Slutför inloggningen till Dropbox i webbläsaren och kom sedan tillbaka hit.",
     gdriveConnected:
-      "Dina anteckningar synkas till en mapp i din Google Drive.",
+      "Dina anteckningar synkas till en mapp i din Dropbox.",
     gdriveUnconnected:
-      "Logga in för att behålla dina anteckningar i din egen Google Drive.",
+      "Logga in för att behålla dina anteckningar i din egen Dropbox.",
     backendNextcloud: "Nextcloud",
     nextcloudConnected:
       "Dina anteckningar synkas till ”{folder}” på {server} — en server du kör själv.",

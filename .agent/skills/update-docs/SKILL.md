@@ -15,7 +15,7 @@ The current docs surface:
 - `docs/configuration.md` — build-time env vars (`VITE_BASE`, the cloud credentials), the PWA manifest, the icon pipeline, the theme presets.
 - `docs/getting-started.md` — prerequisites, install, dev/build/preview, installing as a PWA, regenerating icons.
 - `docs/troubleshooting.md` — update toast, "my notes disappeared", dev-server, icons, lint/type errors.
-- `docs/features/storage.md` — the storage backends (this device / local folder / Dropbox / Google Drive), encryption, offline & conflicts, settings travel, cloud credentials.
+- `docs/features/storage.md` — the storage backends (this device / local folder / Dropbox), encryption, offline & conflicts, settings travel, cloud credentials.
 - `docs/features/namespaces.md` — the namespace model and where each namespace's data lives.
 
 ## Tracking mechanism

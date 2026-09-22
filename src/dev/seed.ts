@@ -217,7 +217,7 @@ export function buildSeed(now: number = Date.now()): SeededNamespace[] {
               "",
               '- [ ] Conflict resolution UX ("keep mine" / "keep theirs")',
               "- [ ] Retry with backoff on the cloud backends",
-              "- [x] Offline mirror for Google Drive",
+              "- [x] Offline mirror for Dropbox",
               "",
               "## 2. Onboarding",
               "",

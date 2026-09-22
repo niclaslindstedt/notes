@@ -11,7 +11,7 @@
 // secret, and keeping them readable lets the unlock gate render in the user's
 // theme).
 //
-// Each file-based backend (local folder, Dropbox, Google Drive) builds one
+// Each file-based backend (local folder, Dropbox, Dropbox) builds one
 // over a root-scoped `FileStore` via `fileSettingsStore`. The browser
 // backend has no folders, so it keeps settings in localStorage and exposes no
 // separate store (the appearance store's localStorage cache is its home).

@@ -51,7 +51,7 @@ const app: AppCatalog = {
       browser: "den här enheten",
       folder: "din anteckningsmapp",
       dropbox: "Dropbox",
-      gdrive: "Google Drive",
+      gdrive: "Dropbox",
       nextcloud: "Nextcloud",
       notesd: "din egen server",
     },

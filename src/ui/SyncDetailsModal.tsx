@@ -298,7 +298,7 @@ export function SyncDetailsModal({
 
   const view = providerView(backend, namespace, nextcloudConfig ?? null);
   // The "Open in …" link names the destination service itself — Dropbox,
-  // Google Drive — not the at-rest encryption state. `providerName` is the
+  // the provider — not the at-rest encryption state. `providerName` is the
   // adapter label, which the encryption wrapper suffixes with " (encrypted)";
   // strip that so the button reads "Open in Dropbox", not
   // "Open in Dropbox (encrypted)".

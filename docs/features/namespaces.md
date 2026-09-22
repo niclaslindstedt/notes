@@ -6,7 +6,7 @@ personal set of notes and a shared one side by side without one bleeding into
 the other. There is always a default namespace, and you can add more whenever
 you want to wall off a new area.
 
-When you sync to a local folder, Dropbox, or Google Drive, **each non-default
+When you sync to a local folder, Dropbox,, **each non-default
 namespace gets its own folder**. That isolation is the point: you can share one
 namespace's folder — say, the `family` one — with the people who need it,
 without handing them anything in the rest of your namespaces. The default

@@ -1,4 +1,4 @@
-// The cloud-backend (Dropbox + Google Drive) OAuth concern, lifted out of
+// The cloud-backend (Dropbox + Dropbox) OAuth concern, lifted out of
 // `useStorageBackend`: the access / refresh token state, the connect /
 // disconnect verbs, and the Dropbox boot-redirect completion. Produces the
 // tokens the backend `selection` memo (and the namespace registry) key off.
@@ -65,7 +65,7 @@ export interface CloudBackend {
   dropboxToken: string | null;
   /** The Dropbox refresh token, or null. Threaded into the adapter's auth. */
   dropboxRefresh: string | null;
-  /** The Google Drive access token, or null when not connected. */
+  /** The Dropbox access token, or null when not connected. */
   /**
    * Persist + remember a silently-refreshed Dropbox access token. Wired into
    * the selection memo's `onAccessTokenRefreshed` so a token the adapter
@@ -83,7 +83,7 @@ export interface CloudBackend {
   connectDropbox: () => Promise<void>;
   /** Forget the Dropbox tokens and fall back to the browser store. */
   disconnectDropbox: () => void;
-  /** Forget the Google Drive token and fall back to the browser store. */
+  /** Forget the Dropbox token and fall back to the browser store. */
 }
 
 export function useCloudBackend({
@@ -118,7 +118,7 @@ export function useCloudBackend({
     [selectBackend],
   );
 
-  // Complete a Dropbox OAuth redirect on boot. Google Drive uses a popup
+  // Complete a Dropbox OAuth redirect on boot. Dropbox uses a popup
   // (resolved inline in `connectGdrive`), so only Dropbox lands back here
   // with a `?code=`. `selectBackend` is a stable callback, so this still runs
   // once on mount; a re-run would be a no-op since the code is consumed and

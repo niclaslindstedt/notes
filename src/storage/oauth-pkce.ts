@@ -1,5 +1,5 @@
 // Shared OAuth 2.0 PKCE helpers used by every cloud storage adapter that signs
-// in through a redirect (Dropbox today; the GIS popup flow for Google Drive
+// in through a redirect (Dropbox today; the GIS popup flow for Dropbox
 // lives in its own adapter). The helpers are pure and stateless; each adapter
 // owns its own `sessionStorage` key for the verifier so parallel auth flows
 // don't race each other.

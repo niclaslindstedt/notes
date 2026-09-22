@@ -390,7 +390,7 @@ export function useStorageBackend(): UseStorageBackend {
     selectBackend,
   });
 
-  // The cloud (Dropbox + Google Drive) concern: the access / refresh token
+  // The cloud (Dropbox + Dropbox) concern: the access / refresh token
   // state, the connect / disconnect verbs, and the Dropbox boot-redirect
   // completion. Produces the tokens `selection` (and the namespace registry)
   // key off — so it runs before them.

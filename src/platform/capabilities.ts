@@ -17,7 +17,7 @@
 // Answering each of them at its own call site is how they drift apart, and it
 // already bit once: the desktop build offered no cloud sync, and the reason
 // looked like the packaging job not passing `VITE_DROPBOX_APP_KEY` /
-// `VITE_GOOGLE_CLIENT_ID` when the real one was that the redirect could never
+// a missing client id when the real reason was that the redirect could never
 // land. This module is where that is written down.
 //
 // **This lives in `src/`, not in a wrapper.** The page works out its own

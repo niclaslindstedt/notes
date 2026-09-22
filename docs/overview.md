@@ -4841,7 +4841,7 @@ Save.
 ### Storage settings
 
 `StorageSection` (`src/ui/settings/StorageSection.tsx`) — the radio picker for
-the backend (This device / Local folder / Dropbox / Google Drive / Nextcloud,
+the backend (This device / Local folder / Dropbox / Nextcloud,
 plus Self-hosted in the app) with connect buttons — Nextcloud's is an inline
 form (server, user name, app password, folder) rather than a button, since it
 points at a server the user runs, plus the at-rest-encryption toggle. Driven entirely by the
@@ -5044,7 +5044,7 @@ operations. The adapter is memoised so it doesn't churn each render.
 ### Backend preference
 
 `src/storage/backend-preference.ts` — per-device localStorage keys for the
-chosen `BackendId` (`browser` / `folder` / `dropbox` / `gdrive` / `nextcloud` /
+chosen `BackendId` (`browser` / `folder` / `dropbox` / `nextcloud` /
 `notesd`), the cloud tokens, the Nextcloud connection, and the encryption mode. These are device-local (never in the synced
 document, which would create a bootstrap loop) and read on boot before any
 backend resolves.
@@ -6473,7 +6473,7 @@ refuses to execute unsigned arm64 code at all. The `desktop` job in
 `.github/workflows/release.yml` builds all four on one runner per platform and
 attaches them to the draft release, which the `publish` job then makes public.
 
-The cloud backends (Dropbox, Google Drive) are **not offered** in the desktop
+The cloud backend (Dropbox) is **not offered** in the desktop
 app — `capabilities().redirectOauth` is false there, so the storage picker
 shows both rows disabled the way it already does for the folder backend on
 Safari. Their OAuth flows redirect to a registered `https://` URL, which
@@ -6511,7 +6511,7 @@ stays statically imported; so should anything else that must render within the
 tap.
 
 **The backends you never connect never load.** `remote-backends.ts` is a single
-`import()` boundary in front of Dropbox, Google Drive, the picked folder and
+`import()` boundary in front of Dropbox, the picked folder and
 notesd, together with the directory adapter and offline-cache mirror they
 share. The app opens on the browser backend and stays there unless someone
 deliberately connects something, so for most people that is code downloaded and

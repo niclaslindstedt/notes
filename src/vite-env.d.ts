@@ -25,9 +25,6 @@ interface ImportMetaEnv {
   // (Dropbox creates `Apps/<this>/`). Unset defaults to `free-notes`; set it
   // to match a fork's own Dropbox app folder.
   readonly VITE_DROPBOX_APP_FOLDER?: string;
-  // Public Google OAuth client id for the Google Drive storage backend.
-  // Unset disables the Google Drive option in the storage picker.
-  readonly VITE_GOOGLE_CLIENT_ID?: string;
 }
 
 interface ImportMeta {

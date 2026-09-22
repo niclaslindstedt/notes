@@ -12,7 +12,7 @@ control. Open **Settings → Where your notes are stored** and pick one:
   them on GitHub, or keep the folder in git. Available in Chromium-based
   browsers (Chrome, Edge, Brave, Arc); hidden where the File System Access API
   isn't supported.
-- **Dropbox** / **Google Drive** — sign in through the provider's own screen
+- **Dropbox** — sign in through Dropbox's own screen
   and `notes` keeps your notes in that account from then on, ready to pick up on
   your next device. Each note is stored as a markdown file in the app's folder,
   so you can read and edit them straight from Dropbox or Drive too.
@@ -57,7 +57,7 @@ keeping them readable is what lets the unlock screen render in your theme.
 
 ## Configuring the cloud backends
 
-The Dropbox and Google Drive options only appear when their app credentials are
+The Dropbox options only appear when their app credentials are
 built in. Set them at build time (see `.env.example`):
 
 - `VITE_DROPBOX_APP_KEY` — a Dropbox "Scoped access / App folder" app key.
@@ -71,7 +71,7 @@ Unset, each backend is simply hidden from the picker; This device, Local folder,
 and encryption work without any configuration.
 
 For the **deployed** app these are read from GitHub Actions secrets of the same
-name (`VITE_DROPBOX_APP_KEY`, `VITE_GOOGLE_CLIENT_ID`), while the non-secret
+name (`VITE_DROPBOX_APP_KEY`), while the non-secret
 `VITE_DROPBOX_APP_FOLDER` is a repository **variable** (`vars`). Adding them is
 not enough on its own — Actions does not expose secrets or variables to steps
 automatically, so each `npm run build` step in `.github/workflows/pages.yml`

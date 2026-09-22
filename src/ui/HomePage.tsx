@@ -482,12 +482,11 @@ export function HomePage() {
               <em>desktop builds</em> for Windows, macOS, and Linux: the same
               app in its own window, sending nothing anywhere unless you connect
               a sync location. Dropbox sync works there too — sign-in opens in
-              your own browser and comes back to the app. Google Drive sync is
-              available in the browser and mobile app only.
+              your own browser and comes back to the app.
             </li>
             <li>
               Optionally sync your notes to a location you control: a local
-              folder on your computer, your own Dropbox, your own Google Drive,
+              folder on your computer, your own Dropbox,
               or a <span className="text-fg-bright">Nextcloud you run</span>{" "}
               (see below).
             </li>
@@ -564,15 +563,6 @@ export function HomePage() {
             files in <span className="text-fg-bright">your own account</span>:
           </p>
           <ul className="ml-5 list-disc space-y-1.5">
-            <li>
-              <span className="text-fg-bright">Google Drive.</span> notes
-              requests only the{" "}
-              <code className="text-fg-bright">drive.file</code> scope, which
-              lets the app see and manage{" "}
-              <em>only the files it itself creates</em> — a single{" "}
-              <code className="text-fg-bright">notes/</code> folder of your
-              notes. It cannot see, read, or touch any other file in your Drive.
-            </li>
             <li>
               <span className="text-fg-bright">Dropbox.</span> notes uses an
               app-scoped folder, so it can only read and write inside its own

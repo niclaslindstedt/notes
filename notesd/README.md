@@ -2,7 +2,7 @@
 
 A self-hosted, security-first daemon backend for the
 [notes](https://github.com/niclaslindstedt/notes) app. It's the fast,
-push-capable alternative to the Dropbox / Google Drive backends: because we own
+push-capable alternative to the Dropbox backends: because we own
 both ends of the wire, there's no OAuth token dance, notes load and save over a
 LAN/loopback round trip, and changes are **pushed** to every device instead of
 polled.

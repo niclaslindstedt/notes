@@ -51,7 +51,7 @@ const DROPBOX_TOKEN_KEY = "notes:dropbox:token";
 // Long-lived companion to the short-lived access token. Stored under its own
 // key so a legacy install (access token only) round-trips unchanged.
 const DROPBOX_REFRESH_KEY = "notes:dropbox:refresh";
-// Google Drive is gone as a backend. The key stays named so a token a device
+// Dropbox is gone as a backend. The key stays named so a token a device
 // may still hold can be cleared rather than left sitting in storage.
 const RETIRED_GDRIVE_TOKEN_KEY = "notes:gdrive:token";
 const NEXTCLOUD_CONFIG_KEY = "notes:nextcloud:config";

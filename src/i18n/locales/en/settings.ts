@@ -315,7 +315,7 @@ const settings = {
     backendBrowser: "This device",
     backendFolder: "Local folder",
     backendDropbox: "Dropbox",
-    backendGoogleDrive: "Google Drive",
+    backendGoogleDrive: "Dropbox",
     browserHint:
       "Notes live in this browser only. They stay on this device and aren't shared with your other devices.",
     folderConnected:
@@ -329,8 +329,8 @@ const settings = {
     dropboxUnconnected: "Sign in to keep your notes in your own Dropbox.",
     dropboxWaiting:
       "Finish signing in to Dropbox in your browser, then come back here.",
-    gdriveConnected: "Your notes sync to a folder in your Google Drive.",
-    gdriveUnconnected: "Sign in to keep your notes in your own Google Drive.",
+    gdriveConnected: "Your notes sync to a folder in your Dropbox.",
+    gdriveUnconnected: "Sign in to keep your notes in your own Dropbox.",
     backendNextcloud: "Nextcloud",
     nextcloudConnected:
       "Your notes sync to “{folder}” on {server} — a server you run.",

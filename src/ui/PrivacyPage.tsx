@@ -3,8 +3,8 @@
 // notes is local-first with no backend of our own, no accounts, and no
 // analytics — by default everything stays in the browser. Two things reach
 // anyone else: the opt-in sync backends (a picked local folder, the user's own
-// Dropbox, the user's own Google Drive), which this policy describes in full
-// because the Google Drive scope is verified against it, and the inline
+// Dropbox), which this policy describes in full because the Dropbox app's
+// listing points at it, and the inline
 // YouTube player a link in a note renders as, which fetches a poster frame
 // from YouTube and the player itself only once it is played.
 // It is English-only by design (a legal page, not chrome), mirroring
@@ -56,8 +56,8 @@ export function PrivacyPage() {
           <p>
             You may <span className="text-fg-bright">optionally</span> turn on
             sync to a storage location <em>you</em> control — a local folder on
-            your computer, your own Dropbox, your own Google Drive, or a
-            Nextcloud you run yourself — so the same notes appear on more than
+            your computer, your own Dropbox, or a Nextcloud you run yourself —
+            so the same notes appear on more than
             one device. Even then your notes go only to that location in your
             own account; the project authors never receive your notes in any
             configuration. The{" "}
@@ -161,7 +161,7 @@ export function PrivacyPage() {
             are ever loaded.
           </p>
           <p>
-            If you opt in to Dropbox or Google Drive sync, the app additionally
+            If you opt in to Dropbox sync, the app additionally
             talks directly from your browser to that provider&apos;s own API to
             sign you in and to read and write your notes. Those requests go to
             the provider, not to us. If you opt in to Nextcloud sync, the same
@@ -229,16 +229,6 @@ export function PrivacyPage() {
               there as ordinary <code className="text-fg-bright">.md</code>{" "}
               markdown files. Nothing is sent over the network; the data never
               leaves your machine.
-            </li>
-            <li>
-              <span className="text-fg-bright">Google Drive.</span> The app
-              requests only the{" "}
-              <code className="text-fg-bright">drive.file</code> scope, which
-              lets it see and manage <em>only the files it itself creates</em> —
-              a single <code className="text-fg-bright">notes/</code> folder of
-              your notes. It cannot see, read, or touch any other file in your
-              Drive. Sign-in uses Google&apos;s OAuth flow, and the access token
-              Google returns is held only in this browser.
             </li>
             <li>
               <span className="text-fg-bright">Dropbox.</span> The app uses an
