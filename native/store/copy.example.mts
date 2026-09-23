@@ -64,11 +64,11 @@ export const APPLE_INFO: Record<string, AppleInfo> = { "en-US": EN_US };
 export const APPLE_REVIEW_NOTES = `REVIEW NOTES — no account is needed; what
 the app does; that the whole app ships inside the binary and works in airplane
 mode (guideline 4.2); what the native layer adds; that nothing is sold and no
-data is collected; how to turn on the contacts feature and what it reads; and
+data is collected; which permission, if any, the app asks for and why; and
 the privacy page, which the listing also points at:
 https://apps.agilator.se/notes/privacy/`;
 
-// NO MAC OR STEAM COPY HERE. `listing.mts` says this game ships on the App
+// NO MAC OR STEAM COPY HERE. `listing.mts` says this app ships on the App
 // Store alone, so there is no second page to write. When a desktop storefront
 // is turned on, its fields join this file beside the phone's — the shape is in
 // the sibling repo that already ships on all three.

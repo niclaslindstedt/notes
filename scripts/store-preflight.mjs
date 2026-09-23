@@ -390,9 +390,9 @@ section("BY HAND IN THE CONSOLES");
 
 warn(
   "the App Privacy questionnaire",
-  "the answer is NO DATA COLLECTED, and it is true: settings, progress, boards, " +
-    "ghosts and photographs are all in the WebView's own local storage and " +
-    "nothing is transmitted. /privacy/ says the same thing.",
+  "the answer is NO DATA COLLECTED, and it is true: what the app holds stays " +
+    "on the device, and a sync the reader turns on goes to storage they chose, " +
+    "under their own account. Nothing reaches us. /privacy/ says the same thing.",
   "apple",
 );
 warn(

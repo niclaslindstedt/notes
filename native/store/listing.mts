@@ -2,11 +2,11 @@
 // THE STORE LISTING'S RULES — everything about the submission that is not the
 // marketing copy. Committed; the copy is not.
 //
-// THE SPLIT IS DELIBERATE AND IT IS ABOUT ONE FACT: the game is PAID on the
-// App Store and OPEN SOURCE on GitHub. Those two are only in tension for the
+// THE SPLIT IS DELIBERATE AND IT IS ABOUT ONE FACT: the app is on the App
+// Store and OPEN SOURCE on GitHub. Those two are only in tension for the
 // listing's WORDS. A product page's description, subtitle, promotional text
 // and keyword set are what the store indexes and what a competitor reads, and
-// publishing them in a public repository puts the paid listing's own copy on a
+// publishing them in a public repository puts the listing's own copy on a
 // crawlable page under somebody else's domain — competing with, and sometimes
 // outranking, the listing it was written for. Nothing else here has that
 // problem: an age-rating answer, a category, a field limit and a cross-check
@@ -17,7 +17,7 @@
 //   listing.mts        THIS FILE. Types, limits, categories, the age-rating
 //                      questionnaire, the release policy, and what the Steam
 //                      page may not claim. Committed.
-//   copy.mts           Every word a buyer reads. GITIGNORED.
+//   copy.mts           Every word a reader of the listing sees. GITIGNORED.
 //   copy.example.mts   The committed template that documents its shape, with
 //                      obvious placeholder text.
 //
@@ -39,13 +39,12 @@
 // `tauri/` (the desktop shell), because a Mac app is a desktop app and the
 // Expo shell does not build one. Each store's assets sit beside the shell that
 // submits them; the words are authored once, here and in `copy.mts`, because
-// they describe one game.
+// they describe one app.
 //
 // A TypeScript module rather than a YAML catalog, for the reason the rest of
 // this repo's small fixed catalogs are (docs/spec-conformance.md, §24): the
 // tests and the generator read the same typed rows with no schema layer and no
-// parser dependency, and the identity it composes against
-// (`pwa/src/identity.ts`) is a module, not a data file.
+// parser dependency.
 //
 // TWO MORE KINDS OF FIELD, NEITHER OF WHICH IS HERE:
 //
@@ -118,7 +117,7 @@ export type StoreRules = {
     supportUrl: string;
   };
 
-  /** WHICH STOREFRONTS THIS GAME ACTUALLY SHIPS ON.
+  /** WHICH STOREFRONTS THIS APP ACTUALLY SHIPS ON.
    *
    * The subsystem is a sibling of the one in `game2`, and it is meant to be
    * portable across the fleet — where most apps have one storefront and no
@@ -126,7 +125,7 @@ export type StoreRules = {
    * assumed: the generator writes only the outputs named here, and the
    * preflight only asks for what an enabled storefront needs.
    *
-   * A listing compiled for a store the game does not ship on is worse than no
+   * A listing compiled for a store the app does not ship on is worse than no
    * listing: it is a page of claims nobody is checking against a build. */
   storefronts: {
     /** The iPhone app under `native/`. */
@@ -149,7 +148,7 @@ export type StoreRules = {
   };
   /** THE MAC APP STORE. Apple's second storefront, a different binary, and
    * the same questionnaire — `apple.advisory` and `apple.contact` are shared,
-   * because the age rating and the review contact are claims about the GAME
+   * because the age rating and the review contact are claims about the APP
    * rather than about a build. */
   mac?: {
     /** App Store Connect's own category ids, shared across platforms. */
@@ -165,7 +164,7 @@ export type StoreRules = {
      * is the load-bearing half of what the review notes claim about this app:
      * a sandboxed process that never asks for the network is a very short
      * argument that nothing leaves the device. Anything ADDED here is a new
-     * claim to defend, so the list stays as short as the game can stand. */
+     * claim to defend, so the list stays as short as the app can stand. */
     entitlements: string[];
     /** Whether the Mac app is sold as ONE PURCHASE with the iPhone app.
      *
@@ -202,10 +201,10 @@ export const RULES: StoreRules = {
     supportUrl: "https://apps.agilator.se/notes/support/",
   },
 
-  // Sea Haven ships on the App Store. The desktop shell exists (`tauri/`) but
-  // no Mac App Store record does, and there is no Steam page — so neither is
-  // compiled, and the preflight does not ask for screenshots nobody submits.
-  // Turning one on is this flag plus the section it belongs to below.
+  // Notes ships on the App Store alone. There is no Mac App Store record and
+  // no Steam page, so neither is compiled, and the preflight does not ask for
+  // screenshots nobody submits. Turning one on is this flag plus the section
+  // it belongs to below.
   storefronts: {
     appStore: true,
     macAppStore: false,
@@ -257,7 +256,7 @@ export const RULES: StoreRules = {
     },
   },
 
-  // No `mac` or `steam` section: the storefront flags above say this game
+  // No `mac` or `steam` section: the storefront flags above say this app
   // ships on neither, so there is nothing to author for them. Adding one back
   // is the flag plus the section — the generator and the preflight read the
   // flag, not the presence of the section.

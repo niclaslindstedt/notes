@@ -782,7 +782,7 @@ if (process.argv.includes("--check")) {
       macRules.categories,
     );
   }
-  const steamPage = writeSteamPage();
+  const steamPage = steam ? writeSteamPage() : null;
   console.log(
     [
       `generate-store-metadata: wrote ${rel(configFile)}`,
@@ -801,7 +801,9 @@ if (process.argv.includes("--check")) {
         ? `  mac        ${rel(macConfigFile)} + ${rel(macFastlane)}` +
           ` (subtitle ${budget(macInfo["en-US"].subtitle, 30)})`
         : "  mac        SKIPPED — no MAC_INFO / MAC_REVIEW_NOTES in the copy module",
-      `  steam      ${rel(steamPage)} (short ${budget(steam.shortDescription, STEAM_SHORT_MAX)})`,
+      steamPage
+        ? `  steam      ${rel(steamPage)} (short ${budget(steam.shortDescription, STEAM_SHORT_MAX)})`
+        : "  steam      SKIPPED — listing.mts does not ship on Steam",
     ].join("\n"),
   );
 }
