@@ -29,6 +29,7 @@ import { fileURLToPath } from "node:url";
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const WINDOWS = process.platform === "win32";
+const MACOS = process.platform === "darwin";
 
 const args = process.argv.slice(2);
 const requireIdentity = args.includes("--require-identity");
@@ -59,21 +60,40 @@ execFileSync(process.execPath, [join(APP_DIR, "scripts", "bundle-web.mjs")], {
   stdio: "inherit",
 });
 
+// NEVER ONLY LINKER-SIGNED on macOS. With no identity the bundler leaves the
+// app with the signature the linker gave the binary, which seals no
+// resources: `codesign --verify --deep --strict` fails on it, and Apple
+// Silicon may refuse a downloaded copy as "damaged". An ad-hoc signature ("-")
+// seals the whole bundle; a Developer ID (APPLE_SIGNING_IDENTITY, exported by
+// .github/actions/apple-signing only once its certificate is imported) is the
+// real thing. `||`, not `??`: an absent secret arrives as "".
+const signingIdentity = process.env.APPLE_SIGNING_IDENTITY?.trim() || "-";
+
 const override = {
   ...(displayName ? { productName: displayName } : {}),
   ...(bundleId ? { identifier: bundleId } : {}),
+  ...(MACOS ? { bundle: { macOS: { signingIdentity } } } : {}),
 };
 const configArgs = [];
 if (Object.keys(override).length > 0) {
   const file = join(mkdtempSync(join(tmpdir(), "tauri-identity-")), "id.json");
   writeFileSync(file, JSON.stringify(override));
   configArgs.push("--config", file);
+}
+if (displayName || bundleId) {
   console.log(
     `• packaging as ${displayName || "(project name)"} — ` +
       `${bundleId || "(development identifier)"}`,
   );
 } else {
   console.log("• packaging under the development identity");
+}
+if (MACOS) {
+  console.log(
+    signingIdentity === "-"
+      ? "• signing ad hoc (no Developer ID certificate)"
+      : `• signing as ${signingIdentity}`,
+  );
 }
 
 execFileSync(
