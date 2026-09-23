@@ -120,7 +120,8 @@ export type OrphanFile = {
 export type StorageAdapter = {
   // Stable identifier so device-local settings (auth tokens, last-used
   // adapter) can be keyed per backend.
-  readonly id: "browser" | "folder" | "dropbox" | "nextcloud" | "notesd";
+  readonly id:
+    "browser" | "folder" | "dropbox" | "icloud" | "nextcloud" | "notesd";
 
   // Human-readable label for the settings UI.
   readonly label: string;

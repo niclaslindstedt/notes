@@ -3,7 +3,7 @@
 A **thin** React Native (Expo) shell around the **notes** web PWA. It embeds a
 compiled copy of the web app and loads it offline from local files inside a
 single full-screen WebView. Everything the user sees is the web app; the
-wrapper exists only to add the two capabilities a WebView can't provide.
+wrapper exists only to add the capabilities a WebView can't provide.
 
 [`RELEASING.md`](RELEASING.md) is the step-by-step for building and submitting
 to the App Store and Google Play via EAS. The store listings themselves — the
@@ -23,10 +23,16 @@ can't do on its own:
    browser can't do but native code can.
 3. **QR camera scan** — reading a notesd daemon's pairing QR needs reliable
    camera access, which iOS WKWebView can't grant a `file://` page.
+4. **iCloud Drive** (iOS) — a web page has no way to write into the user's
+   iCloud Drive. The wrapper offers a small file store (list, read, write,
+   remove) inside the app's own container, `iCloud.se.agilator.notes`, and the
+   web app's directory adapter drives it like any other folder.
 
 Everything else — the UI, storage (`localStorage`), Markdown editor, themes,
-cloud backends, achievements — is the web app, unchanged. There is **no**
-duplicated presentation layer and **no** native storage backend anymore.
+cloud backends, encryption, achievements — is the web app, unchanged. There is
+**no** duplicated presentation layer, and the iCloud store decides nothing: it
+moves the bytes the web app hands it, which are already sealed when encryption
+is on.
 
 ## How it's built and loaded
 
@@ -81,6 +87,37 @@ carry binary (encrypted) envelopes.
   dismissed). The web app calls `qr.scan()`, which rejects outside the wrapper,
   and feeds the code into the existing notesd pairing path.
 
+## iCloud Drive — a capability, not a message
+
+iCloud rides beside the bridge above rather than inside it. The web app never
+asks whether it is in the wrapper; it looks for an **iCloud provider** on
+`window` ([`../src/platform/icloud-host.ts`](../src/platform/icloud-host.ts))
+and offers the backend only when one is there. The wrapper installs it:
+
+- [`src/icloudBridge.ts`](src/icloudBridge.ts) — `ICLOUD_SCRIPT`, injected
+  before the page loads (`injectedJavaScriptBeforeContentLoaded`), defines
+  `window.__notesICloud` (`version: 1`, `status`, `list`, `read`, `write`,
+  `readBytes`, `writeBytes`, `remove`) and fires `notes:icloud-host`. Each call
+  posts `{ type: "notes-native/icloud-request", id, method, args }`; the answer
+  comes back through `resolveScript`, as a JSON string parsed in the page so no
+  note text can break out of the script.
+- [`src/icloud.ts`](src/icloud.ts) — answers a request from the native module,
+  turning every failure into `{ ok: false, error }`, caching and logging
+  nothing.
+- [`modules/icloud-store`](modules/icloud-store) — the Swift file store in the
+  container's `Documents` folder: coordinated reads (which download a file not
+  yet on the device), atomic writes, `.icloud` placeholders listed under their
+  real names. iOS only; on Android the module is absent, the status is
+  `unavailable`, and the web app hides the option.
+- [`app.config.js`](app.config.js) — the iCloud entitlements and the
+  `NSUbiquitousContainers` declaration that shows the folder in the Files app
+  as "Notes". The container is a committed literal, never derived from the
+  bundle id; see [`RELEASING.md`](RELEASING.md) for registering it.
+
+The contract — property, event, method list, script safety, and the container
+spelled the same in every place — is pinned from the root suite by
+`tests/platform/icloud-host.test.ts`.
+
 > **Status:** the pinned-fetch native module can only be exercised
 > end-to-end once the web-side notesd adapter and a running daemon exist. The
 > web seam is unit-tested (`tests/platform/native-bridge.test.ts`); the native
@@ -88,8 +125,8 @@ carry binary (encrypted) envelopes.
 
 ## Running it
 
-Because the app embeds native modules (WebView + pinning), it needs a **dev
-client / prebuild** — it does not run in Expo Go.
+Because the app embeds native modules (WebView + pinning + iCloud), it needs a
+**dev client / prebuild** — it does not run in Expo Go.
 
 ```sh
 cd native

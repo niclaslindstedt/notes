@@ -9,7 +9,7 @@ import { createLogger } from "../dev/logger.ts";
 const log = createLogger("backend-pref");
 
 export type BackendId =
-  "browser" | "folder" | "dropbox" | "nextcloud" | "notesd";
+  "browser" | "folder" | "dropbox" | "icloud" | "nextcloud" | "notesd";
 
 // Everything needed to reach and trust a paired notesd daemon, stored
 // per-device (like the cloud tokens). `spkiPin` validates the daemon's
@@ -94,6 +94,7 @@ export function getBackend(): BackendId {
   const raw = read(BACKEND_KEY);
   if (raw === "dropbox") return "dropbox";
   if (raw === "folder") return "folder";
+  if (raw === "icloud") return "icloud";
   if (raw === "nextcloud") return "nextcloud";
   if (raw === "notesd") return "notesd";
   // Any unknown / missing value falls through to the browser backend.

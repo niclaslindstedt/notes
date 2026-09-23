@@ -31,6 +31,25 @@ const DISPLAY_NAME = process.env.APP_DISPLAY_NAME?.trim() || PROJECT_NAME;
 const BUNDLE_ID = process.env.APP_BUNDLE_ID?.trim() || DEV_BUNDLE_ID;
 const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID?.trim();
 
+// THE iCLOUD CONTAINER IS NOT THE BUNDLE ID, and deriving it from one would be
+// a mistake. It names a container, registered once in the developer portal and
+// addressed by the app and its native module; the listing it ships under is
+// not its business. Deriving it would mean a plain checkout addressing
+// `iCloud.dev.local.notes` while the module's Swift — which cannot read a
+// build variable — said something else, and a store pointed at the wrong
+// container syncs nothing while reporting success.
+//
+// So it is committed, identical in every build, and spelled the same in
+// `modules/icloud-store/index.ts` and its Swift. The root test suite
+// (`tests/platform/icloud-host.test.ts`) fails if the three drift apart.
+const ICLOUD_CONTAINER = "iCloud.se.agilator.notes";
+
+// What the container's folder is called in the Files app. The project's plain
+// name, not the listing name: it is the one string of the arrangement a user
+// sees, and it must not move between releases. `ICLOUD_FOLDER_NAME` in
+// `src/storage/icloud/index.ts` shows the same name in the sync details.
+const ICLOUD_FOLDER_NAME = PROJECT_NAME;
+
 // A `production` build is one headed for a store, so the fallbacks above are
 // not good enough: fail here rather than uploading a binary under the dev
 // bundle id or the project name. EAS sets EAS_BUILD_PROFILE on its builders.
@@ -64,6 +83,31 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: BUNDLE_ID,
+      entitlements: {
+        // What lets the app read and write its iCloud Drive container — the
+        // iCloud Drive storage backend (`modules/icloud-store`). The three keys
+        // travel together: the service, the container the app may address, and
+        // the one it treats as its own.
+        "com.apple.developer.icloud-services": ["CloudDocuments"],
+        "com.apple.developer.icloud-container-identifiers": [ICLOUD_CONTAINER],
+        "com.apple.developer.ubiquity-container-identifiers": [
+          ICLOUD_CONTAINER,
+        ],
+      },
+      infoPlist: {
+        // Publishes the container's `Documents` folder to the Files app under
+        // the app's plain name, so the user can see, copy and back up the notes
+        // the app keeps there. Without it the container syncs but stays
+        // invisible. Folders nest (namespaces, note folders, attachments), so
+        // any depth is allowed.
+        NSUbiquitousContainers: {
+          [ICLOUD_CONTAINER]: {
+            NSUbiquitousContainerIsDocumentScopePublic: true,
+            NSUbiquitousContainerSupportedFolderLevels: "Any",
+            NSUbiquitousContainerName: ICLOUD_FOLDER_NAME,
+          },
+        },
+      },
     },
     android: {
       package: BUNDLE_ID,

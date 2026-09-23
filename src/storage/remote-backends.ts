@@ -1,10 +1,10 @@
 // The single code-splitting boundary for every backend that isn't this
 // browser's `localStorage`.
 //
-// Dropbox, Nextcloud, the picked folder and notesd together are the
-// largest block of code most people never execute: the app opens on the
+// Dropbox, iCloud Drive, Nextcloud, the picked folder and notesd together are
+// the largest block of code most people never execute: the app opens on the
 // browser backend and stays there unless someone deliberately connects
-// something. This module exists so all four — and the directory adapter and
+// something. This module exists so all five — and the directory adapter and
 // offline-cache mirror they share — sit behind one `import()` rather than
 // being reachable from the seven hooks that use them.
 //
@@ -29,6 +29,13 @@ export {
   createFolderNamespaceStore,
   createFolderSettingsStore,
 } from "./folder/index.ts";
+export {
+  createICloudAdapter,
+  createICloudNamespaceSettingsStore,
+  createICloudNamespaceStore,
+  createICloudSettingsStore,
+  deleteICloudNamespace,
+} from "./icloud/index.ts";
 export {
   createNextcloudAdapter,
   createNextcloudNamespaceSettingsStore,

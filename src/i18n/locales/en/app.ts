@@ -90,6 +90,7 @@ const app = {
       folder: "your notes folder",
       dropbox: "Dropbox",
       gdrive: "Dropbox",
+      icloud: "iCloud Drive",
       nextcloud: "Nextcloud",
       notesd: "your own server",
     },

@@ -2,6 +2,7 @@
 import { renderHook } from "@testing-library/preact";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { ICloudHost } from "../../src/platform/icloud-host.ts";
 import type { DirectoryCrypto } from "../../src/storage/directory-adapter.ts";
 import * as remoteBackends from "../../src/storage/remote-backends.ts";
 import {
@@ -26,6 +27,7 @@ function deps(over: Partial<BackendSelectionDeps> = {}): BackendSelectionDeps {
     dropboxToken: null,
     dropboxRefresh: null,
     rememberDropboxAccessToken: vi.fn(),
+    icloudHost: null,
     nextcloudConfig: null,
     notesdConfig: null,
     folderHandle: null,
@@ -39,6 +41,18 @@ function deps(over: Partial<BackendSelectionDeps> = {}): BackendSelectionDeps {
 }
 
 const fakeHandle = {} as FileSystemDirectoryHandle;
+
+// Nothing is read or written at construction time, so the methods never run.
+const ICLOUD = {
+  version: 1,
+  status: async () => "ready",
+  list: async () => [],
+  read: async () => null,
+  write: async () => {},
+  readBytes: async () => null,
+  writeBytes: async () => {},
+  remove: async () => {},
+} as unknown as ICloudHost;
 
 const NEXTCLOUD = {
   endpoint: "https://cloud.test",
@@ -109,6 +123,21 @@ describe("useBackendSelection — selection resolution", () => {
     ).toBe("browser");
   });
 
+  it("resolves icloud only while a usable host is handed in", () => {
+    expect(
+      renderHook(() =>
+        useBackendSelection(deps({ backend: "icloud", icloudHost: ICLOUD })),
+      ).result.current.selection,
+    ).toEqual({ kind: "icloud", host: ICLOUD });
+
+    // No host (a browser, or a device signed out of iCloud) → browser fallback.
+    expect(
+      renderHook(() =>
+        useBackendSelection(deps({ backend: "icloud", icloudHost: null })),
+      ).result.current.selection.kind,
+    ).toBe("browser");
+  });
+
   it("resolves folder only once the boot probe has a live handle", () => {
     // Handle present but probe not yet resolved → browser fallback.
     expect(
@@ -171,6 +200,13 @@ describe("useBackendSelection — makeInner dispatch", () => {
       ),
     );
     expect(result.current.makeInner("default").id).toBe("nextcloud");
+  });
+
+  it("builds an icloud adapter that keeps its id", () => {
+    const { result } = renderHook(() =>
+      useBackendSelection(deps({ backend: "icloud", icloudHost: ICLOUD })),
+    );
+    expect(result.current.makeInner("default").id).toBe("icloud");
   });
 
   it("builds a folder adapter for the folder selection", () => {

@@ -49,6 +49,8 @@ import {
 } from "./useEncryption.ts";
 import { type FolderActiveRef, useFolderBackend } from "./useFolderBackend.ts";
 import { useCloudBackend } from "./useCloudBackend.ts";
+import { useICloudBackend } from "./useICloudBackend.ts";
+import type { ICloudStatus } from "../platform/icloud-host.ts";
 import {
   type NextcloudConnectRequest,
   useNextcloudBackend,
@@ -188,6 +190,22 @@ export interface UseStorageBackend {
   disconnectFolder: () => Promise<void>;
   connectDropbox: () => Promise<void>;
   disconnectDropbox: () => void;
+  /**
+   * Whether iCloud Drive is offerable here: a host provides it (the iOS app
+   * does; a browser, the desktop shell and Android do not). The page asks
+   * whether the capability is present, never where it is running.
+   */
+  icloudAvailable: boolean;
+  /** Whether the iCloud container is usable right now — see `ICloudStatus`. */
+  icloudStatus: ICloudStatus;
+  /** Whether iCloud Drive is the active backend and its container is usable. */
+  icloudConnected: boolean;
+  /** Re-check the container and switch to it; rejects when it's unreachable. */
+  connectICloud: () => Promise<void>;
+  /** Fall back to the browser store (the files stay in iCloud Drive). */
+  disconnectICloud: () => void;
+  /** Re-ask whether the container is usable (after signing in to iCloud). */
+  refreshICloud: () => Promise<ICloudStatus>;
   /** Whether a Nextcloud connection is stored and active. */
   nextcloudConnected: boolean;
   /** The stored Nextcloud connection, so the UI can show what it points at. */
@@ -402,6 +420,19 @@ export function useStorageBackend(): UseStorageBackend {
     disconnectDropbox,
   } = useCloudBackend({ selectBackend });
 
+  // The iCloud Drive concern: whether a host offers it, whether its container
+  // is usable, and the connect / disconnect verbs. Nothing to store — the
+  // container is the app's own, reached through the device's Apple Account.
+  const {
+    icloudHost,
+    icloudStatus,
+    connectICloud,
+    disconnectICloud,
+    refreshICloud,
+  } = useICloudBackend({ selectBackend });
+  // The host is only handed to the selection while its container is usable.
+  const usableICloudHost = icloudStatus === "ready" ? icloudHost : null;
+
   // The Nextcloud concern: the stored server connection + connect / disconnect
   // verbs. No OAuth — the credential is an app password the user pastes, so the
   // connect verb verifies it against the server before storing it.
@@ -454,6 +485,7 @@ export function useStorageBackend(): UseStorageBackend {
     dropboxToken,
     dropboxRefresh,
     rememberDropboxAccessToken,
+    icloudHost: usableICloudHost,
     nextcloudConfig,
     notesdConfig,
     folderHandle,
@@ -479,6 +511,8 @@ export function useStorageBackend(): UseStorageBackend {
     switch (selection.kind) {
       case "dropbox":
         return remote.createDropboxNamespaceStore(selection.auth);
+      case "icloud":
+        return remote.createICloudNamespaceStore(selection.host);
       case "nextcloud":
         return remote.createNextcloudNamespaceStore(selection.config);
       case "folder":
@@ -523,6 +557,7 @@ export function useStorageBackend(): UseStorageBackend {
     backend,
     dropboxToken,
     folderHandle,
+    icloudHost: usableICloudHost,
     nextcloudConfig,
     notesdConfig,
     activeNamespace,
@@ -547,6 +582,8 @@ export function useStorageBackend(): UseStorageBackend {
     switch (selection.kind) {
       case "dropbox":
         return remote.createDropboxSettingsStore(selection.auth);
+      case "icloud":
+        return remote.createICloudSettingsStore(selection.host);
       case "nextcloud":
         return remote.createNextcloudSettingsStore(selection.config);
       case "folder":
@@ -578,6 +615,11 @@ export function useStorageBackend(): UseStorageBackend {
       case "dropbox":
         return remote.createDropboxNamespaceSettingsStore(
           selection.auth,
+          activeNamespace,
+        );
+      case "icloud":
+        return remote.createICloudNamespaceSettingsStore(
+          selection.host,
           activeNamespace,
         );
       case "nextcloud":
@@ -727,6 +769,12 @@ export function useStorageBackend(): UseStorageBackend {
     disconnectFolder,
     connectDropbox,
     disconnectDropbox,
+    icloudAvailable: icloudHost !== null,
+    icloudStatus,
+    icloudConnected: backend === "icloud" && usableICloudHost !== null,
+    connectICloud,
+    disconnectICloud,
+    refreshICloud,
     nextcloudConnected: backend === "nextcloud" && nextcloudConfig !== null,
     nextcloudConfig,
     connectNextcloud,

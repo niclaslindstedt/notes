@@ -21,6 +21,7 @@ import {
   nextcloudNotesPath,
   nextcloudWebUrl,
 } from "../storage/nextcloud/index.ts";
+import { icloudNotesPath } from "../storage/icloud/constants.ts";
 import { namespaceNotesFolder } from "../storage/namespaces.ts";
 import { writeClipboard } from "./clipboard.ts";
 import { FloatingPanel } from "./FloatingPanel.tsx";
@@ -140,6 +141,11 @@ function providerView(
       path: `Apps/${DROPBOX_APP_FOLDER}/${notesFolder}`,
       url: dropboxWebUrl(namespace),
     };
+  }
+  // iCloud Drive has no web view of an app's container, so there is no link —
+  // only the folder the user finds in the Files app.
+  if (backend === "icloud") {
+    return { path: icloudNotesPath(namespace), url: null };
   }
   if (backend === "nextcloud" && nextcloudConfig) {
     return {

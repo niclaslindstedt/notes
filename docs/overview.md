@@ -2330,7 +2330,7 @@ Copying or cutting an image unlocks the **Cutout** achievement.
 ### Attachment removal prompt
 
 An attachment is two things: a reference in the note's text, and a real file in
-the user's own Dropbox / Drive / Nextcloud / notes folder. Erasing the reference
+the user's own Dropbox / Drive / iCloud Drive / Nextcloud / notes folder. Erasing the reference
 is an edit and lands at once — the thumbnail or chip stops rendering the moment
 the body stops linking to it. Deleting *the file* is somebody else's data, and
 a keystroke is not consent for it, so the app asks:
@@ -4841,8 +4841,10 @@ Save.
 ### Storage settings
 
 `StorageSection` (`src/ui/settings/StorageSection.tsx`) — the radio picker for
-the backend (This device / Local folder / Dropbox / Nextcloud,
-plus Self-hosted in the app) with connect buttons — Nextcloud's is an inline
+the backend (This device / Local folder / Dropbox / Nextcloud, plus iCloud
+Drive and Self-hosted in the app) with connect buttons — iCloud Drive's needs
+nothing from the user and connects on the pick, or explains how to sign in to
+iCloud when the container can't be reached; Nextcloud's is an inline
 form (server, user name, app password, folder) rather than a button, since it
 points at a server the user runs, plus the at-rest-encryption toggle. Driven entirely by the
 [storage backend hook](#storage-backend-hook). How heavy turning encryption on
@@ -5044,7 +5046,7 @@ operations. The adapter is memoised so it doesn't churn each render.
 ### Backend preference
 
 `src/storage/backend-preference.ts` — per-device localStorage keys for the
-chosen `BackendId` (`browser` / `folder` / `dropbox` / `nextcloud` /
+chosen `BackendId` (`browser` / `folder` / `dropbox` / `icloud` / `nextcloud` /
 `notesd`), the cloud tokens, the Nextcloud connection, and the encryption mode. These are device-local (never in the synced
 document, which would create a bootstrap loop) and read on boot before any
 backend resolves.
@@ -5108,6 +5110,39 @@ full-page-redirect [OAuth](#oauth) flow and refresh tokens for silent re-auth on
 and lists the namespace's notes folder recursively so notes filed into a
 [folder subdirectory](#folders-sidecar) are found. Built on the
 [directory adapter](#directory-adapter).
+
+### iCloud Drive backend
+
+`createICloudAdapter` (`src/storage/icloud/index.ts`), labelled "iCloud Drive"
+— notes as `.md` files in the **iOS app's own iCloud Drive container**
+(`iCloud.se.agilator.notes`), which the Files app shows as a folder called
+"Notes". It is the picked-folder backend with a different transport: the
+[directory adapter](#directory-adapter) does all the work and this module only
+supplies a `FileStore` / `AttachmentStore` over an **iCloud host**, writing the
+same layout every file backend writes (`<ns>/notes/*.md`,
+`<ns>/attachments/<stem>/*`, `settings.json` / `namespaces.json` at the root).
+At-rest encryption composes **per file inside** the directory adapter via the
+injected `DirectoryCrypto`, exactly as for Dropbox, so with encryption on the
+host only ever receives `.enc` ciphertext. The container is a folder on the
+device's own disk that iOS syncs underneath, so — like the folder backend — it
+has no [offline cache](#offline-cache). `deleteICloudNamespace` removes every
+file under a namespace's folder.
+
+The host is a **capability, not an identity**. `src/platform/icloud-host.ts`
+defines the contract (`ICloudHost`: `status`, `list`, `read`, `write`,
+`readBytes`, `writeBytes`, `remove`) and finds a provider installed on
+`window.__notesICloud` (`getICloudHost`, `useICloudHost`, which also listens for
+the `notes:icloud-host` announcement). The iOS wrapper installs it
+(`native/src/icloudBridge.ts`, answered by the `icloud-store` Swift module); a
+browser, the desktop shell and Android never do, so the option is simply not
+listed there — the page never asks where it is running. `useICloudBackend`
+(`src/storage/`) probes `status()` — `ready`, `signed-out` (no iCloud account or
+iCloud Drive off: the settings panel offers **Check again**), or `unavailable`
+— and the selection only builds the adapter while it is `ready`, falling back
+to the browser store otherwise, the way an unresolved folder grant does.
+Connecting needs no sign-in and unlocks the **Cloud walker** achievement; the
+sync details show the Files-app path (`icloudNotesPath`) with no web link, and
+Reconnect there re-checks the container.
 
 ### Nextcloud backend
 

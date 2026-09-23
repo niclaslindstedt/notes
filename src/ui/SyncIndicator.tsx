@@ -66,6 +66,16 @@ export function SyncIndicator({
     // Nextcloud has no grant to re-issue: the credential is an app password
     // the user pastes, so a rejected one is re-entered in Settings. Rejecting
     // with that instruction is what the modal has room to show.
+    // iCloud Drive has no grant either: the device's Apple Account opens the
+    // container. Re-checking is the whole reconnect — it picks the backend back
+    // up once the user has signed in to iCloud, and says so when they haven't.
+    if (storage.backend === "icloud") {
+      return storage.refreshICloud().then((status) => {
+        if (status !== "ready") {
+          throw new Error(t("settings.storage.icloudSignedOut"));
+        }
+      });
+    }
     if (storage.backend === "nextcloud") {
       return Promise.reject(new Error(t("settings.storage.nextcloudReauth")));
     }

@@ -331,6 +331,14 @@ const settings = {
       "Finish signing in to Dropbox in your browser, then come back here.",
     gdriveConnected: "Your notes sync to a folder in your Dropbox.",
     gdriveUnconnected: "Sign in to keep your notes in your own Dropbox.",
+    backendICloud: "iCloud Drive",
+    icloudConnected:
+      "Your notes sync through your iCloud Drive — find them in the Files app, in the “{folder}” folder.",
+    icloudUnconnected:
+      "Keep your notes in your own iCloud Drive, on every device signed in to your Apple Account. They stay ordinary markdown files you can open in the Files app.",
+    icloudSignedOut:
+      "iCloud Drive isn't available on this device. Sign in to iCloud and turn on iCloud Drive in the Settings app, then check again.",
+    icloudCheckAgain: "Check again",
     backendNextcloud: "Nextcloud",
     nextcloudConnected:
       "Your notes sync to “{folder}” on {server} — a server you run.",

@@ -56,10 +56,11 @@ export function PrivacyPage() {
           <p>
             You may <span className="text-fg-bright">optionally</span> turn on
             sync to a storage location <em>you</em> control — a local folder on
-            your computer, your own Dropbox, or a Nextcloud you run yourself —
-            so the same notes appear on more than one device. Even then your
-            notes go only to that location in your own account; the project
-            authors never receive your notes in any configuration. The{" "}
+            your computer, your own Dropbox, your own iCloud Drive (in the
+            iPhone and iPad app), or a Nextcloud you run yourself — so the same
+            notes appear on more than one device. Even then your notes go only
+            to that location in your own account; the project authors never
+            receive your notes in any configuration. The{" "}
             <a className="text-link hover:underline" href="#cloud-sync">
               Optional sync
             </a>{" "}
@@ -165,7 +166,10 @@ export function PrivacyPage() {
             to read and write your notes. Those requests go to the provider, not
             to us. If you opt in to Nextcloud sync, the same is true of the
             server address you enter: the app talks to that server and to no one
-            else. See <em>Optional sync</em> below.
+            else. iCloud Drive sync makes no network requests of the app&apos;s
+            own: it writes files into a folder on the device, and iOS carries
+            them to your other devices through your Apple Account. See{" "}
+            <em>Optional sync</em> below.
           </p>
         </Section>
 
@@ -240,6 +244,20 @@ export function PrivacyPage() {
               <code className="text-fg-bright">127.0.0.1</code>, reachable from
               nowhere else) for the moment the sign-in takes; it receives the
               sign-in result and nothing else, and closes immediately after.
+            </li>
+            <li>
+              <span className="text-fg-bright">
+                iCloud Drive (iPhone and iPad app).
+              </span>{" "}
+              The app writes your notes as ordinary{" "}
+              <code className="text-fg-bright">.md</code> files into its own
+              folder in your iCloud Drive, which you can open in the Files app
+              under &quot;Notes&quot;. It reaches only that folder — never the
+              rest of your iCloud Drive — and needs no sign-in of its own: iOS
+              syncs the folder to the other devices signed in to your Apple
+              Account, under Apple&apos;s privacy policy. The project authors
+              receive nothing and hold no token for it. The website and the
+              desktop app do not offer this option.
             </li>
             <li>
               <span className="text-fg-bright">Nextcloud.</span> You enter the

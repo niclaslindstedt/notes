@@ -437,7 +437,7 @@ const achievements: AchievementsCatalog = {
       name: "Molnvandraren",
       condition: "Anslut en molnlagring.",
       learnMore:
-        "Anslut Dropbox eller Dropbox så synkas dina anteckningar till din egen molnlagring, så att de följer dig till varje enhet du loggar in på.",
+        "Anslut Dropbox — eller iCloud Drive, i appen för iPhone och iPad — så synkas dina anteckningar till din egen molnlagring, så att de följer dig till varje enhet du loggar in på.",
     },
     homeCloud: {
       name: "Eget moln",

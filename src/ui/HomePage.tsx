@@ -486,7 +486,9 @@ export function HomePage() {
             </li>
             <li>
               Optionally sync your notes to a location you control: a local
-              folder on your computer, your own Dropbox, or a{" "}
+              folder on your computer, your own Dropbox, your own{" "}
+              <span className="text-fg-bright">iCloud Drive</span> in the iPhone
+              and iPad app, or a{" "}
               <span className="text-fg-bright">Nextcloud you run</span> (see
               below).
             </li>
@@ -567,6 +569,13 @@ export function HomePage() {
               <span className="text-fg-bright">Dropbox.</span> notes uses an
               app-scoped folder, so it can only read and write inside its own
               dedicated folder — never the rest of your Dropbox.
+            </li>
+            <li>
+              <span className="text-fg-bright">iCloud Drive</span> (iPhone and
+              iPad app only). There is nothing to authorise: notes writes into
+              its own folder in your iCloud Drive — shown in the Files app as
+              &quot;Notes&quot; — and never the rest of it, and iOS carries that
+              folder to your other devices through your Apple Account.
             </li>
           </ul>
           <p>

@@ -57,6 +57,7 @@ const browserDeps = (
   backend: "browser",
   dropboxToken: null,
   folderHandle: null,
+  icloudHost: null,
   nextcloudConfig: null,
   notesdConfig: null,
   ...over,

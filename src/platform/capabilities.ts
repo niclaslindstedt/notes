@@ -23,6 +23,12 @@
 // **This lives in `src/`, not in a wrapper.** The page works out its own
 // surface from what it can observe; no shell tells it anything, and there is
 // no bridge message for this. See AGENTS.md, "The wrappers are thin".
+//
+// One capability is deliberately not here: **iCloud Drive**. It is offered by
+// a provider the iOS wrapper installs on `window`, which can in principle land
+// after the first render, so it is state rather than a fixed answer — see
+// `./icloud-host.ts` and `useICloudBackend`. Like everything here it is asked
+// as "is it present?", never "which surface is this?".
 
 import { isDesktopShellOrigin } from "@niclaslindstedt/oss-framework/storage";
 

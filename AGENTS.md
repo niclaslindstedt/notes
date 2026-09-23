@@ -11,12 +11,15 @@ desktop. It runs entirely in the browser and is served as static files —
 there is **no backend**. Notes are persisted to `localStorage`. A React
 Native (Expo) app lives under [`native/`](native/README.md) — a **thin
 WebView wrapper** that embeds the compiled web app (built by `make
-build-native`) and loads it offline from local files. It adds only the two
+build-native`) and loads it offline from local files. It adds only the
 capabilities a WebView can't provide: native haptics and SPKI-pinned HTTPS
 for the self-hosted **notesd** backend, bridged over `postMessage` through
-[`src/platform/native-bridge.ts`](src/platform/native-bridge.ts). It no
-longer imports the web source or ships its own storage backends — the
-embedded app runs its own `localStorage`.
+[`src/platform/native-bridge.ts`](src/platform/native-bridge.ts), and on iOS
+an **iCloud Drive** file store the page finds as a provider on `window`
+([`src/platform/icloud-host.ts`](src/platform/icloud-host.ts)) — the page asks
+whether that capability is present, never where it is running. It no longer
+imports the web source; the storage logic, encryption included, stays in the
+embedded app, and the iCloud store only moves the bytes it is handed.
 
 A Tauri desktop app lives under [`tauri/`](tauri/README.md) — a **thin
 window** around the same compiled web app (built by `make tauri-bundle`),
@@ -557,9 +560,10 @@ The source tree under `src/` is organized by concern, not by file type:
   `migrations.ts`) runs on every load/save so backends only move bytes.
   Backends: `local/` (localStorage, default), `folder/` (a picked directory
   of markdown files via the File System Access API) and `dropbox/`
-  (each note a markdown file in the user's own cloud), and `nextcloud/` (the
-  same, over WebDAV to a Nextcloud the user runs, reached with a revocable app
-  password rather than OAuth). `encrypting/` and
+  (each note a markdown file in the user's own cloud), `icloud/` (the same, in
+  the iOS app's own iCloud Drive container, through the wrapper's file store),
+  and `nextcloud/` (the same, over WebDAV to a Nextcloud the user runs, reached
+  with a revocable app password rather than OAuth). `encrypting/` and
   `cache/` are higher-order wrappers (AES-GCM at rest; offline mirror for the
   cloud backends); `markdown/codec.ts` is the one-`.md`-file-per-note codec
   the file backends share via `directory-adapter.ts`. `attachment-store.ts` is
@@ -599,7 +603,11 @@ The source tree under `src/` is organized by concern, not by file type:
   (`folderPicker`, `redirectOauth`, `pinnedFetch`). Every "is this available
   here?" question routes through it rather than being re-derived at the call
   site; the page works this out from what it can observe, so no wrapper has
-  to tell it anything.
+  to tell it anything. `icloud-host.ts`: the one capability a wrapper *does*
+  offer from outside — an iCloud Drive provider installed on `window`
+  (`getICloudHost` / `useICloudHost`). The page asks whether it is there, not
+  where it runs; it is kept out of `capabilities()` because it can arrive
+  after the first render.
 - `src/i18n/` — the i18n layer (ported from checklist): a dependency-free,
   typed `t()` runtime (`index.ts`) over per-language catalog modules under
   `locales/<lang>/` (English `en/` is bundled + is the `Catalog`/`MessageKey`
@@ -651,7 +659,10 @@ The rule for both, and the one to check a change against:
 For `native/` that is a short, closed list — haptics, SPKI-pinned HTTPS, QR
 camera scan — each behind the `postMessage` bridge in
 [`src/platform/native-bridge.ts`](src/platform/native-bridge.ts), which is
-inert on the web. For `tauri/` the list is **one item long**: a loopback HTTP
+inert on the web; plus, on iOS, an iCloud Drive file store the page finds as a
+provider (`src/platform/icloud-host.ts`) and drives through the same directory
+adapter as every other folder backend — the store lists, reads, writes and
+removes files, and decides nothing. For `tauri/` the list is **one item long**: a loopback HTTP
 listener for one OAuth redirect, because a web page cannot hold a listening
 socket — the flow RFC 8252 prescribes for native apps, and the only way the
 desktop build gets cloud sync at all (its `notes:` origin is not a redirect

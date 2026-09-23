@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 // Aliased: this module's `unlock` arg would otherwise shadow the achievement.
 import { unlock as unlockAchievement } from "../achievements/index.ts";
 import { createLogger } from "../dev/logger.ts";
+import type { ICloudHost } from "../platform/icloud-host.ts";
 import { createPinnedFetch } from "../platform/native-bridge.ts";
 import {
   clearEncryption,
@@ -114,6 +115,8 @@ export interface NamespaceRegistryDeps {
   backend: BackendId;
   dropboxToken: string | null;
   folderHandle: FileSystemDirectoryHandle | null;
+  /** The iCloud Drive host, null unless its container is usable. */
+  icloudHost: ICloudHost | null;
   /** The stored Nextcloud connection, null unless it is the active backend. */
   nextcloudConfig: NextcloudConfig | null;
   /** The paired notesd daemon config, null unless a daemon is the active backend. */
@@ -136,6 +139,7 @@ export function useNamespaceRegistry(
     backend,
     dropboxToken,
     folderHandle,
+    icloudHost,
     nextcloudConfig,
     notesdConfig,
     activeNamespace,
@@ -266,6 +270,9 @@ export function useNamespaceRegistry(
           // cannot be on one of these backends without it having loaded.
           const remote = await import("./remote-backends.ts");
           await remote.deleteDropboxNamespace(dropboxToken, slug);
+        } else if (backend === "icloud" && icloudHost) {
+          const remote = await import("./remote-backends.ts");
+          await remote.deleteICloudNamespace(icloudHost, slug);
         } else if (backend === "nextcloud" && nextcloudConfig) {
           const remote = await import("./remote-backends.ts");
           await remote.deleteNextcloudNamespace(nextcloudConfig, slug);
@@ -298,6 +305,7 @@ export function useNamespaceRegistry(
     [
       backend,
       dropboxToken,
+      icloudHost,
       nextcloudConfig,
       notesdConfig,
       activeNamespace,

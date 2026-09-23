@@ -329,6 +329,14 @@ const settings: SettingsCatalog = {
     gdriveConnected: "Dina anteckningar synkas till en mapp i din Dropbox.",
     gdriveUnconnected:
       "Logga in för att behålla dina anteckningar i din egen Dropbox.",
+    backendICloud: "iCloud Drive",
+    icloudConnected:
+      "Dina anteckningar synkas via din iCloud Drive — du hittar dem i appen Filer, i mappen ”{folder}”.",
+    icloudUnconnected:
+      "Behåll dina anteckningar i din egen iCloud Drive, på alla enheter som är inloggade med ditt Apple-konto. De förblir vanliga markdown-filer som du kan öppna i appen Filer.",
+    icloudSignedOut:
+      "iCloud Drive är inte tillgängligt på den här enheten. Logga in på iCloud och slå på iCloud Drive i appen Inställningar, och kontrollera sedan igen.",
+    icloudCheckAgain: "Kontrollera igen",
     backendNextcloud: "Nextcloud",
     nextcloudConnected:
       "Dina anteckningar synkas till ”{folder}” på {server} — en server du kör själv.",

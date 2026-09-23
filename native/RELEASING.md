@@ -59,6 +59,27 @@ npm install
 eas init --id <projectId>
 ```
 
+### The iCloud container
+
+The iOS app offers **iCloud Drive** as a storage backend, through the container
+`iCloud.se.agilator.notes`. Unlike the three variables above it **is**
+committed — in `app.config.js` (the entitlements and the `NSUbiquitousContainers`
+declaration that shows it in the Files app as "Notes") and in
+[`modules/icloud-store`](modules/icloud-store) — because the native module's
+Swift cannot read a build variable, and it must never be derived from the
+bundle id. Before the first iOS build under the store bundle id:
+
+1. In the Apple Developer portal, register the iCloud container
+   `iCloud.se.agilator.notes` (Identifiers → iCloud Containers).
+2. On the app's App ID, enable the **iCloud** capability and assign that
+   container to it (the app uses iCloud Documents, not CloudKit records).
+3. Let EAS regenerate the provisioning profile (`eas build` offers to; or
+   `eas credentials`), so the profile carries the iCloud entitlement. A build
+   whose profile lacks it fails to sign.
+
+Changing the container after release strands every user's synced notes in the
+old one — it is set once.
+
 ## 1. Set the marketing version
 
 `app.config.js` → `expo.version` is the user-visible version (e.g. `1.0.0`). Bump

@@ -16,6 +16,12 @@ control. Open **Settings → Where your notes are stored** and pick one:
   and `notes` keeps your notes in that account from then on, ready to pick up on
   your next device. Each note is stored as a markdown file in the app's folder,
   so you can read and edit them straight from Dropbox or Drive too.
+- **iCloud Drive** — in the iPhone and iPad app only. Pick it and `notes`
+  keeps your notes in its own folder in your iCloud Drive — **Notes** in the
+  Files app — and iOS carries them to your other devices signed in to the same
+  Apple Account. There is nothing to sign in to; if the device isn't signed in
+  to iCloud (or iCloud Drive is off), the settings say so and offer to check
+  again once it is. With encryption on, only encrypted files reach iCloud.
 
 However you store them, your notes are saved as **one markdown file per note**,
 so they stay readable and portable outside the app. On the folder and cloud

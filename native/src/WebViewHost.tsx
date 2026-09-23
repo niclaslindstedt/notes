@@ -7,10 +7,14 @@
 // provide, routed over the bridge in `bridge/on-message.ts`:
 //   1. real haptics (iOS WKWebView ignores `navigator.vibrate`),
 //   2. SPKI-pinned HTTPS for a self-hosted notesd daemon, and
-//   3. a QR camera scan (the `QrScanner` overlay) for pairing that daemon.
+//   3. a QR camera scan (the `QrScanner` overlay) for pairing that daemon —
+// plus one the page finds rather than asks for:
+//   4. an iCloud Drive file store (iOS), installed as a provider on `window`
+//      by `ICLOUD_SCRIPT` and answered by `answerICloud` (`icloud*.ts`). The
+//      page asks whether the provider is there, never where it is running.
 //
-// See `native/README.md` for the message protocol and the web-side seam in
-// `src/platform/native-bridge.ts`.
+// See `native/README.md` for the message protocol and the web-side seams in
+// `src/platform/native-bridge.ts` and `src/platform/icloud-host.ts`.
 
 import { useRef, useState } from "react";
 import { Platform, StyleSheet } from "react-native";
@@ -20,7 +24,19 @@ import * as FileSystem from "expo-file-system";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { handleBridgeMessage } from "./bridge/on-message";
+import { answerICloud } from "./icloud";
+import { ICLOUD_SCRIPT, isICloudRequest, resolveScript } from "./icloudBridge";
 import QrScanner from "./QrScanner";
+
+// Parse a message body for the iCloud check. The other bridge parses its own;
+// anything that is not JSON is simply not an iCloud request.
+function parseMessage(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
 // Where the embedded bundle's entry point lives on each platform. Android
 // keeps it under the APK's `assets/`; iOS under the app bundle, whose file URL
@@ -71,8 +87,23 @@ export default function WebViewHost() {
           domStorageEnabled
           javaScriptEnabled
           setSupportMultipleWindows={false}
+          // The iCloud provider, installed before the page's own scripts run
+          // so the storage picker can offer iCloud Drive on the first render.
+          injectedJavaScriptBeforeContentLoaded={ICLOUD_SCRIPT}
           onMessage={(event: WebViewMessageEvent) => {
-            void handleBridgeMessage(event.nativeEvent.data, {
+            const raw = event.nativeEvent.data;
+            const parsed = parseMessage(raw);
+            if (isICloudRequest(parsed)) {
+              // Answered without caching or logging — the payload is the
+              // user's notes. See `icloud.ts`.
+              void answerICloud(parsed.method, parsed.args).then((result) =>
+                webView.current?.injectJavaScript(
+                  resolveScript(parsed.id, result),
+                ),
+              );
+              return;
+            }
+            void handleBridgeMessage(raw, {
               inject: (script) => webView.current?.injectJavaScript(script),
               scanQr: (id) => setScanId(id),
             });

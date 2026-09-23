@@ -52,6 +52,7 @@ const app: AppCatalog = {
       folder: "din anteckningsmapp",
       dropbox: "Dropbox",
       gdrive: "Dropbox",
+      icloud: "iCloud Drive",
       nextcloud: "Nextcloud",
       notesd: "din egen server",
     },

@@ -437,7 +437,7 @@ const achievements = {
       name: "Cloud walker",
       condition: "Connect a cloud backend.",
       learnMore:
-        "Connect Dropbox and your notes sync to your own cloud storage, so they follow you to every device you sign in on.",
+        "Connect Dropbox — or iCloud Drive, in the iPhone and iPad app — and your notes sync to your own cloud storage, so they follow you to every device you sign in on.",
     },
     homeCloud: {
       name: "Home cloud",

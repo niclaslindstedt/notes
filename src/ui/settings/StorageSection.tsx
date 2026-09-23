@@ -26,6 +26,7 @@ import {
 } from "./EncryptionLogModal.tsx";
 import { NamespacePinSection } from "./NamespacePinSection.tsx";
 import { NextcloudConnectForm } from "./NextcloudConnectForm.tsx";
+import { ICLOUD_FOLDER_NAME } from "../../storage/icloud/constants.ts";
 import { Section } from "./shared.tsx";
 
 // Storage settings: pick the backend that persists the notes (this device /
@@ -47,6 +48,11 @@ export function StorageSection({ storage, conversion }: Props) {
     folderAvailable,
     folderConnected,
     folderReconnectNeeded,
+    icloudAvailable,
+    icloudStatus,
+    icloudConnected,
+    connectICloud,
+    disconnectICloud,
     nextcloudConnected,
     nextcloudConfig,
     connectNextcloud,
@@ -86,6 +92,11 @@ export function StorageSection({ storage, conversion }: Props) {
   // Same for Nextcloud: picking it with nothing stored reveals the connect
   // form, and "Change server" brings it back with the stored values prefilled.
   const [editingNextcloud, setEditingNextcloud] = useState(false);
+  // True while an iCloud connect or re-check is asking the host.
+  const [icloudPending, setICloudPending] = useState(false);
+  // Picking iCloud on a device signed out of iCloud leaves the backend where it
+  // was, so the panel that explains why is shown on the pick, not the backend.
+  const [icloudPicked, setICloudPicked] = useState(false);
 
   const backendOptions: {
     value: BackendId;
@@ -103,6 +114,17 @@ export function StorageSection({ storage, conversion }: Props) {
       label: t("settings.storage.backendDropbox"),
       disabled: !dropboxAvailable,
     },
+    // iCloud Drive is offered wherever a host provides it — the iOS app does,
+    // a browser never can. The page asks whether the capability is there, not
+    // where it is running, so the option simply isn't listed elsewhere.
+    ...(icloudAvailable
+      ? [
+          {
+            value: "icloud" as const,
+            label: t("settings.storage.backendICloud"),
+          },
+        ]
+      : []),
     // Nextcloud needs no build-time key and no OAuth redirect — it is a server
     // the user runs, reached with credentials they paste — so it is offered on
     // every surface.
@@ -134,12 +156,31 @@ export function StorageSection({ storage, conversion }: Props) {
     }
   };
 
+  // Connect iCloud Drive — which re-checks the container first, so it is also
+  // the "Check again" after signing in to iCloud. A container that still can't
+  // be reached is not an error to show verbatim: the status it leaves behind
+  // drives the translated hint below.
+  const connectICloudWithStatus = async () => {
+    setICloudPending(true);
+    try {
+      await connectICloud();
+    } catch {
+      // `icloudStatus` now says why; the panel shows it.
+    } finally {
+      setICloudPending(false);
+    }
+  };
+
   const onPickBackend = (next: BackendId) => {
     setDropboxError(null);
+    setICloudPicked(next === "icloud");
     if (next === backend) return;
     if (next === "browser") selectBrowser();
     else if (next === "folder") void connectFolder();
     else if (next === "dropbox") void connectDropboxWithCapture();
+    // iCloud needs nothing from the user — the container is the app's own and
+    // the device's Apple Account opens it — so picking it connects at once.
+    else if (next === "icloud") void connectICloudWithStatus();
     // Nextcloud doesn't auto-connect on pick either: with nothing stored it
     // reveals the connect form, and only switches backend once the server has
     // accepted the credentials.
@@ -262,6 +303,42 @@ export function StorageSection({ storage, conversion }: Props) {
               >
                 {dropboxError}
               </p>
+            )}
+          </div>
+        )}
+
+        {icloudAvailable && (backend === "icloud" || icloudPicked) && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-muted">
+              {icloudConnected
+                ? t("settings.storage.icloudConnected", {
+                    folder: ICLOUD_FOLDER_NAME,
+                  })
+                : icloudStatus === "signed-out"
+                  ? t("settings.storage.icloudSignedOut")
+                  : t("settings.storage.icloudUnconnected")}
+            </p>
+            {icloudConnected ? (
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" onClick={disconnectICloud}>
+                  {t("common.disconnect")}
+                </Button>
+                <span className="text-xs text-accent">
+                  {t("common.connected")}
+                </span>
+              </div>
+            ) : (
+              <Button
+                variant="primary"
+                disabled={icloudPending}
+                onClick={() => void connectICloudWithStatus()}
+              >
+                <BusyLabel busy={icloudPending}>
+                  {icloudStatus === "signed-out"
+                    ? t("settings.storage.icloudCheckAgain")
+                    : t("common.connect")}
+                </BusyLabel>
+              </Button>
             )}
           </div>
         )}

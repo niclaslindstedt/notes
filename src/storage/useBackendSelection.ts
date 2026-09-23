@@ -14,6 +14,7 @@
 
 import { useCallback, useMemo } from "react";
 
+import type { ICloudHost } from "../platform/icloud-host.ts";
 import { createPinnedFetch } from "../platform/native-bridge.ts";
 import type { StorageAdapter } from "./adapter.ts";
 import type {
@@ -31,6 +32,7 @@ import type { RemoteBackends } from "./remote-backends.ts";
 // branch instead of re-deriving the `backend && token` chain several times.
 export type BackendSelection =
   | { kind: "dropbox"; auth: DropboxAuth }
+  | { kind: "icloud"; host: ICloudHost }
   | { kind: "nextcloud"; config: NextcloudConfig }
   | { kind: "folder"; handle: FileSystemDirectoryHandle }
   | { kind: "notesd"; config: NotesdConfig }
@@ -51,6 +53,11 @@ export interface BackendSelectionDeps {
   dropboxRefresh: string | null;
   /** Persist a silently-refreshed Dropbox access token back to storage. */
   rememberDropboxAccessToken: (accessToken: string) => void;
+  /**
+   * The iCloud Drive host, but only while its container is usable — null on
+   * every surface that offers none, and on a device signed out of iCloud.
+   */
+  icloudHost: ICloudHost | null;
   /** The stored Nextcloud connection, null until one is set up. */
   nextcloudConfig: NextcloudConfig | null;
   /** The paired notesd daemon config, null until a daemon is paired. */
@@ -92,6 +99,7 @@ export function useBackendSelection(
     dropboxToken,
     dropboxRefresh,
     rememberDropboxAccessToken,
+    icloudHost,
     nextcloudConfig,
     notesdConfig,
     folderHandle,
@@ -119,6 +127,13 @@ export function useBackendSelection(
         },
       };
     }
+    // iCloud Drive: only once the host has answered that its container is
+    // usable. Before that (the first probe in flight) or on a device signed out
+    // of iCloud, fall through to the browser store, like an unresolved folder
+    // grant.
+    if (backend === "icloud" && icloudHost) {
+      return { kind: "icloud", host: icloudHost };
+    }
     if (backend === "nextcloud" && nextcloudConfig) {
       return { kind: "nextcloud", config: nextcloudConfig };
     }
@@ -138,6 +153,7 @@ export function useBackendSelection(
     dropboxToken,
     dropboxRefresh,
     rememberDropboxAccessToken,
+    icloudHost,
     nextcloudConfig,
     notesdConfig,
     folderHandle,
@@ -194,6 +210,17 @@ export function useBackendSelection(
               seal: sealFor(namespace),
               unseal: unsealFor(namespace),
             },
+          );
+        // iCloud Drive is a folder on the device's own disk that iCloud syncs
+        // underneath, so — like the picked folder — it needs no offline
+        // mirror. Encryption composes per file inside the directory adapter via
+        // `cryptoFor`, exactly as it does for Dropbox, so with it on only
+        // ciphertext ever reaches the host.
+        case "icloud":
+          return remote.createICloudAdapter(
+            selection.host,
+            namespace,
+            cryptoFor(namespace),
           );
         case "folder":
           return remote.createFolderAdapter({
