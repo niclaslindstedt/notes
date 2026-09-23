@@ -261,5 +261,4 @@ export const RULES: StoreRules = {
   // ships on neither, so there is nothing to author for them. Adding one back
   // is the flag plus the section — the generator and the preflight read the
   // flag, not the presence of the section.
-
 };

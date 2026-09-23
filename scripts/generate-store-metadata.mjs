@@ -37,7 +37,13 @@
 //   make store-metadata                                   # write the outputs
 //   node scripts/generate-store-metadata.mjs --check      # validate only
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, relative } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -55,7 +61,8 @@ const identity = existsSync(identityFile)
   ? await import(identityFile)
   : {
       APP_NAME: RULES.brand.projectName,
-      APP_TITLE: process.env.APP_DISPLAY_NAME?.trim() || RULES.brand.projectName,
+      APP_TITLE:
+        process.env.APP_DISPLAY_NAME?.trim() || RULES.brand.projectName,
       PUBLISHER: RULES.brand.publisher,
       SITE_URL: RULES.brand.marketingUrl,
     };
@@ -169,7 +176,9 @@ if (!phone) {
       "you do; the field is left out of the upload.",
   );
 } else if (!phone.startsWith("+")) {
-  fail(`ASC_REVIEW_PHONE (${phone}) has no biome code — Apple requires the + prefix`);
+  fail(
+    `ASC_REVIEW_PHONE (${phone}) has no biome code — Apple requires the + prefix`,
+  );
 }
 
 const info = {};
@@ -203,10 +212,16 @@ for (const [locale, authored] of Object.entries(copy.APPLE_INFO)) {
     fail(`${field("keywords")}: at least one keyword is required`);
   } else {
     const joined = keywords.join(",");
-    checkLength(`${field("keywords")} (joined "${joined}")`, joined, LIMITS.keywordsJoined);
+    checkLength(
+      `${field("keywords")} (joined "${joined}")`,
+      joined,
+      LIMITS.keywordsJoined,
+    );
     const dupes = keywords.filter((k, n) => keywords.indexOf(k) !== n);
     if (dupes.length) {
-      fail(`${field("keywords")}: duplicated — ${[...new Set(dupes)].join(", ")}`);
+      fail(
+        `${field("keywords")}: duplicated — ${[...new Set(dupes)].join(", ")}`,
+      );
     }
     // A keyword already in the title or subtitle is indexed anyway, so spending
     // part of a 100-character budget on it a second time buys nothing.
@@ -241,7 +256,11 @@ for (const required of ["firstName", "lastName", "email"]) {
 // ---------------------------------------------------------------------------
 // Which storefronts this app ships on — declared in listing.mts, because most
 // of the fleet has one and this subsystem is meant to be portable to them.
-const SHIPS = RULES.storefronts ?? { appStore: true, macAppStore: true, steam: true };
+const SHIPS = RULES.storefronts ?? {
+  appStore: true,
+  macAppStore: true,
+  steam: true,
+};
 
 const macInfoAuthored = copy.MAC_INFO ?? null;
 const macNotes = copy.MAC_REVIEW_NOTES ?? null;
@@ -312,7 +331,9 @@ const identifiersFile = at("native", "identifiers.js");
 const identifiersSource = existsSync(identifiersFile)
   ? readFileSync(identifiersFile, "utf8")
   : appConfig;
-const devBundleId = /const DEV_BUNDLE_ID = "([^"]+)"/.exec(identifiersSource)?.[1];
+const devBundleId = /const DEV_BUNDLE_ID = "([^"]+)"/.exec(
+  identifiersSource,
+)?.[1];
 const bundleId = process.env.APP_BUNDLE_ID?.trim() || devBundleId;
 if (!bundleId) {
   fail(
@@ -330,7 +351,9 @@ if (!bundleId) {
 // matters is a paragraph explaining why the field is absent — and a check that
 // a file does not mention a field is a check that fails on the comment saying
 // so. What is being looked for is an assignment, not the word.
-const withoutComments = appConfig.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const withoutComments = appConfig
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
 if (/gameUrl\s*:/.test(withoutComments)) {
   fail(
     "native/app.config.js sets extra.gameUrl — the review notes claim the game " +
@@ -380,10 +403,14 @@ if (/no in-app\s+purchases/i.test(notes)) {
 // is a listing that tells a player to file an issue.
 const support = info["en-US"]?.supportUrl ?? "";
 if (!/^https:\/\//.test(support)) {
-  fail(`apple.info.en-US.supportUrl (${support}) must be an https URL — Apple rejects a mailto:`);
+  fail(
+    `apple.info.en-US.supportUrl (${support}) must be an https URL — Apple rejects a mailto:`,
+  );
 }
 if (support.includes("github.com")) {
-  fail("apple.info.en-US.supportUrl points at the source repository — it needs a support page");
+  fail(
+    "apple.info.en-US.supportUrl points at the source repository — it needs a support page",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +429,9 @@ if (support.includes("github.com")) {
 // a page of claims nobody checks against a build.
 const tauriConfig =
   SHIPS.macAppStore || SHIPS.steam
-    ? JSON.parse(readFileSync(at("tauri", "src-tauri", "tauri.conf.json"), "utf8"))
+    ? JSON.parse(
+        readFileSync(at("tauri", "src-tauri", "tauri.conf.json"), "utf8"),
+      )
     : null;
 const macRules = RULES.mac ?? {};
 
@@ -420,7 +449,11 @@ if (tauriConfig && !tauriConfig?.bundle?.resources?.["../webroot"]) {
 // import the other, and the one that is WRONG is the listing — a store page
 // promising a macOS the binary refuses to launch on is a refund.
 const shellFloor = tauriConfig?.bundle?.macOS?.minimumSystemVersion;
-if (SHIPS.macAppStore && macRules.minimumSystemVersion && shellFloor !== macRules.minimumSystemVersion) {
+if (
+  SHIPS.macAppStore &&
+  macRules.minimumSystemVersion &&
+  shellFloor !== macRules.minimumSystemVersion
+) {
   fail(
     `mac.minimumSystemVersion (${macRules.minimumSystemVersion}) and ` +
       `tauri.conf.json's bundle.macOS.minimumSystemVersion (${shellFloor}) disagree`,
@@ -430,7 +463,10 @@ if (SHIPS.macAppStore && macRules.minimumSystemVersion && shellFloor !== macRule
 // THE SANDBOX. Not optional on the Mac App Store, and the shortest true
 // sentence the review notes have — so a list that has lost it is a submission
 // that will be rejected before anybody reads a word.
-if (SHIPS.macAppStore && !(macRules.entitlements ?? []).includes("com.apple.security.app-sandbox")) {
+if (
+  SHIPS.macAppStore &&
+  !(macRules.entitlements ?? []).includes("com.apple.security.app-sandbox")
+) {
   fail(
     "mac.entitlements does not include com.apple.security.app-sandbox — the Mac " +
       "App Store requires it, and the review notes are written around it.",
@@ -479,13 +515,18 @@ if (SHIPS.macAppStore && macRules.universalPurchase) {
 // ---------------------------------------------------------------------------
 const steam = SHIPS.steam
   ? {
-  ...RULES.steam,
-  shortDescription: copy.STEAM_SHORT_DESCRIPTION,
-  aboutBody: copy.STEAM_ABOUT_BODY,
+      ...RULES.steam,
+      shortDescription: copy.STEAM_SHORT_DESCRIPTION,
+      aboutBody: copy.STEAM_ABOUT_BODY,
     }
   : null;
-if (steam) checkLength("steam.shortDescription", steam.shortDescription, { max: STEAM_SHORT_MAX });
-const steamCopy = steam ? `${steam.shortDescription}\n${steam.aboutBody}`.toLowerCase() : "";
+if (steam)
+  checkLength("steam.shortDescription", steam.shortDescription, {
+    max: STEAM_SHORT_MAX,
+  });
+const steamCopy = steam
+  ? `${steam.shortDescription}\n${steam.aboutBody}`.toLowerCase()
+  : "";
 for (const claim of steam?.notYetShipped ?? []) {
   if (steamCopy.includes(claim.toLowerCase())) {
     fail(
@@ -496,7 +537,8 @@ for (const claim of steam?.notYetShipped ?? []) {
   }
 }
 if (steam) {
-  if (!steam.genres?.length) fail("steam.genres is empty — the store page needs at least one");
+  if (!steam.genres?.length)
+    fail("steam.genres is empty — the store page needs at least one");
   if (!steam.tags?.length) fail("steam.tags is empty");
 }
 
@@ -541,7 +583,12 @@ function categoryFiles(categories) {
     });
   };
   const [primary, secondary] = categories;
-  put(primary, "primary_category", "primary_first_sub_category", "primary_second_sub_category");
+  put(
+    primary,
+    "primary_category",
+    "primary_first_sub_category",
+    "primary_second_sub_category",
+  );
   put(
     secondary,
     "secondary_category",
@@ -722,7 +769,11 @@ if (process.argv.includes("--check")) {
   let macFastlane = null;
   let macConfigFile = null;
   if (macListed) {
-    const macReview = { ...RULES.apple.contact, notes: macNotes, ...(phone ? { phone } : {}) };
+    const macReview = {
+      ...RULES.apple.contact,
+      notes: macNotes,
+      ...(phone ? { phone } : {}),
+    };
     macConfigFile = writeMacConfig(macReview);
     macFastlane = writeFastlaneTree(
       at("tauri", "fastlane", "metadata"),

@@ -63,7 +63,6 @@ vi.mock("../../src/storage/dropbox/pending.ts", () => ({
   hasPendingDropboxAuth: () => hasPendingDropboxAuth(),
 }));
 
-
 // Drive `?code=` boot redirects without navigating: rewrite the search string
 // and capture the replaceState the URL-cleaning helper issues.
 function setSearch(search: string): void {

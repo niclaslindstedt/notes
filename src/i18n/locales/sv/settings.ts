@@ -326,8 +326,7 @@ const settings: SettingsCatalog = {
       "Logga in för att behålla dina anteckningar i din egen Dropbox.",
     dropboxWaiting:
       "Slutför inloggningen till Dropbox i webbläsaren och kom sedan tillbaka hit.",
-    gdriveConnected:
-      "Dina anteckningar synkas till en mapp i din Dropbox.",
+    gdriveConnected: "Dina anteckningar synkas till en mapp i din Dropbox.",
     gdriveUnconnected:
       "Logga in för att behålla dina anteckningar i din egen Dropbox.",
     backendNextcloud: "Nextcloud",

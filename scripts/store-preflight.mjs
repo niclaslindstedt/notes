@@ -51,8 +51,14 @@ const nowOnly = process.argv.includes("--now");
 // submission would otherwise stall on afterwards. `--now` is that list.
 // ---------------------------------------------------------------------------
 const GATES = {
-  apple: { short: "needs the App Store Connect record", hint: "native/RELEASING.md §1" },
-  mac: { short: "needs the Mac App Store record", hint: "tauri/store/MAC_APP_STORE.md" },
+  apple: {
+    short: "needs the App Store Connect record",
+    hint: "native/RELEASING.md §1",
+  },
+  mac: {
+    short: "needs the Mac App Store record",
+    hint: "tauri/store/MAC_APP_STORE.md",
+  },
   steam: { short: "needs the Steamworks app", hint: "tauri/store/README.md" },
 };
 
@@ -62,8 +68,10 @@ const section = (title) => {
   group = title;
 };
 const ok = (message) => findings.push({ level: "ok", group, message });
-const warn = (message, hint, gate) => findings.push({ level: "warn", group, message, hint, gate });
-const fail = (message, hint, gate) => findings.push({ level: "fail", group, message, hint, gate });
+const warn = (message, hint, gate) =>
+  findings.push({ level: "warn", group, message, hint, gate });
+const fail = (message, hint, gate) =>
+  findings.push({ level: "fail", group, message, hint, gate });
 
 const env = nativeEnv(root);
 
@@ -74,7 +82,11 @@ const env = nativeEnv(root);
 // Which storefronts this app actually submits to. Declared in listing.mts
 // because most of the fleet has one: asking a game with no Steam page for five
 // 1920×1080 captures is noise that teaches a reader to skim the report.
-const SHIPS = RULES.storefronts ?? { appStore: true, macAppStore: true, steam: true };
+const SHIPS = RULES.storefronts ?? {
+  appStore: true,
+  macAppStore: true,
+  steam: true,
+};
 
 section("LISTING");
 
@@ -120,7 +132,8 @@ if (listing.status === 0) {
 } else {
   fail(
     "the listing does not compile",
-    (listing.stderr || listing.stdout || "").trim() || "run `make store-metadata` for the detail",
+    (listing.stderr || listing.stdout || "").trim() ||
+      "run `make store-metadata` for the detail",
   );
 }
 
@@ -136,7 +149,10 @@ if (!phone) {
       `${rel(env.file)} — NEVER in listing.mts, which is committed to a public repository.`,
   );
 } else if (!phone.startsWith("+")) {
-  fail(`ASC_REVIEW_PHONE (${phone}) has no biome code`, "Apple requires the + prefix, e.g. +46…");
+  fail(
+    `ASC_REVIEW_PHONE (${phone}) has no biome code`,
+    "Apple requires the + prefix, e.g. +46…",
+  );
 } else {
   ok(`review contact ${phone}`);
 }
@@ -145,11 +161,15 @@ if (!phone) {
 // opens the app at all, and rejects a support URL that is a mailto: — so both
 // have to be pages in the site's own tree rather than promises in the YAML.
 for (const [page, why] of [
-  ["privacy", "Apple requires it and fetches it; the Play Console's Data safety form links it"],
+  [
+    "privacy",
+    "Apple requires it and fetches it; the Play Console's Data safety form links it",
+  ],
   ["support", "Apple requires an http(s) support URL and rejects a mailto:"],
 ]) {
   const file = at("pwa", "public", page, "index.html");
-  const url = page === "privacy" ? RULES.brand?.privacyUrl : RULES.brand?.supportUrl;
+  const url =
+    page === "privacy" ? RULES.brand?.privacyUrl : RULES.brand?.supportUrl;
   if (existsSync(file)) {
     ok(`/${page}/ has a page behind it (${rel(file)})`);
   } else if (url?.startsWith("https://apps.agilator.se/")) {
@@ -183,7 +203,9 @@ if (existsSync(distIndex)) {
 
 const webroot = at("native", "assets", "webroot.zip");
 if (existsSync(webroot)) {
-  ok(`native/assets/webroot.zip present (${(statSync(webroot).size / 1e6).toFixed(1)} MB)`);
+  ok(
+    `native/assets/webroot.zip present (${(statSync(webroot).size / 1e6).toFixed(1)} MB)`,
+  );
 } else {
   warn(
     "native/assets/webroot.zip has not been built",
@@ -196,7 +218,9 @@ if (existsSync(webroot)) {
 /** How many PNGs a generated art directory holds (0 when it never ran). */
 const pngCount = (dir) =>
   existsSync(dir)
-    ? readdirSync(dir, { recursive: true }).filter((f) => String(f).endsWith(".png")).length
+    ? readdirSync(dir, { recursive: true }).filter((f) =>
+        String(f).endsWith(".png"),
+      ).length
     : 0;
 
 const appleShots = pngCount(at("native", "store", "screenshots"));
@@ -228,9 +252,11 @@ else
 
 // The icon set every storefront reads, and the one artifact here that is
 // generated from the app's own mark rather than drawn.
-const icons = ["icons/pwa-512.png", "icons/apple-touch-icon-180.png", "og.png"].filter(
-  (f) => !existsSync(at("pwa", "public", f)),
-);
+const icons = [
+  "icons/pwa-512.png",
+  "icons/apple-touch-icon-180.png",
+  "og.png",
+].filter((f) => !existsSync(at("pwa", "public", f)));
 if (icons.length === 0) ok("the icon set and the share card are generated");
 else warn(`missing generated art: ${icons.join(", ")}`, "`make icons`");
 
@@ -285,8 +311,11 @@ if (!configBundle) {
     "apple",
   );
 } else {
-  const appfileBundle = /app_identifier\("([^"]+)"\)/.exec(readFileSync(appfilePath, "utf8"))?.[1];
-  if (appfileBundle === configBundle) ok(`bundle id ${configBundle}, agreed by fastlane`);
+  const appfileBundle = /app_identifier\("([^"]+)"\)/.exec(
+    readFileSync(appfilePath, "utf8"),
+  )?.[1];
+  if (appfileBundle === configBundle)
+    ok(`bundle id ${configBundle}, agreed by fastlane`);
   else {
     fail(
       `bundle id drift: app.config.js says ${configBundle}, the Appfile says ${appfileBundle}`,
@@ -303,7 +332,9 @@ section("CREDENTIALS");
 
 const credentials = ascCredentials(root);
 if (credentials.missing.length === 0) {
-  ok(`App Store Connect API key ${credentials.keyId} (issuer ${credentials.issuerId})`);
+  ok(
+    `App Store Connect API key ${credentials.keyId} (issuer ${credentials.issuerId})`,
+  );
 } else {
   warn(
     "no App Store Connect API key",
@@ -318,7 +349,9 @@ if (credentials.missing.length === 0) {
 // on its own and `eas submit` does not, so a value that lives only in the file
 // is configured for one tool and invisible to the other.
 const easKeyVars = ["ASC_KEY_PATH", "ASC_KEY_ID", "ASC_ISSUER_ID"];
-const unexported = easKeyVars.filter((key) => !process.env[key] && env.value(key));
+const unexported = easKeyVars.filter(
+  (key) => !process.env[key] && env.value(key),
+);
 if (unexported.length) {
   warn(
     `export ${unexported.join(", ")} before running eas submit`,
@@ -326,7 +359,10 @@ if (unexported.length) {
   );
 }
 
-if (env.value("EXPO_TOKEN") || existsSync(join(process.env.HOME ?? "", ".expo", "state.json"))) {
+if (
+  env.value("EXPO_TOKEN") ||
+  existsSync(join(process.env.HOME ?? "", ".expo", "state.json"))
+) {
   ok("EAS has a way to authenticate (token or an `eas login` session)");
 } else {
   warn(
@@ -335,7 +371,10 @@ if (env.value("EXPO_TOKEN") || existsSync(join(process.env.HOME ?? "", ".expo", 
   );
 }
 
-if (/EAS_PROJECT_ID = process\.env/.test(appConfig) && !env.value("EAS_PROJECT_ID")) {
+if (
+  /EAS_PROJECT_ID = process\.env/.test(appConfig) &&
+  !env.value("EAS_PROJECT_ID")
+) {
   warn(
     "the EAS project id is not pinned in app.config.js and is not in the environment",
     "run `eas init` in native/, then pin the id it prints as EAS_PROJECT_ID in " +
@@ -376,138 +415,158 @@ warn(
 //    not produce on its own.
 // ---------------------------------------------------------------------------
 if (SHIPS.macAppStore) {
-section("MAC APP STORE");
+  section("MAC APP STORE");
 
-const macConfig = at("tauri", "store", "mac.config.json");
-if (existsSync(macConfig)) {
-  ok(`the Mac listing is compiled (${rel(macConfig)})`);
-} else {
-  warn(
-    "the Mac listing has not been compiled",
-    "`make store-metadata`. If it says SKIPPED, the copy module has no MAC_INFO / " +
-      "MAC_REVIEW_NOTES — the Mac page is a separate piece of writing, because the " +
-      "phone's review notes describe a different binary. See the `store-listing` skill.",
-  );
-}
+  const macConfig = at("tauri", "store", "mac.config.json");
+  if (existsSync(macConfig)) {
+    ok(`the Mac listing is compiled (${rel(macConfig)})`);
+  } else {
+    warn(
+      "the Mac listing has not been compiled",
+      "`make store-metadata`. If it says SKIPPED, the copy module has no MAC_INFO / " +
+        "MAC_REVIEW_NOTES — the Mac page is a separate piece of writing, because the " +
+        "phone's review notes describe a different binary. See the `store-listing` skill.",
+    );
+  }
 
-// THE ICON THE DOCK DRAWS. Not one of the PNGs: a macOS bundle reads
-// `icon.icns` and nothing else, and a build without one ships the blank
-// generic icon — which is both a rejection and the first thing anybody sees.
-const icns = at("tauri", "src-tauri", "icons", "icon.icns");
-if (existsSync(icns)) ok(`the macOS .icns is generated (${rel(icns)})`);
-else warn("no macOS .icns", "`npm --prefix tauri run icons`; `make tauri` runs it too.");
+  // THE ICON THE DOCK DRAWS. Not one of the PNGs: a macOS bundle reads
+  // `icon.icns` and nothing else, and a build without one ships the blank
+  // generic icon — which is both a rejection and the first thing anybody sees.
+  const icns = at("tauri", "src-tauri", "icons", "icon.icns");
+  if (existsSync(icns)) ok(`the macOS .icns is generated (${rel(icns)})`);
+  else
+    warn(
+      "no macOS .icns",
+      "`npm --prefix tauri run icons`; `make tauri` runs it too.",
+    );
 
-// The Tahoe half. Optional today and dated tomorrow: without a layered icon
-// the Dock shows a flat square beside neighbours that pick up the glass.
-const layers = pngCount(at("tauri", "store", "icon-layers"));
-if (layers >= 2) ok(`${layers} Icon Composer layers for the macOS 26 icon`);
-else warn("no Icon Composer layers", "`make icons`; tauri/store/MAC_APP_STORE.md has the rest.");
+  // The Tahoe half. Optional today and dated tomorrow: without a layered icon
+  // the Dock shows a flat square beside neighbours that pick up the glass.
+  const layers = pngCount(at("tauri", "store", "icon-layers"));
+  if (layers >= 2) ok(`${layers} Icon Composer layers for the macOS 26 icon`);
+  else
+    warn(
+      "no Icon Composer layers",
+      "`make icons`; tauri/store/MAC_APP_STORE.md has the rest.",
+    );
 
-// EVERYTHING BELOW NEEDS A MAC, and says so rather than failing on Linux: the
-// entitlements name a team, the profile is issued to that team, and both are
-// gitignored because this repository is public.
-const entitlements = at("tauri", "src-tauri", "Entitlements.plist");
-if (existsSync(entitlements)) {
-  ok(`the sandbox entitlements are generated (${rel(entitlements)})`);
-} else {
-  warn(
-    "no Entitlements.plist — the Mac App Store requires the App Sandbox",
-    "`npm --prefix tauri run mac:appstore` writes it from APPLE_TEAM_ID in " +
-      "native/.env. Generated rather than committed because it names a specific " +
-      "developer account, and this repository is public.",
-    "mac",
-  );
-}
+  // EVERYTHING BELOW NEEDS A MAC, and says so rather than failing on Linux: the
+  // entitlements name a team, the profile is issued to that team, and both are
+  // gitignored because this repository is public.
+  const entitlements = at("tauri", "src-tauri", "Entitlements.plist");
+  if (existsSync(entitlements)) {
+    ok(`the sandbox entitlements are generated (${rel(entitlements)})`);
+  } else {
+    warn(
+      "no Entitlements.plist — the Mac App Store requires the App Sandbox",
+      "`npm --prefix tauri run mac:appstore` writes it from APPLE_TEAM_ID in " +
+        "native/.env. Generated rather than committed because it names a specific " +
+        "developer account, and this repository is public.",
+      "mac",
+    );
+  }
 
-const profile = at("tauri", "src-tauri", "embedded.provisionprofile");
-if (existsSync(profile)) ok("a Mac App Store provisioning profile is in place");
-else
-  warn(
-    "no embedded.provisionprofile",
-    "download a Mac App Store profile for the app id in the developer portal and " +
-      "save it as tauri/src-tauri/embedded.provisionprofile (gitignored).",
-    "mac",
-  );
+  const profile = at("tauri", "src-tauri", "embedded.provisionprofile");
+  if (existsSync(profile))
+    ok("a Mac App Store provisioning profile is in place");
+  else
+    warn(
+      "no embedded.provisionprofile",
+      "download a Mac App Store profile for the app id in the developer portal and " +
+        "save it as tauri/src-tauri/embedded.provisionprofile (gitignored).",
+      "mac",
+    );
 
-// ---------------------------------------------------------------------------
-// 7. STEAM. The desktop shell ships to a second storefront, and everything
-//    above is Apple's. The build side of it — packaging, signing, the upload
-//    — belongs to `make tauri-package`; these are the STORE-PAGE facts, which
-//    are true or false from a cold checkout.
-// ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // 7. STEAM. The desktop shell ships to a second storefront, and everything
+  //    above is Apple's. The build side of it — packaging, signing, the upload
+  //    — belongs to `make tauri-package`; these are the STORE-PAGE facts, which
+  //    are true or false from a cold checkout.
+  // ---------------------------------------------------------------------------
 }
 
 if (SHIPS.steam) {
-section("STEAM");
+  section("STEAM");
 
-const steamConfigPath = at("tauri", "store", "steam.json");
-let steamConfig = null;
-try {
-  steamConfig = JSON.parse(readFileSync(steamConfigPath, "utf8"));
-} catch {
-  fail(
-    `${rel(steamConfigPath)} could not be read`,
-    "it holds the app and depot ids an upload writes into its VDF.",
-  );
-}
-
-if (steamConfig) {
-  // 480 is Spacewar, Valve's shared test app. Everything works with it — the
-  // build uploads, the page renders — into a sandbox every developer on Steam
-  // shares. It is the quietest failure in the whole submission.
-  const appId = Number(process.env.SF_STEAM_APP_ID || steamConfig.appId);
-  if (appId === 480) {
+  const steamConfigPath = at("tauri", "store", "steam.json");
+  let steamConfig = null;
+  try {
+    steamConfig = JSON.parse(readFileSync(steamConfigPath, "utf8"));
+  } catch {
     fail(
-      "the Steam app id is 480 — that is Spacewar, Valve's shared test app",
-      "an upload against it succeeds into a sandbox every Steam developer shares. " +
-        "Put the real id in tauri/store/steam.json.",
-      "steam",
-    );
-  } else if (Number.isFinite(appId) && appId > 0) {
-    ok(`Steam app ${appId}`);
-  } else {
-    fail(
-      "tauri/store/steam.json has no appId",
-      "Steamworks → App Admin; the number in the URL is the app id.",
-      "steam",
+      `${rel(steamConfigPath)} could not be read`,
+      "it holds the app and depot ids an upload writes into its VDF.",
     );
   }
 
-  const depots = Object.entries(steamConfig.depots ?? {});
-  const unset = depots.filter(([, id]) => !Number.isFinite(Number(id)) || Number(id) <= 0);
-  if (depots.length === 0) {
-    fail("tauri/store/steam.json names no depots", "one per platform the build ships", "steam");
-  } else if (unset.length === 0) {
-    ok(`${depots.length} Steam depots (${depots.map(([os]) => os).join(", ")})`);
-  } else {
+  if (steamConfig) {
+    // 480 is Spacewar, Valve's shared test app. Everything works with it — the
+    // build uploads, the page renders — into a sandbox every developer on Steam
+    // shares. It is the quietest failure in the whole submission.
+    const appId = Number(process.env.SF_STEAM_APP_ID || steamConfig.appId);
+    if (appId === 480) {
+      fail(
+        "the Steam app id is 480 — that is Spacewar, Valve's shared test app",
+        "an upload against it succeeds into a sandbox every Steam developer shares. " +
+          "Put the real id in tauri/store/steam.json.",
+        "steam",
+      );
+    } else if (Number.isFinite(appId) && appId > 0) {
+      ok(`Steam app ${appId}`);
+    } else {
+      fail(
+        "tauri/store/steam.json has no appId",
+        "Steamworks → App Admin; the number in the URL is the app id.",
+        "steam",
+      );
+    }
+
+    const depots = Object.entries(steamConfig.depots ?? {});
+    const unset = depots.filter(
+      ([, id]) => !Number.isFinite(Number(id)) || Number(id) <= 0,
+    );
+    if (depots.length === 0) {
+      fail(
+        "tauri/store/steam.json names no depots",
+        "one per platform the build ships",
+        "steam",
+      );
+    } else if (unset.length === 0) {
+      ok(
+        `${depots.length} Steam depots (${depots.map(([os]) => os).join(", ")})`,
+      );
+    } else {
+      warn(
+        `Steam depots not set: ${unset.map(([os]) => os).join(", ")}`,
+        "Steamworks → App Admin → Depots. A depot per platform, or the upload has " +
+          "nowhere to put that platform's build.",
+        "steam",
+      );
+    }
+  }
+
+  const steamPage = at("tauri", "store", "steam-listing.md");
+  if (existsSync(steamPage))
+    ok(`the Steam store page is compiled (${rel(steamPage)})`);
+  else
+    warn("the Steam store page has not been compiled", "`make store-metadata`");
+
+  // Valve's own required art. Not generated from the app mark — a capsule is a
+  // designed image with the game's name set in it, which is a different job from
+  // an icon (see the store-art half of tauri/store/README.md).
+  const capsules = at("tauri", "store", "capsules");
+  const capsuleCount = pngCount(capsules);
+  if (capsuleCount > 0)
+    ok(`${capsuleCount} Steam capsule images in ${rel(capsules)}`);
+  else
     warn(
-      `Steam depots not set: ${unset.map(([os]) => os).join(", ")}`,
-      "Steamworks → App Admin → Depots. A depot per platform, or the upload has " +
-        "nowhere to put that platform's build.",
-      "steam",
+      "no Steam capsule art",
+      "Valve requires a header (920×430), a small capsule (462×174), a main capsule " +
+        "(1232×706) and a library capsule (600×900). None can be an upscaled icon — a " +
+        "capsule is the game's name set in a picture, which is a designed image and " +
+        "not a generated one. NOT gated on the Steamworks record: this is doable today, " +
+        "and it is the item a first upload most often waits on.",
     );
-  }
-}
-
-const steamPage = at("tauri", "store", "steam-listing.md");
-if (existsSync(steamPage)) ok(`the Steam store page is compiled (${rel(steamPage)})`);
-else warn("the Steam store page has not been compiled", "`make store-metadata`");
-
-// Valve's own required art. Not generated from the app mark — a capsule is a
-// designed image with the game's name set in it, which is a different job from
-// an icon (see the store-art half of tauri/store/README.md).
-const capsules = at("tauri", "store", "capsules");
-const capsuleCount = pngCount(capsules);
-if (capsuleCount > 0) ok(`${capsuleCount} Steam capsule images in ${rel(capsules)}`);
-else
-  warn(
-    "no Steam capsule art",
-    "Valve requires a header (920×430), a small capsule (462×174), a main capsule " +
-      "(1232×706) and a library capsule (600×900). None can be an upscaled icon — a " +
-      "capsule is the game's name set in a picture, which is a designed image and " +
-      "not a generated one. NOT gated on the Steamworks record: this is doable today, " +
-      "and it is the item a first upload most often waits on.",
-  );
 }
 
 // ---------------------------------------------------------------------------

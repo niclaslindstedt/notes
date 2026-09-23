@@ -44,9 +44,7 @@ export interface NotesdDiscovery {
 
 // Which cloud discovery would read from — answerable from the tokens alone, so
 // the render path can label the source without loading a backend.
-function resolveSource(
-  opts: UseNotesdDiscoveryOptions,
-): "Dropbox" | null {
+function resolveSource(opts: UseNotesdDiscoveryOptions): "Dropbox" | null {
   return opts.dropboxToken ? "Dropbox" : null;
 }
 

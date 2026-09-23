@@ -30,7 +30,8 @@ import * as skeleton from "../native/store/copy.example.mts";
 // A tool repo has no identity module: the brand-shaped facts are stated in
 // the listing itself (`RULES.brand`), and the LISTING NAME arrives as
 // APP_DISPLAY_NAME like every other deployment coordinate.
-const APP_TITLE = process.env.APP_DISPLAY_NAME?.trim() || RULES.brand.projectName;
+const APP_TITLE =
+  process.env.APP_DISPLAY_NAME?.trim() || RULES.brand.projectName;
 const PUBLISHER = RULES.brand.publisher;
 const PRIVACY_URL = RULES.brand.privacyUrl;
 
@@ -88,7 +89,6 @@ const authored = copy !== skeleton;
  */
 const itAuthored = authored ? it : it.skip;
 
-
 describe("the App Store listing fits Apple's fields", () => {
   it("has a title between 2 and 30 characters", () => {
     // Composed from identity.ts rather than authored, so this is really an
@@ -111,7 +111,9 @@ describe("the App Store listing fits Apple's fields", () => {
   it("does not repeat a keyword, or spend one the title already spends", () => {
     expect(new Set(EN.keywords).size).toBe(EN.keywords.length);
     const spent = `${APP_TITLE} ${EN.subtitle}`.toLowerCase();
-    expect(EN.keywords.filter((k) => spent.includes(k.toLowerCase()))).toEqual([]);
+    expect(EN.keywords.filter((k) => spent.includes(k.toLowerCase()))).toEqual(
+      [],
+    );
   });
 
   it("keeps promo text under 170 and the description between 10 and 4000", () => {
@@ -177,7 +179,9 @@ describe("the review notes are true of the build", () => {
     // `RULES.brand.privacyUrl` — so there is nothing in this tree to read.
     // What IS checkable here is that the notes name the same URL the listing
     // submits, which is the pair that drifts.
-    expect(PRIVACY_URL).toMatch(/^https:\/\/apps\.agilator\.se\/[a-z-]+\/privacy\/$/);
+    expect(PRIVACY_URL).toMatch(
+      /^https:\/\/apps\.agilator\.se\/[a-z-]+\/privacy\/$/,
+    );
     expect(NOTES).toContain(PRIVACY_URL);
   });
 
@@ -207,4 +211,3 @@ describe("the review notes are true of the build", () => {
     expect(PUBLISHER).toBeTruthy();
   });
 });
-

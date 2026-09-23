@@ -92,8 +92,10 @@ export function ascCredentials(root) {
   const keyContent = env.value("ASC_KEY_CONTENT");
 
   const missing = [];
-  if (!keyId) missing.push("ASC_KEY_ID — the id in the AuthKey_<KEY_ID>.p8 filename");
-  if (!issuerId) missing.push("ASC_ISSUER_ID — one per team, above the key list (a UUID)");
+  if (!keyId)
+    missing.push("ASC_KEY_ID — the id in the AuthKey_<KEY_ID>.p8 filename");
+  if (!issuerId)
+    missing.push("ASC_ISSUER_ID — one per team, above the key list (a UUID)");
 
   let keyFile = "";
   if (keyPath && keyContent) {

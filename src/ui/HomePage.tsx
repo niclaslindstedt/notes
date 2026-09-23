@@ -486,9 +486,9 @@ export function HomePage() {
             </li>
             <li>
               Optionally sync your notes to a location you control: a local
-              folder on your computer, your own Dropbox,
-              or a <span className="text-fg-bright">Nextcloud you run</span>{" "}
-              (see below).
+              folder on your computer, your own Dropbox, or a{" "}
+              <span className="text-fg-bright">Nextcloud you run</span> (see
+              below).
             </li>
             <li>
               In the installed app, optionally sync to your own{" "}

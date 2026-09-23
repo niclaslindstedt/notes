@@ -57,10 +57,9 @@ export function PrivacyPage() {
             You may <span className="text-fg-bright">optionally</span> turn on
             sync to a storage location <em>you</em> control — a local folder on
             your computer, your own Dropbox, or a Nextcloud you run yourself —
-            so the same notes appear on more than
-            one device. Even then your notes go only to that location in your
-            own account; the project authors never receive your notes in any
-            configuration. The{" "}
+            so the same notes appear on more than one device. Even then your
+            notes go only to that location in your own account; the project
+            authors never receive your notes in any configuration. The{" "}
             <a className="text-link hover:underline" href="#cloud-sync">
               Optional sync
             </a>{" "}
@@ -161,12 +160,12 @@ export function PrivacyPage() {
             are ever loaded.
           </p>
           <p>
-            If you opt in to Dropbox sync, the app additionally
-            talks directly from your browser to that provider&apos;s own API to
-            sign you in and to read and write your notes. Those requests go to
-            the provider, not to us. If you opt in to Nextcloud sync, the same
-            is true of the server address you enter: the app talks to that
-            server and to no one else. See <em>Optional sync</em> below.
+            If you opt in to Dropbox sync, the app additionally talks directly
+            from your browser to that provider&apos;s own API to sign you in and
+            to read and write your notes. Those requests go to the provider, not
+            to us. If you opt in to Nextcloud sync, the same is true of the
+            server address you enter: the app talks to that server and to no one
+            else. See <em>Optional sync</em> below.
           </p>
         </Section>
 

@@ -42,7 +42,8 @@ read on a phone.`,
   keywords: ["keyword", "budget", "spent", "joined"],
 
   // ≤ 4000. The product page's "What's New".
-  releaseNotes: "RELEASE NOTES — what changed, for the version this ships beside.",
+  releaseNotes:
+    "RELEASE NOTES — what changed, for the version this ships beside.",
 
   // Required, must be http(s), and deliberately not the source repository.
   supportUrl: "https://example.invalid/support/",
