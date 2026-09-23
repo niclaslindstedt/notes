@@ -75,9 +75,9 @@ Unset, each backend is simply hidden from the picker; This device, Local folder,
 and encryption work without any configuration.
 
 For the **deployed** app these are read from GitHub Actions secrets of the same
-name (`VITE_DROPBOX_APP_KEY`), while the non-secret
-`VITE_DROPBOX_APP_FOLDER` is a repository **variable** (`vars`). Adding them is
-not enough on its own — Actions does not expose secrets or variables to steps
+name (`VITE_DROPBOX_APP_KEY`, `VITE_DROPBOX_APP_FOLDER`) — the folder name is
+public, but the repo keeps every setting as a secret. Adding them is
+not enough on its own — Actions does not expose secrets to steps
 automatically, so each `npm run build` step in `.github/workflows/pages.yml`
 maps them into its `env:`. If you add a new build step or workflow that ships a
 deploy, map them there too or that build will silently disable the cloud

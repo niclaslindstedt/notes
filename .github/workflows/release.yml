@@ -186,9 +186,9 @@ jobs:
           VITE_BASE: /
           # Mirror the deploy env (pages.yml) so this build is representative.
           VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
-          VITE_DROPBOX_APP_FOLDER: ${{ vars.VITE_DROPBOX_APP_FOLDER }}
+          VITE_DROPBOX_APP_FOLDER: ${{ secrets.VITE_DROPBOX_APP_FOLDER }}
           # Optional donate link in the side menu. Unset -> the row is hidden.
-          VITE_DONATE_URL: ${{ vars.VITE_DONATE_URL }}
+          VITE_DONATE_URL: ${{ secrets.VITE_DONATE_URL }}
 
       - name: Commit + tag
         env:
@@ -295,7 +295,7 @@ jobs:
           # key's Dropbox app has to carry the loopback redirect URIs too (see
           # src/storage/dropbox/index.ts).
           dropbox-app-key: ${{ secrets.VITE_DROPBOX_APP_KEY }}
-          dropbox-app-folder: ${{ vars.VITE_DROPBOX_APP_FOLDER }}
+          dropbox-app-folder: ${{ secrets.VITE_DROPBOX_APP_FOLDER }}
 
       # Whatever this platform's bundler produced, BY EXTENSION — a step that
       # listed filenames would silently upload nothing the day a target changed

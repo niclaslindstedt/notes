@@ -17,7 +17,7 @@ variables rather than hard-coding it:
 | `APP_BUNDLE_ID`    | `ios.bundleIdentifier` and `android.package`            |
 | `EAS_PROJECT_ID`   | `extra.eas.projectId` — the Expo project to build against |
 
-Each has to exist in **two** places: as a repository variable, which
+Each has to exist in **two** places: as a repository secret, which
 [`native-build.yml`](../.github/workflows/native-build.yml) forwards, and as an
 EAS environment variable on the EAS project, because EAS resolves
 `app.config.js` again on its own builders. Unset, each falls back to a local
@@ -25,7 +25,7 @@ development default so `expo start` still works — and a `production` build
 throws in `app.config.js` rather than uploading under the wrong identity.
 
 None of the three is in the tree; read the current values from the repository
-variables or from App Store Connect / the Play Console, and don't paste them
+secrets or from App Store Connect / the Play Console, and don't paste them
 back into a file here.
 
 Build/submit profiles live in [`eas.json`](eas.json). Icons and the splash

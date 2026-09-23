@@ -12,7 +12,7 @@
 //                     most public of the three
 //   EAS_PROJECT_ID    the Expo project this builds against
 //
-// Each lives as a repository variable (which `.github/workflows/native-build.yml`
+// Each lives as a repository secret (which `.github/workflows/native-build.yml`
 // forwards) AND as an EAS environment variable on the EAS project, because EAS
 // resolves this file again on its own builders. Unset, each falls back to a
 // local development default below, so a plain checkout still runs `expo start`
