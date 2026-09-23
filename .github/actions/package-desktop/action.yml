@@ -43,6 +43,35 @@ inputs:
     description: VITE_DROPBOX_APP_FOLDER for the same build.
     required: false
     default: ""
+  # macOS SIGNING AND NOTARIZATION — all optional, and all empty in a fork.
+  # With no certificate the app is signed ad hoc, exactly as before; see
+  # .github/actions/apple-signing.
+  mac-certificate:
+    description: MAC_CSC_LINK — the Developer ID Application .p12, base64.
+    required: false
+    default: ""
+  mac-certificate-password:
+    description: MAC_CSC_KEY_PASSWORD — the password the .p12 was exported with.
+    required: false
+    default: ""
+  mac-sign-identity:
+    description: >
+      MAC_SIGN_IDENTITY — optional; read out of the certificate when empty,
+      and ignored when there is no certificate.
+    required: false
+    default: ""
+  apple-id:
+    description: APPLE_ID — the Apple Account that notarizes.
+    required: false
+    default: ""
+  apple-password:
+    description: APPLE_APP_SPECIFIC_PASSWORD — an app-specific password for it.
+    required: false
+    default: ""
+  apple-team-id:
+    description: APPLE_TEAM_ID — the ten-character team id.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -81,6 +110,18 @@ runs:
       shell: bash
       run: npm ci --prefix tauri
 
+    # Turns Tauri's ad-hoc fallback into a real Developer ID signature, by
+    # importing the certificate and exporting APPLE_SIGNING_IDENTITY for the
+    # step below. A no-op with a warning when no certificate is given, so the
+    # identity is never set without a key behind it.
+    - name: Apple signing
+      if: inputs.target == 'macos'
+      uses: ./.github/actions/apple-signing
+      with:
+        certificate: ${{ inputs.mac-certificate }}
+        certificate-password: ${{ inputs.mac-certificate-password }}
+        identity: ${{ inputs.mac-sign-identity }}
+
     # `npm run package` is `scripts/package.mjs`: `bundle-web.mjs` (which
     # builds the site with the service worker off), then `tauri build` with the
     # identity below merged over the committed config. Going through the
@@ -94,11 +135,22 @@ runs:
         RELEASE: ${{ inputs.release }}
         VITE_DROPBOX_APP_KEY: ${{ inputs.dropbox-app-key }}
         VITE_DROPBOX_APP_FOLDER: ${{ inputs.dropbox-app-folder }}
+        # NOTARIZATION. The bundler acts on these only once the app is signed
+        # with a real identity (the step above), and ignores them otherwise.
+        # `APPLE_PASSWORD` is the bundler's name for an app-specific password.
+        APPLE_ID: ${{ inputs.apple-id }}
+        APPLE_PASSWORD: ${{ inputs.apple-password }}
+        APPLE_TEAM_ID: ${{ inputs.apple-team-id }}
       run: |
         # An empty input is "not provided", not an empty value: the app falls
         # back to its defaults only for a variable that is absent.
         [ -n "$VITE_DROPBOX_APP_KEY" ] || unset VITE_DROPBOX_APP_KEY
         [ -n "$VITE_DROPBOX_APP_FOLDER" ] || unset VITE_DROPBOX_APP_FOLDER
+        # An empty Apple variable is unset for the same reason: the bundler
+        # should see no notarization credentials, not blank ones.
+        [ -n "$APPLE_ID" ] || unset APPLE_ID
+        [ -n "$APPLE_PASSWORD" ] || unset APPLE_PASSWORD
+        [ -n "$APPLE_TEAM_ID" ] || unset APPLE_TEAM_ID
         if [ "$RELEASE" = "true" ]; then
           npm run package --prefix tauri -- --require-identity
         else

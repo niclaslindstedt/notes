@@ -1,0 +1,107 @@
+name: apple-signing
+description: >
+  Unlock a Developer ID certificate so the macOS bundle is signed for real.
+
+  Apple Silicon does not merely distrust unsigned arm64 code, it refuses to
+  EXECUTE it, and reports that as "the app is damaged" — the same wording
+  macOS uses for a corrupted download. So the app is NEVER unsigned: with no
+  certificate configured the bundler falls back to an ad-hoc signature, which
+  runs but costs the user one Gatekeeper prompt. This action is what turns
+  that fallback into a real signature, and it is a no-op with a clear warning
+  when the certificate secret is empty — a fork with no Apple account
+  packages exactly as it did before.
+
+  It exports APPLE_SIGNING_IDENTITY (read by the packaging step) and
+  KEYCHAIN_PATH for the steps that follow, and ONLY once a certificate has
+  been imported: an identity with no key behind it would fail at codesign.
+  Notarization is separate: it is the APPLE_ID / APPLE_PASSWORD /
+  APPLE_TEAM_ID environment the packaging step carries, which the bundler
+  acts on only once the app is signed with a real identity.
+
+inputs:
+  certificate:
+    description: >
+      The Developer ID Application certificate as a base64-encoded .p12
+      (`base64 -i cert.p12`). Empty means ad-hoc.
+    required: false
+    default: ""
+  certificate-password:
+    description: The password the .p12 was exported with.
+    required: false
+    default: ""
+  identity:
+    description: >
+      An explicit signing identity, e.g. `Developer ID Application: Name
+      (TEAMID)`. Optional — without it the identity is read back out of the
+      imported certificate, which is one fewer secret to keep in step with
+      a renewed cert. Ignored when no certificate is given.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Import the Developer ID certificate
+      shell: bash
+      env:
+        CERTIFICATE: ${{ inputs.certificate }}
+        CERTIFICATE_PASSWORD: ${{ inputs.certificate-password }}
+        EXPLICIT_IDENTITY: ${{ inputs.identity }}
+      run: |
+        set -euo pipefail
+
+        # No certificate: say so loudly and leave APPLE_SIGNING_IDENTITY
+        # unset, which is what makes the packager choose the ad-hoc "-".
+        # An identity on its own is NOT passed on — a hosted runner has no
+        # key for it, so it would turn an ad-hoc build into a failed one.
+        if [ -z "$CERTIFICATE" ]; then
+          if [ -n "$EXPLICIT_IDENTITY" ]; then
+            echo "::warning::MAC_SIGN_IDENTITY is set but MAC_CSC_LINK is not — ignoring the identity."
+          fi
+          echo "::warning::No Developer ID certificate configured — the macOS app will be ad-hoc signed, and the first launch will be refused until the user allows it in System Settings."
+          exit 0
+        fi
+
+        # A throwaway keychain rather than the login one: it is unlocked with
+        # a password nothing else knows, it is destroyed with the runner, and
+        # it cannot collide with whatever else a hosted macOS image carries.
+        KEYCHAIN="$RUNNER_TEMP/apple-signing.keychain-db"
+        KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+        CERT_PATH="$RUNNER_TEMP/certificate.p12"
+
+        printf '%s' "$CERTIFICATE" | base64 --decode > "$CERT_PATH"
+
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+        # Six hours, and no lock-on-sleep: a Rust build is long enough that a
+        # default-locked keychain fails at the codesign step and nowhere else.
+        security set-keychain-settings -lut 21600 "$KEYCHAIN"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+        security import "$CERT_PATH" -k "$KEYCHAIN" -P "$CERTIFICATE_PASSWORD" \
+          -T /usr/bin/codesign -T /usr/bin/security
+        # Without this, codesign finds the key and then blocks on a GUI prompt
+        # that no runner can answer.
+        security set-key-partition-list -S apple-tool:,apple:,codesign: \
+          -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+        # Search order, so a plain `codesign` that was given no keychain still
+        # looks here first.
+        security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+        rm -f "$CERT_PATH"
+
+        if [ -n "$EXPLICIT_IDENTITY" ]; then
+          IDENTITY="$EXPLICIT_IDENTITY"
+        else
+          # `|| true` so an empty result reaches the error below with
+          # something to say, rather than tripping `set -e` first.
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | sed -n 's/.*"\(.*\)".*/\1/p' | head -n1 || true)
+        fi
+
+        if [ -z "$IDENTITY" ]; then
+          echo "::error::the certificate imported but no code-signing identity came out of it — is it a Developer ID Application certificate, exported with its private key?"
+          security find-identity -v -p codesigning "$KEYCHAIN" || true
+          exit 1
+        fi
+
+        echo "APPLE_SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+        echo "KEYCHAIN_PATH=$KEYCHAIN" >> "$GITHUB_ENV"
+        echo "Signing as: $IDENTITY"

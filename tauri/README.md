@@ -182,5 +182,30 @@ platforms without cutting a release.
 
 **macOS is never signed with nothing** — Apple Silicon refuses to execute
 unsigned arm64 code and reports it to the user as "the app is damaged", so the
-default is an ad-hoc signature and the user answers one Gatekeeper prompt. Set
-the `MAC_SIGN_IDENTITY` repository secret and the same job signs for real.
+default is an ad-hoc signature and the user answers one Gatekeeper prompt.
+
+### Signing and notarizing macOS
+
+Both workflows sign the macOS app from a Developer ID certificate through
+`.github/actions/apple-signing`, which `.github/actions/package-desktop` runs on
+the macOS runner: it imports the `.p12` into a throwaway keychain, reads the
+identity out of it, and exports `APPLE_SIGNING_IDENTITY` for `tauri build`,
+which then signs with the hardened runtime, notarizes and staples. Six
+repository **secrets**:
+
+| Secret                        | What it is                                                                          |
+| ----------------------------- | ----------------------------------------------------------------------------------- |
+| `MAC_CSC_LINK`                | the Developer ID Application certificate, a base64 `.p12` (`base64 -i c.p12`)       |
+| `MAC_CSC_KEY_PASSWORD`        | the password the `.p12` was exported with                                           |
+| `MAC_SIGN_IDENTITY`           | optional — `Developer ID Application: Name (TEAMID)`; read from the cert when unset |
+| `APPLE_ID`                    | the Apple Account that notarizes                                                    |
+| `APPLE_APP_SPECIFIC_PASSWORD` | an app-specific password for it (appleid.apple.com)                                 |
+| `APPLE_TEAM_ID`               | the ten-character team id                                                           |
+
+**Without them the build is exactly what it was**: no certificate means no
+identity is exported — `MAC_SIGN_IDENTITY` alone is ignored, since a runner has
+no key for it — so the app is signed ad hoc and not notarized, and a fork with
+no Apple account still packages. The release notes say which one shipped: the
+"notarized" wording appears only when `MAC_CSC_LINK` and `APPLE_ID` are both
+set. Dispatching `desktop-tauri.yml` for macOS rehearses the whole thing without
+cutting a release.
