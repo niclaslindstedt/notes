@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// The desktop half of the OAuth flow (`runLoopbackAuth`). The Electron shell
+// The desktop half of the OAuth flow (`runLoopbackAuth`). The Tauri shell
 // only holds the socket, so everything worth getting wrong is here: which URI
 // the provider is told to redirect to, that the SAME URI is replayed at the
 // token endpoint, that a redirect carrying someone else's `state` never gets

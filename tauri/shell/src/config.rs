@@ -33,10 +33,10 @@ pub const APP_HOST: &str = "localhost";
 /// The page inside the bundle that the window opens on.
 pub const APP_ENTRY: &str = "index.html";
 
-/// The app's dark surface (`SPLASH_BG` in `scripts/gen-native-icons.mjs`,
-/// `#1d2027`), painted behind the page so no white flash shows through while
-/// it loads.
-pub const BRAND_BG: (u8, u8, u8, u8) = (0x1d, 0x20, 0x27, 0xff);
+/// The app's dark plate (`THEME` in `scripts/gen-native-icons.mjs`,
+/// `#0e1116` — the same ink as the favicon and the manifest's background),
+/// painted behind the page so no white flash shows through while it loads.
+pub const BRAND_BG: (u8, u8, u8, u8) = (0x0e, 0x11, 0x16, 0xff);
 
 /// What the window is called.
 pub const WINDOW_TITLE: &str = "Notes";

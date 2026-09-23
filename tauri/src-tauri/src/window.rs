@@ -10,6 +10,7 @@ use notes_shell::config::{
     app_origin, is_internal_url, remote_app_url, start_url, BRAND_BG, DEFAULT_HEIGHT,
     DEFAULT_WIDTH, MIN_HEIGHT, MIN_WIDTH, WINDOW_TITLE,
 };
+use tauri::webview::NewWindowResponse;
 use tauri::{AppHandle, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
@@ -40,6 +41,17 @@ pub fn build(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         // the site already carries.
         .background_color(tauri::window::Color(r, g, b, a))
         .on_navigation(navigation_guard(app.clone(), origin, remote))
+        // `window.open` is how the page starts a sign-in: the provider's
+        // consent screen, in the user's own browser. This window never grows
+        // a second one — an http(s) URL goes to the browser, anything else is
+        // refused, and the page gets no window handle either way.
+        .on_new_window({
+            let app = app.clone();
+            move |url, _features| {
+                open_in_browser(&app, url.as_str());
+                NewWindowResponse::Deny
+            }
+        })
         .build()?;
 
     Ok(window)
@@ -61,15 +73,20 @@ fn navigation_guard(
         if is_internal_url(url, &origin, remote.as_deref()) {
             return true;
         }
-        // `http(s)` only: a `mailto:` or a `javascript:` reaching the opener is
-        // a mail client or a script this shell never meant to launch.
-        if url.starts_with("http://") || url.starts_with("https://") {
-            if let Err(err) = app.opener().open_url(url, None::<&str>) {
-                eprintln!("could not open {url} in the browser — {err}");
-            }
-        } else {
-            eprintln!("refused navigation to {url}");
-        }
+        open_in_browser(&app, url);
         false
+    }
+}
+
+/// Hand a URL to the user's browser. `http(s)` only: a `mailto:` or a
+/// `javascript:` reaching the opener is a mail client or a script this shell
+/// never meant to launch.
+fn open_in_browser(app: &AppHandle, url: &str) {
+    if url.starts_with("http://") || url.starts_with("https://") {
+        if let Err(err) = app.opener().open_url(url, None::<&str>) {
+            eprintln!("could not open {url} in the browser — {err}");
+        }
+    } else {
+        eprintln!("refused navigation to {url}");
     }
 }

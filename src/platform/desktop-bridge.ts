@@ -1,13 +1,13 @@
-// The seam to the Electron shell, and the desktop counterpart of
+// The seam to the Tauri shell, and the desktop counterpart of
 // `./native-bridge.ts`. Where the native bridge talks over `postMessage`, this
-// one talks over the private `notes://app` scheme the desktop build is already
-// served from: `electron/main.js` registers a protocol handler for every
-// request on it, so two reserved paths are a request/response channel that
-// costs the shell no preload, no IPC, and no second file.
+// one talks over the private `notes:` scheme the desktop build is already
+// served from: the shell answers every request on it, so two reserved paths
+// are a request/response channel that costs it no IPC and no injected
+// script.
 //
 // It carries exactly one capability, and only because a web page cannot have
-// it: **a loopback listener for one OAuth redirect**. The app runs on
-// `notes://app`, which no provider will accept as a redirect URI, so the flow
+// it: **a loopback listener for one OAuth redirect**. The app runs on the
+// `notes:` scheme, which no provider will accept as a redirect URI, so the flow
 // RFC 8252 prescribes for native apps is the only one available — open the
 // provider in the real browser, catch the redirect on `127.0.0.1`.
 //
@@ -19,10 +19,10 @@
 
 import { capabilities } from "./capabilities.ts";
 
-// The origin `electron/main.js` serves the app from, and the two paths it
-// answers on. Deliberately the same constants on both sides — change one and
-// the connect flow fails with a 404 that looks like a missing asset.
-const DESKTOP_ORIGIN = "notes://app";
+// The two paths the shell answers on (`tauri/shell/src/oauth.rs`), asked of
+// the page's own origin — which is the shell's, however the platform spells
+// it. Deliberately the same constants on both sides — change one and the
+// connect flow fails with a 404 that looks like a missing asset.
 const BEGIN_PATH = "/__oauth/begin";
 const AWAIT_PATH = "/__oauth/await";
 
@@ -41,7 +41,7 @@ async function ask(path: string): Promise<LoopbackReply> {
   }
   let res: Response;
   try {
-    res = await fetch(`${DESKTOP_ORIGIN}${path}`);
+    res = await fetch(`${window.location.origin}${path}`);
   } catch (err) {
     throw new Error(`Could not reach the desktop shell: ${String(err)}`, {
       cause: err,

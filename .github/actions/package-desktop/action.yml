@@ -33,6 +33,16 @@ inputs:
       development identity.
     required: false
     default: "false"
+  dropbox-app-key:
+    description: >
+      VITE_DROPBOX_APP_KEY for the site build inside the package. Empty builds
+      an app with no Dropbox backend to offer.
+    required: false
+    default: ""
+  dropbox-app-folder:
+    description: VITE_DROPBOX_APP_FOLDER for the same build.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -82,7 +92,13 @@ runs:
         APP_DISPLAY_NAME: ${{ inputs.display-name }}
         APP_BUNDLE_ID: ${{ inputs.bundle-id }}
         RELEASE: ${{ inputs.release }}
+        VITE_DROPBOX_APP_KEY: ${{ inputs.dropbox-app-key }}
+        VITE_DROPBOX_APP_FOLDER: ${{ inputs.dropbox-app-folder }}
       run: |
+        # An empty input is "not provided", not an empty value: the app falls
+        # back to its defaults only for a variable that is absent.
+        [ -n "$VITE_DROPBOX_APP_KEY" ] || unset VITE_DROPBOX_APP_KEY
+        [ -n "$VITE_DROPBOX_APP_FOLDER" ] || unset VITE_DROPBOX_APP_FOLDER
         if [ "$RELEASE" = "true" ]; then
           npm run package --prefix tauri -- --require-identity
         else

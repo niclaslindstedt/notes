@@ -8,12 +8,12 @@ import { capabilities, platform } from "../../src/platform/capabilities.ts";
  * `showDirectoryPicker`, so each test states only the surface it cares about
  * and restores it afterwards.
  */
-function setProtocol(protocol: string, hostname = "app") {
+function setProtocol(protocol: string, hostname = "localhost") {
   const url = `${protocol}//${hostname}/index.html`;
   window.history.replaceState(null, "", "/");
   Object.defineProperty(window, "location", {
     configurable: true,
-    value: { ...window.location, protocol, href: url },
+    value: { ...window.location, protocol, hostname, href: url },
   });
 }
 
@@ -33,9 +33,21 @@ describe("platform", () => {
     expect(platform()).toBe("web");
   });
 
-  it("is desktop behind the Electron shell's private scheme", () => {
+  it("is desktop behind the Tauri shell's private scheme", () => {
     setProtocol("notes:");
     expect(platform()).toBe("desktop");
+  });
+
+  // WebView2 maps the registered scheme onto `http://notes.localhost`, so on
+  // Windows the protocol says nothing and the host is the tell.
+  it("is desktop on Windows, where the scheme becomes a localhost host", () => {
+    setProtocol("http:", "notes.localhost");
+    expect(platform()).toBe("desktop");
+  });
+
+  it("is still web on a plain localhost dev server", () => {
+    setProtocol("http:", "localhost");
+    expect(platform()).toBe("web");
   });
 
   it("is native inside the React Native WebView wrapper", () => {
@@ -103,8 +115,9 @@ describe("capabilities", () => {
     expect(capabilities().folderPicker).toBe(true);
   });
 
-  // The desktop shell is Chromium, so the folder backend stays available
-  // there — losing cloud sync must not be read as losing sync altogether.
+  // On Windows the desktop shell's webview is Chromium (WebView2), so the
+  // folder backend stays available there — losing redirect OAuth must not be
+  // read as losing sync altogether.
   it("keeps the folder picker on the desktop", () => {
     setProtocol("notes:");
     (window as unknown as Record<string, unknown>).showDirectoryPicker =

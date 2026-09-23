@@ -6,15 +6,15 @@ name: Release
 # optional `breaking: true` — see scripts/release/compute-bump.mjs),
 # then consumes those fragments into a new CHANGELOG section, bumps
 # package.json, tags vX.Y.Z, pushes, creates a DRAFT GitHub Release,
-# packages the Electron desktop app for Windows / macOS (Intel and Apple
-# Silicon) / Linux and attaches those archives to it, publishes the
-# release once every archive is up, and chains into pages.yml so the new
+# packages the Tauri desktop app (tauri/) for Windows / macOS / Linux and
+# attaches those installers to it, publishes the release once every
+# installer is up, and chains into pages.yml so the new
 # tag is served at `/` (and the same code at `/preview/` because main
 # now matches the tag) without waiting for the next push.
 #
 # The web deploy does NOT wait for the desktop packaging: the site is the
 # app, it builds from the tag that already exists, and holding it back
-# for four Electron builds would delay every user who never downloads one.
+# for three desktop builds would delay every user who never downloads one.
 #
 # `bump` defaults to `auto` — the fragment-derived bump above. Set it to
 # an explicit patch/minor/major only to override that derivation.
@@ -141,8 +141,8 @@ jobs:
 
       # The notes are the changelog section plus a standing footer about the
       # desktop downloads. The macOS half of that footer is not decoration:
-      # the archives are signed but not notarized unless the Apple secrets are
-      # set (see electron/README.md), so Gatekeeper refuses the first launch,
+      # the app is signed ad hoc unless a signing identity is set (see
+      # tauri/README.md), so Gatekeeper refuses the first launch,
       # and someone with no answer to that prompt has no app.
       - name: Extract release-notes body
         run: |
@@ -153,9 +153,8 @@ jobs:
 
           ### Desktop downloads
 
-          The same app in its own window. Pick the archive for your machine:
-          `mac-arm64` for Apple Silicon (M1 and later), `mac-x64` for an Intel
-          Mac.
+          The same app in its own window: the `.exe` for Windows, the `.dmg`
+          for macOS, and the `.AppImage` or `.deb` for Linux.
 
           **macOS:** the app is signed but not notarized, so the first launch
           is refused. Open **System Settings → Privacy & Security**, scroll to
@@ -164,7 +163,7 @@ jobs:
 
           Dropbox sync works here too: signing in opens your normal browser
           and hands the app back the result. The desktop build otherwise stores
-          notes locally or in a folder you pick.
+          notes locally or in a folder you pick (on Windows).
           NOTES
 
       - name: Sanity build
@@ -222,16 +221,15 @@ jobs:
             gh release create "$TAG" --draft --title "$TAG" --notes-file .release-notes.md
           fi
 
-  # The downloadable desktop builds, attached to the release the job above
-  # created. One runner per platform, because each one packages that platform's
-  # Electron binary and the archive has to be built where the app was. macOS
-  # builds BOTH slices — Intel and Apple Silicon — as separate artifacts rather
-  # than one universal binary, so neither download carries a copy of Chromium
-  # the machine will never run.
+  # THE DOWNLOADS. One runner per platform, because each packages the app for
+  # its own OS and an installer has to be built where the app was: an `.msi`
+  # and `.exe` on Windows, a `.dmg` on macOS, a `.deb` and an `.AppImage` on
+  # Linux.
   #
-  # Four archives come out: two macOS zips, a Windows zip, a Linux tar.gz.
-  # Archives rather than installers — see electron/electron-builder.config.cjs
-  # for why an unsigned installer is a promise this project cannot keep.
+  # It checks out the TAG rather than main, so what ships is exactly what was
+  # released — the tag names the release commit, which carries the changelog and
+  # the bumped `package.json`, and `tauri.conf.json` reads its version straight
+  # out of that file.
   desktop:
     needs: release
     name: desktop (${{ matrix.target }})
@@ -241,74 +239,57 @@ jobs:
         include:
           - os: windows-latest
             target: windows
-            script: dist:win
           - os: macos-latest
             target: macos
-            script: dist:mac
           - os: ubuntu-latest
             target: linux
-            script: dist
     runs-on: ${{ matrix.os }}
     permissions:
-      # contents: write — the archives are uploaded onto the GitHub Release.
+      # contents: write — the installers are uploaded onto the GitHub Release.
       contents: write
-      # packages: read — the root `npm ci` pulls @niclaslindstedt from
-      # GitHub Packages when GITHUB_PAT falls back to the workflow token.
+      # npm ci resolves @niclaslindstedt/oss-framework from GitHub Packages.
       packages: read
     env:
-      # The release commit is on the tag, so the build is made from exactly
-      # what was tagged rather than from whatever main looks like by now.
       TAG: ${{ needs.release.outputs.tag }}
-      # macOS SIGNING — optional here, but the build is never unsigned. Apple
-      # Silicon refuses to EXECUTE unsigned arm64 code and reports that as
-      # "the app is damaged", so electron-builder signs ad hoc when none of
-      # these are set (see electron/electron-builder.config.cjs). Set them and
-      # the same job signs and notarizes for real. Every one is empty until
-      # somebody adds it, and empty means "not provided" to electron-builder.
-      CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-      CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      # macOS SIGNING — optional, but the build is never left unsigned.
+      #
+      # Apple Silicon refuses to execute unsigned arm64 code and reports it to
+      # the user as "the app is damaged", so an unsigned arm64 download is not
+      # a download at all. Tauri therefore signs AD HOC when this is empty: the
+      # app runs natively and the user answers one Gatekeeper prompt. Set the
+      # secret and the same job signs for real.
+      APPLE_SIGNING_IDENTITY: ${{ secrets.MAC_SIGN_IDENTITY }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.release.outputs.tag }}
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/package-desktop
         with:
-          node-version-file: .nvmrc
-          cache: npm
+          target: ${{ matrix.target }}
+          npm-token: ${{ secrets.GITHUB_TOKEN }}
+          display-name: ${{ secrets.APP_DISPLAY_NAME }}
+          bundle-id: ${{ secrets.APP_BUNDLE_ID }}
+          release: "true"
+          # Without the key the packaged app has no Dropbox app to sign in to.
+          # The desktop signs in through the shell's loopback listener, so the
+          # key's Dropbox app has to carry the loopback redirect URIs too (see
+          # src/storage/dropbox/index.ts).
+          dropbox-app-key: ${{ secrets.VITE_DROPBOX_APP_KEY }}
+          dropbox-app-folder: ${{ vars.VITE_DROPBOX_APP_FOLDER }}
 
-      # Two installs: the web app builds from the root tree, and `electron/`
-      # has its own dependency tree (it is not a workspace member).
-      - run: npm ci
-      - run: npm ci
-        working-directory: electron
-
-      # The same build-time key the web deploy gets. Without
-      # VITE_DROPBOX_APP_KEY the packaged app has no Dropbox app to sign in to
-      # and the picker's Dropbox row stays disabled — the loopback flow the
-      # shell provides is necessary but not sufficient (see
-      # ../../src/platform/capabilities.ts).
-      - name: Package
-        shell: bash
-        run: npm --prefix electron run ${{ matrix.script }}
-        env:
-          VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
-          VITE_DROPBOX_APP_FOLDER: ${{ vars.VITE_DROPBOX_APP_FOLDER }}
-
-      # Matched by extension rather than by filename, so a job that changed
-      # target suffix fails loudly instead of silently uploading nothing.
+      # Whatever this platform's bundler produced, BY EXTENSION — a step that
+      # listed filenames would silently upload nothing the day a target changed
+      # its suffix, and `if-no-files-found` has no equivalent here.
       - name: Attach to the release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          shopt -s nullglob
-          assets=(electron/release/*.zip electron/release/*.tar.gz)
+          shopt -s nullglob globstar
+          assets=(tauri/target/release/bundle/**/*.{dmg,deb,AppImage,exe,msi})
           if [ ${#assets[@]} -eq 0 ]; then
             echo "::error::${{ matrix.target }} produced no distributable files"
-            ls -R electron/release || true
+            ls -R tauri/target/release/bundle || true
             exit 1
           fi
           printf 'uploading %s\n' "${assets[@]}"

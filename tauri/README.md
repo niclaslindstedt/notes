@@ -135,19 +135,18 @@ identifier it installs under arrive at packaging time, as the phone app's do:
 
 `scripts/package.mjs` merges them over the committed config with
 `tauri build --config`. Unset, a local package runs under the development
-identity; a release package passes `--require-identity` and refuses it.
+identity; the release workflow passes `--require-identity` and refuses it.
 **The identifier is also where the data lives** — each desktop webview keys its
 storage by it — so changing it after a release strands every installed copy's
 notes.
 
-### Not in the release yet
+### Nothing else to do
 
-The release still ships the Electron desktop app (`../electron/`): its
-`desktop` job in `.github/workflows/release.yml` attaches those archives. This
-shell is packaged on demand by dispatching `.github/workflows/desktop-tauri.yml`,
-which builds all three platforms and keeps the installers as run artifacts.
-Putting it into the release means choosing between the two desktop apps, since
-shipping both would offer two downloads per platform.
+`.github/workflows/release.yml` packages this shell on one
+runner per platform for every release and attaches the installers to the
+GitHub Release — a `.exe` on Windows, a `.dmg` on macOS, an `.AppImage` and a
+`.deb` on Linux. The release is created as a draft and only published once all
+three have uploaded, so a release page never appears with a download missing.
 
 The version comes from the root `package.json` (`tauri.conf.json` names that
 file rather than repeating the number), and the release job checks out the tag,

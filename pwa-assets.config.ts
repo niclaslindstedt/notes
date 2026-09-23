@@ -5,7 +5,7 @@ import {
 
 // Drives @vite-pwa/assets-generator. Source: public/favicon.svg.
 // Output (committed): public/pwa-{64,192,512}.png,
-// public/maskable-icon-{512,1024}.png, and
+// public/maskable-icon-512x512.png, and
 // public/apple-touch-icon-180x180.png. The manifest in `vite.config.ts`
 // references the same icon bytes.
 //
@@ -25,15 +25,11 @@ import {
 // the background — it does NOT inset only the artwork, so it compounds with
 // the mark's own scale in `favicon.svg`. Change either and re-check both.
 //
-// The maskable variant is generated at **1024 as well as 512**, and the
-// larger one is what `electron/electron-builder.config.cjs` packages as the
-// desktop app icon — not because a desktop needs a mask, but because
-// "opaque, edge-to-edge, glyph inside a safe zone" is exactly what the
-// macOS 26 Dock wants. It masks every app icon into the system squircle;
-// artwork carrying a transparent margin is read as a small legacy icon and
-// gets inset onto a light backdrop instead (the white plate this replaces).
-// 1024 is the largest slice an `.icns` holds, so anything smaller leaves
-// the Dock upscaling on a Retina display.
+// The desktop app's icons are not made here: `scripts/gen-native-icons.mjs`
+// cuts them for `tauri/src-tauri/icons/` from the same mark, opaque and edge
+// to edge, which is what the macOS Dock wants — it masks every app icon into
+// the system squircle, and artwork with a transparent margin is read as a
+// small legacy icon and inset onto a light backdrop.
 
 const THEME_BACKGROUND = "#0e1116";
 
@@ -52,7 +48,7 @@ export default defineConfig({
     },
     maskable: {
       ...preset.maskable,
-      sizes: [512, 1024],
+      sizes: [512],
       padding: 0.1,
       resizeOptions: { fit: "contain", background: THEME_BACKGROUND },
     },

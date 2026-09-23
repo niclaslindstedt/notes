@@ -9,7 +9,7 @@ generated assets.
 | Variable            | Default | Purpose                                                                                 |
 | ------------------- | ------- | --------------------------------------------------------------------------------------- |
 | `VITE_BASE`         | `/`     | The base path the app is served from. `pages.yml` sets this per deploy slot — `/` (production), `/preview/`, or `/branch/` — so one bundle serves any of them. |
-| `APP_DISPLAY_NAME`  | `Notes` | The mobile store listing's name — read **only** when `VITE_TARGET=native`, and by `native/app.config.js` for `expo.name`. The web and Electron builds always use the project name. In the app it surfaces as `APP_NAME` (`src/build-env.ts`, from the `__APP_NAME__` define, and `%APP_NAME%` in `index.html`). |
+| `APP_DISPLAY_NAME`  | `Notes` | The mobile store listing's name — read **only** when `VITE_TARGET=native`, and by `native/app.config.js` for `expo.name`. The web and desktop page builds always use the project name (the desktop package's own name comes from the same variable, at packaging time). In the app it surfaces as `APP_NAME` (`src/build-env.ts`, from the `__APP_NAME__` define, and `%APP_NAME%` in `index.html`). |
 | `GITHUB_RUN_NUMBER` | —       | Set by GitHub Actions; appended to the build label so you can tell which build is live. |
 
 None are required for local development — every one has a working default.

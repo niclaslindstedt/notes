@@ -19,10 +19,12 @@
 //! permission list (`capabilities/default.json`), no commands to reach the
 //! shell by, and a window pinned to our own origin (`window::navigation_guard`).
 
+mod loopback;
 mod protocol;
 mod window;
 
 use notes_shell::config::APP_SCHEME;
+use notes_shell::oauth::{AWAIT_PATH, BEGIN_PATH};
 use notes_shell::webroot::webroot_exists;
 use tauri::{Manager, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
@@ -45,9 +47,24 @@ fn main() {
         // THE WHOLE APP, served off local disk from one stable origin. See
         // `notes_shell::webroot` for the three properties this arrangement is
         // for and how each is kept.
-        .register_uri_scheme_protocol(APP_SCHEME, |ctx, request| {
-            let root = protocol::webroot_dir(ctx.app_handle());
-            protocol::serve(&request, &root)
+        //
+        // Asynchronous for ONE path: `/__oauth/await` holds its answer until
+        // the sign-in redirect lands on the loopback listener (see
+        // `notes_shell::oauth`), which can be minutes, so it answers from a
+        // thread of its own. Everything else answers at once, as before.
+        .register_asynchronous_uri_scheme_protocol(APP_SCHEME, |ctx, request, responder| {
+            match request.uri().path() {
+                BEGIN_PATH => responder.respond(protocol::json(loopback::begin())),
+                AWAIT_PATH => {
+                    std::thread::spawn(move || {
+                        responder.respond(protocol::json(loopback::wait()));
+                    });
+                }
+                _ => {
+                    let root = protocol::webroot_dir(ctx.app_handle());
+                    responder.respond(protocol::serve(&request, &root));
+                }
+            }
         })
         .setup(|app| {
             let handle = app.handle().clone();

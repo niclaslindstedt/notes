@@ -8,8 +8,8 @@ declare const __BUILD_LABEL__: string;
 // `APP_DISPLAY_NAME` build variable (generic default when unset).
 declare const __APP_NAME__: string;
 // True only in the wrapper builds that embed the bundle locally — the native
-// WebView shell (`VITE_TARGET=native`) and the Electron desktop shell
-// (`VITE_TARGET=electron`); false on the web. Gates paths that assume a
+// WebView shell (`VITE_TARGET=native`) and the Tauri desktop shell
+// (`VITE_SHELL_BUILD=on`); false on the web. Gates paths that assume a
 // service worker / HTTP origin.
 declare const __EMBEDDED__: boolean;
 

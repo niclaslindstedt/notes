@@ -104,6 +104,11 @@ jobs:
         run: echo '<!doctype html><title>placeholder</title>' > webroot/index.html
       - name: clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+      # The effects crate's own tests — the loopback sign-in on a real socket —
+      # need the same libraries to link, so they run here rather than in the
+      # decision-layer job.
+      - name: effects tests
+        run: cargo test -p notes-tauri
 
   package:
     name: package (${{ matrix.target }})

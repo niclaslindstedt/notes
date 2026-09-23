@@ -10,4 +10,5 @@
 //! [`webroot`] (what one request off the bundled site resolves to).
 
 pub mod config;
+pub mod oauth;
 pub mod webroot;

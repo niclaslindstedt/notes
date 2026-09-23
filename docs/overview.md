@@ -2649,7 +2649,7 @@ space — and where cutting acts on the picked run rather than on a caret, so
 with nothing picked the press is a no-op rather than a cut of the line an
 invisible caret was last left on. Otherwise it follows the pointer
 rather than the [platform](#capabilities), because the reason is the
-input device, not the shell — the Electron window and a desktop browser tab are
+input device, not the shell — the desktop app's window and a desktop browser tab are
 the same case, and a tablet running the PWA is not.
 
 What exactly goes is decided by the pure `cutLine` (`src/domain/line-edit.ts`),
@@ -6235,11 +6235,9 @@ generator insets the artwork before centring it on the dark background:
 - **`maskable-icon-512x512.png`** (`purpose: "maskable"`) — padding 0.1, which
   shrinks the mark to ~61% so every foreground pixel clears the W3C
   80%-diameter safe circle whatever shape an Android launcher masks it with.
-- **`maskable-icon-1024x1024.png`** — the same artwork at the largest size an
-  `.icns` carries. It is not in the manifest and is excluded from the
-  service-worker precache; it exists solely as `ICON` in
-  `electron/electron-builder.config.cjs`, which converts it into the desktop
-  app's `.icns` / `.ico` / PNG set.
+- The **desktop app's icons** (`tauri/src-tauri/icons/`) are not made here:
+  `scripts/gen-native-icons.mjs` cuts them from the same mark, in the RGBA and
+  `.ico` flavours Tauri requires.
 
 Every output is **fully opaque, edge-to-edge** — there is no transparent margin
 anywhere in the set. That is a requirement, not a stylistic choice: iOS paints
@@ -6268,7 +6266,7 @@ change or the brand splits:
 | `FAVICON_BG` in `src/ui/namespace-favicon.ts`                  | the same plate on the favicon path                   |
 | `THEME` in `scripts/gen-native-icons.mjs`                      | `native/assets/{icon,adaptive-icon}.png`             |
 | `android.adaptiveIcon.backgroundColor` in `native/app.config.js` | the Android launcher plate behind the adaptive icon |
-| the two `#0e1116` in `electron/main.js`                        | the desktop window background and its loading screen |
+| `BRAND_BG` in `tauri/shell/src/config.rs`                      | the desktop window background while the page loads  |
 
 Retoning the SVG means rerunning **both** generators — `make icons` for
 `public/`, `node scripts/gen-native-icons.mjs` for `native/assets/` — and
@@ -6328,7 +6326,7 @@ the tile outside it, and no other surface can pick the listing name up.
 
 It is a build variable rather than an i18n string on purpose — it is a proper
 noun, identical in every language. The project's identity keys (`expo.slug`,
-`scheme`, the Electron `appId`, the executable and archive names) are
+`scheme`, the desktop app's `notes:` scheme and executable name) are
 deliberately independent of it.
 
 ### Embedded (wrapper) builds
@@ -6336,7 +6334,7 @@ deliberately independent of it.
 `isEmbedded` / `__EMBEDDED__` (`vite.config.ts`, `src/vite-env.d.ts`) — true
 when the bundle is being built for one of the two wrappers that ship the app as
 a downloadable binary: `VITE_TARGET=native` (the React Native WebView shell in
-`native/`) or `VITE_TARGET=electron` (the desktop shell in `electron/`). It
+`native/`) or `VITE_SHELL_BUILD=on` (the Tauri desktop shell in `tauri/`). It
 flips three things at once: the asset base becomes relative (`./`) so
 `/assets/...` URLs resolve under a `file://` or private-scheme origin; VitePWA
 is disabled, because offline is already guaranteed by the on-device bundle and
@@ -6351,8 +6349,9 @@ worker to register.
 `platform()` / `capabilities()` (`src/platform/capabilities.ts`) — the single
 answer to *which surface is this, and what can it do*. `platform()` returns
 `"native"` (the `native/` WebView wrapper, detected by
-`window.ReactNativeWebView`), `"desktop"` (the `electron/` shell, detected by
-its private `notes:` scheme), or `"web"`. `capabilities()` turns that into the
+`window.ReactNativeWebView`), `"desktop"` (the `tauri/` shell, detected by
+its private `notes:` scheme — or the `notes.localhost` host WebView2 maps it
+onto on Windows), or `"web"`. `capabilities()` turns that into the
 four things that actually differ:
 
 - **`folderPicker`** — the File System Access API behind the
@@ -6390,9 +6389,10 @@ web client — so it stays gated on `redirectOauth` alone.
 
 `runLoopbackAuth` (`src/storage/oauth-pkce.ts`) + `beginLoopbackRedirect` /
 `awaitLoopbackRedirect` (`src/platform/desktop-bridge.ts`) + the listener in
-`electron/main.js` — how the desktop build signs in to a cloud provider at all.
+the Tauri shell (`tauri/shell/src/oauth.rs`, `tauri/src-tauri/src/loopback.rs`)
+— how the desktop build signs in to a cloud provider at all.
 
-The problem it solves: the desktop app is served from `notes://app`, and no
+The problem it solves: the desktop app is served from the `notes:` scheme, and no
 provider will accept a custom scheme as a redirect URI, so the web flow
 (`startAuth` navigating away and the provider redirecting back to the app's own
 origin) has nowhere to land. The answer is the one RFC 8252 prescribes for
@@ -6400,7 +6400,7 @@ native apps — open the consent screen in the user's **real browser**, and
 receive the redirect on a loopback listener the app opens for the occasion.
 
 The split is deliberate and is the same one the
-[native bridge](#notesd-backend) makes. The Electron shell holds the socket and
+[native bridge](#notesd-backend) makes. The Tauri shell holds the socket and
 nothing else: it binds `127.0.0.1` (never `0.0.0.0`, which would put a listener
 holding a live authorization code on the local network), takes the first free
 port of three fixed ones, closes the instant a redirect arrives, and times out
@@ -6410,11 +6410,11 @@ the token exchange — is in `runLoopbackAuth`, which also passes the loopback
 URI explicitly to `completeAuth`, since `window.location` knows nothing about
 it and the providers re-check the URI at the token endpoint.
 
-It needs no preload and no IPC: the page reaches the shell by `fetch`ing two
-reserved paths (`__oauth/begin`, `__oauth/await`) on the `notes://` scheme the
-protocol handler already serves. The ports are fixed rather than ephemeral
+It needs no IPC and no injected script: the page reaches the shell by
+`fetch`ing two reserved paths (`__oauth/begin`, `__oauth/await`) on its own
+origin, which the shell's scheme handler already serves. The ports are fixed rather than ephemeral
 because providers match redirect URIs exactly, so each one has to be on the
-Dropbox app's allowlist up front — `LOOPBACK_PORTS` in `electron/main.js` and
+Dropbox app's allowlist up front — `LOOPBACK_PORTS` in `tauri/shell/src/oauth.rs` and
 the list in `src/storage/dropbox/index.ts`'s header comment are the two halves
 of that, and drift between them fails at the consent screen.
 
@@ -6424,54 +6424,45 @@ round-trip; on the desktop the whole thing resolves in place, so the tokens are
 stored right there and a failure rejects to the settings panel — there being no
 redirect to explain a silent one.
 
-### Desktop app (Electron)
+### Desktop app
 
-`electron/` — a **thin** Electron window around the same compiled web app. The
-entire main process is `electron/main.js`: it registers a private `notes://app`
-scheme, serves `electron/webroot/` (the embedded build, written by
-`electron/scripts/bundle-web.mjs`) from it, opens one sandboxed
-context-isolated window, and sends off-origin links to the system browser.
-There is no preload, no IPC, and no storage the renderer can see — the embedded
-app runs its own `localStorage`, exactly as it does in a browser tab. It is
-plain CommonJS rather than TypeScript (compiling one file would put generated
-output between the source and what runs), but not unchecked: `// @ts-check`
-plus `electron/jsconfig.json` type-check it against Electron's own
-`electron.d.ts` with no emit, run by the `electron` job in `ci.yml` because the
-root `make lint` / `make test` stop at that directory's edge.
+`tauri/` — a **thin** [Tauri](https://tauri.app) window around the same
+compiled web app, in the platform's own webview (WebView2, WKWebView,
+WebKitGTK). It registers a private `notes:` scheme, serves `tauri/webroot/`
+(the embedded build, written by `tauri/scripts/bundle-web.mjs` with
+`VITE_SHELL_BUILD=on`) from it, opens one window, and sends off-origin links
+and `window.open` to the system browser. There is no IPC and no injected
+script — the embedded app runs its own `localStorage`, exactly as it does in a
+browser tab. It is two Rust crates: `tauri/shell/` holds every decision and
+needs no GUI libraries (so its tests run anywhere), `tauri/src-tauri/` holds
+every effect. `desktop-tauri.yml` runs the tests and clippy on every push that
+touches the tree, because the root `make lint` / `make test` stop at its edge.
 
-The one thing the shell owns is the window's **remembered size and position**
-(`window-state.json` in the app's user-data directory, written on `close`),
-because a web page cannot size or place its own OS window. It reads that file
-defensively: bounds are saved from `getNormalBounds` so a maximized window does
-not restore at screen size forever, a rectangle that no longer overlaps any
-connected display keeps its size but drops its position (an unplugged monitor
-would otherwise strand the window off-screen), and an unreadable or malformed
-file falls through to the 1100×800 default.
-
-The private scheme rather than `loadFile` is the one load-bearing decision:
+The private scheme rather than a file URL is the one load-bearing decision:
 `localStorage` is keyed by origin and a `file://` page is an *opaque* origin, so
-notes would depend on where the app happened to be installed. `notes://app` is
-a constant, so notes survive updates and moves. It must be registered before
-Electron's `ready` event — a scheme registered late loads the page as an opaque
-origin anyway, with no `localStorage` at all.
+notes would depend on where the app happened to be installed. The scheme's
+origin is a constant — `notes://localhost`, or `http://notes.localhost` on
+Windows, where WebView2 maps a registered scheme onto a localhost host — so
+notes survive updates and moves.
 
-`electron-builder.config.cjs` packages an **archive** per platform (Windows
-zip, macOS zip for x64 and arm64 separately, Linux tar.gz) rather than an
-installer, because an unsigned installer trips SmartScreen / Gatekeeper; it
-reads the app's real version from the root `package.json`, and always signs the
-macOS build — ad hoc when no Apple credentials are present, since Apple Silicon
-refuses to execute unsigned arm64 code at all. The `desktop` job in
-`.github/workflows/release.yml` builds all four on one runner per platform and
+The one capability the shell adds is the **loopback OAuth listener** (see
+[Loopback OAuth](#loopback-oauth)): the page cannot hold a listening socket,
+and no provider will redirect to a `notes:` origin. `tauri/shell/src/oauth.rs`
+owns the paths, ports and replies; `tauri/src-tauri/src/loopback.rs` holds the
+socket.
+
+`tauri/scripts/package.mjs` packages installers — a `.exe` on Windows, a `.dmg`
+on macOS, an `.AppImage` and a `.deb` on Linux — merging `APP_DISPLAY_NAME` and
+`APP_BUNDLE_ID` over the committed development identity. The `desktop` job in
+`.github/workflows/release.yml` builds them on one runner per platform and
 attaches them to the draft release, which the `publish` job then makes public.
+macOS is always signed — ad hoc when no signing identity is set, since Apple
+Silicon refuses to execute unsigned arm64 code at all.
 
-The cloud backend (Dropbox) is **not offered** in the desktop
-app — `capabilities().redirectOauth` is false there, so the storage picker
-shows both rows disabled the way it already does for the folder backend on
-Safari. Their OAuth flows redirect to a registered `https://` URL, which
-`notes://app` is not. Local storage and the picked-folder backend work as they
-do on the web. See [Capabilities](#capabilities), `electron/README.md`, and
-AGENTS.md's "The wrappers are thin" for the rule about what may live in that
-directory (in short: nothing that could live in `src/`).
+The window opens at its default size each launch; the shell keeps no window
+state. See [Capabilities](#capabilities), `tauri/README.md`, and AGENTS.md's
+"The wrappers are thin" for the rule about what may live in that directory (in
+short: nothing that could live in `src/`).
 
 ### Code splitting
 
@@ -6526,7 +6517,7 @@ safe because the toggle is off at mount and the adapter is only ever swapped in
 mid-session.
 
 **The wrappers get none of this.** `vite.config.ts` turns on
-`inlineDynamicImports` for the embedded builds, so `native/` and `electron/`
+`inlineDynamicImports` for the embedded builds, so `native/` and `tauri/`
 emit exactly one chunk, the shape they have always shipped. Splitting is a
 network optimisation and a wrapper has no network — it loads the bundle off the
 device — while the native WebView serves the page from a `file://` origin,

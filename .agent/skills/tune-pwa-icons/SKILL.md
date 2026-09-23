@@ -23,12 +23,11 @@ notes derives its whole PWA icon set from **one source SVG** with
   `VitePWA({ manifest: { icons: [...] } })`. It lists `pwa-64x64.png`,
   `pwa-192x192.png`, `pwa-512x512.png` (`purpose` defaults to `any`) and
   `maskable-icon-512x512.png` (`purpose: "maskable"`).
-- **The desktop packaging config**, `electron/electron-builder.config.cjs`.
-  Its `ICON` points at `maskable-icon-1024x1024.png`, which
-  electron-builder converts into the `.icns` / `.ico` / PNG set the
-  downloadable app ships with. That file is generated but deliberately
-  **not** in the manifest and is excluded from the service-worker
-  precache in `vite.config.ts` — it is packaging input, not a web asset.
+- **The desktop app's icons**, `tauri/src-tauri/icons/`. Not made by
+  `make icons`: `node scripts/gen-native-icons.mjs` cuts them from the same
+  mark (RGBA PNGs at 32–512 and a DIB-flavoured `icon.ico`), which Tauri
+  bundles into the `.icns` / `.ico` / PNG set the downloadable app ships
+  with.
 
 Running `make icons` (→ `pwa-assets-generator`) reads
 `public/favicon.svg`, applies the config, and writes the committed PNGs
@@ -42,7 +41,6 @@ public/favicon.svg            (the single source of truth)
    ├─ public/pwa-192x192.png             ← manifest icon (any)
    ├─ public/pwa-512x512.png             ← manifest icon (any)
    ├─ public/maskable-icon-512x512.png   ← manifest icon (maskable)
-   ├─ public/maskable-icon-1024x1024.png ← desktop app icon (electron-builder)
    ├─ public/apple-touch-icon-180x180.png ← <link rel="apple-touch-icon"> in index.html
    └─ public/favicon.ico                 ← legacy browser tab
    │  make build   (vite build → vite-plugin-pwa)
@@ -83,8 +81,8 @@ Also invoke when:
   `public/favicon.svg`.
 - Adding or removing an icon size from the manifest `icons` array, or
   tuning any variant's padding in `pwa-assets.config.ts`.
-- Changing which generated PNG `electron/electron-builder.config.cjs`
-  packages as the desktop app icon.
+- Changing the desktop app's icons (`scripts/gen-native-icons.mjs` →
+  `tauri/src-tauri/icons/`).
 
 Do **not** invoke for unrelated visual work (in-app DOM/CSS — that's
 the theme/styles work in `src/styles/theme.css`; the social-preview /
@@ -213,11 +211,11 @@ outside the safe-zone circle under a tight circular mask.
 
 ## Desktop app icon — what good looks like
 
-`electron-builder` converts one PNG into the `.icns` (macOS), `.ico`
+Tauri bundles `tauri/src-tauri/icons/` into the `.icns` (macOS), `.ico`
 (Windows) and PNG set (Linux) the downloadable app ships with. All three
-platforms draw a square tile or apply their own mask, so the source must
-be **opaque and edge-to-edge**; that is why `ICON` points at the
-*maskable* variant rather than `pwa-512x512.png`.
+platforms draw a square tile or apply their own mask, so the icons must be
+**opaque and edge-to-edge** — `scripts/gen-native-icons.mjs` renders them on
+the full `THEME` plate with no margin.
 
 macOS is the one that punishes getting this wrong, and it changed:
 
@@ -225,14 +223,13 @@ macOS is the one that punishes getting this wrong, and it changed:
 | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Zero transparency anywhere in the icon** — not even a 2% margin.                       | macOS 26 masks every app icon into the system squircle. Artwork that carries its own margin is read as a legacy icon: the Dock insets it further and fills the rest of the shape with a light backdrop, so a dark app shows up as a small tile on a white plate. Opaque artwork simply fills the mask. |
 | **Don't round the corners in the source.** Same rule as maskable.                        | The Dock's mask is the rounding. Pre-rounded artwork either double-rounds or leaves the system backdrop showing in the four corners.                                                                                                            |
-| **1024×1024 source.** Nothing smaller.                                                   | 1024 is the largest slice an `.icns` carries. A 512 source leaves the Dock upscaling on every Retina display.                                                                                                                                   |
+| **The largest slice decides Retina sharpness.**                                          | 1024 is the largest slice an `.icns` carries; the set is currently rendered up to 512, so the Dock upscales on Retina. Adding a 1024 PNG to `TAURI_ICONS` and `tauri.conf.json`'s `bundle.icon` list is the fix if it shows.                 |
 | **Keep the mark inside the maskable safe zone.**                                         | The squircle is gentler than an Android circle, so clearing the 80%-diameter circle clears the Dock with room to spare.                                                                                                                         |
 
 The tradeoff worth naming: a full-bleed source renders as a literal
 square on macOS 15 and earlier, which apply no mask. That is the
 accepted cost of looking right on the current release — if the balance
-ever needs revisiting, the real fix is an Icon Composer `.icon` asset,
-which electron-builder cannot package today.
+ever needs revisiting, the real fix is an Icon Composer `.icon` asset.
 
 ## Common pitfalls
 
@@ -291,8 +288,8 @@ current files:
 - [ ] `maskable-icon-512x512.png` keeps every foreground pixel within
       the inner 80%-diameter circle, and its background bleeds to all
       four edges.
-- [ ] `maskable-icon-1024x1024.png` — the desktop app icon — has **no**
-      pixel with alpha below 255, anywhere. Measure it; a transparent
+- [ ] The desktop icons in `tauri/src-tauri/icons/` have **no** pixel
+      with alpha below 255, anywhere. Measure it; a transparent
       margin is what puts the macOS Dock's white plate back.
 - [ ] `pwa-192x192.png` is still legible at thumbnail size — the glyph
       is recognisable, not a blob — and `pwa-64x64.png`'s strokes haven't

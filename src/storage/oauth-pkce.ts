@@ -11,9 +11,9 @@
 //     the provider and the provider redirects back to the app's own origin, so
 //     completion happens on the next boot (`useCloudBackend`).
 //   - `runLoopbackAuth` — the desktop one, per RFC 8252. The app's origin is
-//     `notes://app`, which no provider will accept, so the consent screen
-//     opens in the user's real browser and the redirect is caught on a
-//     loopback listener the Electron shell holds. Nothing navigates, so the
+//     the `notes:` scheme, which no provider will accept, so the consent
+//     screen opens in the user's real browser and the redirect is caught on a
+//     loopback listener the Tauri shell holds. Nothing navigates, so the
 //     whole round trip resolves in one promise.
 //
 // Everything either shape decides — the challenge, the `state` check, the
@@ -126,7 +126,7 @@ export async function startAuth(config: OAuthConfig): Promise<void> {
 
 // The whole desktop sign-in, start to tokens, in one promise. Nothing
 // navigates: the consent screen opens in the user's own browser (the shell
-// turns `window.open` into `shell.openExternal`) and the provider redirects to
+// hands `window.open` to the system browser) and the provider redirects to
 // a loopback listener the shell opened for the occasion, so — unlike the web
 // flow — there is no boot effect to complete anything afterwards.
 //

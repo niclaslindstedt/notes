@@ -77,3 +77,14 @@ pub fn serve(request: &Request<Vec<u8>>, root: &std::path::Path) -> Response<Vec
         .body(body)
         .unwrap_or_else(|_| not_found(path))
 }
+
+/// A JSON answer on the app's own scheme — the loopback sign-in's two paths.
+/// Never cached: every answer is about one flow, once.
+pub fn json(body: String) -> Response<Vec<u8>> {
+    Response::builder()
+        .status(200)
+        .header("content-type", "application/json; charset=utf-8")
+        .header("cache-control", "no-store")
+        .body(body.into_bytes())
+        .unwrap_or_else(|_| Response::new(Vec::new()))
+}

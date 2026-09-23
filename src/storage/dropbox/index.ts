@@ -71,7 +71,7 @@ const log = createLogger("dropbox");
 //     from `window.location.origin` + pathname.
 //   - The desktop loopback URIs, one per port the shell may bind:
 //     `http://127.0.0.1:53682/`, `:53683/`, `:53684/` (the `LOOPBACK_PORTS`
-//     in `electron/main.js` — keep the two lists in step). Dropbox permits
+//     in `tauri/shell/src/oauth.rs` — keep the two lists in step). Dropbox permits
 //     plain `http` for loopback hosts, which is why the desktop flow works
 //     without a certificate; the trailing slash is part of the match.
 //

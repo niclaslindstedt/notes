@@ -103,7 +103,7 @@ describe("useCloudBackend", () => {
     expect(selectBackend).not.toHaveBeenCalled();
   });
 
-  // The desktop cannot complete a redirect back to `notes://app`, so the same
+  // The desktop cannot complete a redirect back to its `notes:` origin, so the same
   // verb runs the loopback flow instead — and unlike the redirect, it finishes
   // in place, so everything the boot effect would have done happens here.
   it("connectDropbox runs the loopback flow and finishes in place on the desktop", async () => {

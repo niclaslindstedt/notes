@@ -1,8 +1,8 @@
 // WHAT THIS COPY OF THE APP CAN DO — one place that answers it.
 //
 // The app ships to three surfaces: a browser tab (or installed PWA), the
-// React Native WebView wrapper in `native/`, and the Electron window in
-// `electron/`. They are the same bundle, but not every capability exists on
+// React Native WebView wrapper in `native/`, and the Tauri window in
+// `tauri/`. They are the same bundle, but not every capability exists on
 // every one, and the reasons are unrelated to each other:
 //
 //   - The **folder picker** needs the File System Access API, which is a
@@ -30,21 +30,24 @@ import { isNative } from "./native-bridge.ts";
 export type Platform = "web" | "native" | "desktop";
 
 /**
- * The private scheme the Electron shell serves the app from
- * (`electron/main.js`). It is the one thing about that surface the page can
- * see from the inside, and it is deliberately the same constant on both
- * sides — change one and the desktop build silently reverts to answering
+ * Where the Tauri shell serves the app from (`tauri/shell/src/config.rs`).
+ * It is the one thing about that surface the page can see from the inside,
+ * and the platform spells it two ways: WKWebView and WebKitGTK serve the
+ * registered scheme as a real `notes://localhost` URL, while WebView2 maps it
+ * onto `http://notes.localhost`. Both are the same constants on the shell's
+ * side — change one and the desktop build silently reverts to answering
  * "web", which is what would put the unusable cloud options back.
  */
 const DESKTOP_PROTOCOL = "notes:";
+const DESKTOP_WINDOWS_HOST = "notes.localhost";
 
 export function platform(): Platform {
   if (isNative()) return "native";
-  if (
-    typeof window !== "undefined" &&
-    window.location?.protocol === DESKTOP_PROTOCOL
-  ) {
-    return "desktop";
+  if (typeof window !== "undefined" && window.location) {
+    const { protocol, hostname } = window.location;
+    if (protocol === DESKTOP_PROTOCOL || hostname === DESKTOP_WINDOWS_HOST) {
+      return "desktop";
+    }
   }
   return "web";
 }
@@ -53,7 +56,8 @@ export interface Capabilities {
   /**
    * The File System Access API directory picker, behind the **Local folder**
    * backend. Chromium-only (Chrome, Edge, Opera, Brave, Arc); Firefox and
-   * Safari have no equivalent. True in both wrappers, which are Chromium.
+   * Safari have no equivalent. In the desktop shell it follows the platform
+   * webview: WebView2 on Windows has it, WebKit on macOS and Linux does not.
    */
   folderPicker: boolean;
 
@@ -61,8 +65,8 @@ export interface Capabilities {
    * Whether a redirect-based OAuth flow can complete on this origin.
    *
    * False on the desktop, and not for want of trying: `redirectUri()`
-   * (`src/storage/oauth-pkce.ts`) is built from `window.location`, so on the
-   * Electron shell it is `notes://app`. No provider will register a custom
+   * (`src/storage/oauth-pkce.ts`) is built from `window.location`, so in the
+   * desktop shell it is `notes://localhost` (or `http://notes.localhost`). No provider will register a custom
    * scheme as a redirect URI, and Google rejects non-`https` outright, so the
    * flow cannot be completed rather than merely being unconfigured. The
    * browser and the WebView wrapper both have a real `https://` origin.
@@ -77,7 +81,8 @@ export interface Capabilities {
    *
    * True only on the desktop, and it is the reason cloud sync exists there at
    * all. It needs something able to hold a listening socket, which a web page
-   * is not — `electron/main.js` owns it and `./desktop-bridge.ts` reaches it.
+   * is not — the Tauri shell owns it (`tauri/src-tauri/src/loopback.rs`) and
+   * `./desktop-bridge.ts` reaches it.
    * The browser and the WebView wrapper have `redirectOauth` and need no such
    * thing.
    *

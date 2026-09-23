@@ -4,8 +4,8 @@
 [![license](https://img.shields.io/badge/license-PolyForm--Noncommercial--1.0.0-blue.svg)](LICENSE)
 
 A Vite + Preact + Tailwind progressive web app, with a React Native (Expo)
-WebView wrapper under [`native/`](native/README.md) and an Electron wrapper
-under [`electron/`](electron/README.md) that both embed the compiled bundle.
+WebView wrapper under [`native/`](native/README.md) and a Tauri desktop
+wrapper under [`tauri/`](tauri/README.md) that both embed the compiled bundle.
 
 This README covers working on the code. For how the pieces fit together, read
 [`docs/architecture.md`](docs/architecture.md); for what the words in the
@@ -57,7 +57,7 @@ The two wrappers embed a build of their own:
 
 ```sh
 make build-native    # → native/web/, then see native/README.md
-make build-electron  # → electron/webroot/, then see electron/README.md
+make tauri-bundle    # → tauri/webroot/, then see tauri/README.md
 ```
 
 ## Quality gates
@@ -87,7 +87,7 @@ list, including `make icons` (regenerate the PWA icon set) and `make bump` /
 | `src/theme`  | Theme engine; `src/styles` holds the CSS token system.        |
 | `tests/`     | Vitest suites, `*.test.ts(x)`, mirroring the `src/` concerns.  |
 | `native/`    | Expo WebView wrapper (thin — see its README).                 |
-| `electron/`  | Electron desktop wrapper (thin — see its README).             |
+| `tauri/`     | Tauri desktop wrapper (thin — see its README).                |
 | `notesd/`    | Optional self-hosted sync daemon.                             |
 
 Dependency direction is `app → ui → domain` and `app → storage → domain`;

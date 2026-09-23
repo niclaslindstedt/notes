@@ -18,11 +18,11 @@ for the self-hosted **notesd** backend, bridged over `postMessage` through
 longer imports the web source or ships its own storage backends — the
 embedded app runs its own `localStorage`.
 
-An Electron desktop app lives under [`electron/`](electron/README.md) — a
-**thin window** around the same compiled web app (built by `make
-build-electron`), served from a private `notes://app` scheme so
-`localStorage` gets a stable origin. It adds no capabilities at all; it is
-one file, `electron/main.js`. See "The wrappers are thin" below.
+A Tauri desktop app lives under [`tauri/`](tauri/README.md) — a **thin
+window** around the same compiled web app (built by `make tauri-bundle`),
+served from a private `notes:` scheme so `localStorage` gets a stable origin.
+It adds one capability, the loopback listener that lets Dropbox sign in on the
+desktop. See "The wrappers are thin" below.
 
 Mobile is the primary testing device. Every visible change should be checked
 at a phone viewport first.
@@ -137,7 +137,6 @@ When you close any deferred item above, delete its bullet here in the same PR.
 make dev         # vite dev server (hot reload)
 make dev-seed    # dev server seeded with realistic fake data (VITE_SEED)
 make build       # production build → dist/ (also emits the service worker)
-make build-electron  # build the app into electron/webroot/ for the desktop shell
 make preview     # serve the production build locally
 make test        # vitest run
 make lint        # eslint + tsc --noEmit, zero warnings
@@ -159,12 +158,13 @@ make tauri-package-debug  # …debug profile: minutes faster, much bigger
 ```
 
 It is a **thin** wrapper: a window, the built site served from a private
-`notes://` scheme, and nothing else. **The page is never told it is inside
-it** — no injected global, no Tauri command. `tauri/shell/` holds every
-decision and needs no GUI toolkit; `tauri/src-tauri/` holds every effect. One
-seam reaches back into this tree, `VITE_SHELL_BUILD`, set by the shell's site
-build, which makes it an embedded build like the native and Electron ones
-(`isEmbedded` in `vite.config.ts`): no service worker, no update prompt. A desktop build updates by being replaced. The package's
+`notes:` scheme, and one capability — the loopback OAuth listener (see "The
+wrappers are thin"). There is no injected global and no Tauri command.
+`tauri/shell/` holds every decision and needs no GUI toolkit;
+`tauri/src-tauri/` holds every effect. One seam reaches back into this tree,
+`VITE_SHELL_BUILD`, set by the shell's site build, which makes it an embedded
+build like the native one (`isEmbedded` in `vite.config.ts`): no service
+worker, no update prompt. A desktop build updates by being replaced. The package's
 name and identifier come from `APP_DISPLAY_NAME` and `APP_BUNDLE_ID` at
 packaging time (`tauri/scripts/package.mjs`), like the phone app's. See
 [`tauri/README.md`](tauri/README.md).
@@ -264,23 +264,22 @@ so the slots don't clobber one another's service worker on the shared origin.
 
 ### Two names: the project and the store listing
 
-The repository, the Pages deploy, and the desktop archives are all **the
-project**, and they all carry the project name, written down once per surface
-(`vite.config.ts`'s `PROJECT_NAME`, `electron-builder.config.cjs`'s
-`PRODUCT_NAME`). The **mobile store listing** is a deployment of the project,
-and a deployment's coordinates are configuration, not source — so the values
-that identify the app in the App Store and on Google Play are not in the tree
-at all:
+The repository and the Pages deploy are **the project**, and carry the project
+name (`vite.config.ts`'s `PROJECT_NAME`). The **store listing** and the
+**desktop download** are deployments of the project, and a deployment's
+coordinates are configuration, not source — so the values that identify the
+app there are not in the tree at all:
 
 | Variable           | Fills                                                        |
 | ------------------ | ------------------------------------------------------------ |
-| `APP_DISPLAY_NAME` | `expo.name`, and the built-in wordmark of the bundle embedded in the mobile app |
-| `APP_BUNDLE_ID`    | `ios.bundleIdentifier` and `android.package`                  |
+| `APP_DISPLAY_NAME` | `expo.name`, the built-in wordmark of the bundle embedded in the mobile app, and the desktop package's `productName` |
+| `APP_BUNDLE_ID`    | `ios.bundleIdentifier`, `android.package`, and the desktop package's `identifier` |
 | `EAS_PROJECT_ID`   | `extra.eas.projectId`                                         |
 
-Each lives as a repository variable (forwarded by `native-build.yml`) **and**
-as an EAS environment variable, because EAS resolves `native/app.config.js`
-again on its own builders. Unset, each falls back to a local development
+Each lives as a repository secret (forwarded by `native-build.yml` and the
+release's desktop job) **and**, for the phone app, as an EAS environment
+variable, because EAS resolves `native/app.config.js` again on its own
+builders. The desktop package merges its two in `tauri/scripts/package.mjs`. Unset, each falls back to a local development
 default so a plain checkout runs; a `production` build with any of them
 missing throws in `app.config.js` rather than shipping under the wrong
 identity.
@@ -293,11 +292,11 @@ What this means when you touch the code:
   That is also why the header wordmark is not an i18n string: it is a proper
   noun, identical in every language.
 - **Only `VITE_TARGET=native` reads `APP_DISPLAY_NAME`.** `vite.config.ts`
-  gates it on the target, so the web and Electron builds cannot pick up a
+  gates it on the target, so the web and desktop builds cannot pick up a
   listing name even if the variable happens to be exported. Don't remove that
   gate.
 - **The project's own identity keys stay literal** — `expo.slug`, `scheme`,
-  the Electron `appId`, the executable name, and the release-archive names.
+  the desktop app's `notes:` scheme and executable name.
   They are not listing coordinates, and changing them breaks resolution.
 - **Store listing copy is not kept in the repo.** The name, description, and
   screenshots live in App Store Connect and the Play Console. Don't add a
@@ -331,12 +330,12 @@ Release from that section, and chains into `pages.yml` so the tag is served at
 `/` immediately. Preview the changelog locally with `make changelog
 VERSION=X.Y.Z` (consumes the fragments — run on a scratch branch).
 
-In parallel it packages the [Electron desktop app](electron/README.md) on one
-runner per platform — Windows zip, macOS zip for Intel **and** Apple Silicon,
-Linux tar.gz — attaches the four archives to that draft, and only then
-publishes it. A packaging failure therefore leaves the release a draft rather
-than a public page with a missing download; the fix is to re-dispatch, or to
-flip the draft by hand once the archive is uploaded. The **web** deploy does
+In parallel it packages the [desktop app](tauri/README.md) on one runner per
+platform — a `.exe` on Windows, a `.dmg` on macOS, an `.AppImage` and a `.deb`
+on Linux — attaches them to that draft, and only then publishes it. A
+packaging failure therefore leaves the release a draft rather than a public
+page with a missing download; the fix is to re-dispatch, or to flip the draft
+by hand once the installer is uploaded. The **web** deploy does
 not wait for any of that.
 
 ### Changeset fragments
@@ -430,7 +429,7 @@ lands back in everyone's first download:
   toggle flips, not at mount.
 
 **The wrappers opt out of all of it.** `vite.config.ts` sets
-`inlineDynamicImports` for the embedded builds: `native/` and `electron/` ship
+`inlineDynamicImports` for the embedded builds: `native/` and `tauri/` ship
 the bundle on the device with no network in front of it, so splitting buys them
 nothing, and the native WebView serves the page from a `file://` origin where
 dynamic `import()` is not dependably permitted. One chunk there, split on the
@@ -638,10 +637,10 @@ the DOM. This keeps `domain/` pure and trivially testable (no I/O, no DOM).
 
 Two directories ship the same web app as a downloadable binary:
 [`native/`](native/README.md) (React Native WebView, iOS + Android) and
-[`electron/`](electron/README.md) (Electron, desktop). **Both are shells, and
-they stay shells.** They embed a compiled copy of the app — built by `make
-build-native` / `make build-electron`, which set `VITE_TARGET` so the bundle
-gets a relative asset base and no service worker — and show it. Neither
+[`tauri/`](tauri/README.md) (Tauri, desktop). **Both are shells, and they stay
+shells.** They embed a compiled copy of the app — built by `make build-native`
+/ `make tauri-bundle`, which set `VITE_TARGET` / `VITE_SHELL_BUILD` so the
+bundle gets a relative asset base and no service worker — and show it. Neither
 imports anything from `src/`.
 
 The rule for both, and the one to check a change against:
@@ -652,32 +651,31 @@ The rule for both, and the one to check a change against:
 For `native/` that is a short, closed list — haptics, SPKI-pinned HTTPS, QR
 camera scan — each behind the `postMessage` bridge in
 [`src/platform/native-bridge.ts`](src/platform/native-bridge.ts), which is
-inert on the web. For `electron/` the list is **two items long**: the
-remembered window bounds, because a web page cannot size or place its own OS
-window, and a loopback HTTP listener for one OAuth redirect, because a web page
-cannot hold a listening socket — the flow RFC 8252 prescribes for native apps,
-and the only way the desktop build gets cloud sync at all (its `notes://app`
-origin is not a redirect URI any provider will register). The whole main
-process is still one file, with no preload, no IPC, and no storage the renderer
-can see: the loopback capability is reached through the `notes://` protocol
-handler that already exists, from
-[`src/platform/desktop-bridge.ts`](src/platform/desktop-bridge.ts). Keep it
-that way — the shell holds the socket, and every decision about what to do with
-what arrives on it stays in `src/`.
+inert on the web. For `tauri/` the list is **one item long**: a loopback HTTP
+listener for one OAuth redirect, because a web page cannot hold a listening
+socket — the flow RFC 8252 prescribes for native apps, and the only way the
+desktop build gets cloud sync at all (its `notes:` origin is not a redirect
+URI any provider will register). There is no IPC and no injected script: the
+capability is reached through the `notes:` scheme handler that already exists,
+from [`src/platform/desktop-bridge.ts`](src/platform/desktop-bridge.ts), on two
+reserved paths (`tauri/shell/src/oauth.rs` owns their decisions,
+`tauri/src-tauri/src/loopback.rs` the socket). Keep it that way — the shell
+holds the socket, and every decision about what to do with what arrives on it
+stays in `src/`.
 
 So when a feature request arrives while you are working in a wrapper:
 
 - **Build it in `src/`** and let both wrappers pick it up for free. A feature
   written in the shell exists on one platform, is barely verified (both
-  wrappers are outside `make lint` / `make test`; `electron/` gets a
-  types-only check from the `electron` CI job and neither has any tests), and
-  has to be written again for the other shell and for the web.
+  wrappers are outside `make lint` / `make test`; `tauri/` has its own Rust
+  tests and clippy, run by `desktop-tauri.yml`), and has to be written again
+  for the other shell and for the web.
 - **If it genuinely cannot be done in a web page**, add the *smallest possible*
   capability to the wrapper, expose it through the platform seam, and put the
   decision of when to use it in `src/` — the wrapper answers a question, it
   does not decide anything.
-- **Wanting to add a second file to `electron/`** is the signal to stop and
-  re-ask whether the PWA can do it. Usually it can.
+- **Wanting to add a second capability to `tauri/`** is the signal to stop
+  and re-ask whether the PWA can do it. Usually it can.
 
 ### Shared namespaces: settings widths and the two locks
 
@@ -736,7 +734,7 @@ would take the whole app down for everyone, including their own namespaces.
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |
 | PWA / service-worker behaviour           | `src/pwa/`                         |
 | A native-wrapper capability (bridge)     | `src/platform/native-bridge.ts` + `native/` |
-| A desktop-wrapper capability (bridge)    | `src/platform/desktop-bridge.ts` + `electron/main.js` |
+| A desktop-wrapper capability (bridge)    | `src/platform/desktop-bridge.ts` + `tauri/shell/` (decision) + `tauri/src-tauri/` (effect) |
 | Anything a wrapper seems to need         | `src/` — see "The wrappers are thin" |
 | A "can this surface do X?" check          | `src/platform/capabilities.ts` — never re-derive it at the call site |
 | A new achievement / its unlock trigger   | `src/achievements/catalog.ts`      |
@@ -803,7 +801,7 @@ pasting it verbatim.
 | A user-facing feature / surface (shipped or removed) | **Add (or retire) a matching achievement** in the same PR — see "Achievements". Every feature is also an unlockable trophy. |
 | What data the app reads/writes/sends, or an OAuth scope | `src/ui/HomePage.tsx` **and** `src/ui/PrivacyPage.tsx` |
 | Release / deploy / changelog flow | this file's "Releases and changelog"  |
-| Anything under `electron/` or `native/` | that wrapper's `README.md`, and re-read "The wrappers are thin" before adding code there |
+| Anything under `tauri/` or `native/` | that wrapper's `README.md`, and re-read "The wrappers are thin" before adding code there |
 
 ## Achievements
 

@@ -12,8 +12,6 @@ notesd/target
 # wrapper's native-code modules (Swift / Kotlin / Gradle — not Prettier's
 # remit).
 native/web
-electron/webroot
-electron/release
 native/modules/**/ios
 native/modules/**/android
 
