@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 //! THE WINDOW — building it, and keeping it pinned to our own origin.
 //!
-//! There is no geometry to remember here and no state to persist: Tauri
-//! remembers nothing by itself, and a wrapper this thin does not add a store
-//! for it. The window opens at a sensible size, the app inside it is the app,
-//! and that is the whole of this file bar the navigation guard.
+//! The one thing kept between launches is where the window was: its size,
+//! position and maximized / fullscreen state, in the app's own data directory.
+//! Every decision about that file is `notes_shell::window_state`'s; this
+//! file only asks the window and the monitors.
 
 use notes_shell::config::{
-    app_origin, is_internal_url, remote_app_url, start_url, BRAND_BG, DEFAULT_HEIGHT,
-    DEFAULT_WIDTH, MIN_HEIGHT, MIN_WIDTH, WINDOW_TITLE,
+    app_origin, is_internal_url, remote_app_url, start_url, BRAND_BG, WINDOW_TITLE,
 };
+use notes_shell::window_state::{
+    load_window_state, save_window_state, DisplayArea, WindowState, MIN_HEIGHT, MIN_WIDTH,
+};
+use std::path::{Path, PathBuf};
 use tauri::webview::NewWindowResponse;
-use tauri::{AppHandle, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, Url, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
+};
 use tauri_plugin_opener::OpenerExt;
 
 /// The origin the platform grants our registered scheme, for this build.
@@ -31,11 +38,22 @@ pub fn build(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .map_err(|_| tauri::Error::UnknownPath)
         .map(WebviewUrl::External)?;
 
+    // Where the remembered geometry lives. Without a data directory there is
+    // nothing to remember into, and the window opens at its default size.
+    let user_data = app.path().app_data_dir().ok();
+    let state = user_data
+        .as_deref()
+        .map(|dir| load_window_state(dir, &[], &mut warn))
+        .unwrap_or(DEFAULT_WINDOW);
+
     let (r, g, b, a) = BRAND_BG;
     let window = WebviewWindowBuilder::new(app, "main", url)
         .title(WINDOW_TITLE)
-        .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        .inner_size(state.width, state.height)
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
+        // Hidden until it is where it belongs, so it never opens in one place
+        // and jumps to another.
+        .visible(false)
         // The app's own dark surface, so the window is never a white rectangle
         // that fills in — the desktop equivalent of the theme-color meta tag
         // the site already carries.
@@ -54,7 +72,111 @@ pub fn build(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         })
         .build()?;
 
+    // NOW the monitors can be asked, so the remembered POSITION gets its
+    // does-this-still-land-anywhere check.
+    if let Some(dir) = user_data.as_deref() {
+        let placed = load_window_state(dir, &display_areas(&window), &mut warn);
+        if let (Some(x), Some(y)) = (placed.x, placed.y) {
+            let _ = window.set_position(LogicalPosition::new(x, y));
+        }
+        if placed.maximized {
+            let _ = window.maximize();
+        }
+        if placed.fullscreen {
+            let _ = window.set_fullscreen(true);
+        }
+    }
+    let _ = window.show();
+
+    if let Some(dir) = user_data {
+        remember_on_close(&window, dir);
+    }
     Ok(window)
+}
+
+/// The shipped geometry, for a build with no data directory to read one from.
+const DEFAULT_WINDOW: WindowState = notes_shell::window_state::DEFAULT_STATE;
+
+fn warn(line: &str) {
+    eprintln!("{line}");
+}
+
+/// The monitors' areas, in the logical pixels the stored rect is in. Tauri
+/// reports PHYSICAL pixels with a scale factor per monitor, so the conversion
+/// happens per monitor — a laptop with an external display routinely has two.
+fn display_areas(window: &WebviewWindow) -> Vec<DisplayArea> {
+    let Ok(monitors) = window.available_monitors() else {
+        // Says nothing rather than "nowhere": an empty list keeps the
+        // remembered position (see `window_state::on_some_display`).
+        return Vec::new();
+    };
+    monitors
+        .iter()
+        .map(|monitor| {
+            let scale = monitor.scale_factor();
+            let position = monitor.position().to_logical::<f64>(scale);
+            let size = monitor.size().to_logical::<f64>(scale);
+            DisplayArea {
+                x: position.x,
+                y: position.y,
+                width: size.width,
+                height: size.height,
+            }
+        })
+        .collect()
+}
+
+/// Write the geometry down on the CLOSE REQUEST — the last moment the window
+/// still exists to be asked.
+fn remember_on_close(window: &WebviewWindow, user_data: PathBuf) {
+    let handle = window.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { .. } = event {
+            remember_now(&handle, &user_data);
+        }
+    });
+}
+
+/// Where the window is, right now. The rect is read UN-MAXIMIZED: a maximized
+/// or fullscreen window reports the screen, and restoring that as its normal
+/// size would leave the user unable to get a small window back — so those keep
+/// the stored rect and change only the flag.
+fn remember_now(window: &WebviewWindow, user_data: &Path) {
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let maximized = window.is_maximized().unwrap_or(false);
+    let fullscreen = window.is_fullscreen().unwrap_or(false);
+    let size = window
+        .inner_size()
+        .map(|size| size.to_logical::<f64>(scale))
+        .unwrap_or(LogicalSize::new(0.0, 0.0));
+    let position = window
+        .outer_position()
+        .map(|position| position.to_logical::<f64>(scale))
+        .ok();
+
+    let stored = load_window_state(user_data, &[], &mut |_| {});
+    let (width, height, x, y) = if maximized || fullscreen {
+        (stored.width, stored.height, stored.x, stored.y)
+    } else {
+        (
+            size.width.max(MIN_WIDTH),
+            size.height.max(MIN_HEIGHT),
+            position.map(|p| p.x),
+            position.map(|p| p.y),
+        )
+    };
+    save_window_state(
+        user_data,
+        &WindowState {
+            x,
+            y,
+            width,
+            height,
+            maximized,
+            fullscreen,
+        },
+        &mut warn,
+    );
 }
 
 /// Keep the window on our own origin, and send everything else to the browser.

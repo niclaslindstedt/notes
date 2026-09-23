@@ -9,11 +9,12 @@
 //!
 //! The shell holds the socket and nothing else. It does not know which
 //! provider is being connected, what scopes were asked for, or what the code
-//! is worth — `src/storage/oauth-pkce.ts` builds the authorization URL, checks
-//! `state`, and trades the code for tokens. The shell answers two questions,
+//! is worth — the framework's `runLoopbackAuth` builds the authorization URL,
+//! checks `state`, and trades the code for tokens. The shell answers two questions,
 //! on two reserved paths of the app's own scheme: "what URI can I be
 //! redirected to?" and "what came back?". The page reaches them with a plain
-//! `fetch` (`src/platform/desktop-bridge.ts`, which owns the same two paths).
+//! `fetch` (the framework's `desktop-loopback.ts`, which owns the same two
+//! paths).
 
 use std::time::Duration;
 
@@ -85,9 +86,9 @@ pub fn error_reply(message: &str) -> String {
     format!("{{\"error\":{}}}", json_string(message))
 }
 
-/// A JSON string literal. The replies carry three fields of plain text, which
-/// is not worth a serialisation dependency, but the query is whatever the
-/// provider sent, so it is escaped rather than trusted.
+/// A JSON string literal. The replies are three fields of plain text, spelled
+/// out here so their format reads at a glance beside the page's side of it; the
+/// query is whatever the provider sent, so it is escaped rather than trusted.
 fn json_string(value: &str) -> String {
     let mut out = String::with_capacity(value.len() + 2);
     out.push('"');

@@ -23,7 +23,8 @@ loopback listener instead (RFC 8252, the native-app flow): the page `fetch`es
 `/__oauth/begin` on its own origin, opens the consent screen in the user's
 browser (`window.open` is handed to it), and `fetch`es `/__oauth/await` for
 what the provider sent back to `http://127.0.0.1:<port>/`. The shell decides
-nothing about it — `src/storage/oauth-pkce.ts` checks `state` and trades the code.
+nothing about it — the framework's `runLoopbackAuth` checks `state` and trades
+the code.
 `shell/src/oauth.rs` owns the paths, the three fixed ports (53682–53684, which
 the Dropbox app's redirect allowlist must carry) and the replies;
 `src-tauri/src/loopback.rs` holds the socket.

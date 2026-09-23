@@ -6461,8 +6461,10 @@ attaches them to the draft release, which the `publish` job then makes public.
 macOS is always signed — ad hoc when no signing identity is set, since Apple
 Silicon refuses to execute unsigned arm64 code at all.
 
-The window opens at its default size each launch; the shell keeps no window
-state. See [Capabilities](#capabilities), `tauri/README.md`, and AGENTS.md's
+The shell remembers the window's size, position and maximized / fullscreen
+state between launches (`window-state.json` in the app's data directory,
+`tauri/shell/src/window_state.rs`), and drops a position that no longer lands
+on any attached monitor. See [Capabilities](#capabilities), `tauri/README.md`, and AGENTS.md's
 "The wrappers are thin" for the rule about what may live in that directory (in
 short: nothing that could live in `src/`).
 

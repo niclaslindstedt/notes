@@ -12,7 +12,7 @@ use notes_shell::oauth::{
 
 #[test]
 fn the_paths_are_the_ones_the_page_asks_on() {
-    // `src/platform/desktop-bridge.ts` spells these too.
+    // The framework's `LOOPBACK_BEGIN_PATH` / `LOOPBACK_AWAIT_PATH` spell these too.
     assert_eq!(BEGIN_PATH, "/__oauth/begin");
     assert_eq!(AWAIT_PATH, "/__oauth/await");
 }
