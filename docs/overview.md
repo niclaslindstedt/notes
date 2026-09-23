@@ -6387,10 +6387,12 @@ web client — so it stays gated on `redirectOauth` alone.
 
 ### Loopback OAuth
 
-`runLoopbackAuth` (`src/storage/oauth-pkce.ts`) + `beginLoopbackRedirect` /
-`awaitLoopbackRedirect` (`src/platform/desktop-bridge.ts`) + the listener in
-the Tauri shell (`tauri/shell/src/oauth.rs`, `tauri/src-tauri/src/loopback.rs`)
-— how the desktop build signs in to a cloud provider at all.
+The framework's `runLoopbackAuth` (`@niclaslindstedt/oss-framework/storage`,
+reached through `connectDropboxLoopback` in `src/storage/dropbox/index.ts`) +
+the listener in the Tauri shell (`tauri/shell/src/oauth.rs`,
+`tauri/src-tauri/src/loopback.rs`) — how the desktop build signs in to a cloud
+provider at all. The flow is shared with every app in the fleet rather than
+kept here; notes supplies its Dropbox app key and its log.
 
 The problem it solves: the desktop app is served from the `notes:` scheme, and no
 provider will accept a custom scheme as a redirect URI, so the web flow
@@ -6406,9 +6408,9 @@ holding a live authorization code on the local network), takes the first free
 port of three fixed ones, closes the instant a redirect arrives, and times out
 after five minutes. It does not know which provider is being connected or what
 the code is worth. Everything decided — the PKCE challenge, the `state` check,
-the token exchange — is in `runLoopbackAuth`, which also passes the loopback
-URI explicitly to `completeAuth`, since `window.location` knows nothing about
-it and the providers re-check the URI at the token endpoint.
+the token exchange — is in `runLoopbackAuth`, which also replays the loopback
+URI at the token exchange, since `window.location` knows nothing about it and
+the providers re-check the URI at the token endpoint.
 
 It needs no IPC and no injected script: the page reaches the shell by
 `fetch`ing two reserved paths (`__oauth/begin`, `__oauth/await`) on its own

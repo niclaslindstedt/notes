@@ -12,6 +12,8 @@
 // happens one level up in `withEncryption`, so an encrypted store lands as a
 // single `/notes.json` envelope instead of markdown.
 
+import { connectDropboxLoopback as frameworkConnectDropboxLoopback } from "@niclaslindstedt/oss-framework/storage";
+
 import { createLogger } from "../../dev/logger.ts";
 import { DROPBOX_APP_KEY } from "../cloud-configured.ts";
 import { PKCE_VERIFIER_KEY } from "./pkce-key.ts";
@@ -49,7 +51,6 @@ import {
   type TokenResult,
   completeAuth,
   refreshAccessToken,
-  runLoopbackAuth,
   startAuth,
 } from "../oauth-pkce.ts";
 
@@ -500,11 +501,13 @@ export function startDropboxAuth(): Promise<void> {
 // The desktop sign-in: opens Dropbox in the user's browser and resolves with
 // the tokens once the redirect lands on the shell's loopback listener. Unlike
 // `startDropboxAuth` nothing navigates, so the caller gets the result directly
-// instead of picking it up from the next boot.
+// instead of picking it up from the next boot. The flow is the framework's —
+// the same Dropbox endpoints, `state` and `token_access_type=offline` as
+// `DROPBOX_OAUTH` above — so this only supplies the app key and the log.
 export function connectDropboxLoopback(
   fetchImpl: FetchImpl = fetch,
 ): Promise<DropboxAuthResult> {
-  return runLoopbackAuth(DROPBOX_OAUTH, fetchImpl);
+  return frameworkConnectDropboxLoopback(DROPBOX_APP_KEY, fetchImpl, log);
 }
 
 // True when a Dropbox OAuth flow is mid-flight — i.e. `startDropboxAuth`

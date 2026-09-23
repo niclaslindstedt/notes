@@ -657,8 +657,9 @@ socket — the flow RFC 8252 prescribes for native apps, and the only way the
 desktop build gets cloud sync at all (its `notes:` origin is not a redirect
 URI any provider will register). There is no IPC and no injected script: the
 capability is reached through the `notes:` scheme handler that already exists,
-from [`src/platform/desktop-bridge.ts`](src/platform/desktop-bridge.ts), on two
-reserved paths (`tauri/shell/src/oauth.rs` owns their decisions,
+by the framework's loopback sign-in (`runLoopbackAuth` in
+`@niclaslindstedt/oss-framework/storage`, via `connectDropboxLoopback` in
+`src/storage/dropbox/index.ts`), on two reserved paths (`tauri/shell/src/oauth.rs` owns their decisions,
 `tauri/src-tauri/src/loopback.rs` the socket). Keep it that way — the shell
 holds the socket, and every decision about what to do with what arrives on it
 stays in `src/`.
@@ -734,7 +735,7 @@ would take the whole app down for everyone, including their own namespaces.
 | A theme token or palette change          | `src/styles/theme.css` + `theme/`  |
 | PWA / service-worker behaviour           | `src/pwa/`                         |
 | A native-wrapper capability (bridge)     | `src/platform/native-bridge.ts` + `native/` |
-| A desktop-wrapper capability (bridge)    | `src/platform/desktop-bridge.ts` + `tauri/shell/` (decision) + `tauri/src-tauri/` (effect) |
+| A desktop-wrapper capability (bridge)    | the page side in `src/` (or the framework, if every app needs it) + `tauri/shell/` (decision) + `tauri/src-tauri/` (effect) |
 | Anything a wrapper seems to need         | `src/` — see "The wrappers are thin" |
 | A "can this surface do X?" check          | `src/platform/capabilities.ts` — never re-derive it at the call site |
 | A new achievement / its unlock trigger   | `src/achievements/catalog.ts`      |

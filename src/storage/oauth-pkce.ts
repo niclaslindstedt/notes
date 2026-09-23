@@ -4,27 +4,19 @@
 // owns its own `sessionStorage` key for the verifier so parallel auth flows
 // don't race each other.
 //
-// There are **two shapes of the same flow**, differing only in where the
-// provider sends the user back to:
+// This is the WEB shape of the flow — `startAuth` + `completeAuth`: the page
+// navigates away to the provider and the provider redirects back to the app's
+// own origin, so completion happens on the next boot (`useCloudBackend`).
 //
-//   - `startAuth` + `completeAuth` — the web one. The page navigates away to
-//     the provider and the provider redirects back to the app's own origin, so
-//     completion happens on the next boot (`useCloudBackend`).
-//   - `runLoopbackAuth` — the desktop one, per RFC 8252. The app's origin is
-//     the `notes:` scheme, which no provider will accept, so the consent
-//     screen opens in the user's real browser and the redirect is caught on a
-//     loopback listener the Tauri shell holds. Nothing navigates, so the
-//     whole round trip resolves in one promise.
-//
-// Everything either shape decides — the challenge, the `state` check, the
-// token exchange — lives here. The shell only holds the socket.
+// The DESKTOP shape is not here. The desktop app's origin is the `notes:`
+// scheme, which no provider will redirect to, so it signs in per RFC 8252 —
+// consent in the user's real browser, the redirect caught on the Tauri shell's
+// loopback listener — and that flow is the framework's `runLoopbackAuth`
+// (`@niclaslindstedt/oss-framework/storage`), reached through
+// `connectDropboxLoopback` in `./dropbox/index.ts`.
 
 import { createLogger } from "../dev/logger.ts";
 import { toBase64Url } from "../encoding/base64url.ts";
-import {
-  awaitLoopbackRedirect,
-  beginLoopbackRedirect,
-} from "../platform/desktop-bridge.ts";
 import { readErrorBody } from "./http-utils.ts";
 
 const log = createLogger("oauth");
@@ -124,74 +116,13 @@ export async function startAuth(config: OAuthConfig): Promise<void> {
   window.location.assign(await authUrl(config, redirect, verifier));
 }
 
-// The whole desktop sign-in, start to tokens, in one promise. Nothing
-// navigates: the consent screen opens in the user's own browser (the shell
-// hands `window.open` to the system browser) and the provider redirects to
-// a loopback listener the shell opened for the occasion, so — unlike the web
-// flow — there is no boot effect to complete anything afterwards.
-//
-// Throws on every failure the user can cause as well as the ones they can't:
-// declining consent, closing the browser and letting the listener time out, or
-// a `state` that doesn't match the one this flow sent. The verifier is dropped
-// on all of them so a failed attempt can't be resumed by a later redirect.
-export async function runLoopbackAuth(
-  config: OAuthConfig,
-  fetchImpl: FetchImpl = fetch,
-): Promise<TokenResult> {
-  const redirect = await beginLoopbackRedirect();
-  log.info(`${config.providerName}: loopback auth (redirect=${redirect})`);
-  const verifier = randomVerifier();
-  sessionStorage.setItem(config.verifierKey, verifier);
-  try {
-    // `noopener` because this never becomes a window this page talks to — the
-    // shell denies the open and hands the URL to the desktop instead.
-    window.open(
-      await authUrl(config, redirect, verifier),
-      "_blank",
-      "noopener",
-    );
-    const params = await awaitLoopbackRedirect();
-
-    const error = params.get("error");
-    if (error) {
-      throw new Error(
-        `${config.providerName} declined the connection: ${
-          params.get("error_description") ?? error
-        }`,
-      );
-    }
-    // Checked before the code is spent: a `state` that isn't ours means the
-    // redirect belongs to some other flow, and the code is not ours to trade.
-    if (params.get("state") !== config.state) {
-      throw new Error(
-        `${config.providerName} redirect carried an unexpected state`,
-      );
-    }
-    const code = params.get("code");
-    if (!code) {
-      throw new Error(`${config.providerName} redirect carried no code`);
-    }
-    return await completeAuth(config, code, fetchImpl, redirect);
-  } catch (err) {
-    sessionStorage.removeItem(config.verifierKey);
-    log.error(`${config.providerName}: loopback auth failed`, err);
-    throw err;
-  }
-}
-
 // Trades the code from the redirect for an access (and, where the provider
 // issues one, refresh) token. Caller is responsible for persisting both and
 // cleaning the URL. Throws on any failure so the caller can surface it.
-//
-// `redirect` must be the SAME URI the authorization request carried — the
-// providers check it again at the token endpoint. It defaults to this origin
-// for the web flow; the loopback flow passes the listener's URI, which
-// `window.location` knows nothing about.
 export async function completeAuth(
   config: OAuthConfig,
   code: string,
   fetchImpl: FetchImpl = fetch,
-  redirect: string = redirectUri(),
 ): Promise<TokenResult> {
   log.info(`${config.providerName}: completeAuth (code received)`);
   const verifier = sessionStorage.getItem(config.verifierKey);
@@ -204,7 +135,7 @@ export async function completeAuth(
     code,
     grant_type: "authorization_code",
     client_id: config.clientId,
-    redirect_uri: redirect,
+    redirect_uri: redirectUri(),
     code_verifier: verifier,
   });
   let res: Response;

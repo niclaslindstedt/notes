@@ -24,31 +24,21 @@
 // surface from what it can observe; no shell tells it anything, and there is
 // no bridge message for this. See AGENTS.md, "The wrappers are thin".
 
+import { isDesktopShellOrigin } from "@niclaslindstedt/oss-framework/storage";
+
 import { isNative } from "./native-bridge.ts";
 
 /** Which of the three surfaces this bundle is running on. */
 export type Platform = "web" | "native" | "desktop";
 
-/**
- * Where the Tauri shell serves the app from (`tauri/shell/src/config.rs`).
- * It is the one thing about that surface the page can see from the inside,
- * and the platform spells it two ways: WKWebView and WebKitGTK serve the
- * registered scheme as a real `notes://localhost` URL, while WebView2 maps it
- * onto `http://notes.localhost`. Both are the same constants on the shell's
- * side — change one and the desktop build silently reverts to answering
- * "web", which is what would put the unusable cloud options back.
- */
-const DESKTOP_PROTOCOL = "notes:";
-const DESKTOP_WINDOWS_HOST = "notes.localhost";
-
 export function platform(): Platform {
   if (isNative()) return "native";
-  if (typeof window !== "undefined" && window.location) {
-    const { protocol, hostname } = window.location;
-    if (protocol === DESKTOP_PROTOCOL || hostname === DESKTOP_WINDOWS_HOST) {
-      return "desktop";
-    }
-  }
+  // The desktop shell is recognised from the origin alone — the `notes:`
+  // scheme (`notes://localhost` on macOS and Linux) or the `notes.localhost`
+  // host WebView2 maps it onto on Windows. The framework's check is the one
+  // its loopback sign-in gates on, so the two can never disagree about where
+  // the page is; change the shell's scheme and both follow.
+  if (isDesktopShellOrigin()) return "desktop";
   return "web";
 }
 
@@ -82,7 +72,7 @@ export interface Capabilities {
    * True only on the desktop, and it is the reason cloud sync exists there at
    * all. It needs something able to hold a listening socket, which a web page
    * is not — the Tauri shell owns it (`tauri/src-tauri/src/loopback.rs`) and
-   * `./desktop-bridge.ts` reaches it.
+   * the framework's `runLoopbackAuth` reaches it.
    * The browser and the WebView wrapper have `redirectOauth` and need no such
    * thing.
    *

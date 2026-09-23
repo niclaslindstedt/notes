@@ -150,7 +150,7 @@ export function useCloudBackend({
     const m = await import("./dropbox/index.ts");
     if (capabilities().loopbackOauth) {
       // The desktop: Dropbox opens in the user's browser and comes back to a
-      // loopback listener, so the tokens land right here (see
+      // loopback listener, so the tokens land right here (the framework's
       // `runLoopbackAuth`). Rejections propagate — the settings panel shows
       // them, since there is no redirect to explain a silent failure.
       acceptDropboxTokens(await m.connectDropboxLoopback());
