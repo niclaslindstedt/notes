@@ -36,3 +36,14 @@ native/.metro-health-check*
 
 # Transient release artifacts (written by the Release workflow)
 .release-notes.md
+
+# Store submission OUTPUT, and the listing's own WORDS. The RULES stay
+# committed (native/store/listing.mts) and a SKELETON documents the shape
+# (copy.example.mts); the marketing copy is what a store indexes and a
+# competitor reads, so it is not published here. Nothing backs it up — keep a
+# copy outside the checkout.
+native/store/copy.mts
+
+native/store/store.config.json
+native/store/screenshots/
+native/fastlane/metadata/

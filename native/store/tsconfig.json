@@ -1,0 +1,10 @@
+{
+  // The store listing is plain TypeScript with no Expo import, and the ROOT
+  // suite reads it (tests/store-listing.test.ts). The native project's own
+  // tsconfig extends `expo/tsconfig.base`, which resolves only once `native/`
+  // has its dependencies installed — so a checkout that never ran
+  // `npm --prefix native ci` could not transform this file at all. It takes
+  // the root's settings instead, which is where the suite that reads it runs.
+  "extends": "../../tsconfig.json",
+  "include": ["./*.mts"]
+}

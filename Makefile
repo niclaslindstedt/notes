@@ -1,4 +1,4 @@
-.PHONY: build build-native build-electron test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump
+.PHONY: build build-native build-electron test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump store-preflight store-metadata
 
 install:
 	npm ci
@@ -65,3 +65,20 @@ bump:
 
 clean:
 	rm -rf dist dev-dist node_modules
+
+# ---------------------------------------------------------------------------
+# SHIPPING TO THE STORE (native/store/)
+# ---------------------------------------------------------------------------
+# One authored listing compiles into the files the upload tools read. The
+# RULES are committed; the WORDS are not — see native/store/README.md.
+
+# "Is this checkout wired up to ship?" — every gate between here and a
+# submission, what is missing and where to get it.
+store-preflight:
+	@node --experimental-strip-types --disable-warning=ExperimentalWarning \
+		scripts/store-preflight.mjs $(ARGS)
+
+# Compile the listing. `ARGS="--check"` validates without writing.
+store-metadata:
+	node --experimental-strip-types --disable-warning=ExperimentalWarning \
+		scripts/generate-store-metadata.mjs $(ARGS)
