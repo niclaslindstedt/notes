@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+#
+# THE DECISIONS. Nothing in this crate opens, draws or talks to anything, and
+# it depends on no GUI toolkit — which is what lets `cargo test -p notes-shell`
+# run on a runner with a Rust toolchain and nothing else. See ../Cargo.toml.
+
+[package]
+name = "notes-shell"
+description = "The decision layer behind the Notes desktop shell: where the bundled site is, and what one request off it resolves to."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

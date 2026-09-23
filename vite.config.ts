@@ -14,9 +14,15 @@ import { defineConfig, type Plugin } from "vitest/config";
 // `./assets/...` and resolve under a `file://` (or private-scheme) origin, and
 // disables the service worker below (offline is already guaranteed by the
 // local bundle; updates ride app releases).
+//
+// The Tauri desktop shell (`tauri/`) is a third: its site build
+// (`tauri/scripts/bundle-web.mjs`) sets `VITE_SHELL_BUILD=on`, the one
+// variable every app in the fleet uses for that build, and it embeds the same
+// way.
 const isEmbedded =
   process.env.VITE_TARGET === "native" ||
-  process.env.VITE_TARGET === "electron";
+  process.env.VITE_TARGET === "electron" ||
+  process.env.VITE_SHELL_BUILD === "on";
 
 // The GitHub Pages base path is injected by the `pages.yml` workflow via
 // VITE_BASE so the same bundle works at `/`, `/preview/`, or `/branch/`.

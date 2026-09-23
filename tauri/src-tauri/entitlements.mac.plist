@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
+  Hardened-runtime entitlements for the macOS build, and DELIBERATELY EMPTY of
+  the ones a webview shell is usually handed.
+
+  Apple's hardened runtime is required for notarization and switches off
+  several things an app may need. This app needs none of them:
+
+    allow-jit / allow-unsigned-executable-memory
+      An Electron app needs both, because V8 lives inside it and compiles
+      JavaScript to machine code in the app's own address space. WKWebView does
+      not: it runs the page in its own out-of-process content and JIT services,
+      which carry Apple's entitlements rather than ours. Granting an app
+      permission to write executable memory it never writes is a hole with no
+      feature behind it.
+
+    disable-library-validation
+      Nothing unsigned is loaded — the binary is one executable and a directory
+      of static files.
+
+    device.*
+      The app is a notes app. It opens no camera, no microphone and no
+      location.
+
+  The file exists rather than being left out so that the day something here
+  DOES need an entitlement, the argument for it is written next to it.
+-->
+<plist version="1.0">
+  <dict/>
+</plist>

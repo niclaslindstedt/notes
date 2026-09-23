@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the app's window may reach. DENY BY DEFAULT, and it stays that way: the renderer here is the Notes PWA exactly as the website serves it, and the website has no Tauri API to call. It has no business holding a handle to the filesystem, the shell, the clipboard or a second window — everything it does, it already does through the browser APIs it uses in a tab. `core:default` is Tauri's own minimum (the window's own lifecycle events); the dialog and opener plugins are called from Rust only and are deliberately not on this list.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

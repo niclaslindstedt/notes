@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+#
+# THE EFFECTS. Everything in this crate opens, draws or answers something; the
+# decisions behind all of it live in `notes-shell`, which knows nothing about
+# Tauri. See ../Cargo.toml.
+#
+# The dependency list is the whole argument for a THIN wrapper: Tauri itself,
+# a dialog for the one fatal error a packaged app can report, an opener for the
+# links that belong in a browser, and a single-instance lock. Nothing here adds
+# a feature to the app — the app is the website, unchanged.
+
+[package]
+name = "notes-tauri"
+description = "The Tauri desktop shell around the Notes PWA — one window, the bundled site, and nothing else."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# `notes` rather than the package name, so the executable, the user-data folder
+# and the docs all say the same word.
+[[bin]]
+name = "notes"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+notes-shell = { path = "../shell" }
+tauri = { version = "2", features = [] }
+# The fatal-error box — a packaged app has no console, so an unbundled or
+# unreadable webroot has to say so somewhere the user will see it.
+tauri-plugin-dialog = "2"
+# The one way an external link reaches the user's own browser instead of
+# replacing the app with a page it cannot leave (see `window::navigation_guard`).
+tauri-plugin-opener = "2"
+# A SECOND COPY would fight the first over the same IndexedDB document. The
+# browser gets this for free (one origin, one storage); a desktop app has to
+# ask for it.
+tauri-plugin-single-instance = "2"
+
+# Both plugins above are called from RUST ONLY and are deliberately absent from
+# `capabilities/default.json`, so the page cannot reach either.
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

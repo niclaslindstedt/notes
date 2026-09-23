@@ -1,0 +1,152 @@
+name: desktop-tauri
+
+# The desktop shell (`tauri/`) — checks on every relevant push, and
+# dispatch-only packaging.
+#
+# Split by the cost boundary the tree has structurally, because it is two
+# crates:
+#
+#   check    Cheap and automatic. `cargo test -p notes-shell` is the whole
+#            decision layer and needs NO GUI libraries — that is the entire
+#            point of the crate split, and the reason this half lands in
+#            seconds on an ordinary runner.
+#
+#   lint     Medium. `cargo clippy --workspace` reaches the app crate too,
+#            which DOES need the platform's webview development libraries — so
+#            it is an apt step and a cache away.
+#
+#   package  Expensive and manual. Real Windows/macOS/Linux runners producing
+#            real installers, for trying a build before a release makes one.
+#            release.yml runs the same packaging on every tag; this is the
+#            "does it still package?" button between them.
+#
+# `tauri/` is on no other workflow's path — it is not an npm workspace member
+# and its crates are not on `make lint`'s path — so without this file
+# `make tauri-test` and `make tauri-lint` run only when somebody remembers.
+
+on:
+  # `branches: [main]` on the push half, matching ci.yml: without it a PR branch
+  # runs both halves on every push and pays for the same checks twice.
+  push:
+    branches: [main]
+    paths:
+      - "tauri/**"
+      - "scripts/generate-icons.mjs"
+      - ".github/workflows/desktop-tauri.yml"
+  pull_request:
+    paths:
+      - "tauri/**"
+      - "scripts/generate-icons.mjs"
+      - ".github/workflows/desktop-tauri.yml"
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to package
+        type: choice
+        default: all
+        options: [all, windows, macos, linux]
+
+concurrency:
+  group: desktop-tauri-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: decision layer
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tauri
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tauri
+      # `-p notes-shell` and DELIBERATELY only that crate: it depends on no GUI
+      # toolkit, so this job installs nothing beyond a Rust toolchain. A test
+      # that needed more than this is a decision sitting in the wrong crate.
+      - name: test
+        run: cargo test -p notes-shell
+      - name: format
+        run: cargo fmt --all -- --check
+
+  lint:
+    name: clippy (both crates)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tauri
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tauri
+      # The app crate links the platform's webview, so clippy needs its headers
+      # even though nothing here opens a window.
+      - name: webview development libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf
+      # `tauri.conf.json` declares `../webroot` as a bundle resource, so the
+      # tree needs one — an empty page is enough to compile against, and
+      # building the real site here would cost minutes to typecheck Rust.
+      - name: a placeholder webroot
+        run: echo '<!doctype html><title>placeholder</title>' > webroot/index.html
+      - name: clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  package:
+    name: package (${{ matrix.target }})
+    if: github.event_name == 'workflow_dispatch'
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows
+          - os: macos-latest
+            target: macos
+          - os: ubuntu-latest
+            target: linux
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      # npm ci resolves @niclaslindstedt/oss-framework from GitHub Packages.
+      packages: read
+    env:
+      # An absent secret means the ad-hoc signature `tauri build` falls back to,
+      # which is the minimum an arm64 app needs to run at all — see release.yml.
+      APPLE_SIGNING_IDENTITY: ${{ secrets.MAC_SIGN_IDENTITY }}
+    steps:
+      - name: Skip unselected platform
+        if: inputs.platform != 'all' && inputs.platform != matrix.target
+        run: echo "not selected"
+
+      - uses: actions/checkout@v7
+        if: inputs.platform == 'all' || inputs.platform == matrix.target
+      - uses: ./.github/actions/package-desktop
+        if: inputs.platform == 'all' || inputs.platform == matrix.target
+        with:
+          target: ${{ matrix.target }}
+          npm-token: ${{ secrets.GITHUB_TOKEN }}
+          display-name: ${{ secrets.APP_DISPLAY_NAME }}
+          bundle-id: ${{ secrets.APP_BUNDLE_ID }}
+
+      - uses: actions/upload-artifact@v7
+        if: inputs.platform == 'all' || inputs.platform == matrix.target
+        with:
+          name: desktop-tauri-${{ matrix.target }}
+          path: tauri/target/release/bundle
+          if-no-files-found: error
+          retention-days: 7

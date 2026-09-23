@@ -1,0 +1,13 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
+     Tauri's `build.frontendDist` must name a directory, and this shell has no
+     frontend to build: the real one is `../webroot/`, copied in by
+     `scripts/bundle-web.mjs` and served from the `notes://` scheme at runtime
+     rather than loaded as a bundled frontend.
+
+     Nothing ever renders this page. It exists so the config is valid and the
+     bundler has something to point at.
+-->
+<title>Notes</title>
+<p>This page is a placeholder. The app is served from the bundled webroot.</p>

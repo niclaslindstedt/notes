@@ -146,6 +146,29 @@ make fmt-check   # prettier --check (CI)
 make icons       # regenerate PWA icons from public/favicon.svg
 ```
 
+The desktop shell in `tauri/` is a Rust project with its own toolchain; `make
+test` and `make lint` stop at its edge:
+
+```sh
+make tauri                # bundle the site into the shell and run the desktop app
+make tauri-test           # its decision layer (cargo test -p notes-shell — no GUI libs)
+make tauri-lint           # clippy at zero warnings, both crates
+make tauri-fmt            # rustfmt in place (tauri-fmt-check verifies)
+make tauri-package        # this machine's installers
+make tauri-package-debug  # …debug profile: minutes faster, much bigger
+```
+
+It is a **thin** wrapper: a window, the built site served from a private
+`notes://` scheme, and nothing else. **The page is never told it is inside
+it** — no injected global, no Tauri command. `tauri/shell/` holds every
+decision and needs no GUI toolkit; `tauri/src-tauri/` holds every effect. One
+seam reaches back into this tree, `VITE_SHELL_BUILD`, set by the shell's site
+build, which makes it an embedded build like the native and Electron ones
+(`isEmbedded` in `vite.config.ts`): no service worker, no update prompt. A desktop build updates by being replaced. The package's
+name and identifier come from `APP_DISPLAY_NAME` and `APP_BUNDLE_ID` at
+packaging time (`tauri/scripts/package.mjs`), like the phone app's. See
+[`tauri/README.md`](tauri/README.md).
+
 ## Development workflow
 
 - **Run `npm install` first in a fresh checkout.** The `make` targets shell

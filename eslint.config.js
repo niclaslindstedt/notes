@@ -29,13 +29,18 @@ export default [
       ".agent/**",
       "native/**",
       "electron/**",
+      // The desktop shell's own trees: Rust build output, and the site copied
+      // in from `dist/` (both gitignored — see tauri/README.md).
+      "tauri/target/**",
+      "tauri/webroot/**",
+      "tauri/node_modules/**",
     ],
   },
   js.configs.recommended,
   {
     // Node tooling scripts (release / changelog automation). These run
     // under Node, so expose its globals rather than the browser's.
-    files: ["scripts/**/*.mjs"],
+    files: ["scripts/**/*.mjs", "tauri/scripts/**/*.mjs"],
     languageOptions: {
       sourceType: "module",
       ecmaVersion: 2022,

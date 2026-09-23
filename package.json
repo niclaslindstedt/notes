@@ -19,7 +19,18 @@
     "typecheck": "tsc --noEmit",
     "fmt": "prettier --write .",
     "fmt:check": "prettier --check .",
-    "icons": "pwa-assets-generator"
+    "icons": "pwa-assets-generator",
+    "tauri": "npm --prefix tauri run start",
+    "tauri:fast": "npm --prefix tauri run start:fast",
+    "tauri:bundle": "npm --prefix tauri run bundle",
+    "tauri:install": "npm --prefix tauri install",
+    "tauri:test": "npm --prefix tauri run test",
+    "tauri:lint": "npm --prefix tauri run lint",
+    "tauri:fmt": "npm --prefix tauri run fmt",
+    "tauri:fmt:check": "npm --prefix tauri run fmt:check",
+    "tauri:package": "npm run tauri:install && npm --prefix tauri run package --",
+    "tauri:package:debug": "npm run tauri:install && npm --prefix tauri run package:debug --",
+    "tauri:clean": "npm --prefix tauri run clean"
   },
   "author": "Niclas Lindstedt <niclas@agilator.se>",
   "dependencies": {

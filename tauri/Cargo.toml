@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+#
+# The Tauri desktop shell — a THIN wrapper around the Notes PWA, and nothing
+# more. The app it opens is the same app the website serves; this tree adds a
+# window, a private scheme to serve the built site from, and no features.
+#
+# TWO crates, and the split is the only structure here:
+#
+#   shell/      the DECISIONS — where the site is, what a URL resolves to,
+#               what a file is served as. No Tauri, no GUI, no window.
+#   src-tauri/  the EFFECTS — the window, the scheme handler, the lifecycle.
+#
+# `cargo test -p notes-shell` therefore runs the whole decision layer on a
+# machine with a Rust toolchain and nothing else installed — no WebKitGTK, no
+# WebView2, no Xcode. That is what keeps this tree's logic checkable on an
+# ordinary CI runner, and it is why the two files worth testing live one
+# directory over from the two that cannot be.
+#
+# See README.md for the tree and the release procedure.
+
+[workspace]
+members = ["shell", "src-tauri"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+authors = ["Niclas Lindstedt <niclas@agilator.se>"]
+license = "PolyForm-Noncommercial-1.0.0"
+publish = false
+
+# A shipped app is built small: this binary is a window and a file server, so
+# there is nothing in it worth trading size for speed over, and a panic in the
+# shell is a bug report rather than something to unwind through.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

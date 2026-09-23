@@ -1,0 +1,90 @@
+name: Package the desktop app
+description: >
+  Build the site, bundle it into the Tauri shell, and produce this runner's
+  installers. Shared by desktop-tauri.yml (the dispatch-only "does it still
+  package?" button) and release.yml (the downloads attached to every release),
+  so the two can never drift into packaging differently.
+
+inputs:
+  target:
+    description: windows | macos | linux — which runner this is.
+    required: true
+  npm-token:
+    description: >
+      A token with `read:packages`. `npm ci` resolves
+      @niclaslindstedt/oss-framework from the GitHub Packages registry, which
+      requires auth even for a public package.
+    required: true
+  display-name:
+    description: >
+      APP_DISPLAY_NAME — the listing name the package installs as. Empty keeps
+      the project's own name.
+    required: false
+    default: ""
+  bundle-id:
+    description: >
+      APP_BUNDLE_ID — the identifier the package installs under, and so where
+      the installed app keeps its data. Empty keeps the development one.
+    required: false
+    default: ""
+  release:
+    description: >
+      "true" for a package that ships: refuses to fall back to the
+      development identity.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+        registry-url: "https://npm.pkg.github.com"
+        scope: "@niclaslindstedt"
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: tauri
+
+    # WebKitGTK is the webview on Linux, and the bundler wants `patchelf` and
+    # librsvg for the AppImage. Windows has WebView2 in the image and macOS has
+    # WKWebView in the OS, so neither needs anything.
+    - name: Linux packaging libraries
+      if: inputs.target == 'linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+          libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
+
+    # The site build lives in the root project; the shell only carries its
+    # output. `tauri/` is deliberately not a workspace member — it has its own
+    # toolchain — so it is a second, tiny install.
+    - name: Install
+      shell: bash
+      run: npm ci
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.npm-token }}
+    - name: Install the shell's own tooling
+      shell: bash
+      run: npm ci --prefix tauri
+
+    # `npm run package` is `scripts/package.mjs`: `bundle-web.mjs` (which
+    # builds the site with the service worker off), then `tauri build` with the
+    # identity below merged over the committed config. Going through the
+    # shell's own script rather than calling `tauri build` here is what keeps a
+    # release build identical to the one a maintainer makes locally.
+    - name: Package
+      shell: bash
+      env:
+        APP_DISPLAY_NAME: ${{ inputs.display-name }}
+        APP_BUNDLE_ID: ${{ inputs.bundle-id }}
+        RELEASE: ${{ inputs.release }}
+      run: |
+        if [ "$RELEASE" = "true" ]; then
+          npm run package --prefix tauri -- --require-identity
+        else
+          npm run package --prefix tauri
+        fi

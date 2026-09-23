@@ -1,0 +1,25 @@
+{
+  "name": "notes-tauri",
+  "version": "0.1.0",
+  "author": "Niclas Lindstedt <niclas@agilator.se>",
+  "description": "Desktop wrapper around the Notes PWA — bundles the app on-device and serves it from a private scheme, in the platform's own webview. See README.md.",
+  "private": true,
+  "scripts": {
+    "icons": "node ../scripts/generate-icons.mjs",
+    "bundle": "node scripts/bundle-web.mjs",
+    "bundle:copy": "node scripts/bundle-web.mjs --skip-build",
+    "build": "cargo build",
+    "start": "npm run bundle && cargo run --bin notes",
+    "start:fast": "npm run bundle:copy && cargo run --bin notes",
+    "test": "cargo test -p notes-shell",
+    "lint": "cargo clippy --workspace --all-targets -- -D warnings",
+    "fmt": "cargo fmt --all",
+    "fmt:check": "cargo fmt --all -- --check",
+    "package": "node scripts/package.mjs",
+    "package:debug": "node scripts/package.mjs --debug",
+    "clean": "cargo clean"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
