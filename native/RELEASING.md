@@ -80,6 +80,23 @@ bundle id. Before the first iOS build under the store bundle id:
 Changing the container after release strands every user's synced notes in the
 old one — it is set once.
 
+### Dropbox
+
+The app signs in to Dropbox through an in-app authentication session that
+returns on **`se.agilator.notes://oauth`** — `<APP_BUNDLE_ID>://oauth`, since
+the app's URL scheme is its bundle id (see
+[README → Signing in to Dropbox](README.md#signing-in-to-dropbox)). In the
+[Dropbox App Console](https://www.dropbox.com/developers/apps), open the app
+whose key is the `VITE_DROPBOX_APP_KEY` secret and add
+`se.agilator.notes://oauth` under **Settings → OAuth 2 → Redirect URIs**,
+exactly as written. The CI build bakes that key (and `VITE_DROPBOX_APP_FOLDER`)
+into the embedded bundle; a local build needs them in the environment of
+`make build-native`. Without the key the app offers no Dropbox at all.
+
+To check it on a device: Settings → Storage → Dropbox opens Dropbox in a sheet
+over the app (not in Safari); approving closes the sheet and connects, and
+closing the sheet instead leaves nothing connected and shows no error.
+
 ## 1. Set the marketing version
 
 `app.config.js` → `expo.version` is the user-visible version (e.g. `1.0.0`). Bump
@@ -201,6 +218,13 @@ workflow can authenticate to EAS non-interactively. Store submission
 configured on the EAS project (Apple App Store Connect credentials managed by
 EAS; a Google Play service-account key uploaded to EAS or committed as
 described above).
+
+**What it runs.** It installs the web app's dependencies, runs
+`npm run build:native` with the `VITE_DROPBOX_APP_KEY` /
+`VITE_DROPBOX_APP_FOLDER` secrets so the embedded bundle carries the Dropbox
+key, and only then queues `eas build`. The bundle rides the upload: EAS leaves
+out whatever the repository-root [`.easignore`](../.easignore) lists, and that
+file — unlike `native/.gitignore` — keeps `native/web/`.
 
 **Dispatch it** from the *Actions → Native build* tab (or `gh workflow run
 native-build.yml`) with:

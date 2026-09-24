@@ -20,6 +20,13 @@ name: Native build
 # again on its own builders, as EAS environment variables on the EAS project.
 # A `production` build with any of them missing fails in app.config.js rather
 # than uploading a binary under the wrong identity.
+#
+# The embedded web app is built HERE, before `eas build`, and rides the upload
+# (the root .easignore keeps the gitignored native/web/ in it). That is where
+# VITE_DROPBOX_APP_KEY / VITE_DROPBOX_APP_FOLDER (secrets, optional) reach the
+# bundle: unset, the app offers no Dropbox; set, the Dropbox app must list
+# <APP_BUNDLE_ID>://oauth — se.agilator.notes://oauth — as a redirect URI
+# (native/RELEASING.md).
 
 on:
   workflow_dispatch:
@@ -50,6 +57,9 @@ on:
 
 permissions:
   contents: read
+  # The root install resolves @niclaslindstedt/oss-framework from GitHub
+  # Packages, which needs a token even for a public package.
+  packages: read
 
 jobs:
   build:
@@ -63,6 +73,25 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
+
+      # The wrapper has no UI of its own — it loads this bundle, and a build
+      # without it fails at prebuild (plugins/with-web-bundle.js). .npmrc
+      # authenticates the @niclaslindstedt scope through GITHUB_PAT.
+      - name: Install the web app's dependencies
+        working-directory: .
+        run: npm ci
+        env:
+          GITHUB_PAT: ${{ secrets.GITHUB_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Build the embedded web app
+        working-directory: .
+        run: npm run build:native
+        env:
+          # The same Dropbox app as the website's. The phone app signs in
+          # through an authentication session that returns on
+          # <APP_BUNDLE_ID>://oauth, which that app must list.
+          VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
+          VITE_DROPBOX_APP_FOLDER: ${{ secrets.VITE_DROPBOX_APP_FOLDER }}
 
       # Installs the pinned eas-cli and authenticates it with EXPO_TOKEN so
       # the eas commands below run non-interactively.

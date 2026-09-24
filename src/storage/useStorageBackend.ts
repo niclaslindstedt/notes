@@ -741,11 +741,14 @@ export function useStorageBackend(): UseStorageBackend {
     namespaceSettingsStore,
     backend,
     // Both halves must hold: the key has to be built in, and the surface has
-    // to be able to finish a redirect OAuth flow. The desktop shell fails the
-    // second even when a build passes it the keys.
+    // to be able to finish one of the OAuth flows — a redirect in the browser,
+    // the loopback listener on the desktop, an authentication session in the
+    // phone app. A surface with none of them hides Dropbox even when a build
+    // passes it the key.
     dropboxAvailable:
       (platformCapabilities.redirectOauth ||
-        platformCapabilities.loopbackOauth) &&
+        platformCapabilities.loopbackOauth ||
+        platformCapabilities.authSessionOauth) &&
       isDropboxConfigured(),
     dropboxConnected: dropboxToken !== null,
     folderAvailable: platformCapabilities.folderPicker,

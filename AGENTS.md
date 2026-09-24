@@ -16,8 +16,10 @@ capabilities a WebView can't provide: native haptics and SPKI-pinned HTTPS
 for the self-hosted **notesd** backend, bridged over `postMessage` through
 [`src/platform/native-bridge.ts`](src/platform/native-bridge.ts), and on iOS
 an **iCloud Drive** file store the page finds as a provider on `window`
-([`src/platform/icloud-host.ts`](src/platform/icloud-host.ts)) — the page asks
-whether that capability is present, never where it is running. It no longer
+([`src/platform/icloud-host.ts`](src/platform/icloud-host.ts)), plus an
+**authentication session** for the Dropbox sign-in the page finds at
+`window.__ossAuthSession` (the framework's `getAuthSessionHost`) — the page
+asks whether each capability is present, never where it is running. It no longer
 imports the web source; the storage logic, encryption included, stays in the
 embedded app, and the iCloud store only moves the bytes it is handed.
 
@@ -599,8 +601,9 @@ The source tree under `src/` is organized by concern, not by file type:
   SPKI-pinned `fetch` routed through native for the notesd backend). Inert
   on the plain web; only lights up inside `native/`. `capabilities.ts`: the
   single answer to **which surface is this and what can it do** — `web` /
-  `native` / `desktop`, and the three capabilities that differ between them
-  (`folderPicker`, `redirectOauth`, `pinnedFetch`). Every "is this available
+  `native` / `desktop`, and the capabilities that differ between them
+  (`folderPicker`, `redirectOauth`, `loopbackOauth`, `authSessionOauth`,
+  `pinnedFetch`). Every "is this available
   here?" question routes through it rather than being re-derived at the call
   site; the page works this out from what it can observe, so no wrapper has
   to tell it anything. `icloud-host.ts`: the one capability a wrapper *does*
@@ -662,7 +665,18 @@ camera scan — each behind the `postMessage` bridge in
 inert on the web; plus, on iOS, an iCloud Drive file store the page finds as a
 provider (`src/platform/icloud-host.ts`) and drives through the same directory
 adapter as every other folder backend — the store lists, reads, writes and
-removes files, and decides nothing. For `tauri/` the list is **one item long**: a loopback HTTP
+removes files, and decides nothing; and an authentication session for signing
+in to Dropbox, because a `file://` page has no origin a provider can redirect
+back to. The wrapper installs it at `window.__ossAuthSession`
+(`native/src/authSessionBridge.ts`), opens the consent page in
+`expo-web-browser`'s `openAuthSessionAsync` and hands back the URL the sheet
+closed on; the PKCE verifier, the `state` check and the token exchange stay in
+the page (the framework's `runAuthSessionAuth`, via
+`connectDropboxAuthSession` in `src/storage/dropbox/index.ts`). Its redirect
+URI is `<bundle id>://oauth` — the Expo `scheme` is the bundle id, so
+`se.agilator.notes://oauth` in the store build — and the Dropbox app must list
+it; `tests/platform/auth-session.test.ts` pins the property, event and
+scheme. For `tauri/` the list is **one item long**: a loopback HTTP
 listener for one OAuth redirect, because a web page cannot hold a listening
 socket — the flow RFC 8252 prescribes for native apps, and the only way the
 desktop build gets cloud sync at all (its `notes:` origin is not a redirect

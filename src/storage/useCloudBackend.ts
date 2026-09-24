@@ -10,6 +10,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import {
+  getAuthSessionHost,
+  isAuthCancelled,
+} from "@niclaslindstedt/oss-framework/storage";
+
 // Aliased: the storage layer also has a passphrase `unlock` of its own.
 import { unlock as unlockAchievement } from "../achievements/index.ts";
 import { createLogger } from "../dev/logger.ts";
@@ -73,12 +78,14 @@ export interface CloudBackend {
    */
   rememberDropboxAccessToken: (token: string) => void;
   /**
-   * Connect Dropbox. Two shapes behind one verb, picked by what the surface
-   * can do (`capabilities()`): on the web the page navigates to Dropbox and
-   * the promise resolves as it leaves, with completion running in the boot
-   * effect after the redirect; on the desktop the whole round trip happens
-   * here and the promise rejects with anything that went wrong, so the caller
-   * can show it.
+   * Connect Dropbox. Three shapes behind one verb, picked by what the surface
+   * can do: on the web the page navigates to Dropbox and the promise resolves
+   * as it leaves, with completion running in the boot effect after the
+   * redirect; in the phone app (an authentication-session host on `window`)
+   * and on the desktop (`capabilities().loopbackOauth`) the whole round trip
+   * happens here and the promise rejects with anything that went wrong, so
+   * the caller can show it — except a closed sign-in sheet, which resolves
+   * quietly.
    */
   connectDropbox: () => Promise<void>;
   /** Forget the Dropbox tokens and fall back to the browser store. */
@@ -148,6 +155,23 @@ export function useCloudBackend({
 
   const connectDropbox = useCallback(async () => {
     const m = await import("./dropbox/index.ts");
+    // The phone app: its page is a `file://` one no redirect can land on, so
+    // the wrapper offers an authentication session instead — asked for as a
+    // capability, never as a platform. The sheet hands the redirect back and
+    // the tokens land right here. Closing the sheet is not an error.
+    const authSession = getAuthSessionHost();
+    if (authSession) {
+      try {
+        acceptDropboxTokens(await m.connectDropboxAuthSession(authSession));
+      } catch (err) {
+        if (isAuthCancelled(err)) {
+          log.info("Dropbox sign-in cancelled");
+          return;
+        }
+        throw err;
+      }
+      return;
+    }
     if (capabilities().loopbackOauth) {
       // The desktop: Dropbox opens in the user's browser and comes back to a
       // loopback listener, so the tokens land right here (the framework's

@@ -12,7 +12,11 @@
 // happens one level up in `withEncryption`, so an encrypted store lands as a
 // single `/notes.json` envelope instead of markdown.
 
-import { connectDropboxLoopback as frameworkConnectDropboxLoopback } from "@niclaslindstedt/oss-framework/storage";
+import {
+  type AuthSessionHost,
+  connectDropboxAuthSession as frameworkConnectDropboxAuthSession,
+  connectDropboxLoopback as frameworkConnectDropboxLoopback,
+} from "@niclaslindstedt/oss-framework/storage";
 
 import { createLogger } from "../../dev/logger.ts";
 import { DROPBOX_APP_KEY } from "../cloud-configured.ts";
@@ -75,6 +79,9 @@ const log = createLogger("dropbox");
 //     in `tauri/shell/src/oauth.rs` — keep the two lists in step). Dropbox permits
 //     plain `http` for loopback hosts, which is why the desktop flow works
 //     without a certificate; the trailing slash is part of the match.
+//   - The phone app's `<bundle id>://oauth` — `se.agilator.notes://oauth` for
+//     the store build — which the wrapper's authentication session returns on
+//     (`connectDropboxAuthSession` below, `native/src/authSessionBridge.ts`).
 //
 // A port missing from that list fails at the consent screen with Dropbox's
 // "invalid redirect_uri", not at the token exchange, so it is obvious.
@@ -508,6 +515,25 @@ export function connectDropboxLoopback(
   fetchImpl: FetchImpl = fetch,
 ): Promise<DropboxAuthResult> {
   return frameworkConnectDropboxLoopback(DROPBOX_APP_KEY, fetchImpl, log);
+}
+
+// The phone app's sign-in: the wrapper offers an authentication session (a
+// sheet over the app that closes on the redirect to `<bundle id>://oauth`),
+// found as a capability on `window`. The flow is the framework's
+// `runAuthSessionAuth` — the same endpoints, `state` and
+// `token_access_type=offline` as `DROPBOX_OAUTH` — which checks the redirect
+// prefix and the `state`, drops the verifier on any failure, and rejects with
+// `isAuthCancelled` when the reader closed the sheet.
+export function connectDropboxAuthSession(
+  host: AuthSessionHost,
+  fetchImpl: FetchImpl = fetch,
+): Promise<DropboxAuthResult> {
+  return frameworkConnectDropboxAuthSession(
+    DROPBOX_APP_KEY,
+    host,
+    fetchImpl,
+    log,
+  );
 }
 
 // True when a Dropbox OAuth flow is mid-flight — i.e. `startDropboxAuth`

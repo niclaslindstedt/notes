@@ -42,6 +42,7 @@
 // import — puts the native module back in the root's type graph and turns CI
 // red on a machine where it passes.
 import type { ICloudResult } from "./icloudWire";
+import { escapeForScript } from "./scriptText";
 
 /** The message the page posts to ask for something. Namespaced, and without
  *  the `v` field the other bridge's envelopes carry, so the two are never
@@ -198,11 +199,4 @@ export function resolveScript(
       }
     } catch (e) {}
   })(); true;`;
-}
-
-/** A JavaScript string literal holding `text`, safe to splice into a script. */
-function escapeForScript(text: string): string {
-  return JSON.stringify(text)
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
 }

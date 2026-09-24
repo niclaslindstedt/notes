@@ -10,13 +10,18 @@
 //   3. a QR camera scan (the `QrScanner` overlay) for pairing that daemon —
 // plus one the page finds rather than asks for:
 //   4. an iCloud Drive file store (iOS), installed as a provider on `window`
-//      by `ICLOUD_SCRIPT` and answered by `answerICloud` (`icloud*.ts`). The
-//      page asks whether the provider is there, never where it is running.
+//      by `ICLOUD_SCRIPT` and answered by `answerICloud` (`icloud*.ts`), and
+//   5. an authentication session for signing in to Dropbox, installed as
+//      `window.__ossAuthSession` by `authSessionScript` and answered by
+//      `answerAuthSession` (`authSession*.ts`). A `file://` page has no
+//      origin a provider can redirect back to; the session's sheet returns on
+//      `<bundle id>://oauth` instead.
+//      The page asks whether each provider is there, never where it is running.
 //
 // See `native/README.md` for the message protocol and the web-side seams in
 // `src/platform/native-bridge.ts` and `src/platform/icloud-host.ts`.
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Platform, StyleSheet } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -26,6 +31,12 @@ import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { handleBridgeMessage } from "./bridge/on-message";
 import { answerICloud } from "./icloud";
 import { ICLOUD_SCRIPT, isICloudRequest, resolveScript } from "./icloudBridge";
+import { answerAuthSession, authRedirectUri } from "./authSession";
+import {
+  authSessionResolveScript,
+  authSessionScript,
+  isAuthSessionRequest,
+} from "./authSessionBridge";
 import QrScanner from "./QrScanner";
 
 // Parse a message body for the iCloud check. The other bridge parses its own;
@@ -37,6 +48,15 @@ function parseMessage(raw: string): unknown {
     return null;
   }
 }
+
+// The redirect URI a sign-in comes back on (`<bundle id>://oauth`), and the
+// provider the page finds it through. Null in a build with no URL scheme,
+// which offers no provider — the page then hides Dropbox, since its redirect
+// flow cannot land on a `file://` page.
+const AUTH_REDIRECT_URI = authRedirectUri();
+const AUTH_SESSION_SCRIPT = AUTH_REDIRECT_URI
+  ? authSessionScript(AUTH_REDIRECT_URI)
+  : "";
 
 // Where the embedded bundle's entry point lives on each platform. Android
 // keeps it under the APK's `assets/`; iOS under the app bundle, whose file URL
@@ -54,6 +74,15 @@ export default function WebViewHost() {
   // The in-flight QR-scan request id, set when the web app asks to scan and
   // cleared once the camera overlay resolves.
   const [scanId, setScanId] = useState<string | null>(null);
+
+  // One sign-in. The sheet is modal and the page waits on it; what comes back
+  // is the provider's redirect URL, handed straight to the page, which holds
+  // the PKCE verifier and makes the token exchange itself.
+  const signIn = useCallback(async (id: string, url: string) => {
+    if (!AUTH_REDIRECT_URI) return;
+    const result = await answerAuthSession(url, AUTH_REDIRECT_URI);
+    webView.current?.injectJavaScript(authSessionResolveScript(id, result));
+  }, []);
 
   // Deliver a scan result back into the page and tear the overlay down. Bodies
   // stay tiny (a decoded string) so no base64 dance is needed.
@@ -87,9 +116,11 @@ export default function WebViewHost() {
           domStorageEnabled
           javaScriptEnabled
           setSupportMultipleWindows={false}
-          // The iCloud provider, installed before the page's own scripts run
-          // so the storage picker can offer iCloud Drive on the first render.
-          injectedJavaScriptBeforeContentLoaded={ICLOUD_SCRIPT}
+          // The iCloud and sign-in providers, installed before the page's own
+          // scripts run so the storage picker can offer iCloud Drive and
+          // Dropbox on the first render. Both are guarded against a second
+          // injection.
+          injectedJavaScriptBeforeContentLoaded={`${ICLOUD_SCRIPT}\n${AUTH_SESSION_SCRIPT}`}
           onMessage={(event: WebViewMessageEvent) => {
             const raw = event.nativeEvent.data;
             const parsed = parseMessage(raw);
@@ -101,6 +132,10 @@ export default function WebViewHost() {
                   resolveScript(parsed.id, result),
                 ),
               );
+              return;
+            }
+            if (isAuthSessionRequest(parsed)) {
+              void signIn(parsed.id, parsed.url);
               return;
             }
             void handleBridgeMessage(raw, {

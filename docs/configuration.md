@@ -43,14 +43,27 @@ there rather than shipping under the wrong identity.
 | `APP_DISPLAY_NAME`        | secret   | `native-build.yml` — the store listing's name.       |
 | `APP_BUNDLE_ID`           | secret   | `native-build.yml` — iOS bundle identifier / Android package name. |
 | `EAS_PROJECT_ID`          | secret   | `native-build.yml` — the Expo project to build against. |
-| `VITE_DROPBOX_APP_KEY`    | secret   | Dropbox backend (public PKCE app key).              |
-| `VITE_DROPBOX_APP_FOLDER` | secret   | Dropbox app-folder name.                            |
+| `VITE_DROPBOX_APP_KEY`    | secret   | Dropbox backend (public PKCE app key) — the Pages builds, and `native-build.yml`, which bakes it into the phone app's embedded bundle. |
+| `VITE_DROPBOX_APP_FOLDER` | secret   | Dropbox app-folder name — same two places.           |
 | `VITE_DONATE_URL`         | secret   | Optional donate row in the side menu.               |
 | `MIRROR_URL`              | secret   | `mirror.yml` — the git mirror, e.g. `gitlab.com/<ns>/notes.git`; unset, the job is a no-op. |
 | `MIRROR_TOKEN`            | secret   | `mirror.yml` — a push token for it.                  |
 | `MIRROR_USER`             | secret   | `mirror.yml` — optional basic-auth user; defaults to `oauth2`. |
 | `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `MAC_SIGN_IDENTITY`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | secret | macOS signing and notarization of the desktop app — see [`tauri/README.md`](../tauri/README.md). |
 | `GITHUB_PAT`              | secret   | `npm ci` against the GitHub Packages registry.      |
+
+### Dropbox redirect URIs
+
+Dropbox matches redirect URIs exactly, so the Dropbox app whose key is
+`VITE_DROPBOX_APP_KEY` lists every one the three surfaces sign in through
+(App Console → Settings → OAuth 2 → Redirect URIs):
+
+- the website's deployed origins, without a trailing slash (the redirect flow);
+- `http://127.0.0.1:53682/`, `:53683/` and `:53684/` for the desktop app (the
+  loopback flow — see `tauri/shell/src/oauth.rs`);
+- `se.agilator.notes://oauth` for the phone app — `<APP_BUNDLE_ID>://oauth`,
+  the authentication session's return address (see
+  [native/README.md](../native/README.md#signing-in-to-dropbox)).
 
 ## PWA manifest
 

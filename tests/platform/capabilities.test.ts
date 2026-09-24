@@ -26,6 +26,7 @@ afterEach(() => {
   });
   delete (window as unknown as Record<string, unknown>).showDirectoryPicker;
   delete (window as unknown as Record<string, unknown>).ReactNativeWebView;
+  delete (window as unknown as Record<string, unknown>).__ossAuthSession;
 });
 
 describe("platform", () => {
@@ -90,14 +91,36 @@ describe("capabilities", () => {
     });
   });
 
-  it("withholds the loopback redirect from the native wrapper, which has a real origin", () => {
+  // The wrapper loads the page over `file://`: no origin a provider would
+  // redirect to, and no socket to listen on. What it offers instead is an
+  // authentication session, found by presence.
+  it("withholds the redirect and the loopback from the native wrapper", () => {
+    setProtocol("file:", "");
     (window as unknown as Record<string, unknown>).ReactNativeWebView = {
       postMessage: () => {},
     };
     expect(capabilities()).toMatchObject({
-      redirectOauth: true,
+      redirectOauth: false,
       loopbackOauth: false,
+      authSessionOauth: false,
     });
+  });
+
+  it("offers auth-session OAuth wherever a sign-in host is installed, and nowhere else", () => {
+    expect(capabilities().authSessionOauth).toBe(false);
+    (window as unknown as Record<string, unknown>).__ossAuthSession = {
+      version: 1,
+      redirectUri: "se.agilator.notes://oauth",
+      open: () => Promise.resolve(null),
+    };
+    expect(capabilities().authSessionOauth).toBe(true);
+    // A host of a version the framework does not speak is no host.
+    (window as unknown as Record<string, unknown>).__ossAuthSession = {
+      version: 2,
+      redirectUri: "se.agilator.notes://oauth",
+      open: () => Promise.resolve(null),
+    };
+    expect(capabilities().authSessionOauth).toBe(false);
   });
 
   it("offers the pinned fetch only inside the native wrapper", () => {

@@ -12,6 +12,9 @@
 //   - **Loopback OAuth** needs something able to hold a listening socket,
 //     which is a wrapper question — and it is how the desktop build gets
 //     cloud sync despite failing the one above.
+//   - **Auth-session OAuth** needs a host that can open a sign-in sheet and
+//     catch a redirect to the app's own URL scheme — the phone wrapper, which
+//     loads the page over `file://` and so fails the redirect question too.
 //   - **SPKI-pinned fetch** needs native code, which is a wrapper question.
 //
 // Answering each of them at its own call site is how they drift apart, and it
@@ -30,7 +33,10 @@
 // `./icloud-host.ts` and `useICloudBackend`. Like everything here it is asked
 // as "is it present?", never "which surface is this?".
 
-import { isDesktopShellOrigin } from "@niclaslindstedt/oss-framework/storage";
+import {
+  getAuthSessionHost,
+  isDesktopShellOrigin,
+} from "@niclaslindstedt/oss-framework/storage";
 
 import { isNative } from "./native-bridge.ts";
 
@@ -60,12 +66,13 @@ export interface Capabilities {
   /**
    * Whether a redirect-based OAuth flow can complete on this origin.
    *
-   * False on the desktop, and not for want of trying: `redirectUri()`
-   * (`src/storage/oauth-pkce.ts`) is built from `window.location`, so in the
-   * desktop shell it is `notes://localhost` (or `http://notes.localhost`). No provider will register a custom
-   * scheme as a redirect URI, and Google rejects non-`https` outright, so the
-   * flow cannot be completed rather than merely being unconfigured. The
-   * browser and the WebView wrapper both have a real `https://` origin.
+   * True only in the browser, and not for want of trying elsewhere:
+   * `redirectUri()` (`src/storage/oauth-pkce.ts`) is built from
+   * `window.location`, so in the desktop shell it is `notes://localhost` (or
+   * `http://notes.localhost`), and in the phone wrapper — which loads the
+   * embedded bundle over `file://` — a `file:///…/index.html` with a `null`
+   * origin. No provider will register either as a redirect URI, so the flow
+   * cannot be completed rather than merely being unconfigured.
    */
   redirectOauth: boolean;
 
@@ -79,8 +86,8 @@ export interface Capabilities {
    * all. It needs something able to hold a listening socket, which a web page
    * is not — the Tauri shell owns it (`tauri/src-tauri/src/loopback.rs`) and
    * the framework's `runLoopbackAuth` reaches it.
-   * The browser and the WebView wrapper have `redirectOauth` and need no such
-   * thing.
+   * The browser has `redirectOauth` and the phone wrapper `authSessionOauth`;
+   * neither needs this.
    *
    * A provider still has to carry the loopback URIs on its redirect
    * allowlist, so this says the flow *can complete here*, not that every
@@ -88,6 +95,20 @@ export interface Capabilities {
    * in `src/storage/useStorageBackend.ts` for which ones are.
    */
   loopbackOauth: boolean;
+
+  /**
+   * Whether an OAuth redirect can be caught by an authentication session the
+   * host offers — `ASWebAuthenticationSession` / a Custom Tab, opened by the
+   * phone wrapper, which closes on a redirect to `<bundle id>://oauth` and
+   * hands it back (the framework's `runAuthSessionAuth`).
+   *
+   * Asked as "is the provider there?" (`getAuthSessionHost()`), never as
+   * "is this the native wrapper?": the wrapper installs it on `window`
+   * before the page's scripts run (`native/src/authSessionBridge.ts`), and a
+   * build with no URL scheme installs none — and then offers no Dropbox,
+   * rather than a sign-in that opens and never comes back.
+   */
+  authSessionOauth: boolean;
 
   /**
    * SPKI-pinned HTTPS, behind the self-hosted **notesd** backend. Needs native
@@ -102,8 +123,9 @@ export function capabilities(): Capabilities {
   return {
     folderPicker:
       typeof window !== "undefined" && "showDirectoryPicker" in window,
-    redirectOauth: surface !== "desktop",
+    redirectOauth: surface === "web",
     loopbackOauth: surface === "desktop",
+    authSessionOauth: getAuthSessionHost() !== null,
     pinnedFetch: surface === "native",
   };
 }

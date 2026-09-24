@@ -2,6 +2,8 @@
 import { act, renderHook, waitFor } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AuthCancelledError } from "@niclaslindstedt/oss-framework/storage";
+
 import { unlock } from "../../src/achievements/index.ts";
 import { useCloudBackend } from "../../src/storage/useCloudBackend.ts";
 
@@ -40,11 +42,25 @@ const startDropboxAuth = vi.fn(async () => {});
 const hasPendingDropboxAuth = vi.fn(() => false);
 const completeDropboxAuth = vi.fn();
 const connectDropboxLoopback = vi.fn();
+const connectDropboxAuthSession = vi.fn();
 vi.mock("../../src/storage/dropbox/index.ts", () => ({
   startDropboxAuth: () => startDropboxAuth(),
   completeDropboxAuth: (code: string) => completeDropboxAuth(code),
   connectDropboxLoopback: () => connectDropboxLoopback(),
+  connectDropboxAuthSession: (host: unknown) => connectDropboxAuthSession(host),
 }));
+
+// The phone wrapper's sign-in provider, as it installs itself on `window`
+// (`native/src/authSessionBridge.ts`). The real `getAuthSessionHost` finds it.
+const authSessionHost = {
+  version: 1,
+  redirectUri: "se.agilator.notes://oauth",
+  open: vi.fn(),
+};
+function installAuthSessionHost(): void {
+  (window as unknown as Record<string, unknown>).__ossAuthSession =
+    authSessionHost;
+}
 
 // `connectDropbox` picks its flow shape from the surface. jsdom is a browser
 // tab, so the redirect path is the default; the desktop tests below flip this.
@@ -54,6 +70,7 @@ vi.mock("../../src/platform/capabilities.ts", () => ({
     folderPicker: false,
     redirectOauth: !loopbackOauth,
     loopbackOauth,
+    authSessionOauth: false,
     pinnedFetch: false,
   }),
 }));
@@ -79,6 +96,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  delete (window as unknown as Record<string, unknown>).__ossAuthSession;
 });
 
 describe("useCloudBackend", () => {
@@ -100,6 +118,63 @@ describe("useCloudBackend", () => {
     // redirect, not a popup that a blocker could tie to the click.
     await waitFor(() => expect(startDropboxAuth).toHaveBeenCalledTimes(1));
     // Completion only lands in the boot effect after the redirect returns.
+    expect(selectBackend).not.toHaveBeenCalled();
+  });
+
+  // The phone app's page is a `file://` one no redirect can land on; the
+  // wrapper's authentication session catches the redirect instead, and the
+  // round trip finishes in place. Found by presence, not by platform.
+  it("connectDropbox signs in through the host's authentication session when one is offered", async () => {
+    installAuthSessionHost();
+    connectDropboxAuthSession.mockResolvedValue({
+      accessToken: "dbx-sheet",
+      refreshToken: "dbx-sheet-ref",
+    });
+    const selectBackend = vi.fn();
+    const { result } = renderHook(() => useCloudBackend({ selectBackend }));
+
+    await act(async () => {
+      await result.current.connectDropbox();
+    });
+
+    expect(connectDropboxAuthSession).toHaveBeenCalledWith(authSessionHost);
+    expect(startDropboxAuth).not.toHaveBeenCalled();
+    expect(connectDropboxLoopback).not.toHaveBeenCalled();
+    expect(setDropboxToken).toHaveBeenCalledWith("dbx-sheet");
+    expect(setDropboxRefreshToken).toHaveBeenCalledWith("dbx-sheet-ref");
+    expect(selectBackend).toHaveBeenCalledWith("dropbox");
+  });
+
+  it("connectDropbox treats a closed sign-in sheet as a quiet cancel", async () => {
+    installAuthSessionHost();
+    connectDropboxAuthSession.mockRejectedValue(
+      new AuthCancelledError("Dropbox"),
+    );
+    const selectBackend = vi.fn();
+    const { result } = renderHook(() => useCloudBackend({ selectBackend }));
+
+    await act(async () => {
+      await expect(result.current.connectDropbox()).resolves.toBeUndefined();
+    });
+
+    expect(setDropboxToken).not.toHaveBeenCalled();
+    expect(selectBackend).not.toHaveBeenCalled();
+    expect(result.current.dropboxToken).toBeNull();
+  });
+
+  it("connectDropbox rejects when the authentication session fails", async () => {
+    installAuthSessionHost();
+    connectDropboxAuthSession.mockRejectedValue(
+      new Error("Dropbox redirect carried an unexpected state"),
+    );
+    const selectBackend = vi.fn();
+    const { result } = renderHook(() => useCloudBackend({ selectBackend }));
+
+    await act(async () => {
+      await expect(result.current.connectDropbox()).rejects.toThrow(
+        /unexpected state/,
+      );
+    });
     expect(selectBackend).not.toHaveBeenCalled();
   });
 

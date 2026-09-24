@@ -27,6 +27,9 @@ can't do on its own:
    iCloud Drive. The wrapper offers a small file store (list, read, write,
    remove) inside the app's own container, `iCloud.se.agilator.notes`, and the
    web app's directory adapter drives it like any other folder.
+5. **Dropbox sign-in** — the page is loaded over `file://`, which no OAuth
+   provider will redirect back to. The wrapper offers an authentication
+   session instead (see [Signing in to Dropbox](#signing-in-to-dropbox)).
 
 Everything else — the UI, storage (`localStorage`), Markdown editor, themes,
 cloud backends, encryption, achievements — is the web app, unchanged. There is
@@ -122,6 +125,48 @@ spelled the same in every place — is pinned from the root suite by
 > end-to-end once the web-side notesd adapter and a running daemon exist. The
 > web seam is unit-tested (`tests/platform/native-bridge.test.ts`); the native
 > module is validated manually against a known-good / known-bad pin.
+
+## Signing in to Dropbox
+
+The web app signs in to Dropbox with a PKCE redirect: it sends the page to
+Dropbox and Dropbox sends it back to the page's own URL. Here that URL is
+`file:///…/web/index.html` — no provider will register it, and the providers
+refuse to show consent inside an embedded WebView anyway. So the wrapper
+offers an **authentication session** — `ASWebAuthenticationSession` on iOS, a
+Custom Tab on Android, both through `expo-web-browser`'s
+`openAuthSessionAsync` — a browser sheet over the app that closes the moment
+Dropbox redirects to a URI the app claims, and hands that URI back.
+
+- [`src/authSessionBridge.ts`](src/authSessionBridge.ts) — the script,
+  injected before the page loads beside the iCloud one, that defines
+  `window.__ossAuthSession` (`version: 1`, `redirectUri`, `open(url)`) and
+  fires `oss:auth-session-host`. Those are the framework's names
+  (`getAuthSessionHost` in `@niclaslindstedt/oss-framework/storage`), because
+  the page-side flow is the framework's `runAuthSessionAuth`. `open` posts
+  `{ type: "notes-native/auth-session-request", id, url }`; only an `https:`
+  URL is honoured.
+- [`src/authSession.ts`](src/authSession.ts) — opens the sheet and reports
+  where it ended: the redirect URL, unread, or `null` when the reader closed
+  it.
+
+The wrapper never sees a token. The page generates the PKCE verifier, checks
+that the sheet ended on the redirect URI and carried the `state` it sent, and
+makes the token exchange itself; a closed sheet is a quiet cancel, and the
+verifier is dropped on any failure. The page offers Dropbox here because the
+provider is present (`capabilities().authSessionOauth`), not because it knows
+it is in the app.
+
+**The redirect URI is `<bundle id>://oauth`.** The Expo `scheme` in
+[`app.config.js`](app.config.js) is the bundle id — `APP_BUNDLE_ID`, falling
+back to `dev.local.notes` — so the store build returns on
+**`se.agilator.notes://oauth`**, and the Dropbox app must list exactly that
+(see [`RELEASING.md`](RELEASING.md#dropbox)). A dev build returns on
+`dev.local.notes://oauth`, which a Dropbox app used for development has to
+list too. The key reaches the bundle as `VITE_DROPBOX_APP_KEY` at
+`make build-native` time; without it the app offers no Dropbox at all.
+
+`tests/platform/auth-session.test.ts` runs the injected script against the
+framework's own validation and pins the scheme to the bundle id.
 
 ## Running it
 

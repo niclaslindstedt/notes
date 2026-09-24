@@ -19,8 +19,15 @@
 // — but a store build with them unset is wrong, which `assertConfigured` makes
 // loud rather than silent.
 //
-// `slug` and `scheme` stay literal: they are the project's own name, they are
-// not listing coordinates, and EAS resolves the project by slug.
+// `slug` stays literal: it is the project's own name, not a listing
+// coordinate, and EAS resolves the project by slug.
+//
+// The URL `scheme` is the bundle id, not the slug. It is what a sign-in comes
+// back on — the Dropbox authentication session returns on
+// `<scheme>://oauth` (`src/authSessionBridge.ts`) — and a reverse-DNS scheme
+// is the one no other app can plausibly claim (RFC 8252 §7.1). So it follows
+// APP_BUNDLE_ID like the identifiers do: `se.agilator.notes` in the store
+// build, `dev.local.notes` in a plain checkout, never a committed literal.
 
 const PROJECT_NAME = "Notes";
 
@@ -73,7 +80,7 @@ module.exports = {
     orientation: "portrait",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
-    scheme: "notes",
+    scheme: BUNDLE_ID,
     icon: "./assets/icon.png",
     splash: {
       image: "./assets/splash.png",
