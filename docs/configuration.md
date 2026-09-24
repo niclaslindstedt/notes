@@ -46,9 +46,6 @@ there rather than shipping under the wrong identity.
 | `VITE_DROPBOX_APP_KEY`    | secret   | Dropbox backend (public PKCE app key) — the Pages builds, and `native-build.yml`, which bakes it into the phone app's embedded bundle. |
 | `VITE_DROPBOX_APP_FOLDER` | secret   | Dropbox app-folder name — same two places.           |
 | `VITE_DONATE_URL`         | secret   | Optional donate row in the side menu.               |
-| `MIRROR_URL`              | secret   | `mirror.yml` — the git mirror, e.g. `gitlab.com/<ns>/notes.git`; unset, the job is a no-op. |
-| `MIRROR_TOKEN`            | secret   | `mirror.yml` — a push token for it.                  |
-| `MIRROR_USER`             | secret   | `mirror.yml` — optional basic-auth user; defaults to `oauth2`. |
 | `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `MAC_SIGN_IDENTITY`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | secret | macOS signing and notarization of the desktop app — see [`tauri/README.md`](../tauri/README.md). |
 | `GITHUB_PAT`              | secret   | `npm ci` against the GitHub Packages registry.      |
 

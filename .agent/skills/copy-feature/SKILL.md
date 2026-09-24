@@ -1,6 +1,6 @@
 ---
 name: copy-feature
-description: "Use whenever you want to bring a feature, look, modal, button, component, or behaviour from the checklist app into this notes app — 'port the settings modal', 'copy the side menu', 'I want checklist's theme picker', 'add the share dialog'. Fetches the checklist repo into /tmp via the bundled clone-sibling.mjs helper (which clones checklist's external mirror, reachable even in the scoped sandbox where github.com egress is blocked), studies the named feature in place (its components, hooks, storage, styles, and the dependencies it needs), then re-implements it here adapted to the notes domain — same structure and patterns, not a verbatim paste. Reach for this instead of hand-copying files, so the port stays idiomatic and self-consistent."
+description: "Use whenever you want to bring a feature, look, modal, button, component, or behaviour from the checklist app into this notes app — 'port the settings modal', 'copy the side menu', 'I want checklist's theme picker', 'add the share dialog'. Fetches the checklist repo into /tmp via the bundled clone-sibling.mjs helper (which clones checklist from GitHub), studies the named feature in place (its components, hooks, storage, styles, and the dependencies it needs), then re-implements it here adapted to the notes domain — same structure and patterns, not a verbatim paste. Reach for this instead of hand-copying files, so the port stays idiomatic and self-consistent."
 ---
 
 # Copying a feature from checklist into notes
@@ -44,31 +44,18 @@ node .agent/skills/copy-feature/clone-sibling.mjs checklist  # -> /tmp/checklist
 node .agent/skills/copy-feature/clone-sibling.mjs checklist /tmp/checklist some-branch
 ```
 
-> **Learning, baked in:** in the Claude Code on the web sandbox the git proxy
-> is scoped to this repo only — `git clone` of github.com **403s**
-> (`repository not authorized`), and the GitHub MCP tools refuse a foreign
-> repo with *"repository … is not configured for this session"*. Don't retry
-> them or hand-curl around them. Instead, the siblings (checklist / budget)
-> push-mirror themselves to an external git host (each repo's
-> `.github/workflows/mirror.yml`), and that mirror **is** reachable over plain
-> `git` even in the scoped sandbox. So the helper clones the mirror directly —
-> `<sibling>.git` appended to `MIRROR_BASE` — giving a real checkout *with full
-> history*. **The helper is the one supported path.**
+> The siblings (checklist / budget) are public repositories under
+> `github.com/niclaslindstedt`, so the helper clones
+> `https://github.com/niclaslindstedt/<sibling>.git` directly — a real
+> checkout *with full history*. **The helper is the one supported path.**
 
-> **Config (provider-agnostic, via env).** `MIRROR_BASE` = the mirror
-> host+namespace, no scheme / no repo (e.g. `gitlab.com/niclaslindstedt` or
-> `codeberg.org/team`) — **required**. `MIRROR_TOKEN` = the PAT, needed for a
-> private mirror (omit for a public one). `MIRROR_USER` optional (default
-> `oauth2`; `x-token-auth` for Bitbucket, your username for Gitea / Codeberg).
-
-If `MIRROR_BASE` isn't set, or the clone fails (no mirror configured yet, or no
-network), the helper stops with a clear error. Fix the config / create
-checklist's mirror — or, if you truly can't reach it, ask the user to paste the
-relevant files. Don't guess from memory, and don't fall back to the scope-locked
-GitHub tools.
+If the clone fails (no network, or a sandbox whose git proxy is scoped to
+this repo only and answers `403 repository not authorized`), the helper stops
+with a clear error. Don't retry around the proxy or guess from memory — ask
+the user to paste the relevant files.
 
 The helper passes `checklist` here, but it takes any sibling name (`budget`
-clones budget's mirror the same way). It clears its destination first, so you
+clones the same way). It clears its destination first, so you
 always study current truth, and writes under `/tmp`, never inside this repo's
 working tree.
 
@@ -142,7 +129,7 @@ git show <hash>
 > network, the GitHub PR description / review discussion can add context — but
 > the in-repo changeset + docs diff are authoritative and always reachable.
 
-The mirror clone carries **full history**, so `git log` / `git show` work
+The clone carries **full history**, so `git log` / `git show` work
 directly with no depth flag to fuss over. When the user names a commit or PR on
 another branch ("the redesigned action bar from #112"), pass that ref as the
 helper's 3rd arg so the checkout lands on it.
@@ -230,10 +217,9 @@ The port is done when:
 
 ## Common pitfalls
 
-1. **Hand-cloning instead of using the Step-0 helper.** `git clone` of
-   github.com 403s in a scoped session, and the git proxy / GitHub MCP are
-   locked to this repo — don't retry them or hand-curl around them. Run
-   `clone-sibling.mjs`, which clones checklist's mirror (`MIRROR_BASE`).
+1. **Hand-cloning instead of using the Step-0 helper.** Run
+   `clone-sibling.mjs`, which clones checklist from GitHub into a clean
+   destination every time, so you never study a stale copy.
 2. **Pasting checklist's domain nouns.** The single biggest tell of a lazy
    port. Translate every `item`/`template`/`list`/`namespace` to a notes
    concept.
@@ -256,9 +242,8 @@ After a port:
 2. If you discovered a reusable sub-port (e.g. you had to bring over the
    `Modal` primitive or a minimal i18n shim before the real feature), note it
    here so the next run pulls that foundation first.
-3. If how checklist's source is reached changed (mirror host, auth, scope,
-   proxy rules), update `clone-sibling.mjs` and the Step 0 summary — keep the
-   `MIRROR_BASE` mirror-clone logic current.
+3. If how checklist's source is reached changed (host, auth, scope, proxy
+   rules), update `clone-sibling.mjs` and the Step 0 summary.
 4. Commit the SKILL.md edit alongside the ported feature, and refresh
    `.last-updated`.
 
