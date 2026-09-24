@@ -26,11 +26,6 @@
   },
   "submit": {
     "production": {
-      "ios": {
-        "appleId": "APPLE_ID_EMAIL",
-        "ascAppId": "APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "APPLE_TEAM_ID"
-      },
       "android": {
         "serviceAccountKeyPath": "./play-service-account.json",
         "track": "internal"
