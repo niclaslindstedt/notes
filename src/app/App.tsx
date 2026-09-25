@@ -856,6 +856,10 @@ export function App() {
                         onReplace={(body) => replaceBody(editing.id, body)}
                         onTitleChange={(title) => retitle(editing.id, title)}
                         onTitleSettle={settleTitle}
+                        nameOnOpen={
+                          pristineNew.current?.id === editing.id &&
+                          pristineNew.current.title === editing.title
+                        }
                         onDropzoneDone={
                           editing.dropzone
                             ? () => dropzoneDone(editing.id)

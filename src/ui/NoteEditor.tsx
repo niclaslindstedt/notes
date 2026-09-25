@@ -207,6 +207,7 @@ export function Editor({
   onReplace,
   onTitleChange,
   onTitleSettle,
+  nameOnOpen = false,
   onToggleFavorite,
   onToggleLock,
   onDropzoneDone,
@@ -243,6 +244,13 @@ export function Editor({
    * rather than the one still in the snapshot.
    */
   onTitleSettle: (title: string) => void;
+  /**
+   * The note was created a moment ago by a "new note" action, so it opens with
+   * its title focused and selected, ready to be named. Needed on top of the
+   * `isBlank` check because a default-title scheme (date/time, numbered) gives
+   * a fresh note a title of its own, and it is no longer blank.
+   */
+  nameOnOpen?: boolean;
   /** Star / unstar the note — the header's leading star button. */
   onToggleFavorite: () => void;
   /** Lock / unlock the note — the header's read-only (eye) button. A locked
@@ -288,10 +296,13 @@ export function Editor({
   // the star, the export menu, find, and copying a selection.
   const locked = isLocked(note);
   // A brand-new note opens with the caret in the title so it's ready to be
-  // named; opening an existing note focuses nothing, so the soft keyboard
-  // stays down until the user taps where they want to type. Captured once for
-  // mount — typing the title doesn't re-route focus mid-session.
-  const titleFirst = useRef(isBlank(note) && !isLocked(note)).current;
+  // named — whether it was born blank or carrying a default title
+  // (`nameOnOpen`); opening an existing note focuses nothing, so the soft
+  // keyboard stays down until the user taps where they want to type. Captured
+  // once for mount — typing the title doesn't re-route focus mid-session.
+  const titleFirst = useRef(
+    (isBlank(note) || nameOnOpen) && !isLocked(note),
+  ).current;
   // A fresh dropzone note opens with the caret in the *body* instead. It is
   // born already named, so there is nothing to type in the title — the thing
   // the user came to do is paste. Without this the editor opens with nothing

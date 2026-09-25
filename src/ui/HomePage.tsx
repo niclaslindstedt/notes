@@ -247,7 +247,8 @@ export function HomePage() {
               <em>archive</em> it: it leaves the list without being deleted, and
               you can restore it from the Archive view. Swipe left to uncover a
               quick Delete. On a computer, right-click a note instead for a menu
-              of the same actions.
+              of the same actions — or right-click any empty space to start a
+              new note, which opens with its name selected, ready to type.
             </li>
             <li>
               Undo and redo your changes — bring back a deleted or archived note

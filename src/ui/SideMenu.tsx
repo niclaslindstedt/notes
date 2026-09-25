@@ -42,6 +42,7 @@ import {
   NoteIcon,
   SpinnerIcon,
 } from "./icons.tsx";
+import { DeadSpaceMenu } from "./DeadSpaceMenu.tsx";
 import { useModalDispatch } from "./modal-bus.ts";
 import { NoteDragItem } from "./note-drag.tsx";
 import {
@@ -711,7 +712,21 @@ export function SideMenu({
           push the pinned rows off-screen instead). `flex-1` keeps the island at
           the foot of the drawer when the list is short, which is what the
           island's own `mt-auto` used to do on its own. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+      <DeadSpaceMenu
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"
+        onNewNote={() => {
+          onAddNote();
+          close();
+        }}
+        onNewDropzone={
+          onAddDropzone
+            ? () => {
+                onAddDropzone();
+                close();
+              }
+            : undefined
+        }
+      >
         {/* Namespaces switcher: tap a row to switch which set of notes is
           shown; the heading's cogwheel opens the full manage dialog (add /
           rename / icon / delete) — a cog, not a "+", because it manages
@@ -878,7 +893,7 @@ export function SideMenu({
             </>
           )}
         </div>
-      </div>
+      </DeadSpaceMenu>
       {/* The button island below the list — see `SideMenuActionBar`. Pinned
           outside the scroll area above, so it and the footer stay put however
           long the note list runs. The drawer owns the live drag state, so the

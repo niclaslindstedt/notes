@@ -922,8 +922,9 @@ vertically centred against the back button and the copy/sync buttons; once it
 wraps the header top-aligns so those stay pinned to the first line (the field
 reports the one-line↔multi-line transition up via `onMultilineChange`). Opening
 an existing note focuses nothing, so the soft keyboard stays down until the user
-taps where to type — only a brand-new note opens with the title focused, ready
-to be named. Enter,
+taps where to type — only a brand-new note (blank, or created a moment ago
+under a default title — the `nameOnOpen` prop) opens with the title focused and
+selected, ready to be named. Enter,
 Arrow-Down and Tab hand focus down to the body (see
 [Editor tab order](#editor-tab-order)), so the field never holds a literal
 newline. Edits route through `useNotes().retitle` → `retitleNote`
@@ -3455,7 +3456,15 @@ is the add control at the foot of the [note list](#note-list--overview): a
 circular floating action button on narrow viewports, which relaxes into an
 in-flow, labelled "New note" pill from the `md` breakpoint up — where the side
 menu docks as a permanent [sidebar](#side-menu) (`nav.pinned`), beside
-which a floating puck reads as awkward.
+which a floating puck reads as awkward. On a computer, right-clicking empty
+space in the overview or the side menu offers the same action (see
+[dead-space menu](#dead-space-menu)). Whatever starts it, the new note opens
+with its [title field](#title-field) focused and its default title selected, so
+the first keystroke names it: `openNew` records the note in `pristineNew`, and
+`App` passes `nameOnOpen` to the `Editor` while the note still carries the
+title it was born with — needed because a
+[default-title scheme](#default-title) gives a fresh note a title, so it is no
+longer `isBlank`.
 
 ### Edit a note
 
@@ -4381,6 +4390,22 @@ Escape / outside-click to dismiss, arrow-key nav), and fires the `rightClick`
 achievement the first time it opens. Destructive rows (delete) are tinted via
 a `danger` flag. Touch devices keep their native context menu and their swipe
 gestures untouched.
+
+### Dead-space menu
+
+`DeadSpaceMenu` (`src/ui/DeadSpaceMenu.tsx`) — the right-click menu for the
+*empty* parts of a surface, on a hover/fine-pointer device. It wraps the whole
+overview (`NoteList`) and the side menu's scrolling list region (`SideMenu`,
+above the button island) and opens at the pointer (`FloatingPanel` with an
+`anchorPoint`) with **New note** — plus **New dropzone note** when
+[dropzone](#dropzone) notes are available. It only answers a right-click nothing
+else claimed: a row's [right-click menu](#right-click-menu) calls
+`preventDefault` first, so the wrapper checks `defaultPrevented`; links,
+buttons, form fields and contenteditable surfaces keep the browser's own menu,
+as does a right-click over a text selection. In the side menu the entry closes
+the drawer like the island's New note does. The new note opens ready to be named
+(see [create a note](#create-a-note)). Picking an entry fires the
+`outOfThinAir` achievement. Touch devices are left alone.
 
 ### Pull to refresh
 

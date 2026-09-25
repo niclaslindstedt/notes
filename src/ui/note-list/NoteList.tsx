@@ -9,6 +9,7 @@ import { noteTitle, type Folder, type Note } from "../../domain/note.ts";
 import { useT } from "../../i18n/index.ts";
 import { useAppearance } from "../../theme/useTheme.ts";
 import { AppTitle } from "../AppTitle.tsx";
+import { DeadSpaceMenu } from "../DeadSpaceMenu.tsx";
 import { useLongPress } from "../hooks/useLongPress.ts";
 import { useMediaQuery } from "../hooks/useMediaQuery.ts";
 import { useSwipeReveal } from "../hooks/useSwipeReveal.ts";
@@ -203,7 +204,11 @@ export function NoteList({
   }
 
   return (
-    <div className="flex h-full flex-col select-none">
+    <DeadSpaceMenu
+      className="flex h-full flex-col select-none"
+      onNewNote={() => onNew()}
+      onNewDropzone={onNewDropzone}
+    >
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-page-bg/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
         <AppTitle />
       </header>
@@ -332,7 +337,7 @@ export function NoteList({
         </span>
         <span className="hidden md:inline">{t("app.newNote")}</span>
       </button>
-    </div>
+    </DeadSpaceMenu>
   );
 }
 
