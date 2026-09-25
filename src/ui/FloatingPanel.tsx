@@ -10,36 +10,42 @@ import { createPortal } from "react-dom";
 
 import {
   DismissBackdrop,
-  FloatingPanel as FrameworkFloatingPanel,
   computeFloatingRect,
+  forgetSafeArea,
+  insetViewport,
+  readEdgeInsets,
   type FloatingPlacement,
   type FloatingPoint,
-  type FloatingRect,
 } from "@niclaslindstedt/oss-framework/components";
 import { useEscapeKey } from "./hooks/useEscapeKey.ts";
 
 // Portalled dropdown / popover shell (float position, Escape + outside-click
-// dismissal). The implementation lives in @niclaslindstedt/oss-framework and
-// this file is where the app's call sites point — but it is a **wrapper**, not
-// a bare re-export, because of `drop`.
+// dismissal) — every dropdown in the app opens through this one. The chrome
+// (backdrop, width, horizontal clamping) is the framework's; the *vertical*
+// decision is ours, for two reasons.
 //
-// The framework flips a panel above its trigger when there is less than ~180px
-// of viewport below it. That is the right default for a control in the middle
-// of a page, and wrong for one pinned near the top of the screen: the flip has
-// no viewport clamp on that side (the "below" branch clamps twice, the "above"
-// branch's height is `max(120, spaceAbove)`), so a panel taller than the room
-// above it is drawn straight off the top edge — and being `position: fixed`, it
-// can't be scrolled back into view. On a phone with the soft keyboard up, the
-// [styling toolbar](../../docs/overview.md)'s menus hit exactly that: the
-// toolbar sits directly under the header, the keyboard shortens the viewport
-// past the flip threshold, and the menu's first row disappears behind the
-// status bar.
+// **Dropdowns drop down.** The framework flips a panel above its trigger
+// whenever less than ~180px of viewport is left below it, however short the
+// panel is. With the phone's soft keyboard up that is nearly always, and it is
+// never what anyone wants: the menu covers the trigger it came from, and for a
+// trigger near the top of the screen (the styling toolbar, under the editor
+// header) it runs off the top edge. Here a panel opens below unless its
+// content doesn't fit there *and* fits whole above — the About menu at the
+// foot of the side drawer is the case that still flips. When it fits neither
+// way it stays below and scrolls inside its own box.
+// `drop="down"` rules the flip out altogether and scrolls inside its own box.
 //
-// So a caller that is structurally near the top of the screen can ask for
-// `drop="down"`, which pins the panel below its trigger and lets it scroll
-// inside its own box instead. Everything else keeps `drop="auto"` — the
-// framework's own behaviour, byte for byte, since that path delegates straight
-// to it.
+// **iOS draws `position: fixed` in a different space than it measures in.** In
+// the installed iOS PWA with the keyboard up, the trigger's
+// `getBoundingClientRect()` and the coordinates a fixed layer is placed at
+// disagree by the keyboard's scroll offset, so a panel placed at "the
+// trigger's bottom edge" lands a couple of hundred pixels higher — straight
+// over the header and under the status bar, even when asked to drop down. No
+// single viewport reading predicts the gap, so the panel measures where it
+// actually landed after each placement and shifts by the difference. The
+// visible band is taken in the fixed layer's own space (the visual viewport,
+// exactly as the app shell is pinned — see `useViewportHeight`) and carried
+// across by the same difference.
 
 type Props = {
   open: boolean;
@@ -48,9 +54,9 @@ type Props = {
   className?: string;
   children: ReactNode;
   /**
-   * `"auto"` (the default) lets the framework flip the panel above its trigger
-   * when the space below runs short. `"down"` pins it below and clamps its
-   * height to what is left, for a trigger with nothing useful above it.
+   * `"auto"` (the default) opens below the trigger, and only flips above when
+   * the content doesn't fit below but fits whole above. `"down"` never
+   * flips: it clamps the height to what is left below and scrolls.
    */
   drop?: "auto" | "down";
 } & (
@@ -58,16 +64,23 @@ type Props = {
   | { anchorPoint: FloatingPoint; triggerRef?: RefObject<HTMLElement> }
 );
 
-export function FloatingPanel({ drop = "auto", ...props }: Props) {
-  if (drop === "auto") return <FrameworkFloatingPanel {...props} />;
-  return <DropDownPanel {...props} />;
-}
+// Where a panel sits, in the fixed (or absolute) layer's own coordinates.
+type Position = {
+  top: number;
+  left: number;
+  width: number;
+  maxWidth: number;
+  maxHeight: number;
+  // The top edge in client coordinates — what `getBoundingClientRect()`
+  // should report for the panel once it is placed at `top`.
+  clientTop: number;
+};
 
-// The `drop="down"` path. Only the *vertical* decision is ours: the width and
-// the horizontal clamping still come from the framework's `computeFloatingRect`
-// (via a viewport it can't flip in — see `measure`), so a panel positioned this
-// way lines up with every other one.
-function DropDownPanel({
+// The fewest pixels a clamped panel keeps, so a couple of rows stay reachable
+// in the extreme case instead of collapsing to nothing.
+const MIN_HEIGHT = 80;
+
+export function FloatingPanel({
   open,
   onClose,
   triggerRef,
@@ -75,22 +88,40 @@ function DropDownPanel({
   placement,
   className = "",
   children,
-}: Omit<Props, "drop">) {
-  const [rect, setRect] = useState<FloatingRect | null>(null);
+  drop = "auto",
+}: Props) {
+  const [position, setPosition] = useState<Position | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // client − layer: how far `getBoundingClientRect()` reads from the
+  // coordinates the panel is placed at. Zero everywhere but iOS with the
+  // keyboard up; learnt from the panel itself after each placement.
+  const skewRef = useRef(0);
+  // The content's full height, read off the rendered panel.
+  const naturalRef = useRef(0);
   // Read through refs so the measuring listeners below never re-bind.
   const placementRef = useRef(placement);
   placementRef.current = placement;
+  const dropRef = useRef(drop);
+  dropRef.current = drop;
   const triggerElRef = useRef(triggerRef);
   triggerElRef.current = triggerRef;
   const pointRef = useRef(anchorPoint);
   pointRef.current = anchorPoint;
+  const placeRef = useRef<() => void>(() => {});
+  // Re-placements since the last outside cause (open, resize, scroll). A real
+  // engine settles in one or two; the cap is for one that never reports where
+  // the panel landed (jsdom reads every box as zero), which would otherwise
+  // chase its own correction forever.
+  const correctionsRef = useRef(0);
 
   useLayoutEffect(() => {
     if (!open) {
-      setRect(null);
+      setPosition(null);
+      skewRef.current = 0;
+      naturalRef.current = 0;
       return;
     }
-    function measure() {
+    function place() {
       const point = pointRef.current;
       const el = triggerElRef.current?.current;
       const box = point
@@ -98,45 +129,99 @@ function DropDownPanel({
         : el?.getBoundingClientRect();
       if (!box) return;
       const p = placementRef.current;
-      const vv = window.visualViewport;
-      const visibleTop = vv?.offsetTop ?? 0;
-      const visibleBottom = visibleTop + (vv?.height ?? window.innerHeight);
       const gap = p.gap ?? 4;
       const margin = p.viewportMargin ?? 8;
-      // Hand the framework a viewport tall enough that its own flip test can't
-      // fire, so what comes back is the below-the-trigger geometry — then keep
-      // its width / left and clamp the height against the *real* viewport.
-      const unflippable = { offsetTop: visibleTop, height: 1e6 };
-      const base = computeFloatingRect(box, p, unflippable, {
-        innerWidth: window.innerWidth,
-        innerHeight: window.innerHeight,
-        scrollX: window.scrollX,
-        scrollY: window.scrollY,
-      });
-      const top = box.bottom + gap;
-      setRect({
-        ...base,
-        top,
-        // A short viewport makes the panel scroll rather than escape the
-        // screen. The 80px floor keeps a couple of rows reachable in the
-        // extreme case instead of collapsing it to nothing.
-        maxHeight: Math.max(80, visibleBottom - top - margin),
-        placement: "below",
+      const documentSpace = p.coordinateSpace === "document";
+      const scrollY = documentSpace ? window.scrollY : 0;
+      const skew = skewRef.current;
+
+      // The visible band in the layer's coordinates, carried into client
+      // coordinates by the measured skew.
+      const band = visibleBand(p);
+      const bandTop = band.offsetTop + skew;
+      const bandBottom = bandTop + band.height;
+
+      const spaceBelow = bandBottom - box.bottom - gap - margin;
+      const spaceAbove = box.top - bandTop - gap - margin;
+      const natural = naturalRef.current;
+      const above =
+        dropRef.current === "auto" &&
+        natural > spaceBelow &&
+        natural <= spaceAbove;
+
+      let clientTop: number;
+      let maxHeight: number;
+      if (above) {
+        maxHeight = Math.max(MIN_HEIGHT, spaceAbove);
+        const height = Math.min(natural, maxHeight);
+        clientTop = Math.max(bandTop + margin, box.top - gap - height);
+      } else {
+        clientTop = box.bottom + gap;
+        maxHeight = Math.max(MIN_HEIGHT, spaceBelow);
+      }
+
+      // Width and horizontal clamping are the framework's, unchanged.
+      const base = computeFloatingRect(
+        box,
+        p,
+        { offsetTop: 0, height: 1e6 },
+        {
+          innerWidth: window.innerWidth,
+          innerHeight: window.innerHeight,
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+        },
+      );
+      setPosition({
+        top: clientTop - skew + scrollY,
+        left: base.left,
+        width: base.width,
+        maxWidth: base.maxWidth,
+        maxHeight,
+        clientTop,
       });
     }
+    function measure() {
+      correctionsRef.current = 0;
+      place();
+    }
+    function remeasure() {
+      forgetSafeArea();
+      measure();
+    }
+    placeRef.current = place;
     measure();
-    window.addEventListener("resize", measure);
+    window.addEventListener("resize", remeasure);
     window.addEventListener("scroll", measure, true);
     const vv = window.visualViewport;
-    vv?.addEventListener("resize", measure);
+    vv?.addEventListener("resize", remeasure);
     vv?.addEventListener("scroll", measure);
     return () => {
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", remeasure);
       window.removeEventListener("scroll", measure, true);
-      vv?.removeEventListener("resize", measure);
+      vv?.removeEventListener("resize", remeasure);
       vv?.removeEventListener("scroll", measure);
     };
   }, [open, anchorPoint?.x, anchorPoint?.y]);
+
+  // Check the placement against where the panel actually landed, and against
+  // how tall its content really is, and re-place if either was off. Both
+  // settle after a pass (the skew is a constant offset, the height is the
+  // content's).
+  useLayoutEffect(() => {
+    const el = panelRef.current;
+    if (!position || !el || correctionsRef.current >= 2) return;
+    const skew =
+      skewRef.current + el.getBoundingClientRect().top - position.clientTop;
+    const natural = el.scrollHeight + (el.offsetHeight - el.clientHeight);
+    const skewed = Math.abs(skew - skewRef.current) > 0.5;
+    const grew = Math.abs(natural - naturalRef.current) > 0.5;
+    if (!skewed && !grew) return;
+    skewRef.current = skew;
+    naturalRef.current = natural;
+    correctionsRef.current += 1;
+    placeRef.current();
+  }, [position]);
 
   useEscapeKey(open, onClose);
 
@@ -156,19 +241,20 @@ function DropDownPanel({
     }
   }, [open, triggerRef]);
 
-  if (!open || !rect) return null;
+  if (!open || !position) return null;
   const fixedWidth = placement.width.kind === "max";
   return createPortal(
     <>
       <DismissBackdrop onDismiss={onClose} />
       <div
+        ref={panelRef}
         className={`${placement.coordinateSpace === "viewport" ? "fixed" : "absolute"} z-[60] flex flex-col overflow-y-auto rounded-md border border-line bg-surface-2 shadow-lg focus-within:border-accent ${className}`.trim()}
         style={{
-          top: rect.top,
-          left: rect.left,
-          minWidth: rect.width,
-          maxWidth: fixedWidth ? rect.width : rect.maxWidth,
-          maxHeight: rect.maxHeight,
+          top: position.top,
+          left: position.left,
+          minWidth: position.width,
+          maxWidth: fixedWidth ? position.width : position.maxWidth,
+          maxHeight: position.maxHeight,
         }}
       >
         {children}
@@ -176,4 +262,22 @@ function DropDownPanel({
     </>,
     document.body,
   );
+}
+
+// The on-screen band a panel may occupy, in the fixed layer's coordinates:
+// the visual viewport, less the safe-area insets and any chrome marked as an
+// edge — the same band the framework's own panels respect.
+function visibleBand(placement: FloatingPlacement): {
+  offsetTop: number;
+  height: number;
+} {
+  const vv = window.visualViewport;
+  const viewport = vv
+    ? { offsetTop: vv.offsetTop, height: vv.height }
+    : { offsetTop: 0, height: window.innerHeight };
+  const edges = placement.edges ?? "safe";
+  if (edges === "none") return viewport;
+  const layoutHeight = window.innerHeight;
+  const insets = edges === "safe" ? readEdgeInsets(layoutHeight) : edges;
+  return insetViewport(viewport, insets, layoutHeight);
 }
