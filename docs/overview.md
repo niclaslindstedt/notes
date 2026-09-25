@@ -2116,9 +2116,13 @@ the active line nor the caret. It can skip the caret arithmetic entirely because
 length-preserving, so every column in the note still means what it did. The
 touch-reveal a press armed is dropped too, since there is no line to scroll to.
 
-Read-only surfaces (the archive's [note view](#archive-view)) leave
-`RenderedLine`'s `interactiveTasks` off, and the box renders as inert state —
-labelled "Done" / "Not done" — rather than as a control that would do nothing.
+A [locked note](#lock-a-note) keeps its checkboxes live: the lock takes the
+caret away, and this gesture never needed one, so ticking items off a locked
+checklist works exactly as it does on an unlocked one — the note's text still
+can't be touched. The archive's [note view](#archive-view), which has nothing to
+write back to, leaves `RenderedLine`'s `interactiveTasks` off, and the box
+renders as inert state — labelled "Done" / "Not done" — rather than as a control
+that would do nothing.
 
 The row the caret is *on* shows its source instead, so there is no checkbox to
 press there — the `[x]` is right in front of you to type over. Because the box
@@ -3729,9 +3733,10 @@ the raw line back to formatted in the same render. The paths that would mutate
 the source stand down with it — `beforeinput` refuses everything outright (a
 second lock, in case an edit reaches the DOM behind React's back, which is the
 failure the whole interception layer exists to prevent), and `format`, `cut`,
-`indentList`, `placeCaretAtEnd`, `toggleTask`, paste and file drop all return
-early. [Task checkboxes](#task-items) render as state rather than press targets
-(`interactiveTasks={false}`). The Markdown-off [plain fallback](#markdown-editor)
+`indentList`, `placeCaretAtEnd`, paste and file drop all return early. The one
+edit a lock still takes is ticking a [task checkbox](#task-items): `toggleTask`
+never touched the caret, so a locked checklist can still be worked through while
+its wording stays fixed. The Markdown-off [plain fallback](#markdown-editor)
 gets the same treatment through the textarea's own `readOnly` — which is what
 suppresses the mobile keyboard there — plus `caret-transparent`, because a
 read-only field still paints a desktop caret. The [title field](#title-field) is

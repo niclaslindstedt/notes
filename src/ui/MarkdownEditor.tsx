@@ -188,8 +188,9 @@ type Props = {
   /**
    * The note is **locked**: render it read-only. The surface stops being
    * `contenteditable`, so the browser puts no caret in it and no soft keyboard
-   * comes up, and every path that would mutate the source stands down. Reading,
-   * selecting, copying and the line-number gutter are untouched — see
+   * comes up, and every path that would mutate the source stands down — bar
+   * ticking a task item's checkbox, which needs no caret. Reading, selecting,
+   * copying and the line-number gutter are untouched — see
    * `docs/overview.md#lock-a-note`.
    */
   locked?: boolean;
@@ -3211,8 +3212,11 @@ export function MarkdownEditor({
   // The arming a touch press did on the way in is dropped too — nothing here
   // moves the caret, so there is no line to reveal, and leaving it set would
   // yank the view on whatever the *next* tap happens to be.
+  //
+  // It is also the one edit a **locked** note still takes. The lock takes the
+  // caret away, and this gesture never needed one: a locked checklist is one
+  // you work through, not one you rewrite, so ticking items off stays live.
   function toggleTask(index: number) {
-    if (locked) return;
     const cur = linesRef.current;
     const flipped = toggleTaskLine(cur[index] ?? "");
     if (flipped === null) return;
@@ -3951,7 +3955,7 @@ export function MarkdownEditor({
                     transforms={transforms}
                     highlights={highlightsByLine.get(index)}
                     edgeClass={edgeClass}
-                    interactiveTasks={!locked}
+                    interactiveTasks
                   />
                   {code !== undefined && (
                     <CodeCopyButton
