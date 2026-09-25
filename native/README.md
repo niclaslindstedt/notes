@@ -56,7 +56,10 @@ cd native && npx expo prebuild   # copies native/web/ into the binary (see plugi
   the message bridge. On iOS the WebView runs edge to edge and the page pads
   itself around the notch and the home indicator with
   `env(safe-area-inset-*)`, as the installed PWA does; on Android the frame
-  keeps the page below the status bar and clear of any cutout.
+  keeps the page below the status bar and clear of any cutout. The status bar
+  and the background behind the WebView follow the page's own theme, which
+  [`src/nativeTheme.ts`](src/nativeTheme.ts) reads off `--page-bg` and
+  reports over the same `postMessage` transport.
 
 ## The web ↔ native bridge
 

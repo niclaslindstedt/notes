@@ -38,6 +38,7 @@ import {
   isAuthSessionRequest,
 } from "./authSessionBridge";
 import QrScanner from "./QrScanner";
+import { useNativeTheme } from "./nativeTheme";
 
 // Parse a message body for the iCloud check. The other bridge parses its own;
 // anything that is not JSON is simply not an iCloud request.
@@ -57,6 +58,11 @@ const AUTH_REDIRECT_URI = authRedirectUri();
 const AUTH_SESSION_SCRIPT = AUTH_REDIRECT_URI
   ? authSessionScript(AUTH_REDIRECT_URI)
   : "";
+
+// The chrome shown before the page reports its theme: the page's pre-boot
+// default (One Dark), with light status-bar icons over it. Once the WebView
+// paints, `useNativeTheme` takes over with the live theme.
+const BACKGROUND = "#1d2027";
 
 // Where the embedded bundle's entry point lives on each platform. Android
 // keeps it under the APK's `assets/`; iOS under the app bundle, whose file URL
@@ -90,6 +96,11 @@ export default function WebViewHost() {
   // The in-flight QR-scan request id, set when the web app asks to scan and
   // cleared once the camera overlay resolves.
   const [scanId, setScanId] = useState<string | null>(null);
+  // The page's resolved theme, for the status bar and the background behind
+  // the WebView. Null until the page reports one.
+  const { injectedJavaScript, theme, onThemeMessage } = useNativeTheme();
+  const background = theme?.background ?? BACKGROUND;
+  const barStyle = theme?.barStyle ?? "light";
 
   // One sign-in. The sheet is modal and the page waits on it; what comes back
   // is the provider's redirect URL, handed straight to the page, which holds
@@ -113,8 +124,14 @@ export default function WebViewHost() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.root} edges={FRAME_EDGES}>
-        <StatusBar style="auto" />
+      <SafeAreaView
+        style={[styles.root, { backgroundColor: background }]}
+        edges={FRAME_EDGES}
+      >
+        {/* Styled from the page's own background, not the system appearance:
+            on iOS the page runs under the status bar, and "auto" draws dark
+            icons over a dark theme whenever the system is in light mode. */}
+        <StatusBar style={barStyle} />
         <WebView
           ref={webView}
           source={{ uri: indexUri() }}
@@ -142,7 +159,11 @@ export default function WebViewHost() {
           // Dropbox on the first render. Both are guarded against a second
           // injection.
           injectedJavaScriptBeforeContentLoaded={`${ICLOUD_SCRIPT}\n${AUTH_SESSION_SCRIPT}`}
+          // The theme reporter (see `./nativeTheme.ts`), once the page has
+          // painted and its theme engine has set `data-theme`.
+          injectedJavaScript={injectedJavaScript}
           onMessage={(event: WebViewMessageEvent) => {
+            if (onThemeMessage(event)) return;
             const raw = event.nativeEvent.data;
             const parsed = parseMessage(raw);
             if (isICloudRequest(parsed)) {
@@ -175,6 +196,6 @@ export default function WebViewHost() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#1d2027" },
+  root: { flex: 1, backgroundColor: BACKGROUND },
   web: { flex: 1, backgroundColor: "transparent" },
 });
