@@ -441,10 +441,11 @@ export function HomePage() {
               note takes no cursor at all, so the on-screen keyboard stays down
               and nothing can be typed into the reference note you keep open by
               accident. You can still read, select, copy, search and export it,
-              and pressing the eye again unlocks it. The lock is stored with the
-              note, so it stays locked on your other devices; it is a guard
-              against stray keystrokes rather than a password, which is what the
-              separate encryption option below is for.
+              and tick its checklist items off, and pressing the eye again
+              unlocks it. The lock is stored with the note, so it stays locked
+              on your other devices; it is a guard against stray keystrokes
+              rather than a password, which is what the separate encryption
+              option below is for.
             </li>
             <li>
               <em>Search across every note</em> from the magnifier on the side

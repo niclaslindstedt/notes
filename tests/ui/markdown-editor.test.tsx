@@ -2426,11 +2426,19 @@ describe("MarkdownEditor (locked)", () => {
     expect(handle.current?.selection()).toBe("**bold** tail");
   });
 
-  it("leaves a task checkbox showing state rather than taking a press", () => {
-    const { onChange } = renderEditor("- [ ] milk", { locked: true });
-    const box = surface().querySelector("[data-task-toggle]");
-    expect(box).toBeNull();
-    expect(onChange).not.toHaveBeenCalled();
+  it("still ticks a task item off, without landing a caret", () => {
+    // The lock takes the caret away, and a checkbox never needed one: a locked
+    // checklist is one you work through, so the box stays a press target.
+    const { onChange } = renderEditor("- [ ] milk\n- [x] bread", {
+      locked: true,
+    });
+    const boxes = screen.getAllByRole("checkbox");
+    fireEvent.click(boxes[0]!);
+    expect(onChange).toHaveBeenLastCalledWith("- [x] milk\n- [x] bread");
+    fireEvent.click(screen.getAllByRole("checkbox")[1]!);
+    expect(onChange).toHaveBeenLastCalledWith("- [x] milk\n- [ ] bread");
+    expect(rawLine()).toBeNull();
+    expect(surface().getAttribute("contenteditable")).toBe("false");
   });
 });
 
