@@ -4962,32 +4962,45 @@ tab (`EditorSection`). The trigger is a bordered field wearing a `ChevronDownIco
 caret; the open menu is a `role="listbox"` of `role="option"` buttons with the
 current value ticked and full keyboard nav (Arrow/Home/End to move, Enter/Space
 to commit, Escape to dismiss without committing). It renders the menu through
-`FloatingPanel` (`src/ui/FloatingPanel.tsx`), a portalled popover shell that owns
-the float position (`useFloatingPosition`, `src/ui/hooks/useFloatingPosition.ts`
-— measures the trigger, clamps the panel into the visible viewport, and flips it
+the framework's `FloatingPanel`, a portalled popover shell that owns the float
+position (`useFloatingPosition`, `src/ui/hooks/useFloatingPosition.ts` —
+measures the trigger, clamps the panel into the visible viewport, and flips it
 above the trigger when there isn't room below), the Escape/outside-click
 dismissal (`useEscapeKey`, `DismissBackdrop`), and the `document.body` portal
 mount. Portalling keeps the menu out of the settings modal's `overflow-y-auto`
 body, so a picker on a control near the bottom of the modal isn't clipped.
 
-`src/ui/FloatingPanel.tsx` is a **wrapper** over the framework's component
-rather than a bare re-export, for one prop: `drop`. The framework flips a panel
-above its trigger when less than ~180px of viewport is left below it — right for
-a control in the middle of a page, wrong for one pinned near the top, because
-that branch has no viewport clamp (the below-branch clamps its `top` twice; the
-above-branch's height is `max(120, spaceAbove)`). A panel taller than the room
-above is therefore drawn straight off the top edge, and being `position: fixed`
-it cannot be scrolled back. The [styling toolbar](#styling-toolbar)'s menus hit
-exactly that on a phone: the toolbar sits directly under the header, the soft
-keyboard shortens the viewport past the flip threshold, and the menu's first
-rows disappear behind the status bar. Those menus pass `drop="down"`, which pins
-the panel below the trigger and clamps its height to what is left, so it scrolls
-inside its own box instead. Every other call site keeps the default `"auto"`,
-which delegates straight to the framework unchanged — the sidebar footer's
-[About dropdown](#folders-in-the-side-menu) in particular *wants* the flip, since
-it sits at the bottom of the screen. Only the vertical axis is the app's: the
-width and horizontal clamping still come from the framework's
-`computeFloatingRect`.
+`src/ui/FloatingPanel.tsx` is the app's **own** panel, not a re-export: it keeps
+the framework's chrome (the `DismissBackdrop`, the width and horizontal clamping
+from `computeFloatingRect`) and owns the vertical axis, for two reasons.
+
+**Dropdowns drop down.** The framework flips a panel above its trigger whenever
+less than ~180px of viewport is left below it, however short the panel. With the
+phone's soft keyboard up that is nearly always, and it is never what anyone
+wants: the menu covers the trigger it came from, and for one near the top of the
+screen — the [styling toolbar](#styling-toolbar)'s menus, directly under the
+header — it runs off the top edge, behind the status bar, where a
+`position: fixed` panel can't be scrolled back. So every panel opens **below**
+its trigger, and only flips above when its rows don't fit below *and* fit whole
+above — the sidebar footer's [About dropdown](#folders-in-the-side-menu), at the
+bottom of the screen, is the case that still flips. When the rows fit neither
+way it stays below and scrolls inside its own box. `drop="down"` (the toolbar
+menus, the [export menu](#export)) rules the flip out entirely.
+
+**iOS measures a fixed layer somewhere other than where it draws it.** In the
+installed iOS PWA with the keyboard up, the trigger's `getBoundingClientRect()`
+and the coordinates a `position: fixed` panel is placed at disagree by the
+keyboard's scroll offset, so a panel placed at "the trigger's bottom edge" lands
+a couple of hundred pixels higher — over the header, even with `drop="down"`.
+No viewport reading predicts the gap, so after each placement the panel reads
+back where it actually landed and shifts by the difference (the *skew*); it
+also reads its own content height, which is what the flip decision weighs. The
+visible band (the visual viewport less the safe-area insets, exactly as the app
+shell is pinned by `useViewportHeight`) is taken in the fixed layer's space and
+carried across by the same skew, so the height clamp follows what is on screen.
+
+`SelectPicker` and the [right-click menu](#right-click-menu) are the framework's
+own components and open through the framework's panel, not this one.
 
 The trigger and the row metrics are the app's dropdown *vocabulary*, not just
 `SelectPicker`'s: a control that opens a list of commands rather than picking a

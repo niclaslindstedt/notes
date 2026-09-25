@@ -15,7 +15,7 @@ import {
 } from "./icons.tsx";
 
 // The footer "About" dropdown opens "up and to the left" of its trigger:
-// `useFloatingPosition` flips it above automatically (there is no room below
+// `FloatingPanel` flips it above automatically (there is no room below
 // at the foot of the drawer), and it widens to at least the trigger.
 const ABOUT_PLACEMENT: FloatingPlacement = {
   width: { kind: "min", minPx: 200 },
