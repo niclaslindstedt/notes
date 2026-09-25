@@ -322,6 +322,12 @@ const achievements = {
       learnMore:
         "On a computer, right-click a note — in the overview or the side menu — for a quick menu of its actions: archive (or restore from the Archive view), and delete. It's the desktop counterpart to the swipe gestures you'd use on a touchscreen.",
     },
+    outOfThinAir: {
+      name: "Out of thin air",
+      condition: "Start a note by right-clicking empty space.",
+      learnMore:
+        "On a computer, right-click anywhere empty — the overview around your notes, or the side menu below its rows — and pick New note. The new note opens with its name selected, so you can type it straight away.",
+    },
     copycat: {
       name: "Copycat",
       condition: "Copy a note to the clipboard.",

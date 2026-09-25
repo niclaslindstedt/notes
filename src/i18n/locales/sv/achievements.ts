@@ -321,6 +321,12 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "På en dator kan du högerklicka på en anteckning — i översikten eller sidomenyn — för en snabb meny med dess åtgärder: arkivera (eller återställ från Arkiv-vyn) och ta bort. Det är datormotsvarigheten till svepgesterna du använder på en pekskärm.",
     },
+    outOfThinAir: {
+      name: "Ur tomma intet",
+      condition: "Skapa en anteckning genom att högerklicka på en tom yta.",
+      learnMore:
+        "På en dator kan du högerklicka var som helst där det är tomt — i översikten runt dina anteckningar, eller i sidomenyn under raderna — och välja Ny anteckning. Den nya anteckningen öppnas med namnet markerat, så att du kan skriva det direkt.",
+    },
     copycat: {
       name: "Kopiekatt",
       condition: "Kopiera en anteckning till urklipp.",

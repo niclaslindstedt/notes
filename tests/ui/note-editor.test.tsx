@@ -202,6 +202,25 @@ describe("Editor", () => {
     expect(body.selectionEnd).toBe(body.value.length);
   });
 
+  it("opens a freshly created note with its default title selected", () => {
+    // A default-title scheme (date/time, numbered) means a new note is born
+    // with a title, so it isn't blank — `nameOnOpen` is what still opens it
+    // ready to be named.
+    renderEditor({
+      note: note({ title: "Note 3", body: "" }),
+      nameOnOpen: true,
+    });
+    const title = screen.getByDisplayValue("Note 3") as HTMLTextAreaElement;
+    expect(document.activeElement).toBe(title);
+    expect(title.selectionStart).toBe(0);
+    expect(title.selectionEnd).toBe("Note 3".length);
+  });
+
+  it("leaves an existing titled note unfocused", () => {
+    renderEditor({ note: note({ title: "Note 3", body: "" }) });
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it("keeps Ctrl+A field-scoped while the title holds focus", () => {
     renderEditor();
     const title = screen.getByDisplayValue("My note") as HTMLTextAreaElement;
