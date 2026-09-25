@@ -68,6 +68,22 @@ function indexUri(): string {
   return `${FileSystem.bundleDirectory ?? ""}web/index.html`;
 }
 
+// Which screen edges the native frame keeps clear of the system bars.
+//
+// iOS: none. The page is built to run edge to edge — `viewport-fit=cover`,
+// and every surface that meets an edge (the sticky headers, the side menu,
+// the modals, toasts and bottom bars) pads itself with
+// `env(safe-area-inset-*)` — which is how the installed PWA looks. Framing the
+// WebView inside the safe area instead zeroes those insets and leaves a flat
+// band above the page, so the side menu and the headers stop short of the
+// status bar.
+//
+// Android: top and the sides, as before. The WebView's safe-area insets are
+// not reliably reported there, so the frame keeps the page clear of the
+// status bar and any display cutout.
+const FRAME_EDGES =
+  Platform.OS === "ios" ? ([] as const) : (["top", "left", "right"] as const);
+
 export default function WebViewHost() {
   const webView = useRef<WebView>(null);
   const bundleDir = FileSystem.bundleDirectory ?? undefined;
@@ -97,7 +113,7 @@ export default function WebViewHost() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
+      <SafeAreaView style={styles.root} edges={FRAME_EDGES}>
         <StatusBar style="auto" />
         <WebView
           ref={webView}
@@ -116,6 +132,11 @@ export default function WebViewHost() {
           domStorageEnabled
           javaScriptEnabled
           setSupportMultipleWindows={false}
+          // iOS runs full-bleed (see `FRAME_EDGES`), so the scroll view must
+          // not pad itself back down by the safe area: the page does that,
+          // through `env(safe-area-inset-*)`, exactly as the installed PWA.
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustContentInsets={false}
           // The iCloud and sign-in providers, installed before the page's own
           // scripts run so the storage picker can offer iCloud Drive and
           // Dropbox on the first render. Both are guarded against a second

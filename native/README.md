@@ -53,7 +53,10 @@ cd native && npx expo prebuild   # copies native/web/ into the binary (see plugi
   (loaded from `file:///android_asset/web/index.html`) and a bundle folder
   reference on iOS (loaded from `bundleDirectory/web/index.html`).
 - [`src/WebViewHost.tsx`](src/WebViewHost.tsx) renders the WebView and wires
-  the message bridge.
+  the message bridge. On iOS the WebView runs edge to edge and the page pads
+  itself around the notch and the home indicator with
+  `env(safe-area-inset-*)`, as the installed PWA does; on Android the frame
+  keeps the page below the status bar and clear of any cutout.
 
 ## The web ↔ native bridge
 
