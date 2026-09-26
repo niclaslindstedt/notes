@@ -25,7 +25,7 @@ import { useCallback, useRef, useState } from "react";
 import { Platform, StyleSheet } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import * as FileSystem from "expo-file-system";
+import { File, Paths } from "expo-file-system";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { handleBridgeMessage } from "./bridge/on-message";
@@ -65,13 +65,13 @@ const AUTH_SESSION_SCRIPT = AUTH_REDIRECT_URI
 const BACKGROUND = "#1d2027";
 
 // Where the embedded bundle's entry point lives on each platform. Android
-// keeps it under the APK's `assets/`; iOS under the app bundle, whose file URL
-// `expo-file-system` exposes as `bundleDirectory`.
+// keeps it under the APK's `assets/`; iOS under the app bundle, which
+// `expo-file-system` exposes as `Paths.bundle`.
 function indexUri(): string {
   if (Platform.OS === "android") {
     return "file:///android_asset/web/index.html";
   }
-  return `${FileSystem.bundleDirectory ?? ""}web/index.html`;
+  return new File(Paths.bundle, "web", "index.html").uri;
 }
 
 // Which screen edges the native frame keeps clear of the system bars.
@@ -92,7 +92,7 @@ const FRAME_EDGES =
 
 export default function WebViewHost() {
   const webView = useRef<WebView>(null);
-  const bundleDir = FileSystem.bundleDirectory ?? undefined;
+  const bundleDir = Platform.OS === "ios" ? Paths.bundle.uri : undefined;
   // The in-flight QR-scan request id, set when the web app asks to scan and
   // cleared once the camera overlay resolves.
   const [scanId, setScanId] = useState<string | null>(null);
@@ -141,9 +141,7 @@ export default function WebViewHost() {
           allowFileAccessFromFileURLs
           // iOS needs explicit read access to the bundle dir so the file://
           // page can pull its sibling hashed assets.
-          allowingReadAccessToURL={
-            Platform.OS === "ios" ? bundleDir : undefined
-          }
+          allowingReadAccessToURL={bundleDir}
           // localStorage is the web app's entire persistence layer, so it must
           // stay on (Android gates it behind this flag).
           domStorageEnabled

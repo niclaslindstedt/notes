@@ -100,12 +100,11 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # The native app pins exact versions and tracks no lockfile
-      # (native/.gitignore), so `npm install` — not `npm ci` — is correct.
-      # It only needs its own deps: the shared core it imports from ../src
-      # is framework-free and dependency-light (React only, pinned here).
+      # From the committed lockfile, so EAS builds what CI checked. It only
+      # needs its own deps: the shared core it imports from ../src is
+      # framework-free and dependency-light (React only, pinned here).
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       # No submit: fire the build and return. --no-wait lets the runner exit
       # while EAS builds in the cloud, so we don't pay for idle Actions

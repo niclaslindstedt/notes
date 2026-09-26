@@ -102,7 +102,7 @@ export default function QrScanner({
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#000000",
     alignItems: "center",
     justifyContent: "center",

@@ -37,6 +37,26 @@ jobs:
       - run: make test
       - run: make build
 
+  # The native wrapper (native/) is a separate Expo app with its own
+  # dependency tree, so nothing in the `build` job above touches it. This job
+  # is the guard that it still installs from its lockfile and that its
+  # sources still compile — cheap, because it never builds a native binary;
+  # that only happens on manual dispatch (see native-build.yml).
+  native:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: native
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: native/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+
   changeset:
     # Enforces that every PR touching user-visible code drops a
     # changelog fragment under .changes/unreleased/, or opts out via

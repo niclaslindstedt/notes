@@ -8,7 +8,7 @@
 // `src/platform/native-bridge.ts`; the web app never calls it directly, only
 // over the WebView bridge.
 
-import { requireNativeModule } from "expo-modules-core";
+import { requireNativeModule } from "expo";
 
 export interface PinnedRequest {
   url: string;

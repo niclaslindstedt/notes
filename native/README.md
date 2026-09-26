@@ -51,7 +51,7 @@ cd native && npx expo prebuild   # copies native/web/ into the binary (see plugi
 - The Expo config plugin [`plugins/with-web-bundle.js`](plugins/with-web-bundle.js)
   copies `native/web/` into the binary at prebuild: `assets/web/` on Android
   (loaded from `file:///android_asset/web/index.html`) and a bundle folder
-  reference on iOS (loaded from `bundleDirectory/web/index.html`).
+  reference on iOS (loaded from `web/index.html` under `Paths.bundle`).
 - [`src/WebViewHost.tsx`](src/WebViewHost.tsx) renders the WebView and wires
   the message bridge. On iOS the WebView runs edge to edge and the page pads
   itself around the notch and the home indicator with
@@ -181,7 +181,7 @@ Because the app embeds native modules (WebView + pinning + iCloud), it needs a
 
 ```sh
 cd native
-npm install
+npm ci
 make build-native   # (from repo root) produce native/web/ first
 npx expo prebuild
 npx expo run:ios     # or: npx expo run:android

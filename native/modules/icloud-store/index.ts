@@ -13,7 +13,7 @@
 // wrapper then reports the backend as unavailable and the web app hides it,
 // rather than crashing at import.
 
-import { requireOptionalNativeModule } from "expo-modules-core";
+import { requireOptionalNativeModule } from "expo";
 
 /**
  * The iCloud container the notes sync through.

@@ -5,7 +5,7 @@
 // `tsc` type-checks `tests/`, `tests/platform/icloud-host.test.ts` imports
 // `icloudBridge.ts`, and a root `npm ci` does not install `native/`'s own
 // dependencies — so anything reachable from that test which imports
-// `expo-modules-core` turns a fully-installed machine green and CI red.
+// `expo` turns a fully-installed machine green and CI red.
 //
 // So `icloudBridge.ts` — pure, and exercised from the root suite — takes its
 // types from here, and only `icloud.ts` reaches for the native module. Nothing

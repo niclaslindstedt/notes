@@ -6,7 +6,7 @@
 //     `file:///android_asset/web/index.html`.
 //   - iOS: copy it into the iOS project and add it to the app target as a
 //     *folder reference* (blue folder) so the whole hashed-asset tree ships in
-//     the bundle and the WebView loads it from `bundleDirectory/web/index.html`.
+//     the bundle and the WebView loads it from `web/index.html` under the bundle.
 //
 // Run `make build-native` before `expo prebuild` so `native/web/` exists.
 

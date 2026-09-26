@@ -55,7 +55,7 @@ this directory and update the variable rather than the file:
 
 ```sh
 cd native
-npm install
+npm ci
 eas init --id <projectId>
 ```
 

@@ -10,7 +10,7 @@
   // when an `extends` cannot be resolved. Reaching into node_modules for the
   // base therefore turns a fully-installed machine green and CI red.
   //
-  // So Expo's base is inlined below, as of expo 53, with this project's own
+  // So Expo's base is inlined below, as of expo 57, with this project's own
   // settings on top (`jsx`, `strict`, `.ts` import extensions). Re-check it
   // against `node_modules/expo/tsconfig.base.json` when expo is upgraded.
   "compilerOptions": {
@@ -30,10 +30,5 @@
     "allowImportingTsExtensions": true
   },
   "include": ["index.js", "src/**/*.ts", "src/**/*.tsx", "modules/**/*.ts"],
-  "exclude": [
-    "node_modules",
-    "babel.config.js",
-    "metro.config.js",
-    "jest.config.js"
-  ]
+  "exclude": ["node_modules"]
 }
