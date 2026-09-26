@@ -72,6 +72,13 @@
     },
     "eslint-plugin-jsx-a11y": {
       "eslint": "$eslint"
+    },
+    "workbox-build": {
+      "glob": "^13.0.6"
     }
+  },
+  "allowScripts": {
+    "core-js": false,
+    "fsevents": false
   }
 }
