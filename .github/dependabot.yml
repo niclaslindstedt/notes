@@ -1,16 +1,18 @@
+# Lockfile-only. The version ranges in package.json move together across
+# the apps, by hand, and a new major is tried in one app first; this keeps
+# each lockfile on the newest release inside those ranges. Security updates
+# come on their own, from the repository's settings. GitHub Actions are
+# pinned to major tags, so their only updates are majors, which move by hand
+# too.
 version: 2
 updates:
   - package-ecosystem: npm
-    directory: "/"
+    directories: ["/", "/native", "/tauri"]
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    versioning-strategy: lockfile-only
     groups:
-      # Batch the routine dev-tooling bumps into one PR to cut noise.
-      dev-dependencies:
-        dependency-type: development
-
-  - package-ecosystem: github-actions
-    directory: "/"
-    schedule:
-      interval: weekly
+      lockfiles:
+        patterns: ["*"]
+    labels: ["dependencies", "no-changelog"]
+    open-pull-requests-limit: 5
