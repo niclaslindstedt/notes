@@ -10,12 +10,13 @@ declare const __APP_NAME__: string;
 // True only in the wrapper builds that embed the bundle locally — the native
 // WebView shell (`VITE_TARGET=native`) and the Tauri desktop shell
 // (`VITE_SHELL_BUILD=on`); false on the web. Gates paths that assume a
-// service worker / HTTP origin.
+// service worker / HTTP origin, and leaves out the side menu's Donate entry.
 declare const __EMBEDDED__: boolean;
 
 interface ImportMetaEnv {
-  // Optional donate link surfaced in the side menu. A blank / unset value
-  // hides the entry entirely (set it at build time, e.g. in CI).
+  // Optional donate link surfaced in the side menu — the website's only; the
+  // wrapper builds (`__EMBEDDED__`) compile the entry out. A blank / unset
+  // value hides the entry entirely (set it at build time, e.g. in CI).
   readonly VITE_DONATE_URL?: string;
   // Public Dropbox app key for the Dropbox storage backend's PKCE flow.
   // Unset disables the Dropbox option in the storage picker. Set it at

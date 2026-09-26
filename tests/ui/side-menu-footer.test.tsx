@@ -10,6 +10,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 // `useModalDispatch` throws outside a bus provider; `useT` and `useAppearance`
@@ -42,6 +43,18 @@ describe("SideMenuFooter", () => {
     expect(donate?.getAttribute("target")).toBe("_blank");
     fireEvent.click(donate!);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("has no donate link in the phone or desktop build, even with a URL configured", () => {
+    // `__EMBEDDED__` is a compile-time define in a real build; stubbing the
+    // global stands in for the wrapper builds here.
+    vi.stubGlobal("__EMBEDDED__", true);
+    vi.stubEnv("VITE_DONATE_URL", "https://donate.example");
+    renderFooter();
+    expect(screen.queryByText("Donate")).toBeNull();
+    expect(
+      document.querySelector('a[href="https://donate.example"]'),
+    ).toBeNull();
   });
 
   it("opens the settings modal and closes the drawer behind it", () => {

@@ -45,7 +45,7 @@ there rather than shipping under the wrong identity.
 | `EAS_PROJECT_ID`          | secret   | `native-build.yml` — the Expo project to build against. |
 | `VITE_DROPBOX_APP_KEY`    | secret   | Dropbox backend (public PKCE app key) — the Pages builds, and `native-build.yml`, which bakes it into the phone app's embedded bundle. |
 | `VITE_DROPBOX_APP_FOLDER` | secret   | Dropbox app-folder name — same two places.           |
-| `VITE_DONATE_URL`         | secret   | Optional donate row in the side menu.               |
+| `VITE_DONATE_URL`         | secret   | Optional donate row in the side menu — the Pages builds only. The phone and desktop builds compile the row out (`__EMBEDDED__`) whatever it says: a payment link outside Apple's is an App Store rejection (guideline 3.1.1). |
 | `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `MAC_SIGN_IDENTITY`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | secret | macOS signing and notarization of the desktop app — see [`tauri/README.md`](../tauri/README.md). |
 | `GITHUB_PAT`              | secret   | `npm ci` against the GitHub Packages registry.      |
 

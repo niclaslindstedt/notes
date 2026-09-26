@@ -185,7 +185,7 @@ const achievements: AchievementsCatalog = {
       condition:
         "Fäll ihop sidomenyns sidfot för att ge mer plats åt anteckningar.",
       learnMore:
-        "Den tunna pilraden precis ovanför sidfoten fäller ihop raderna Donera, troféer, Om och Inställningar och ger det lodräta utrymmet till din anteckningslista. Tryck igen för att ta tillbaka sidfoten — valet kommer ihåg mellan omladdningar.",
+        "Den tunna pilraden precis ovanför sidfoten fäller ihop troféer, Om, Inställningar och resten av sidfoten och ger det lodräta utrymmet till din anteckningslista. Tryck igen för att ta tillbaka sidfoten — valet kommer ihåg mellan omladdningar.",
     },
     clearTheDecks: {
       name: "Rensa däck",

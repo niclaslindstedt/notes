@@ -24,7 +24,7 @@ const ABOUT_PLACEMENT: FloatingPlacement = {
 };
 
 // The relocated burger menu, pinned to the foot of the drawer: an optional
-// Donate, the trophy (achievements), an "About" dropdown that folds away the
+// Donate (website only), the trophy (achievements), an "About" dropdown that folds away the
 // project links (What's new / privacy) above the build label, and Settings
 // pinned last under the thumb. Self-contained — the only thing it borrows from
 // the drawer is the `onClose` that retracts it behind a modal; the About
@@ -45,8 +45,15 @@ export function SideMenuFooter({ onClose }: { onClose: () => void }) {
   const aboutRef = useRef<HTMLButtonElement>(null);
 
   // Build-time env (string | undefined). A blank value disables the donate
-  // entry entirely rather than linking nowhere.
-  const donateUrl = import.meta.env.VITE_DONATE_URL?.trim();
+  // entry entirely rather than linking nowhere. The website's alone: the phone
+  // and desktop builds (`__EMBEDDED__`) ship without it, because a payment link
+  // outside Apple's is an App Store rejection (guideline 3.1.1). The define is
+  // a compile-time constant, so there this is a literal `undefined` and the
+  // minifier drops the entry and the URL — hiding it at runtime would still
+  // ship the link.
+  const donateUrl = __EMBEDDED__
+    ? undefined
+    : import.meta.env.VITE_DONATE_URL?.trim();
   // BASE_URL carries the trailing slash, so this is `/privacy`,
   // `/preview/privacy`, … depending on the deploy slot.
   const privacyUrl = `${import.meta.env.BASE_URL}privacy`;

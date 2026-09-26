@@ -40,8 +40,8 @@ const nav = {
   deleteNote: "Delete note",
   undo: "Undo",
   redo: "Redo",
-  // The thin chevron rail that folds the footer (Donate / About / Settings)
-  // away to hand its vertical space to the note list, and back.
+  // The thin chevron rail that folds the footer (Donate on the website /
+  // About / Settings) away to hand its vertical space to the note list, and back.
   collapseFooter: "Hide footer",
   expandFooter: "Show footer",
   // The full-height rail on the docked sidebar's inner edge, which folds the

@@ -373,7 +373,9 @@ export default defineConfig({
     __APP_NAME__: JSON.stringify(APP_NAME),
     // True only in the wrapper builds (native WebView / Tauri); gates the
     // SW-registration and update-prompt paths that have no service worker to
-    // talk to there.
+    // talk to there, and compiles out the side menu's Donate entry — no build
+    // but the website may carry a payment link outside Apple's (App Store
+    // guideline 3.1.1).
     __EMBEDDED__: JSON.stringify(isEmbedded),
   },
   test: {

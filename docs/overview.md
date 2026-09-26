@@ -4250,7 +4250,7 @@ namespace switcher, the [Favorites](#favorites) section, the recent-notes list
 bordered [button island](#folders-in-the-side-menu) (New note / New folder /
 Show all / Archive over Undo / Redo / Search / the sync glyph) pinned to the foot
 of the list, and a
-footer (an optional donate, the trophy, an **About** dropdown that folds away the
+footer (an optional donate link on the website, the trophy, an **About** dropdown that folds away the
 project links — What's new, source, privacy — and settings). It reads state from
 `NavContext` and dispatches modal-open
 commands on the [modal bus](#modal-bus). The **Namespaces** heading is a
@@ -5921,7 +5921,8 @@ cell of this island and is absent entirely on the local backend.
 The drawer's **footer** — pinned below the island — is the relocated burger
 menu, extracted as a self-contained `SideMenuFooter`
 (`src/ui/SideMenuFooter.tsx`) the drawer renders with just an `onClose` prop: an
-optional donate link, the trophy ([achievements](#achievements)), an **About**
+optional donate link (website only: `__EMBEDDED__` compiles it out of the
+phone and desktop builds), the trophy ([achievements](#achievements)), an **About**
 dropdown, and settings pinned last, built from the footer-local `MenuButton` /
 `MenuLink` row primitives. The **About** row is a plain footer row (no chevron)
 that toggles a `FloatingPanel` of the project links — What's new
@@ -6420,7 +6421,10 @@ a service worker has no HTTP origin to attach to; and the sidecar emitters
 (`version.json`, `precache-manifest.json`, the `/privacy` and `/home` aliases)
 are skipped, since nothing in a wrapper reads them. `usePwaUpdate`
 (`src/pwa/usePwaUpdate.ts`) reads `__EMBEDDED__` to know there is no service
-worker to register.
+worker to register, and `SideMenuFooter` reads it to leave out the Donate
+entry: no build but the website may carry a payment link outside Apple's (App
+Store guideline 3.1.1). Being a compile-time constant, it drops the entry and
+its URL from the bundle rather than hiding them.
 
 ### Capabilities
 

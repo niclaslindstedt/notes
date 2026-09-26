@@ -169,7 +169,8 @@ wrappers are thin"). There is no injected global and no Tauri command.
 `tauri/src-tauri/` holds every effect. One seam reaches back into this tree,
 `VITE_SHELL_BUILD`, set by the shell's site build, which makes it an embedded
 build like the native one (`isEmbedded` in `vite.config.ts`): no service
-worker, no update prompt. A desktop build updates by being replaced. The package's
+worker, no update prompt, no Donate entry (a payment link outside Apple's is
+an App Store rejection, and the website alone keeps it). A desktop build updates by being replaced. The package's
 name and identifier come from `APP_DISPLAY_NAME` and `APP_BUNDLE_ID` at
 packaging time (`tauri/scripts/package.mjs`), like the phone app's. See
 [`tauri/README.md`](tauri/README.md).

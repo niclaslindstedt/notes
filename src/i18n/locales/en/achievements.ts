@@ -188,7 +188,7 @@ const achievements = {
       name: "Space saver",
       condition: "Fold the side menu footer away to make more room for notes.",
       learnMore:
-        "The thin chevron rail just above the footer folds the Donate, trophy, About and Settings rows out of view, handing that vertical space to your note list. Tap it again to bring the footer back — the choice is remembered across reloads.",
+        "The thin chevron rail just above the footer folds the trophy, About, Settings and the rest of the footer out of view, handing that vertical space to your note list. Tap it again to bring the footer back — the choice is remembered across reloads.",
     },
     clearTheDecks: {
       name: "Clear the decks",
