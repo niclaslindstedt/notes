@@ -1,0 +1,3 @@
+# The app this lane talks to. Nothing is committed: the store identity is a
+# deployment coordinate, read from APP_BUNDLE_ID like every build reads it.
+app_identifier(ENV.fetch("APP_BUNDLE_ID"))

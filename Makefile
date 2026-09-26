@@ -1,4 +1,4 @@
-.PHONY: demo build build-native test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump store-preflight store-metadata tauri tauri-bundle tauri-clean tauri-fast tauri-fmt tauri-fmt-check tauri-install tauri-lint tauri-package tauri-package-debug tauri-test
+.PHONY: demo build build-native test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump store-preflight store-metadata store-upload tauri tauri-bundle tauri-clean tauri-fast tauri-fmt tauri-fmt-check tauri-install tauri-lint tauri-package tauri-package-debug tauri-test
 
 install:
 	npm ci
@@ -81,6 +81,22 @@ store-preflight:
 store-metadata:
 	node --experimental-strip-types --disable-warning=ExperimentalWarning \
 		scripts/generate-store-metadata.mjs $(ARGS)
+
+# Upload the listing — text and the screenshots staged in
+# native/store/screenshots/en-US/ — to App Store Connect with fastlane
+# deliver. Compiles first, in the same environment, so what goes up is what
+# the copy says now. Reads the API key, APP_BUNDLE_ID and APP_DISPLAY_NAME
+# from native/.env or the environment (see native/.env.example), and refuses
+# without a listing name: compiled without one, the name is the plain project
+# name, and deliver would rename the product page to it. Never submits for
+# review and never uploads a binary.
+store-upload:
+	@set -a; [ -f native/.env ] && . native/.env; set +a; \
+	if [ -z "$$APP_DISPLAY_NAME" ] || [ -z "$$APP_BUNDLE_ID" ]; then \
+		echo "store-upload: set APP_DISPLAY_NAME and APP_BUNDLE_ID (native/.env)" >&2; exit 1; fi; \
+	node --experimental-strip-types --disable-warning=ExperimentalWarning \
+		scripts/generate-store-metadata.mjs && \
+	cd native && fastlane listing
 
 # The desktop shell (tauri/) — a thin Tauri wrapper around this same app.
 #

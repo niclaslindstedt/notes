@@ -1,0 +1,41 @@
+# The App Store listing, uploaded: the text `make store-metadata` compiled
+# into ./metadata and the screenshots staged in ../store/screenshots/en-US/
+# (upload-ready PNGs at Apple's exact rasters; fastlane files each one under
+# its device by its dimensions).
+#
+#   make store-upload
+#
+# Text and screenshots only. The binary goes up through EAS (`eas submit`),
+# and nothing here submits for review or releases — a human does both in App
+# Store Connect.
+#
+# Authenticates with an App Store Connect API key rather than an Apple ID, so
+# there is no two-factor session to expire mid-upload:
+#   ASC_KEY_ID, ASC_ISSUER_ID, and ASC_KEY_PATH (a .p8) or ASC_KEY_CONTENT.
+# APP_BUNDLE_ID names the app. See native/.env.example.
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Upload the listing text and screenshots to App Store Connect"
+  lane :listing do
+    app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_filepath: ENV["ASC_KEY_PATH"],
+      key_content: ENV["ASC_KEY_CONTENT"],
+    )
+    deliver(
+      app_identifier: ENV.fetch("APP_BUNDLE_ID"),
+      metadata_path: "./metadata",
+      screenshots_path: "../store/screenshots",
+      skip_binary_upload: true,
+      skip_app_version_update: false,
+      overwrite_screenshots: true,
+      submit_for_review: false,
+      automatic_release: false,
+      run_precheck_before_submit: false,
+      force: true,
+    )
+  end
+end
