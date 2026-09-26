@@ -473,7 +473,8 @@ const WRITING: NamespaceSpec = {
         "- Notes nobody else is reading",
         "- A folder I can *back up, search and keep*",
         "",
-        "> Write in the format you can still read when the app is gone.",
+        "## What it costs",
+        "A few minutes to learn Markdown. That is the whole bill.",
       ],
     },
     {
