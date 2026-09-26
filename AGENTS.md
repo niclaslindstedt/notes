@@ -141,6 +141,7 @@ When you close any deferred item above, delete its bullet here in the same PR.
 ```sh
 make dev         # vite dev server (hot reload)
 make dev-seed    # dev server seeded with realistic fake data (VITE_SEED)
+make demo        # dev server on the in-memory store demo (VITE_SEED=demo)
 make build       # production build → dist/ (also emits the service worker)
 make preview     # serve the production build locally
 make test        # vitest run
@@ -205,6 +206,18 @@ packaging time (`tauri/scripts/package.mjs`), like the phone app's. See
   your edits; bump `SEED_VERSION` to force a re-seed), and it **overwrites the
   local document of every namespace it touches**, so it never runs under a plain
   `make dev` or a normal build.
+
+- **The presentation demo (`make demo` / `VITE_SEED=demo`)** — boots onto
+  one person's notebook (`src/dev/demoData.ts`: three namespaces, folders,
+  favorites, line comments and transform rules), written for the App Store
+  screenshots. Unlike the env seed it is **held in memory**: `src/dev/demo.ts`
+  swaps `window.localStorage` for an in-memory store before the app mounts,
+  carrying over only the device's `notes/…` look (theme, layout, language), so
+  nothing is read from or written to the device's notes and connecting a
+  storage backend is refused. Every date is relative to the moment it opens.
+  `tests/dev/demo.test.ts` holds it to the app's own document format and to
+  each store frame's premise — change a note a frame stages and that test
+  says so. Dev tooling: no UI surface, no changeset.
 
 - **In-app "Fake data" toggle (Developer settings)** — `useDevSeed`
   (`src/dev/useDevSeed.ts`) flips an in-memory flag; while on, `App` swaps the

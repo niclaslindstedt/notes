@@ -729,6 +729,20 @@ export function useStorageBackend(): UseStorageBackend {
     makeInner,
   });
 
+  // The presentation demo (`VITE_SEED=demo`, see `dev/demo.ts`) runs on an
+  // in-memory notebook. Connecting a backend from it would sync that notebook
+  // into the reader's real folder or cloud, so every connect is refused. The
+  // check folds to `false` in any other build, and the wrappers with it.
+  const refuseInDemo = <A extends unknown[]>(
+    verb: (...args: A) => Promise<void>,
+  ): ((...args: A) => Promise<void>) =>
+    import.meta.env.VITE_SEED === "demo"
+      ? async () => {
+          log.warn("connect refused — the demo keeps its notes in memory");
+          throw new Error("The demo keeps its notes in memory.");
+        }
+      : verb;
+
   return {
     adapter,
     fetchAttachment,
@@ -767,24 +781,24 @@ export function useStorageBackend(): UseStorageBackend {
     encryptionFromRemote: fromRemote,
     encryptionDisabling: disabling,
     selectBrowser,
-    connectFolder,
-    reconnectFolder,
+    connectFolder: refuseInDemo(connectFolder),
+    reconnectFolder: refuseInDemo(reconnectFolder),
     disconnectFolder,
-    connectDropbox,
+    connectDropbox: refuseInDemo(connectDropbox),
     disconnectDropbox,
     icloudAvailable: icloudHost !== null,
     icloudStatus,
     icloudConnected: backend === "icloud" && usableICloudHost !== null,
-    connectICloud,
+    connectICloud: refuseInDemo(connectICloud),
     disconnectICloud,
     refreshICloud,
     nextcloudConnected: backend === "nextcloud" && nextcloudConfig !== null,
     nextcloudConfig,
-    connectNextcloud,
+    connectNextcloud: refuseInDemo(connectNextcloud),
     disconnectNextcloud,
     notesdAvailable: platformCapabilities.pinnedFetch,
     notesdConnected: backend === "notesd" && notesdConfig !== null,
-    pairNotesd,
+    pairNotesd: refuseInDemo(pairNotesd),
     unpairNotesd,
     notesdDiscovered,
     notesdDiscoverySource,

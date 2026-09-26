@@ -1,4 +1,4 @@
-.PHONY: build build-native test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump store-preflight store-metadata tauri tauri-bundle tauri-clean tauri-fast tauri-fmt tauri-fmt-check tauri-install tauri-lint tauri-package tauri-package-debug tauri-test
+.PHONY: demo build build-native test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump store-preflight store-metadata tauri tauri-bundle tauri-clean tauri-fast tauri-fmt tauri-fmt-check tauri-install tauri-lint tauri-package tauri-package-debug tauri-test
 
 install:
 	npm ci
@@ -11,6 +11,12 @@ dev:
 # UI can be debugged against lifelike content. Overwrites local sample data.
 dev-seed:
 	npm run dev:seed
+
+# Dev server on the presentation demo (VITE_SEED=demo): one person's notebook,
+# held in memory — nothing is read from or written to this browser's notes.
+# It is what the App Store screenshots are taken of. See src/dev/demo.ts.
+demo:
+	npm run dev:demo
 
 build:
 	npm run build

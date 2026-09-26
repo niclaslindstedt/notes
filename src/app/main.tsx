@@ -48,15 +48,26 @@ if (path.endsWith("/privacy")) {
     root.render(<HomePage />);
   });
 } else {
-  // Developer fake-data seeding. The `VITE_SEED` flag is set only by the
-  // `dev:seed` / `build:seed` npm scripts, so in every ordinary build this
-  // condition folds to `false` at compile time and the dataset — all 7 kB of
-  // it — is dropped from the bundle rather than shipped and never run. When
-  // the flag *is* set, the seed lands before the app mounts so the local
-  // backend's first synchronous load already sees the seeded document.
-  const seeded = import.meta.env.VITE_SEED
-    ? import("../dev/seed.ts").then((m) => m.maybeSeedDevData())
-    : Promise.resolve();
+  // Developer seeding. `VITE_SEED` is set only by the `dev:seed` /
+  // `build:seed` npm scripts and `make demo`, so in every ordinary build both
+  // conditions fold to `false` at compile time and the datasets are dropped
+  // from the bundle rather than shipped and never run. When the flag *is* set,
+  // the data lands before the app mounts, so the local backend's first
+  // synchronous load already sees it:
+  //
+  // - `VITE_SEED=demo` — the presentation demo (`dev/demo.ts`): the app runs
+  //   on an in-memory notebook and never reads or writes the device's notes.
+  //   If the in-memory store can't be installed, nothing mounts at all.
+  // - any other value — the debugging seed (`dev/seed.ts`), written into the
+  //   real localStorage once per version.
+  const seeded =
+    import.meta.env.VITE_SEED === "demo"
+      ? import("../dev/demo.ts").then((m) => {
+          if (!m.bootDemo()) throw new Error("demo: storage not replaceable");
+        })
+      : import.meta.env.VITE_SEED
+        ? import("../dev/seed.ts").then((m) => m.maybeSeedDevData())
+        : Promise.resolve();
   void seeded
     .then(() => import("./mount-app.tsx"))
     .then(({ mountApp }) => mountApp(root));
