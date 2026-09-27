@@ -137,7 +137,7 @@ const PERSONAL: NamespaceSpec = {
       body: [
         "- 3 copies: laptop, NAS, cold drive",
         "- 2 kinds of media",
-        "- 1 off-site: the drive at Mum's",
+        "- 1 off-site: the drive at Mom's",
         "",
         "Test a restore every quarter. A backup you never restored is a hope.",
       ],

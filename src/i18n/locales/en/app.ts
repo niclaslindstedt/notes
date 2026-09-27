@@ -189,7 +189,7 @@ const app = {
     deleted: "Dropzone note deleted",
     keepTitle: "Save as a regular note?",
     keepBody:
-      "“{title}” is a dropzone note, meant to be picked up on another device and ticked off. Naming it usually means you want to keep it — save it and it moves into your notes; leave it and it stays in the Dropzone.",
+      "“{title}” is a dropzone note, meant to be picked up on another device and checked off. Naming it usually means you want to keep it — save it and it moves into your notes; leave it and it stays in the Dropzone.",
     keep: "Save note",
     discard: "Keep in Dropzone",
   },

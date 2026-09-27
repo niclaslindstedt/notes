@@ -59,7 +59,7 @@ export function HomePage() {
         <Section title="What notes is">
           <p>
             <span className="text-fg-bright">notes</span> is a free Progressive
-            Web App (PWA) for writing and organising notes. It runs entirely in
+            Web App (PWA) for writing and organizing notes. It runs entirely in
             your browser and can be installed to your home screen so it opens
             like a native app and works fully offline. There is no account to
             create and nothing to pay for — open the page and start writing.
@@ -75,7 +75,7 @@ export function HomePage() {
         <Section title="What you can do with it">
           <ul className="ml-5 list-disc space-y-1.5">
             <li>
-              Write, edit, and organise plain-text notes — each with its own
+              Write, edit, and organize plain-text notes — each with its own
               editable title (heading the page beside a back button) and a
               Markdown body that formats as you type. The row the cursor is on
               keeps its formatting like every other one — a bold word stays bold
@@ -118,7 +118,7 @@ export function HomePage() {
               lines. There are no handles to aim at a single character with,
               which is what makes taking eight lines on a phone awkward
               otherwise. The lines you have taken are tinted along with their
-              line numbers rather than wearing the ordinary selection colour, so
+              line numbers rather than wearing the ordinary selection color, so
               the two are never confused. From there you can type over them,
               delete them, copy or cut them, or style every one of them at once.
               The moment a line is taken the header unfolds the four verbs that
@@ -183,21 +183,21 @@ export function HomePage() {
             </li>
             <li>
               Tap <kbd>space</kbd> twice at the end of a word and the sentence
-              ends itself — the second space becomes a full stop, cursor left
-              ready for the next sentence. It is the shortcut your phone applies
-              in any other text field, done by the app so it works the same on a
-              computer. Two spaces after a full stop stay two spaces, code
-              blocks are left verbatim, and <em>Disable auto correct</em> in
-              Settings turns it off.
+              ends itself — the second space becomes a period, cursor left ready
+              for the next sentence. It is the shortcut your phone applies in
+              any other text field, done by the app so it works the same on a
+              computer. Two spaces after a period stay two spaces, code blocks
+              are left verbatim, and <em>Disable auto correct</em> in Settings
+              turns it off.
             </li>
             <li>
               Sentences start with a capital. The note writes it for you — the
-              first letter of a line, and the first letter after a full stop,
-              question mark or exclamation mark — so the capital your phone puts
-              in everywhere else is there in the editor too, and on a computer
-              where nothing offers it at all. File names and decimals keep their
-              lower case, code blocks are left exactly as typed, and{" "}
-              <em>Capitalise sentences</em> in Settings turns it off.
+              first letter of a line, and the first letter after a period,
+              question mark or exclamation point — so the capital your phone
+              puts in everywhere else is there in the editor too, and on a
+              computer where nothing offers it at all. File names and decimals
+              keep their lower case, code blocks are left exactly as typed, and{" "}
+              <em>Capitalize sentences</em> in Settings turns it off.
             </li>
             <li>
               Lists write themselves. <kbd>Enter</kbd> on a bullet or numbered
@@ -209,15 +209,15 @@ export function HomePage() {
               you are already on. Quotes carry on the same way.
             </li>
             <li>
-              Checklists you can actually tick. A row written{" "}
+              Checklists you can actually check off. A row written{" "}
               <code>- [ ] milk</code> draws a real checkbox — tap it and the
               item is checked off there and then, without opening the editor or
-              raising the keyboard on a phone. The tick is written straight into
-              the Markdown as <code>- [x]</code>, so it is part of the note and
-              travels with it wherever you keep it. <kbd>Enter</kbd> opens the
-              next item, always unchecked — and the formatting toolbar&apos;s{" "}
-              <em>Checklist</em> style turns any lines you have into checkboxes
-              without typing the brackets yourself.
+              raising the keyboard on a phone. The check is written straight
+              into the Markdown as <code>- [x]</code>, so it is part of the note
+              and travels with it wherever you keep it. <kbd>Enter</kbd> opens
+              the next item, always unchecked — and the formatting
+              toolbar&apos;s <em>Checklist</em> style turns any lines you have
+              into checkboxes without typing the brackets yourself.
             </li>
             <li>
               Reorder lines without cutting and pasting. Select whole lines
@@ -226,7 +226,7 @@ export function HomePage() {
               have selected one row up or down the note. The lines stay
               selected, so a second press carries on where the first left off,
               and lines that are not next to each other each swap with their own
-              neighbour. <kbd>Alt</kbd>+<kbd>&uarr;</kbd> and <kbd>Alt</kbd>+
+              neighbor. <kbd>Alt</kbd>+<kbd>&uarr;</kbd> and <kbd>Alt</kbd>+
               <kbd>&darr;</kbd> do the same from the keyboard &mdash; the
               shortcut every code editor binds &mdash; and with nothing selected
               they move the line the cursor is on.
@@ -392,7 +392,7 @@ export function HomePage() {
             </li>
             <li>
               Group notes into separate <em>namespaces</em> — independent
-              buckets you can switch between, each with its own icon and colour.
+              buckets you can switch between, each with its own icon and color.
               A namespace can be shared with other people by sharing its folder
               (or the account behind it), and everything that protects or
               configures one applies to that namespace alone: its own settings,
@@ -407,7 +407,7 @@ export function HomePage() {
               (below) is what actually keeps a namespace from being read.
             </li>
             <li>
-              Organise the notes within a namespace into <em>folders</em> — make
+              Organize the notes within a namespace into <em>folders</em> — make
               one from the side menu, then drag notes into it or create new ones
               straight inside it. Drag a whole folder onto another namespace to
               move it there with everything in it.
@@ -418,7 +418,7 @@ export function HomePage() {
               get a temporary note, already named after the moment you made it,
               waiting in a Dropzone section at the top of the side menu instead
               of among your notes. Write the link, the address or the code on
-              one device, pick it up on another, and tick the checkmark in its
+              one device, pick it up on another, and tap the checkmark in its
               editor to delete it — dropzone notes are meant to be thrown away,
               so they are deleted rather than archived. Give one a name of your
               own instead and the app offers to keep it as a regular note. The
@@ -442,7 +442,7 @@ export function HomePage() {
               note takes no cursor at all, so the on-screen keyboard stays down
               and nothing can be typed into the reference note you keep open by
               accident. You can still read, select, copy, search and export it,
-              and tick its checklist items off, and pressing the eye again
+              and check its checklist items off, and pressing the eye again
               unlocks it. The lock is stored with the note, so it stays locked
               on your other devices; it is a guard against stray keystrokes
               rather than a password, which is what the separate encryption
@@ -568,7 +568,7 @@ export function HomePage() {
             </li>
             <li>
               <span className="text-fg-bright">iCloud Drive</span> (iPhone and
-              iPad app only). There is nothing to authorise: notes writes into
+              iPad app only). There is nothing to authorize: notes writes into
               its own folder in your iCloud Drive — shown in the Files app as
               &quot;Notes&quot; — and never the rest of it, and iOS carries that
               folder to your other devices through your Apple Account.
@@ -578,7 +578,7 @@ export function HomePage() {
             One backend is not a cloud provider at all:{" "}
             <span className="text-fg-bright">Nextcloud</span> is server software
             you host yourself, so there is no third party in the middle and
-            nothing to authorise with anyone. You give the app your server
+            nothing to authorize with anyone. You give the app your server
             address, your user name, and an <em>app password</em> — the
             single-purpose credential Nextcloud creates for you under Settings →
             Security, which you can revoke there at any time without changing

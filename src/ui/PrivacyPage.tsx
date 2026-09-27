@@ -103,8 +103,8 @@ export function PrivacyPage() {
             </li>
             <li>
               Your <em>namespaces</em> — the named buckets you group notes into,
-              with each one&apos;s label, icon, and colour. If you put a PIN on
-              a namespace, what is stored alongside it is a one-way verifier (a
+              with each one&apos;s label, icon, and color. If you put a PIN on a
+              namespace, what is stored alongside it is a one-way verifier (a
               salted PBKDF2 hash) from which the code cannot be read back —
               never the code itself.
             </li>
@@ -331,7 +331,7 @@ export function PrivacyPage() {
 
         <Section title="Web analytics">
           <p>
-            None. The app does not load any analytics or behavioural-tracking
+            None. The app does not load any analytics or behavioral-tracking
             SDK, and the project authors collect no usage statistics from it.
           </p>
         </Section>

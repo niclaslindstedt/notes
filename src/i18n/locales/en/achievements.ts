@@ -116,16 +116,16 @@ const achievements = {
     },
 
     fullStop: {
-      name: "Full stop",
+      name: "Period",
       condition: "End a sentence by tapping space twice.",
       learnMore:
-        'Tap space twice at the end of a word and the note ends the sentence for you: the first space is swallowed and a full stop written in its place, leaving the cursor after ". " ready for the next one. It is the same shortcut your phone applies in any other text field — the editor writes every keystroke into the note itself, which puts the keystroke out of the keyboard\'s reach, so it does the substitution instead and does it the same way on a computer. Two spaces after a full stop stay two spaces, and inside a code block nothing is rewritten at all. Turn it off with "Disable auto correct" in Settings → Editor.',
+        'Tap space twice at the end of a word and the note ends the sentence for you: the first space is swallowed and a period written in its place, leaving the cursor after ". " ready for the next one. It is the same shortcut your phone applies in any other text field — the editor writes every keystroke into the note itself, which puts the keystroke out of the keyboard\'s reach, so it does the substitution instead and does it the same way on a computer. Two spaces after a period stay two spaces, and inside a code block nothing is rewritten at all. Turn it off with "Disable auto correct" in Settings → Editor.',
     },
     capitalIdea: {
       name: "Capital idea",
-      condition: "Let the note capitalise the start of a sentence for you.",
+      condition: "Let the note capitalize the start of a sentence for you.",
       learnMore:
-        'Start a sentence and the note writes the capital for you \u2014 the first letter of a line, and the first letter after a full stop, question mark or exclamation mark. It is the capital your phone puts in for you anywhere else, done by the app because the editor writes every keystroke into the note itself, which puts the keystroke out of the keyboard\'s reach; that is also why it works the same on a computer, where nothing offers it at all. A file name or a decimal keeps its lower case, code blocks are left exactly as typed, and because the capital is an ordinary edit, Backspace or Undo takes it back off. Turn it off with "Capitalise sentences" in Settings \u2192 Editor.',
+        'Start a sentence and the note writes the capital for you \u2014 the first letter of a line, and the first letter after a period, question mark or exclamation point. It is the capital your phone puts in for you anywhere else, done by the app because the editor writes every keystroke into the note itself, which puts the keystroke out of the keyboard\'s reach; that is also why it works the same on a computer, where nothing offers it at all. A file name or a decimal keeps its lower case, code blocks are left exactly as typed, and because the capital is an ordinary edit, Backspace or Undo takes it back off. Turn it off with "Capitalize sentences" in Settings \u2192 Editor.',
     },
     elbowRoom: {
       name: "Elbow room",
@@ -167,7 +167,7 @@ const achievements = {
       name: "Under lock and key",
       condition: "Lock a note so it can't be edited.",
       learnMore:
-        "The eye button beside the star makes the open note read-only. A locked note takes no caret at all: tap into it on a phone and the keyboard stays down, click into it on a desktop and nothing starts blinking, so the note you keep open for reference can't be typed into by accident — or by a pocket. The buttons that would rewrite it go with the caret (formatting, cut, and the title field), while everything that only reads it carries on exactly as before: you can scroll it, select it, copy from it, search it, export it, star it and archive it. The checkboxes on task rows stay live, so a locked checklist can still be ticked off while its wording stays put. The line-number gutter still works too, so pressing a number selects that whole line and the copy button slides out to take it. Press the eye again to unlock it. The lock travels with the note, so it is still locked on your other devices.",
+        "The eye button beside the star makes the open note read-only. A locked note takes no caret at all: tap into it on a phone and the keyboard stays down, click into it on a desktop and nothing starts blinking, so the note you keep open for reference can't be typed into by accident — or by a pocket. The buttons that would rewrite it go with the caret (formatting, cut, and the title field), while everything that only reads it carries on exactly as before: you can scroll it, select it, copy from it, search it, export it, star it and archive it. The checkboxes on task rows stay live, so a locked checklist can still be checked off while its wording stays put. The line-number gutter still works too, so pressing a number selects that whole line and the copy button slides out to take it. Press the eye again to unlock it. The lock travels with the note, so it is still locked on your other devices.",
     },
 
     // ── Intermediate ──────────────────────────────────────────────────
@@ -203,7 +203,7 @@ const achievements = {
       name: "Clear the decks",
       condition: "Collapse the docked sidebar to give the note the full width.",
       learnMore:
-        "On a wide screen the side menu is docked open beside your notes, which is handy right up until you want to read or write without it. Move the pointer to the menu's inner edge and a slim strip fades in down the whole height of it, with a chevron at its centre: press it and the whole panel folds away, giving the note the full width with no gutter left behind. Move the pointer back to that edge of the screen and the strip returns, its chevron now pointing the other way to bring the menu in again. The choice is per device and remembered across reloads.",
+        "On a wide screen the side menu is docked open beside your notes, which is handy right up until you want to read or write without it. Move the pointer to the menu's inner edge and a slim strip fades in down the whole height of it, with a chevron at its center: press it and the whole panel folds away, giving the note the full width with no gutter left behind. Move the pointer back to that edge of the screen and the strip returns, its chevron now pointing the other way to bring the menu in again. The choice is per device and remembered across reloads.",
     },
     marginalia: {
       name: "Marginalia",
@@ -231,9 +231,9 @@ const achievements = {
     },
     checkedOff: {
       name: "Checked off",
-      condition: "Tick a checkbox off in a note.",
+      condition: "Check a checkbox off in a note.",
       learnMore:
-        "A list row written `- [ ] milk` renders as a real checkbox. Press it and the item is ticked off there and then — the caret never moves onto the line, so nothing opens and no keyboard comes up on a phone. The tick is written straight into the Markdown as `- [x]`, so it travels with the note wherever it syncs. Enter on a task row opens the next one, always unticked.",
+        "A list row written `- [ ] milk` renders as a real checkbox. Press it and the item is checked off there and then — the caret never moves onto the line, so nothing opens and no keyboard comes up on a phone. The tick is written straight into the Markdown as `- [x]`, so it travels with the note wherever it syncs. Enter on a task row opens the next one, always unticked.",
     },
     plainText: {
       name: "Plain and simple",
@@ -371,7 +371,7 @@ const achievements = {
       name: "Sweeping statement",
       condition: "Take more than one line at once in select mode.",
       learnMore:
-        "With line numbers on, a press in the gutter turns the note into a list you pick from, opening with that line already taken; with them off, the header's select-mode button does the same job. One press takes a whole line and a second press on it gives that line back, so picking one line never gives up the last one \u2014 no handles to aim at a character with. For a run of them, drag down the rail at the left edge of the note \u2014 the numbers themselves, when they are on; everywhere to the right of it the note goes on scrolling as usual. The lines you have taken are tinted along with their line numbers rather than wearing the ordinary selection colour, so you can tell the two apart at a glance. From there, type over them, delete them, copy or cut them, or style every one at once. Give the last line back and the mode ends with it; Escape leaves it too, handing an unbroken run over as an ordinary selection.",
+        "With line numbers on, a press in the gutter turns the note into a list you pick from, opening with that line already taken; with them off, the header's select-mode button does the same job. One press takes a whole line and a second press on it gives that line back, so picking one line never gives up the last one \u2014 no handles to aim at a character with. For a run of them, drag down the rail at the left edge of the note \u2014 the numbers themselves, when they are on; everywhere to the right of it the note goes on scrolling as usual. The lines you have taken are tinted along with their line numbers rather than wearing the ordinary selection color, so you can tell the two apart at a glance. From there, type over them, delete them, copy or cut them, or style every one at once. Give the last line back and the mode ends with it; Escape leaves it too, handing an unbroken run over as an ordinary selection.",
     },
     offTheTop: {
       name: "Off the top",
@@ -383,7 +383,7 @@ const achievements = {
       name: "Shuffle up",
       condition: "Move selected lines up or down the note.",
       learnMore:
-        "Select whole lines — by hand, or by picking them in select mode — and two chevrons appear beside the formatting button. They shuffle what you have selected one row up or down the note, carrying the lines with them so a second press carries on where the first left off, which is how a list gets reordered without a single cut and paste. Lines that are not next to each other each swap with their own neighbour, and a run already at the top or bottom simply stays put. Alt+↑ and Alt+↓ do the same from the keyboard — the shortcut every code editor binds — and with nothing selected they move the line the cursor is on.",
+        "Select whole lines — by hand, or by picking them in select mode — and two chevrons appear beside the formatting button. They shuffle what you have selected one row up or down the note, carrying the lines with them so a second press carries on where the first left off, which is how a list gets reordered without a single cut and paste. Lines that are not next to each other each swap with their own neighbor, and a run already at the top or bottom simply stays put. Alt+↑ and Alt+↓ do the same from the keyboard — the shortcut every code editor binds — and with nothing selected they move the line the cursor is on.",
     },
     manyHands: {
       name: "Many hands",
@@ -440,7 +440,7 @@ const achievements = {
       name: "Local dialect",
       condition: "Have transform rules in two different namespaces.",
       learnMore:
-        "A transform rule belongs to one namespace, so the issue links you want at work never rewrite the shopping list at home. Settings → Transform still lists every rule you have — the ones belonging to your other namespaces are greyed out — and the rule's “Applies to” picker widens one back to all namespaces when it really is for everything.",
+        "A transform rule belongs to one namespace, so the issue links you want at work never rewrite the shopping list at home. Settings → Transform still lists every rule you have — the ones belonging to your other namespaces are grayed out — and the rule's “Applies to” picker widens one back to all namespaces when it really is for everything.",
     },
     localVault: {
       name: "Local vault",
@@ -544,7 +544,7 @@ const achievements = {
       name: "Theme wizard",
       condition: "Build your own custom theme.",
       learnMore:
-        "The Custom theme in Settings → Appearance opens every colour, the corner radius, and the row density up to you for a look that's entirely your own.",
+        "The Custom theme in Settings → Appearance opens every color, the corner radius, and the row density up to you for a look that's entirely your own.",
     },
     stillness: {
       name: "Stillness",

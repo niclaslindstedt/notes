@@ -17,17 +17,17 @@ notes need no migration.
 
 1. Open the namespace section at the top of the navigation menu and tap the
    "+" to add a new namespace, giving it a name.
-2. While creating it, **pick an icon and a colour**. Both are optional and
-   independent — a colour on its own still tints the default folder icon.
+2. While creating it, **pick an icon and a color**. Both are optional and
+   independent — a color on its own still tints the default folder icon.
 3. Switch between namespaces from the same menu; the one you're in is the only
    set of notes you see.
-4. Change a namespace's name, icon, or colour later from its row in the manage
+4. Change a namespace's name, icon, or color later from its row in the manage
    dialog, and the appearance change applies immediately.
 
-While a namespace is active, its icon and colour **badge it in the side menu**
+While a namespace is active, its icon and color **badge it in the side menu**
 (only the glyph is tinted, never the row text) and the chosen icon, in its
-colour, replaces the browser-tab favicon — so a glance tells you which
-namespace you're working in. A namespace with only a colour keeps the app's own
+color, replaces the browser-tab favicon — so a glance tells you which
+namespace you're working in. A namespace with only a color keeps the app's own
 mark.
 
 > **Where the data lives.** On the local (this-device) backend each namespace

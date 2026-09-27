@@ -9,11 +9,11 @@ import type { Widen } from "./_widen.ts";
 const namespace = {
   heading: "Namespaces",
   blurb:
-    "A namespace is a self-contained group of notes. Switch between them to keep, say, personal and shared notes apart. Each namespace can carry its own icon and colour.",
+    "A namespace is a self-contained group of notes. Switch between them to keep, say, personal and shared notes apart. Each namespace can carry its own icon and color.",
   newLabel: "New namespace",
   nameLabel: "Namespace name",
   namePlaceholder: "e.g. Work, Family",
-  colorLabel: "Colour",
+  colorLabel: "Color",
   glyphLabel: "Icon",
   switchTo: "Switch to {name}",
   rename: "Rename",
@@ -22,7 +22,7 @@ const namespace = {
   nameRequired: "A name is required",
   defaultBadge: "Default",
   noIcon: "No icon",
-  newColorPrefix: "New namespace colour",
+  newColorPrefix: "New namespace color",
   newGlyphNone: "New namespace, no icon",
   newGlyphPrefix: "New namespace icon",
 

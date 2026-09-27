@@ -86,15 +86,15 @@ const settings = {
     filesAtEnd: "Files at the end",
     filesAtEndHint:
       "Collect attached files (anything that isn't an image) in a block at the foot of the note instead of inline.",
-    capitaliseSentences: "Capitalise sentences",
+    capitaliseSentences: "Capitalize sentences",
     capitaliseSentencesHint:
-      "Start every sentence with a capital as you type — after a full stop, question mark or exclamation mark, and at the start of a line. Code blocks are left alone, and the capital is an ordinary edit, so Backspace or Undo takes it straight back off.",
+      "Start every sentence with a capital as you type — after a period, question mark or exclamation point, and at the start of a line. Code blocks are left alone, and the capital is an ordinary edit, so Backspace or Undo takes it straight back off.",
     disableSpellcheck: "Disable spell check",
     disableSpellcheckHint:
       "Stop your device checking spelling as you type, hiding the red squiggles.",
     disableAutocorrect: "Disable auto correct",
     disableAutocorrectHint:
-      "Stop your device auto-correcting and auto-capitalising as you type (mostly affects mobile keyboards), and stop a double-tapped space ending the sentence with a full stop. Overrides Capitalise sentences.",
+      "Stop your device auto-correcting and auto-capitalizing as you type (mostly affects mobile keyboards), and stop a double-tapped space ending the sentence with a period. Overrides Capitalize sentences.",
     trimTrailingSpaces: "Trim trailing spaces",
     trimTrailingSpacesHint:
       "Remove spaces left at the end of every line when a note is saved.",
@@ -114,7 +114,7 @@ const settings = {
     blurb:
       "Rewrite what a note shows without changing what it stores. A rule matches part of a note with a regular expression and shows something else in its place — an issue number as a link to the issue, a phone number with its middle masked. The note keeps exactly what you typed: put the caret on the line to see it, and copying always copies the original.",
     scopeBlurb:
-      "Each rule belongs to a namespace, so work and home can rewrite different things. Rules from your other namespaces are listed here too, greyed out — they don't run over the notes you have open.",
+      "Each rule belongs to a namespace, so work and home can rewrite different things. Rules from your other namespaces are listed here too, grayed out — they don't run over the notes you have open.",
     empty: "No transforms yet.",
     add: "Add transform",
     orderHint:
@@ -240,7 +240,7 @@ const settings = {
     codeSize: "Code size",
     codeBackground: "Code background",
     codeBackgroundHint:
-      "The fill behind code blocks and inline code. Printers honour it, so a dark colour costs ink.",
+      "The fill behind code blocks and inline code. Printers honor it, so a dark color costs ink.",
     codeBackgroundNone: "No background",
     codeBackgroundCustom: "Custom",
     bullet: "Bullet",
@@ -264,7 +264,7 @@ const settings = {
     pageNumberAlignHint:
       "Which edge of the text column the number sits against.",
     alignLeft: "Left",
-    alignCenter: "Centre",
+    alignCenter: "Center",
     alignRight: "Right",
   },
 
@@ -295,7 +295,7 @@ const settings = {
     font: "Font",
     fontFamily: "Font family",
     textSize: "Text size",
-    colours: "Colours",
+    colours: "Colors",
     shapeMotion: "Shape & motion",
     cornerRadius: "Corner radius",
     density: "Density",
