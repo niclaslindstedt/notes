@@ -354,22 +354,6 @@ const settings = {
       "Reaching a Nextcloud from a web page needs that server to allow this app's address to use its WebDAV API — a setting you make once, on the server.",
     nextcloudReauth:
       "Nextcloud rejected the stored app password. Enter a new one in Settings → Storage.",
-    backendNotesd: "Self-hosted",
-    notesdConnected:
-      "Your notes sync to your own notesd server — no cloud, no accounts.",
-    notesdUnconnected:
-      "Run the notesd daemon on your own computer and pair this app to sync privately over your network. Available only in the installed app.",
-    notesdPair: "Pair a server…",
-    notesdPairHint:
-      "Start notesd on your computer, then paste the pairing code it prints (notesd://…) or scan its QR.",
-    notesdPairPlaceholder: "notesd://pair?…",
-    notesdPairSubmit: "Pair",
-    notesdScan: "Scan QR",
-    notesdPairing: "Pairing…",
-    notesdDiscovered: "Found in your {source}:",
-    notesdKnownHint:
-      "Enter a fresh pairing code from “{name}” — start notesd and copy the code it shows.",
-    notesdTokenPlaceholder: "Pairing token or notesd:// code",
     encryptionTitle: "Encryption",
     encryptionOn: "“{namespace}” is encrypted",
     encryptionOff: "“{namespace}” is not encrypted",

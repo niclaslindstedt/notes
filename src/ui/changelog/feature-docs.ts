@@ -17,16 +17,18 @@ export {
 
 // Eagerly inline every `docs/features/*.md` as a raw string. The path is
 // relative to this file: `src/ui/changelog/` → repo root is three levels up,
-// then `docs/features/`.
+// then `docs/features/`. A "Learn more" link to a doc left out is inert.
 //
-// The phone and desktop builds (`__EMBEDDED__`) have no achievements, so they
-// leave that feature's doc out; a "Learn more" link to a missing doc is inert.
+// - `notesd.md` is left out of every build: the notesd backend it describes
+//   was removed from the app.
+// - `achievements.md` is left out of the phone and desktop builds
+//   (`__EMBEDDED__`), which have no achievements; the website keeps it.
 const rawDocs = __EMBEDDED__
   ? import.meta.glob<string>(
-      ["../../../docs/features/*.md", "!**/achievements.md"],
+      ["../../../docs/features/*.md", "!**/notesd.md", "!**/achievements.md"],
       { query: "?raw", import: "default", eager: true },
     )
-  : import.meta.glob<string>("../../../docs/features/*.md", {
+  : import.meta.glob<string>(["../../../docs/features/*.md", "!**/notesd.md"], {
       query: "?raw",
       import: "default",
       eager: true,

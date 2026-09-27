@@ -13,8 +13,8 @@ Native (Expo) app lives under [`native/`](native/README.md) — a **thin
 WebView wrapper** that packs the compiled web app into the binary (`make
 native-bundle` → `native/assets/webroot.zip`) and serves it offline from a
 loopback server on the device, `http://localhost:8311`. It adds only the
-capabilities a WebView can't provide: native haptics and SPKI-pinned HTTPS
-for the self-hosted **notesd** backend, bridged over `postMessage` through
+capabilities a WebView can't provide: native haptics, bridged over
+`postMessage` through
 [`src/platform/native-bridge.ts`](src/platform/native-bridge.ts), and on iOS
 an **iCloud Drive** file store the page finds as a provider on `window`
 ([`src/platform/icloud-host.ts`](src/platform/icloud-host.ts)), plus an
@@ -420,7 +420,7 @@ lands back in everyone's first download:
   the search modal opens in a `flushSync` so iOS raises the keyboard, and an
   await there breaks it. That one stays static, deliberately.
 - **`src/storage/remote-backends.ts` holds every backend that isn't
-  `localStorage`.** Dropbox, Drive, Nextcloud, the picked folder and notesd —
+  `localStorage`.** Dropbox, iCloud Drive, Nextcloud and the picked folder —
   plus the
   directory adapter and offline-cache mirror they share — are behind one
   `import()`, because the app opens on the browser backend and stays there
@@ -609,13 +609,12 @@ The source tree under `src/` is organized by concern, not by file type:
   (`usePwaUpdate.ts`), standalone/install detection (`standalone.ts`).
 - `src/platform/` — the seam to the wrappers. `native-bridge.ts`:
   `isNative()` detection, `haptics.vibrate` (native else
-  `navigator.vibrate`), and `pinnedFetch`/`createPinnedFetch` (an
-  SPKI-pinned `fetch` routed through native for the notesd backend). Inert
-  on the plain web; only lights up inside `native/`. `capabilities.ts`: the
+  `navigator.vibrate`). Inert on the plain web; only lights up inside
+  `native/`. `capabilities.ts`: the
   single answer to **which surface is this and what can it do** — `web` /
   `native` / `desktop`, and the capabilities that differ between them
-  (`folderPicker`, `redirectOauth`, `loopbackOauth`, `authSessionOauth`,
-  `pinnedFetch`). Every "is this available
+  (`folderPicker`, `redirectOauth`, `loopbackOauth`, `authSessionOauth`).
+  Every "is this available
   here?" question routes through it rather than being re-derived at the call
   site; the page works this out from what it can observe, so no wrapper has
   to tell it anything. `icloud-host.ts`: the one capability a wrapper *does*
@@ -671,8 +670,8 @@ The rule for both, and the one to check a change against:
 > **Anything that could live in the PWA, does.** A wrapper may only hold what
 > is *impossible* in a web page on that platform, and nothing else.
 
-For `native/` that is a short, closed list — haptics, SPKI-pinned HTTPS, QR
-camera scan — each behind the `postMessage` bridge in
+For `native/` that is a short, closed list — haptics, behind the
+`postMessage` bridge in
 [`src/platform/native-bridge.ts`](src/platform/native-bridge.ts), which is
 inert on the web; plus, on iOS, an iCloud Drive file store the page finds as a
 provider (`src/platform/icloud-host.ts`) and drives through the same directory

@@ -18,23 +18,19 @@ through the stores as a native binary buys three things the browser/WebView
 can't do on its own:
 
 1. **Haptics** — iOS WKWebView ignores `navigator.vibrate` entirely.
-2. **SPKI-pinned HTTPS** — the self-hosted [`notesd`](../notesd/README.md)
-   daemon serves a self-signed TLS certificate that no public CA vouches for;
-   reaching it safely requires pinning its SPKI SHA-256 fingerprint, which a
-   browser can't do but native code can.
-3. **QR camera scan** — reading a notesd daemon's pairing QR needs reliable
-   camera access, which the WebView doesn't dependably grant a page.
-4. **iCloud Drive** (iOS) — a web page has no way to write into the user's
+2. **iCloud Drive** (iOS) — a web page has no way to write into the user's
    iCloud Drive. The wrapper offers a small file store (list, read, write,
    remove) inside the app's own container, `iCloud.se.agilator.notes`, and the
    web app's directory adapter drives it like any other folder.
-5. **Dropbox sign-in** — a provider will neither show its consent page inside
+3. **Dropbox sign-in** — a provider will neither show its consent page inside
    an embedded WebView nor redirect back into one. The wrapper offers an
    authentication session instead (see
    [Signing in to Dropbox](#signing-in-to-dropbox)).
 
 Everything else — the UI, storage (`localStorage`), Markdown editor, themes,
-cloud backends, encryption, achievements — is the web app, unchanged. There is
+cloud backends, encryption — is the web app, unchanged, except that the phone
+build leaves out what the website alone carries (the Donate row, the
+achievements). There is
 **no** duplicated presentation layer, and the iCloud store decides nothing: it
 moves the bytes the web app hands it, which are already sealed when encryption
 is on.
@@ -78,37 +74,17 @@ make native-bundle         # from the repo root: build:native → native/web/ �
 ## The web ↔ native bridge
 
 The web side lives in [`../src/platform/native-bridge.ts`](../src/platform/native-bridge.ts);
-the native side is [`src/bridge/on-message.ts`](src/bridge/on-message.ts) plus
-the [`pinned-fetch`](modules/pinned-fetch) native module. Messages are JSON:
+the native side is [`src/bridge/on-message.ts`](src/bridge/on-message.ts).
+There is one message, JSON, and nothing comes back:
 
 ```
 web → native  (window.ReactNativeWebView.postMessage(JSON.stringify(msg))):
   { v: 1, type: "haptics.vibrate", pattern }
-  { v: 1, type: "pinnedFetch.request", id, url, method, headers, bodyBase64|null, spkiPin }
-  { v: 1, type: "qr.scan.request", id }
-
-native → web  (injected as window.__NOTES_NATIVE__.resolve / .resolveQr):
-  resolve:   { id, ok, status, statusText, headers, bodyBase64|null, error?: { name, message } }
-  resolveQr: { id, value: string|null, error?: { name, message } }
 ```
 
-Bodies are base64 because both channels are string-only and notesd payloads
-carry binary (encrypted) envelopes.
-
 - **Haptics** → `expo-haptics` (iOS light impact) / `Vibration` (Android,
-  honours the pattern). The web app calls `haptics.vibrate()`, which falls
+  honors the pattern). The web app calls `haptics.vibrate()`, which falls
   back to `navigator.vibrate` outside the wrapper.
-- **Pinned fetch** → the [`pinned-fetch`](modules/pinned-fetch) local Expo
-  module performs an HTTPS request whose server certificate is trusted **iff**
-  its SPKI SHA-256 matches the pin, bypassing the system CA store (iOS: a
-  `URLSession` trust-evaluation delegate; Android: an `HttpsURLConnection`
-  with a pin-only `X509TrustManager`). The notesd `StorageAdapter` (web-side)
-  consumes this via `createPinnedFetch(pin)`.
-- **QR scan** → `expo-camera`'s `CameraView`. `WebViewHost` mounts the
-  [`QrScanner`](src/QrScanner.tsx) overlay while a `qr.scan.request` is in
-  flight and injects `resolveQr` with the decoded pairing code (or `null` when
-  dismissed). The web app calls `qr.scan()`, which rejects outside the wrapper,
-  and feeds the code into the existing notesd pairing path.
 
 ## iCloud Drive — a capability, not a message
 
@@ -140,11 +116,6 @@ and offers the backend only when one is there. The wrapper installs it:
 The contract — property, event, method list, script safety, and the container
 spelled the same in every place — is pinned from the root suite by
 `tests/platform/icloud-host.test.ts`.
-
-> **Status:** the pinned-fetch native module can only be exercised
-> end-to-end once the web-side notesd adapter and a running daemon exist. The
-> web seam is unit-tested (`tests/platform/native-bridge.test.ts`); the native
-> module is validated manually against a known-good / known-bad pin.
 
 ## Signing in to Dropbox
 
@@ -188,18 +159,12 @@ list too. The key reaches the bundle as `VITE_DROPBOX_APP_KEY` at
 `tests/platform/auth-session.test.ts` runs the injected script against the
 framework's own validation and pins the scheme to the bundle id.
 
-## Self-hosted sync from the phone
+## Nextcloud from the phone
 
 The page's origin in the app is `http://localhost:8311`, a real origin rather
-than the `null` one a `file://` page had. What that means for the two
-self-hosted backends:
-
-- **notesd** is untouched by it. Its requests never leave from the page: they
-  go over the bridge to the native `pinned-fetch` module, which makes them
-  from native code, so there is no browser origin, no preflight and no CORS on
-  that path at all.
-- **Nextcloud** is reached with the page's own `fetch`, so it is a
-  cross-origin request like the website's: the server has to answer the
+than the `null` one a `file://` page had. Nextcloud is reached with the page's
+own `fetch`, so it is a cross-origin request like the website's: the server
+has to answer the
   preflight for WebDAV (`GET`, `PROPFIND`, `MKCOL`, `PUT`, `DELETE`, with the
   `Authorization`, `Depth` and `Content-Type` headers). The origin to allow is now exactly
   **`http://localhost:8311`** — no longer `null`, which a server had to allow
@@ -210,12 +175,12 @@ self-hosted backends:
   exception for `localhost` and the `NSAllowsLocalNetworking` every wrapper in
   the fleet declares.
 
-Neither has been tried end to end on a device since the move from `file://`.
+It has not been tried end to end on a device since the move from `file://`.
 
 ## Running it
 
-Because the app embeds native modules (WebView + static server + pinning +
-iCloud), it needs a **dev client / prebuild** — it does not run in Expo Go.
+Because the app embeds native modules (WebView + static server + iCloud), it
+needs a **dev client / prebuild** — it does not run in Expo Go.
 
 ```sh
 make native-install    # from the repo root: npm ci in native/

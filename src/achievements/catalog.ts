@@ -84,7 +84,6 @@ import {
   ScaleTextGlyph,
   ScrollTextGlyph,
   SearchGlyph,
-  ServerGlyph,
   ShieldGlyph,
   SmartphoneGlyph,
   StarGlyph,
@@ -906,13 +905,6 @@ const CATALOG: readonly Achievement[] = [
     trigger: { kind: "manual" },
   },
   {
-    id: "selfHoster",
-    tier: "pro",
-    glyph: ServerGlyph,
-    learnMore: true,
-    trigger: { kind: "manual" },
-  },
-  {
     id: "freshPull",
     tier: "pro",
     glyph: RefreshGlyph,
@@ -1098,10 +1090,15 @@ const CATALOG: readonly Achievement[] = [
       predicate: (prev, next) => {
         // Count against the catalog length minus one (this entry itself), so
         // unlocking every *other* achievement fires it without a
-        // self-referential loop.
+        // self-referential loop. Only ids still in the catalog count: a
+        // retired achievement someone earned (`selfHoster`, from the notesd
+        // backend) stays in their map but is no step towards this one.
         const totalOthers = ACHIEVEMENTS.length - 1;
-        const prevCount = Object.keys(prev.appearance.achievements).length;
-        const nextCount = Object.keys(next.appearance.achievements).length;
+        const earned = (unlocked: Record<string, number>) =>
+          Object.keys(unlocked).filter((id) => ACHIEVEMENT_BY_ID.has(id))
+            .length;
+        const prevCount = earned(prev.appearance.achievements);
+        const nextCount = earned(next.appearance.achievements);
         return prevCount < totalOthers && nextCount >= totalOthers;
       },
     },

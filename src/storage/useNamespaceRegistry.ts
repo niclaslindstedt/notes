@@ -22,12 +22,10 @@ import { useCallback, useEffect, useState } from "react";
 import { unlock as unlockAchievement } from "../achievements/index.ts";
 import { createLogger } from "../dev/logger.ts";
 import type { ICloudHost } from "../platform/icloud-host.ts";
-import { createPinnedFetch } from "../platform/native-bridge.ts";
 import {
   clearEncryption,
   type BackendId,
   type NextcloudConfig,
-  type NotesdConfig,
 } from "./backend-preference.ts";
 import { deleteLocalNamespace } from "./local/index.ts";
 import type { NamespaceRegistryStore } from "./namespace-store.ts";
@@ -119,8 +117,6 @@ export interface NamespaceRegistryDeps {
   icloudHost: ICloudHost | null;
   /** The stored Nextcloud connection, null unless it is the active backend. */
   nextcloudConfig: NextcloudConfig | null;
-  /** The paired notesd daemon config, null unless a daemon is the active backend. */
-  notesdConfig: NotesdConfig | null;
   /**
    * The active-namespace cursor, owned by the orchestrator. It lives up there
    * because the encryption state machine runs before this hook and needs to
@@ -141,7 +137,6 @@ export function useNamespaceRegistry(
     folderHandle,
     icloudHost,
     nextcloudConfig,
-    notesdConfig,
     activeNamespace,
     setActiveNamespace: setActiveNamespaceState,
   } = deps;
@@ -276,13 +271,6 @@ export function useNamespaceRegistry(
         } else if (backend === "nextcloud" && nextcloudConfig) {
           const remote = await import("./remote-backends.ts");
           await remote.deleteNextcloudNamespace(nextcloudConfig, slug);
-        } else if (backend === "notesd" && notesdConfig) {
-          const remote = await import("./remote-backends.ts");
-          await remote.deleteNotesdNamespace(
-            notesdConfig,
-            createPinnedFetch(notesdConfig.spkiPin),
-            slug,
-          );
         }
       } catch (err) {
         log.warn(`removeNamespace: data delete failed for ${slug}`, err);
@@ -307,7 +295,6 @@ export function useNamespaceRegistry(
       dropboxToken,
       icloudHost,
       nextcloudConfig,
-      notesdConfig,
       activeNamespace,
       folderHandle,
       pushNamespaces,

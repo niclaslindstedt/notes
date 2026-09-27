@@ -24,7 +24,6 @@ function renderRegistry() {
       backend: "browser",
       dropboxToken: null,
       folderHandle: null,
-      notesdConfig: null,
       activeNamespace,
       setActiveNamespace,
     } as NamespaceRegistryDeps);

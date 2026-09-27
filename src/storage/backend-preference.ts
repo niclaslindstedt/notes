@@ -9,21 +9,7 @@ import { createLogger } from "../dev/logger.ts";
 const log = createLogger("backend-pref");
 
 export type BackendId =
-  "browser" | "folder" | "dropbox" | "icloud" | "nextcloud" | "notesd";
-
-// Everything needed to reach and trust a paired notesd daemon, stored
-// per-device (like the cloud tokens). `spkiPin` validates the daemon's
-// self-signed TLS cert; `deviceKey` is this device's bearer credential.
-export type NotesdConfig = {
-  /** `https://host:port` base URL. */
-  endpoint: string;
-  /** Per-device bearer key minted at pairing. */
-  deviceKey: string;
-  /** SPKI pin, `sha256:<base64>`, passed to the native pinned fetch. */
-  spkiPin: string;
-  /** Daemon display name, for the backend list. */
-  name: string;
-};
+  "browser" | "folder" | "dropbox" | "icloud" | "nextcloud";
 
 // Everything needed to reach one Nextcloud account, stored per-device like the
 // cloud tokens. There is no OAuth and no refresh: `appPassword` is the
@@ -55,7 +41,11 @@ const DROPBOX_REFRESH_KEY = "notes:dropbox:refresh";
 // may still hold can be cleared rather than left sitting in storage.
 const RETIRED_GDRIVE_TOKEN_KEY = "notes:gdrive:token";
 const NEXTCLOUD_CONFIG_KEY = "notes:nextcloud:config";
-const NOTESD_CONFIG_KEY = "notes:notesd:config";
+// notesd, the self-hosted daemon, is gone as a backend. Both keys stay named
+// so a device that was paired with one is cleared rather than left holding a
+// device key: the stored choice and the pairing (endpoint, key, SPKI pin).
+const RETIRED_NOTESD_BACKEND = "notesd";
+const RETIRED_NOTESD_CONFIG_KEY = "notes:notesd:config";
 // The account-wide encryption flag written before encryption became a
 // per-namespace decision. Still read as the fallback for a namespace that has
 // no setting of its own — see `getEncryption`.
@@ -96,9 +86,17 @@ export function getBackend(): BackendId {
   if (raw === "folder") return "folder";
   if (raw === "icloud") return "icloud";
   if (raw === "nextcloud") return "nextcloud";
-  if (raw === "notesd") return "notesd";
+  // A device that synced with notesd opens on this browser's own notes, as if
+  // sync were off, and forgets the pairing it held.
+  if (raw === RETIRED_NOTESD_BACKEND) forgetRetiredNotesd();
   // Any unknown / missing value falls through to the browser backend.
   return "browser";
+}
+
+/** Clear what a device paired with the retired notesd daemon still holds. */
+export function forgetRetiredNotesd(): void {
+  if (read(BACKEND_KEY) === RETIRED_NOTESD_BACKEND) clear(BACKEND_KEY);
+  clear(RETIRED_NOTESD_CONFIG_KEY);
 }
 
 export function setBackend(backend: BackendId): void {
@@ -175,33 +173,6 @@ export function setNextcloudConfig(config: NextcloudConfig): void {
 
 export function clearNextcloudConfig(): void {
   clear(NEXTCLOUD_CONFIG_KEY);
-}
-
-export function getNotesdConfig(): NotesdConfig | null {
-  const raw = read(NOTESD_CONFIG_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<NotesdConfig>;
-    if (
-      typeof parsed.endpoint === "string" &&
-      typeof parsed.deviceKey === "string" &&
-      typeof parsed.spkiPin === "string" &&
-      typeof parsed.name === "string"
-    ) {
-      return parsed as NotesdConfig;
-    }
-  } catch {
-    // fall through to null on a corrupt blob
-  }
-  return null;
-}
-
-export function setNotesdConfig(config: NotesdConfig): void {
-  write(NOTESD_CONFIG_KEY, JSON.stringify(config));
-}
-
-export function clearNotesdConfig(): void {
-  clear(NOTESD_CONFIG_KEY);
 }
 
 /**

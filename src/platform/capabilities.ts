@@ -16,7 +16,6 @@
 //     catch a redirect to the app's own URL scheme — the phone wrapper, whose
 //     embedded WebView no provider will show consent in or redirect back to,
 //     so it fails the redirect question too.
-//   - **SPKI-pinned fetch** needs native code, which is a wrapper question.
 //
 // Answering each of them at its own call site is how they drift apart, and it
 // already bit once: the desktop build offered no cloud sync, and the reason
@@ -111,13 +110,6 @@ export interface Capabilities {
    * rather than a sign-in that opens and never comes back.
    */
   authSessionOauth: boolean;
-
-  /**
-   * SPKI-pinned HTTPS, behind the self-hosted **notesd** backend. Needs native
-   * code to pin a certificate a browser would refuse, so it exists only in the
-   * React Native wrapper — see `pinnedFetch` in `./native-bridge.ts`.
-   */
-  pinnedFetch: boolean;
 }
 
 export function capabilities(): Capabilities {
@@ -128,6 +120,5 @@ export function capabilities(): Capabilities {
     redirectOauth: surface === "web",
     loopbackOauth: surface === "desktop",
     authSessionOauth: getAuthSessionHost() !== null,
-    pinnedFetch: surface === "native",
   };
 }

@@ -276,17 +276,6 @@ export function PrivacyPage() {
               server to permit this site&apos;s address to use its WebDAV API,
               which is a setting you make on your own server.
             </li>
-            <li>
-              <span className="text-fg-bright">Self-hosted (app only).</span> In
-              the installed app you can pair with your own{" "}
-              <code className="text-fg-bright">notesd</code> server running on a
-              computer you control. Your notes are sent — over an encrypted
-              connection pinned to that server&apos;s own certificate — only to
-              that machine, on your own network; no third-party provider and no
-              account is involved. A per-device key minted when you pair is held
-              only on the device. This option is not offered on the website
-              because a browser cannot make the pinned connection it requires.
-            </li>
           </ul>
           <p>
             In every case the data the app reads or writes is{" "}

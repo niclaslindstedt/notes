@@ -54,7 +54,6 @@ const app: AppCatalog = {
       gdrive: "Dropbox",
       icloud: "iCloud Drive",
       nextcloud: "Nextcloud",
-      notesd: "din egen server",
     },
   },
   imageActions: "Bildåtgärder",

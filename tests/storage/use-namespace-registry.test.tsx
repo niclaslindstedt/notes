@@ -59,7 +59,6 @@ const browserDeps = (
   folderHandle: null,
   icloudHost: null,
   nextcloudConfig: null,
-  notesdConfig: null,
   ...over,
 });
 

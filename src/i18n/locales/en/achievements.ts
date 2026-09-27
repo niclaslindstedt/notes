@@ -460,12 +460,6 @@ const achievements = {
       learnMore:
         "Point the app at a Nextcloud you run and your notes sync there as ordinary markdown files, reachable from every device that account signs in on — no third-party cloud in the middle. The app signs in with a revocable app password, never your account password.",
     },
-    selfHoster: {
-      name: "Self-hoster",
-      condition: "Pair with your own notesd server.",
-      learnMore:
-        "Run the notesd daemon on your own computer and pair the app to it — your notes sync over your network to a server you control, with no cloud and no accounts. The connection is pinned to the daemon's own certificate. Available only in the installed app.",
-    },
     freshPull: {
       name: "Fresh pull",
       condition: "Reload your notes from the backend.",

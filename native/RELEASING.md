@@ -164,7 +164,7 @@ the `preview` profile (Android APK / iOS simulator build) instead.
    questionnaire, and the **Data safety** form. Declare: no data collected by
    us; notes live on-device by default, and cloud sync happens only when the
    user opts into a backend (their own Dropbox, or a
-   self-hosted notesd server). Point the privacy-policy URL at the deployed
+   Nextcloud they run). Point the privacy-policy URL at the deployed
    app's `/privacy` page (the host is the `PAGES_CNAME` repository secret —
    see `docs/configuration.md`).
 
@@ -182,8 +182,8 @@ the `preview` profile (Android APK / iOS simulator build) instead.
 3. Complete the App Store Connect listing: description, keywords, screenshots
    for the required device sizes (6.7", 6.5", and iPad since
    `ios.supportsTablet` is true), the **App Privacy** "nutrition label" (no
-   tracking; any cloud sync is into the user's own Dropbox or
-   self-hosted server), and the privacy-policy URL above. Then submit for
+   tracking; any cloud sync is into the user's own iCloud Drive, Dropbox or
+   Nextcloud), and the privacy-policy URL above. Then submit for
    review.
 
    > **Guideline 4.2 ("minimum functionality").** Apple scrutinizes apps that
@@ -192,10 +192,10 @@ the `preview` profile (Android APK / iOS simulator build) instead.
    > notes. Lead with what makes it more than a bookmark: it ships the whole
    > app **bundled for offline use** (no network required — a genuine
    > local-first native experience, not a thin shell over a live URL), and it
-   > adds **native capabilities the web can't**: real haptics and
-   > **SPKI-pinned HTTPS** for connecting to a user's self-hosted notesd
-   > server. Those native integrations are the "minimum functionality"
-   > argument; state them explicitly.
+   > adds **native capabilities the web can't**: real haptics, an **iCloud
+   > Drive** folder of plain markdown files in the Files app, and a native
+   > sign-in sheet for Dropbox. Those native integrations are the "minimum
+   > functionality" argument; state them explicitly.
 
 ## 6. Subsequent releases
 

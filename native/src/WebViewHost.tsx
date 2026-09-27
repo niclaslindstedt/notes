@@ -6,14 +6,13 @@
 // Everything the user sees is the web app running offline, from inside the
 // download. Links off that origin go to the system browser.
 // The only things this shell adds are the capabilities a WebView can't
-// provide, routed over the bridge in `bridge/on-message.ts`:
-//   1. real haptics (iOS WKWebView ignores `navigator.vibrate`),
-//   2. SPKI-pinned HTTPS for a self-hosted notesd daemon, and
-//   3. a QR camera scan (the `QrScanner` overlay) for pairing that daemon —
-// plus one the page finds rather than asks for:
-//   4. an iCloud Drive file store (iOS), installed as a provider on `window`
+// provide:
+//   1. real haptics (iOS WKWebView ignores `navigator.vibrate`), routed over
+//      the bridge in `bridge/on-message.ts` —
+// plus two the page finds rather than asks for:
+//   2. an iCloud Drive file store (iOS), installed as a provider on `window`
 //      by `ICLOUD_SCRIPT` and answered by `answerICloud` (`icloud*.ts`), and
-//   5. an authentication session for signing in to Dropbox, installed as
+//   3. an authentication session for signing in to Dropbox, installed as
 //      `window.__ossAuthSession` by `authSessionScript` and answered by
 //      `answerAuthSession` (`authSession*.ts`). A provider will neither show
 //      its consent page inside an embedded WebView nor redirect back into
@@ -51,7 +50,6 @@ import {
   authSessionScript,
   isAuthSessionRequest,
 } from "./authSessionBridge";
-import QrScanner from "./QrScanner";
 import { useNativeTheme } from "./nativeTheme";
 import { startLocalServer, type LocalServer } from "./local-server";
 import { SERVICE_WORKER_TEARDOWN, staysInApp } from "./shell";
@@ -106,9 +104,6 @@ export default function WebViewHost() {
   const canGoBack = useRef(false);
   const serverRef = useRef<LocalServer | null>(null);
   const [server, setServer] = useState<ServerState>({ status: "starting" });
-  // The in-flight QR-scan request id, set when the web app asks to scan and
-  // cleared once the camera overlay resolves.
-  const [scanId, setScanId] = useState<string | null>(null);
   // The page's resolved theme, for the status bar and the background behind
   // the WebView. Null until the page reports one.
   const { injectedJavaScript, theme, onThemeMessage } = useNativeTheme();
@@ -173,17 +168,6 @@ export default function WebViewHost() {
     const result = await answerAuthSession(url, AUTH_REDIRECT_URI);
     webView.current?.injectJavaScript(authSessionResolveScript(id, result));
   }, []);
-
-  // Deliver a scan result back into the page and tear the overlay down. Bodies
-  // stay tiny (a decoded string) so no base64 dance is needed.
-  const resolveScan = (id: string, value: string | null) => {
-    webView.current?.injectJavaScript(
-      `window.__NOTES_NATIVE__ && window.__NOTES_NATIVE__.resolveQr(${JSON.stringify(
-        { id, value },
-      )}); true;`,
-    );
-    setScanId(null);
-  };
 
   if (server.status === "failed") {
     return (
@@ -268,16 +252,10 @@ export default function WebViewHost() {
                 void signIn(parsed.id, parsed.url);
                 return;
               }
-              void handleBridgeMessage(raw, {
-                inject: (script) => webView.current?.injectJavaScript(script),
-                scanQr: (id) => setScanId(id),
-              });
+              handleBridgeMessage(raw);
             }}
             style={styles.web}
           />
-        )}
-        {scanId !== null && (
-          <QrScanner onResult={(value) => resolveScan(scanId, value)} />
         )}
       </SafeAreaView>
     </SafeAreaProvider>

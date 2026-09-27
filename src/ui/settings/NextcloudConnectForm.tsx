@@ -7,9 +7,8 @@ import { BusyLabel } from "../BusyLabel.tsx";
 import { Button } from "../form/Button.tsx";
 
 // The Nextcloud connect form: server address, login name, app password, and
-// the folder the notes land in. The sibling of the notesd pairing form — both
-// connect to a server the user runs, so both are a form rather than a
-// "Connect" button that hands off to a provider.
+// the folder the notes land in. It connects to a server the user runs, so it
+// is a form rather than a "Connect" button that hands off to a provider.
 //
 // The app password gets its own line of copy because it is the whole point of
 // the flow: Nextcloud mints a per-client credential under Settings → Security

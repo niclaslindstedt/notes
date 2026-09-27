@@ -735,9 +735,8 @@ export function useNotesSync(deps: {
     if (typeof window === "undefined") return;
     const id = setInterval(() => {
       // A backend that advertises `watch` pushes its own change events (see the
-      // watch subscription below), so the interval poll would be redundant — and
-      // for the whole-document notesd backend, a wasteful full download every
-      // tick. Let watch drive the pulls instead.
+      // watch subscription below), so the interval poll would be redundant.
+      // Let watch drive the pulls instead.
       if (adapterRef.current.capabilities.has("watch")) return;
       if (
         !shouldLivePull({

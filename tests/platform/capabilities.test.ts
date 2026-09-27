@@ -59,8 +59,8 @@ describe("platform", () => {
   });
 
   // The wrapper injects `ReactNativeWebView` into a page it may also be
-  // serving from a local scheme; the native answer has to win, because it is
-  // the one that decides whether the pinned fetch exists.
+  // serving from a local scheme; the native answer has to win, because the
+  // phone app is not the desktop shell whatever its origin looks like.
   it("prefers native over the scheme check when both look true", () => {
     setProtocol("notes:");
     (window as unknown as Record<string, unknown>).ReactNativeWebView = {
@@ -121,14 +121,6 @@ describe("capabilities", () => {
       open: () => Promise.resolve(null),
     };
     expect(capabilities().authSessionOauth).toBe(false);
-  });
-
-  it("offers the pinned fetch only inside the native wrapper", () => {
-    expect(capabilities().pinnedFetch).toBe(false);
-    (window as unknown as Record<string, unknown>).ReactNativeWebView = {
-      postMessage: () => {},
-    };
-    expect(capabilities().pinnedFetch).toBe(true);
   });
 
   it("follows the File System Access API for the folder picker", () => {

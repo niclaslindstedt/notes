@@ -61,7 +61,7 @@ describe("the bridge contract", () => {
     expect(isICloudRequest({ ...ok, method: "rm -rf" })).toBe(false);
     expect(isICloudRequest({ ...ok, args: ["a", 1] })).toBe(false);
     // The other bridge's envelopes are never mistaken for one.
-    expect(isICloudRequest({ v: 1, type: "pinnedFetch.request" })).toBe(false);
+    expect(isICloudRequest({ v: 1, type: "haptics.vibrate" })).toBe(false);
   });
 });
 

@@ -352,22 +352,6 @@ const settings: SettingsCatalog = {
       "För att nå en Nextcloud från en webbsida måste servern tillåta att den här appens adress använder dess WebDAV-API — en inställning du gör en gång, på servern.",
     nextcloudReauth:
       "Nextcloud avvisade det sparade applösenordet. Ange ett nytt under Inställningar → Lagring.",
-    backendNotesd: "Egen server",
-    notesdConnected:
-      "Dina anteckningar synkas till din egen notesd-server — inget moln, inga konton.",
-    notesdUnconnected:
-      "Kör notesd-tjänsten på din egen dator och parkoppla appen för att synka privat över ditt nätverk. Endast tillgängligt i den installerade appen.",
-    notesdPair: "Parkoppla en server…",
-    notesdPairHint:
-      "Starta notesd på din dator och klistra in parkopplingskoden den skriver ut (notesd://…) eller skanna dess QR-kod.",
-    notesdPairPlaceholder: "notesd://pair?…",
-    notesdPairSubmit: "Parkoppla",
-    notesdScan: "Skanna QR",
-    notesdPairing: "Parkopplar…",
-    notesdDiscovered: "Hittade i din {source}:",
-    notesdKnownHint:
-      "Ange en ny parkopplingskod från ”{name}” — starta notesd och kopiera koden den visar.",
-    notesdTokenPlaceholder: "Parkopplingstoken eller notesd://-kod",
     encryptionTitle: "Kryptering",
     encryptionOn: "”{namespace}” är krypterad",
     encryptionOff: "”{namespace}” är inte krypterad",

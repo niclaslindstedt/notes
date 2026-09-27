@@ -3956,10 +3956,9 @@ reconciliation from a push channel instead: `useNotesSync` subscribes to
 stand-down set `refresh` uses — dropping the update (rather than clobbering) if
 anything is unsaved, and no-opping when the etag hasn't actually moved (our own
 write echoing back, or a sibling namespace's revision bump). It still fires the
-`liveSync` trophy when a pushed change lands. Today only [notesd](#notesd-backend)
-advertises `watch`; its shim polls the daemon's cheap `GET /v1/rev` and re-loads
-only when the aggregate revision moves, so a self-hosted device does a full
-document download on an actual change rather than every 10s.
+`liveSync` trophy when a pushed change lands. No backend advertises `watch`
+today (the notesd daemon was the one that did, and it is gone); the seam stays
+for a backend with a real push channel.
 
 ### Save hold
 
@@ -4872,7 +4871,7 @@ Save.
 
 `StorageSection` (`src/ui/settings/StorageSection.tsx`) — the radio picker for
 the backend (This device / Local folder / Dropbox / Nextcloud, plus iCloud
-Drive and Self-hosted in the app) with connect buttons — iCloud Drive's needs
+Drive in the iPhone and iPad app) with connect buttons — iCloud Drive's needs
 nothing from the user and connects on the pick, or explains how to sign in to
 iCloud when the container can't be reached; Nextcloud's is an inline
 form (server, user name, app password, folder) rather than a button, since it
@@ -5089,10 +5088,12 @@ operations. The adapter is memoised so it doesn't churn each render.
 ### Backend preference
 
 `src/storage/backend-preference.ts` — per-device localStorage keys for the
-chosen `BackendId` (`browser` / `folder` / `dropbox` / `icloud` / `nextcloud` /
-`notesd`), the cloud tokens, the Nextcloud connection, and the encryption mode. These are device-local (never in the synced
+chosen `BackendId` (`browser` / `folder` / `dropbox` / `icloud` / `nextcloud`),
+the cloud tokens, the Nextcloud connection, and the encryption mode. These are device-local (never in the synced
 document, which would create a bootstrap loop) and read on boot before any
-backend resolves.
+backend resolves. A device still set to `notesd` — the self-hosted daemon
+backend, since removed — opens on `browser`, as if sync were off, and
+`getBackend` clears that choice and the pairing it held (`forgetRetiredNotesd`).
 
 ### Active note cursor
 
@@ -5228,94 +5229,8 @@ app password, and a server that won't answer this origin's cross-origin
 request. (Nextcloud sends no CORS headers for WebDAV by default; allowing the
 app's origin is a one-off server-side setting the user, who administers the
 server, makes. In the phone app that origin is `http://localhost:8311` — see
-`native/README.md`, "Self-hosted sync from the phone".) Without that probe the first sign of either would be a silent
+`native/README.md`, "Nextcloud from the phone".) Without that probe the first sign of either would be a silent
 "offline" on a backend the user believes is connected.
-
-### notesd backend
-
-`createNotesdAdapter` (`src/storage/notesd/index.ts`) syncs to a user-run
-**notesd** daemon (the Rust binary in `notesd/`) — the self-hosted alternative
-to the cloud backends. Like Dropbox/Drive it is built on the
-[directory adapter](#directory-adapter): the daemon serves its folder
-as a **generic blob store** (`GET /v1/blobs?prefix=&etag=` to list a folder,
-`GET/PUT/DELETE /v1/blob/{*path}` to move one file), so a `NotesdFileStore` moves
-one note's Markdown and a `NotesdAttachmentStore` moves one image's bytes, each
-scoped to the namespace's `notes/` / `attachments/` subfolder
-(`namespaceNotesFolder` / `namespaceAttachmentsFolder`) exactly as the folder
-backend lays them out — which is what lets the same daemon folder be opened
-directly by the web folder backend. **Image attachments are therefore real files
-under `attachments/`, not inline in the note**, and at-rest encryption composes
-**per file inside** the directory adapter via the injected `DirectoryCrypto`
-(the same branch as the folder/cloud backends in `useStorageBackend`, *not* the
-whole-document `withEncryption` the browser store uses). The daemon's per-file
-etag is the revision the directory adapter tracks; its own list+write conflict
-detection drives keep-mine/keep-theirs.
-
-It is the one backend that advertises the **`watch`** capability, so
-cross-device edits arrive by push rather than the whole-document
-[live pull](#live-pull). The directory adapter has no `watch` of its own, so
-`createNotesdAdapter` **bolts one on** (spreading the adapter and adding the
-capability). The daemon's true push channel is its `GET /v1/events` SSE stream,
-but the pinned transport (`createPinnedFetch`) is request/response only — SSE
-can't ride it as-is — so `watch` is a **shim**: it polls the O(1) `GET /v1/rev`
-aggregate revision on a short cadence and, when it moves, re-loads through the
-directory adapter and hands the fresh snapshot to the sync engine, which adopts
-it under its usual guards (see [Live pull](#live-pull)). A real
-streaming-over-bridge transport is a tracked follow-up; until then the shim gives
-low-latency, download-only-on-change sync within the SPKI-pinned transport, with
-no plaintext fallback.
-
-The transport is what makes it **native-only**. `useBackendSelection` builds the
-adapter with `createPinnedFetch(spkiPin)` from `src/platform/native-bridge.ts`,
-which routes the request through the app wrapper's native `pinned-fetch` module
-so the daemon's self-signed certificate is validated against the SPKI pin from
-the pairing code. On the plain web that pinned fetch rejects, so
-`useStorageBackend` reports `notesdAvailable` (i.e. `isNative()`) false and the
-storage picker never offers the option there.
-
-Pairing (`useNotesdBackend`, `src/storage/notesd/pairing.ts`): the daemon prints
-a `notesd://pair?…` QR/paste code carrying its address(es), SPKI pin, and a
-single-use token; `parsePairingUri` validates it and normalises the pin to
-standard base64, `pairNotesd` redeems the token over the pinned fetch
-(`POST /v1/pair`) for a per-device key, stores the config
-(`getNotesdConfig`/`setNotesdConfig` in `backend-preference.ts`), and unlocks the
-**Self-hoster** achievement. The pair UI is `PairNotesdForm` in `StorageSection`:
-paste the code, or — in the installed app — tap **Scan QR** to read the daemon's
-startup QR with the camera. The scan is bridged natively: `qr.scan()`
-(`src/platform/native-bridge.ts`) posts a `qr.scan.request`, `WebViewHost`
-mounts the `QrScanner` (`expo-camera`) overlay and injects the decoded string
-back via `resolveQr`, and the form feeds it through the same
-`parsePairingUri → resolvePairing → pairNotesd` path as a pasted code. The
-button only renders under `isNative()`; on the plain web `qr.scan()` rejects and
-paste is the only path.
-
-Like the folder/cloud backends, notesd syncs its **appearance settings** and
-**namespace registry** across paired devices: `createNotesdSettingsStore` and
-`createNotesdNamespaceStore` (`src/storage/notesd/index.ts`) read/write
-`settings.json` / `namespaces.json` over the daemon's `GET/PUT /v1/settings/{name}`
-endpoint (both names are on the daemon's reserved list, kept off note listings),
-and `useStorageBackend` returns them from the `notesd` case instead of `null`. So
-a theme change or a new namespace made on one paired device lands on the others.
-Removing a namespace deletes its whole subfolder on the daemon too
-(`deleteNotesdNamespace` lists `<slug>/` via `GET /v1/blobs?prefix=` and deletes
-each note and attachment blob) so no orphaned bytes are left behind; the daemon
-prunes the now-empty folders. The default namespace shares the folder root with
-the settings files and has no subtree of its own, so it is never deleted.
-
-**Config plane** (`src/storage/notesd/config-plane.ts`, `useNotesdDiscovery`):
-so a daemon can be found on your *other* devices without its QR, pairing
-publishes a small `notesd.json` to whichever cloud backend
-(Dropbox/Drive) is connected — a list of `{name, endpoint, fingerprint}` at the
-app-folder root, written via `createDropboxConfigPlaneStore` /
-`createGdriveConfigPlaneStore` (a root `FileStore`, the same pattern as the
-settings/namespace stores). It is **credential-free by design**: never a device
-key or token, so per-device keys stay per-device and there is nothing sensitive
-for the provider to read (the pin is a public-key fingerprint, the endpoint just
-an address), which is why the file is plaintext. `useNotesdDiscovery` reads it
-from the connected cloud tokens (independent of the active `selection`, since
-notesd is the active document store) and `StorageSection` lists the discovered
-daemons; picking one pre-fills its address+pin so pairing only needs a fresh
-credential — the device still redeems its own, preserving the model.
 
 ### Directory adapter
 
@@ -5802,12 +5717,6 @@ wholesale carries the settings its users agreed on along with its notes.
 Plaintext even when the notes are encrypted, and **sparse**: only the settings
 that namespace actually has an opinion about, so everything else keeps falling
 through to the global layer.
-
-The notesd daemon's settings endpoint is a flat root namespace with no
-subfolders to nest a file in, so there the default namespace takes the bare name
-and every other one prefixes its slug (`work.namespace-settings.json`); the
-daemon allows exactly that shape and refuses anything else
-(`is_namespace_settings` in `notesd/src/store.rs`).
 
 ## Folders
 
@@ -6464,11 +6373,9 @@ four things that actually differ:
   [loopback listener](#loopback-oauth) instead. True only on the desktop, and
   complementary to the flag above by construction: it is what gives that
   surface cloud sync despite failing it.
-- **`pinnedFetch`** — SPKI-pinned HTTPS behind the
-  [notesd backend](#notesd-backend). Native code only.
 
 `useStorageBackend` reads all four of its availability flags from here
-(`dropboxAvailable`, `gdriveAvailable`, `folderAvailable`, `notesdAvailable`)
+(`dropboxAvailable`, `gdriveAvailable`, `folderAvailable`)
 rather than re-deriving each at its own call site. That centralisation is the
 point: before it, the desktop build offered no cloud sync and the reason looked
 like the packaging job not passing `VITE_DROPBOX_APP_KEY` /
@@ -6500,7 +6407,7 @@ native apps — open the consent screen in the user's **real browser**, and
 receive the redirect on a loopback listener the app opens for the occasion.
 
 The split is deliberate and is the same one the
-[native bridge](#notesd-backend) makes. The Tauri shell holds the socket and
+[native bridge](#capabilities) makes. The Tauri shell holds the socket and
 nothing else: it binds `127.0.0.1` (never `0.0.0.0`, which would put a listener
 holding a live authorization code on the local network), takes the first free
 port of three fixed ones, closes the instant a redirect arrives, and times out
@@ -6595,8 +6502,8 @@ stays statically imported; so should anything else that must render within the
 tap.
 
 **The backends you never connect never load.** `remote-backends.ts` is a single
-`import()` boundary in front of Dropbox, the picked folder and
-notesd, together with the directory adapter and offline-cache mirror they
+`import()` boundary in front of Dropbox, iCloud Drive, Nextcloud and the
+picked folder, together with the directory adapter and offline-cache mirror they
 share. The app opens on the browser backend and stays there unless someone
 deliberately connects something, so for most people that is code downloaded and
 parsed to be skipped. The render path reaches it through `useRemoteBackends`,

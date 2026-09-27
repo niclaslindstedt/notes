@@ -194,7 +194,7 @@ describe("isAuthSessionRequest", () => {
   });
 
   it("ignores messages that are not ours", () => {
-    expect(isAuthSessionRequest({ ...good, type: "qr.scan.request" })).toBe(
+    expect(isAuthSessionRequest({ ...good, type: "haptics.vibrate" })).toBe(
       false,
     );
     expect(

@@ -498,15 +498,6 @@ export function HomePage() {
               below).
             </li>
             <li>
-              In the installed app, optionally sync to your own{" "}
-              <span className="text-fg-bright">self-hosted server</span> — run
-              the small <code className="text-fg-bright">notesd</code> daemon on
-              a computer you own and pair the app to it over your own network,
-              with no cloud provider and no accounts involved. The connection is
-              locked to that daemon&apos;s own certificate. This backend is
-              available only in the app, not the website.
-            </li>
-            <li>
               Your notes stay browsable in the folder they sync to: one plain
               markdown file per note, with the ones you&apos;ve archived filed
               into an <code className="text-fg-bright">archived/</code>{" "}

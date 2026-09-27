@@ -4,7 +4,7 @@
 // as plain notes in the Files app, on any device the user syncs it to, and in
 // any editor.
 //
-// ## A directory backend, like folder / Dropbox / Drive / notesd
+// ## A directory backend, like folder / Dropbox / iCloud Drive
 //
 // The markdown <-> snapshot conversion, per-file at-rest encryption, attachment
 // externalisation, and conflict detection all live in the shared directory

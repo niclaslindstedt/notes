@@ -457,12 +457,6 @@ const achievements: AchievementsCatalog = {
       learnMore:
         "Peka appen mot en Nextcloud du kör själv, så synkas dina anteckningar dit som vanliga markdown-filer och nås från varje enhet som kontot loggar in på — utan något tredjepartsmoln emellan. Appen loggar in med ett återkallningsbart applösenord, aldrig ditt kontolösenord.",
     },
-    selfHoster: {
-      name: "Egen värd",
-      condition: "Parkoppla med din egen notesd-server.",
-      learnMore:
-        "Kör notesd-tjänsten på din egen dator och parkoppla appen till den — dina anteckningar synkas över ditt nätverk till en server du styr, utan moln och utan konton. Anslutningen är låst till tjänstens eget certifikat. Endast tillgängligt i den installerade appen.",
-    },
     freshPull: {
       name: "Färskt drag",
       condition: "Ladda om dina anteckningar från backend.",

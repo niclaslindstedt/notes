@@ -1,5 +1,5 @@
 // Non-ok response → Error mapper for the Nextcloud adapter, the sibling of
-// `../dropbox/errors.ts` and `../notesd/errors.ts` tuned to what a Nextcloud
+// `../dropbox/errors.ts` tuned to what a Nextcloud
 // (SabreDAV) server answers with:
 //
 //   - 401 → AuthError. The app password was revoked, changed, or never valid;

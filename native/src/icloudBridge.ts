@@ -9,9 +9,9 @@
 // picker, simply is not there.
 //
 // It rides beside the wrapper's other bridge (`bridge/on-message.ts`, whose
-// envelopes carry `v` / `type` and are answered through `__NOTES_NATIVE__`)
-// rather than inside it, because it is a different kind of thing: those are
-// requests the page makes knowing it is in the app; this is a provider the page
+// envelopes carry `v` / `type` and get no answer) rather than inside it,
+// because it is a different kind of thing: those are messages the page sends
+// knowing it is in the app; this is a provider the page
 // merely finds. The message type below keeps the two from ever being confused.
 //
 // `react-native-webview` gives us one message channel in each direction: the

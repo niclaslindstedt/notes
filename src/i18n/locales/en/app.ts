@@ -70,7 +70,7 @@ const app = {
   // is and what keeping it buys, and never implies the note still holds it.
   // `backend.*` are the in-sentence names of the backends, deliberately not
   // the storage picker's labels (settings.storage.backend*): "Local folder"
-  // and "Self-hosted" are list entries, these have to read inside "…remove it
+  // is a list entry, these have to read inside "…remove it
   // from ___ too?".
   attachmentRemoval: {
     title: "Remove the attachment from {backend} too?",
@@ -92,7 +92,6 @@ const app = {
       gdrive: "Dropbox",
       icloud: "iCloud Drive",
       nextcloud: "Nextcloud",
-      notesd: "your own server",
     },
   },
   // The right-click / long-press menu on an image in a note, and the two

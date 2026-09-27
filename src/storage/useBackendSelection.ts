@@ -15,13 +15,8 @@
 import { useCallback, useMemo } from "react";
 
 import type { ICloudHost } from "../platform/icloud-host.ts";
-import { createPinnedFetch } from "../platform/native-bridge.ts";
 import type { StorageAdapter } from "./adapter.ts";
-import type {
-  BackendId,
-  NextcloudConfig,
-  NotesdConfig,
-} from "./backend-preference.ts";
+import type { BackendId, NextcloudConfig } from "./backend-preference.ts";
 import type { DirectoryCrypto } from "./directory-adapter.ts";
 import type { DropboxAuth } from "./dropbox/index.ts";
 import { BrowserLocalStorageAdapter } from "./local/index.ts";
@@ -35,7 +30,6 @@ export type BackendSelection =
   | { kind: "icloud"; host: ICloudHost }
   | { kind: "nextcloud"; config: NextcloudConfig }
   | { kind: "folder"; handle: FileSystemDirectoryHandle }
-  | { kind: "notesd"; config: NotesdConfig }
   | { kind: "browser" };
 
 export interface BackendSelectionDeps {
@@ -60,8 +54,6 @@ export interface BackendSelectionDeps {
   icloudHost: ICloudHost | null;
   /** The stored Nextcloud connection, null until one is set up. */
   nextcloudConfig: NextcloudConfig | null;
-  /** The paired notesd daemon config, null until a daemon is paired. */
-  notesdConfig: NotesdConfig | null;
   /** The picked folder handle + whether the boot probe has resolved it. */
   folderHandle: FileSystemDirectoryHandle | null;
   folderHandleLoaded: boolean;
@@ -101,7 +93,6 @@ export function useBackendSelection(
     rememberDropboxAccessToken,
     icloudHost,
     nextcloudConfig,
-    notesdConfig,
     folderHandle,
     folderHandleLoaded,
     markFolderPermissionLost,
@@ -137,9 +128,6 @@ export function useBackendSelection(
     if (backend === "nextcloud" && nextcloudConfig) {
       return { kind: "nextcloud", config: nextcloudConfig };
     }
-    if (backend === "notesd" && notesdConfig) {
-      return { kind: "notesd", config: notesdConfig };
-    }
     // Folder backend: only once the boot probe has resolved with a live,
     // permission-granted handle. While probing, or after a revoked grant,
     // fall through to the browser store so editing keeps working.
@@ -155,7 +143,6 @@ export function useBackendSelection(
     rememberDropboxAccessToken,
     icloudHost,
     nextcloudConfig,
-    notesdConfig,
     folderHandle,
     folderHandleLoaded,
   ]);
@@ -229,19 +216,6 @@ export function useBackendSelection(
             onPermissionLost: markFolderPermissionLost,
             crypto: cryptoFor(namespace),
           });
-        // notesd is a directory backend over an SPKI-pinned fetch: each
-        // namespace's notes and attachments live as individual files in their
-        // own `notes/` / `attachments/` subfolder, and encryption composes per
-        // file *inside* the directory adapter via `directoryCrypto` — exactly
-        // like the folder backend (which, being on-device, likewise needs no
-        // offline-cache mirror).
-        case "notesd":
-          return remote.createNotesdAdapter(
-            selection.config,
-            createPinnedFetch(selection.config.spkiPin),
-            namespace,
-            cryptoFor(namespace),
-          );
       }
     },
     [

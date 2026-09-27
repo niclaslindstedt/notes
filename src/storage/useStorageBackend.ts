@@ -55,15 +55,10 @@ import {
   type NextcloudConnectRequest,
   useNextcloudBackend,
 } from "./useNextcloudBackend.ts";
-import { useNotesdBackend } from "./useNotesdBackend.ts";
-import { useNotesdDiscovery } from "./useNotesdDiscovery.ts";
 import { useNamespaceMigration } from "./useNamespaceMigration.ts";
 import { useBackendSelection } from "./useBackendSelection.ts";
 import { useRemoteBackends } from "./useRemoteBackends.ts";
-import { createPinnedFetch } from "../platform/native-bridge.ts";
 import { capabilities } from "../platform/capabilities.ts";
-import type { NotesdConnectRequest } from "./notesd/pairing.ts";
-import type { PublishedDaemon } from "./notesd/config-plane.ts";
 
 const log = createLogger("storage");
 
@@ -215,27 +210,6 @@ export interface UseStorageBackend {
   /** Forget the Nextcloud connection and fall back to the browser store. */
   disconnectNextcloud: () => void;
   /**
-   * Whether the self-hosted (notesd) backend is offerable here — only inside
-   * the native wrapper, whose pinned fetch can reach a self-signed daemon.
-   */
-  notesdAvailable: boolean;
-  /** Whether a notesd daemon is currently paired. */
-  notesdConnected: boolean;
-  /** Pair with a daemon (from a pasted URI or a discovered entry) and switch to it. */
-  pairNotesd: (request: NotesdConnectRequest) => Promise<void>;
-  /** Forget the paired daemon and fall back to the browser store. */
-  unpairNotesd: () => void;
-  /**
-   * Daemons discovered in the connected cloud's `notesd.json` (config plane),
-   * so a device can pair with a known daemon without its QR — empty unless a
-   * cloud backend is connected and this is the native app.
-   */
-  notesdDiscovered: PublishedDaemon[];
-  /** The cloud discovery reads from ("Dropbox"), or null. */
-  notesdDiscoverySource: "Dropbox" | null;
-  /** Re-read the config plane on demand. */
-  refreshNotesdDiscovery: () => void;
-  /**
    * Turn encryption on with a fresh passphrase, re-wrapping stored bytes.
    * `onProgress` (optional) fires once per phase so the UI can show progress.
    */
@@ -339,7 +313,7 @@ export function useStorageBackend(): UseStorageBackend {
   const [activeNamespace, setActiveNamespaceState] = useState<string>(
     getActiveNamespaceSlug,
   );
-  // Dropbox / Drive / folder / notesd are fetched on demand — see
+  // Dropbox / iCloud / Nextcloud / folder are fetched on demand — see
   // `useRemoteBackends`. Null until then, which every consumer below reads
   // as "this backend isn't resolved yet" and answers with the browser store.
   const remote = useRemoteBackends(backend);
@@ -439,43 +413,6 @@ export function useStorageBackend(): UseStorageBackend {
   const { nextcloudConfig, connectNextcloud, disconnectNextcloud } =
     useNextcloudBackend({ selectBackend });
 
-  // The notesd (self-hosted daemon) concern: the paired config + pair / unpair
-  // verbs. Native-only — the pinned fetch it rides rejects on the plain web.
-  const {
-    notesdConfig,
-    pairNotesd: rawPairNotesd,
-    unpairNotesd,
-  } = useNotesdBackend({ selectBackend });
-
-  // The notesd config plane: discover daemons your other devices published to
-  // the connected cloud, and publish this device's pairings there. Native-only.
-  const {
-    discoveredDaemons: notesdDiscovered,
-    discoverySource: notesdDiscoverySource,
-    refreshDiscovery: refreshNotesdDiscovery,
-    publishDaemon: publishNotesdDaemon,
-  } = useNotesdDiscovery({
-    dropboxToken,
-    dropboxRefresh,
-    rememberDropboxAccessToken,
-    enabled: platformCapabilities.pinnedFetch,
-  });
-
-  // Pair, then publish the daemon's non-secret discovery record (name, endpoint,
-  // pin) to the connected cloud so other devices can find it. Publishing is
-  // best-effort inside the hook and never blocks the pairing.
-  const pairNotesd = useCallback(
-    async (request: NotesdConnectRequest) => {
-      const config = await rawPairNotesd(request);
-      await publishNotesdDaemon({
-        name: config.name,
-        endpoint: config.endpoint,
-        fingerprint: config.spkiPin,
-      });
-    },
-    [rawPairNotesd, publishNotesdDaemon],
-  );
-
   // Resolve the active backend once, and get the factory that builds an
   // adapter for any namespace on it. Both the root stores below and the
   // active-document adapter switch on this single selection.
@@ -487,7 +424,6 @@ export function useStorageBackend(): UseStorageBackend {
     rememberDropboxAccessToken,
     icloudHost: usableICloudHost,
     nextcloudConfig,
-    notesdConfig,
     folderHandle,
     folderHandleLoaded,
     markFolderPermissionLost,
@@ -520,14 +456,6 @@ export function useStorageBackend(): UseStorageBackend {
           selection.handle,
           markFolderPermissionLost,
         );
-      // notesd serves `namespaces.json` from the daemon (`/v1/settings/...`)
-      // over the SPKI-pinned fetch, so the namespace list travels with the
-      // daemon and lands on every paired device.
-      case "notesd":
-        return remote.createNotesdNamespaceStore(
-          selection.config,
-          createPinnedFetch(selection.config.spkiPin),
-        );
       // The browser backend keeps its registry in localStorage and has no
       // separate store.
       case "browser":
@@ -559,7 +487,6 @@ export function useStorageBackend(): UseStorageBackend {
     folderHandle,
     icloudHost: usableICloudHost,
     nextcloudConfig,
-    notesdConfig,
     activeNamespace,
     setActiveNamespace: setActiveNamespaceState,
   });
@@ -590,13 +517,6 @@ export function useStorageBackend(): UseStorageBackend {
         return remote.createFolderSettingsStore(
           selection.handle,
           markFolderPermissionLost,
-        );
-      // notesd serves `settings.json` from the daemon (`/v1/settings/...`) over
-      // the SPKI-pinned fetch, so appearance settings sync across paired devices.
-      case "notesd":
-        return remote.createNotesdSettingsStore(
-          selection.config,
-          createPinnedFetch(selection.config.spkiPin),
         );
       // The browser backend keeps settings in localStorage (the appearance
       // store's cache is its home) and has no separate store.
@@ -633,12 +553,6 @@ export function useStorageBackend(): UseStorageBackend {
           activeNamespace,
           markFolderPermissionLost,
         );
-      case "notesd":
-        return remote.createNotesdNamespaceSettingsStore(
-          selection.config,
-          createPinnedFetch(selection.config.spkiPin),
-          activeNamespace,
-        );
       case "browser":
         return null;
     }
@@ -655,8 +569,8 @@ export function useStorageBackend(): UseStorageBackend {
     // notes aren't sitting one devtools panel away while it is up.
     if (locked || pinLocked) return lockedAdapter(backend);
     // Only the single-document browser store seals the whole blob here; the
-    // file/cloud backends and notesd encrypt per file inside the directory
-    // adapter instead.
+    // file/cloud backends encrypt per file inside the directory adapter
+    // instead.
     if (encryption === "encrypted" && selection.kind === "browser") {
       return withEncryption(inner, passwordRefFor(activeNamespace));
     }
@@ -796,13 +710,6 @@ export function useStorageBackend(): UseStorageBackend {
     nextcloudConfig,
     connectNextcloud: refuseInDemo(connectNextcloud),
     disconnectNextcloud,
-    notesdAvailable: platformCapabilities.pinnedFetch,
-    notesdConnected: backend === "notesd" && notesdConfig !== null,
-    pairNotesd: refuseInDemo(pairNotesd),
-    unpairNotesd,
-    notesdDiscovered,
-    notesdDiscoverySource,
-    refreshNotesdDiscovery,
     enableEncryption,
     disableEncryption,
     finishDisableEncryption,

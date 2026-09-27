@@ -29,7 +29,6 @@ function deps(over: Partial<BackendSelectionDeps> = {}): BackendSelectionDeps {
     rememberDropboxAccessToken: vi.fn(),
     icloudHost: null,
     nextcloudConfig: null,
-    notesdConfig: null,
     folderHandle: null,
     folderHandleLoaded: false,
     markFolderPermissionLost: vi.fn(),

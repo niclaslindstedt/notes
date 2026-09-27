@@ -147,12 +147,6 @@ module.exports = {
         "expo-build-properties",
         { android: { minSdkVersion: 28, usesCleartextTraffic: true } },
       ],
-      [
-        "expo-camera",
-        {
-          cameraPermission: `${DISPLAY_NAME} uses the camera only to scan a notesd server's pairing QR code.`,
-        },
-      ],
     ],
     // Omitted entirely when unset, so EAS falls back to resolving the project
     // by slug instead of being handed an empty id.
