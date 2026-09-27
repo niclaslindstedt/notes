@@ -28,11 +28,12 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -97,6 +98,40 @@ if (worker.length) {
       `VITE_SHELL_BUILD=on. Rebuild through this script rather than copying dist/.`,
   );
   process.exit(1);
+}
+
+// Nor may the desktop app carry what only the website may: a Donate link (the
+// same rule as the App Store's guideline 3.1.1, kept for every store) or the
+// achievements, which no Nird native build has. `VITE_SHELL_BUILD` compiles
+// both out (`__EMBEDDED__`); a `dist/` left by a website build — which
+// `--skip-build` would copy — carries them. Looks for whatever
+// `VITE_DONATE_URL` this shell has set, the unlock notice's copy, and the
+// achievements feature page's path, which the changelog's doc glob spells out.
+const needles = [
+  ["a Donate link", process.env.VITE_DONATE_URL?.trim()],
+  ["the achievements", "Achievement unlocked"],
+  ["the achievements feature page", "docs/features/achievements.md"],
+].filter(([, needle]) => needle);
+function textFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return textFiles(path);
+    return /\.(html|js|mjs|css|json|webmanifest|txt|xml)$/.test(entry.name)
+      ? [path]
+      : [];
+  });
+}
+for (const path of textFiles(OUT_DIR)) {
+  const text = readFileSync(path, "utf8");
+  const hit = needles.find(([, needle]) => text.includes(needle));
+  if (hit) {
+    console.error(
+      `✗ ${relative(REPO_DIR, path)} carries ${hit[0]} (${hit[1]}) — the ` +
+        `desktop app must not. Rebuild through this script rather than ` +
+        `copying dist/.`,
+    );
+    process.exit(1);
+  }
 }
 
 console.log(`✓ webroot → ${OUT_DIR}`);

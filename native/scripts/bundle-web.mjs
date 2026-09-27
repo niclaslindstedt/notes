@@ -6,8 +6,9 @@
 //
 // The web build is `npm run build:native` at the repo root
 // (`VITE_TARGET=native`, output `native/web/`): the build that carries the
-// listing name (`APP_DISPLAY_NAME`), has no service worker and no Donate link,
-// and folds into one chunk — see `vite.config.ts`. Its relative asset base
+// listing name (`APP_DISPLAY_NAME`), has no service worker, no Donate link and
+// no achievements (both the website's alone, and refused below if they show
+// up), and folds into one chunk — see `vite.config.ts`. Its relative asset base
 // resolves under the loopback origin exactly as it does anywhere else. If the
 // wrapper ever needs the web app to behave differently beyond that, it has
 // stopped being thin.
@@ -95,6 +96,36 @@ if (count === 0 || !files["index.html"]) {
     `native/web/ has no index.html (${count} files) — the web build looks empty.`,
   );
 }
+
+/** Refuse a webroot that carries what only the website may: a Donate link
+ *  (App Store guideline 3.1.1) or the achievements, which no Nird native build
+ *  has. `build:native` compiles both out (`__EMBEDDED__`); a `native/web/`
+ *  filled some other way — a website build copied in, then re-zipped with
+ *  `--skip-build` — would carry them. Looks for whatever `VITE_DONATE_URL`
+ *  this shell has set, the unlock notice's copy, and the achievements feature
+ *  page's path, which the changelog's doc glob spells out. */
+function assertWebsiteOnlyAbsent(files) {
+  const needles = [
+    ["a Donate link", process.env.VITE_DONATE_URL?.trim()],
+    ["the achievements", "Achievement unlocked"],
+    ["the achievements feature page", "docs/features/achievements.md"],
+  ].filter(([, needle]) => needle);
+  const decoder = new TextDecoder();
+  for (const [path, bytes] of Object.entries(files)) {
+    if (!/\.(html|js|mjs|css|json|webmanifest|txt|xml)$/.test(path)) continue;
+    const text = decoder.decode(bytes);
+    const hit = needles.find(([, needle]) => text.includes(needle));
+    if (hit) {
+      throw new Error(
+        `native/web/${path} carries ${hit[0]} (${hit[1]}) — the phone app ` +
+          `must not. Rebuild through this script (drop --skip-build) so ` +
+          `VITE_TARGET=native compiles it out.`,
+      );
+    }
+  }
+}
+
+assertWebsiteOnlyAbsent(files);
 
 // Deterministic zip: every entry pinned to the ZIP epoch (1980-01-01), so the
 // artifact is reproducible instead of drifting with the clock.
