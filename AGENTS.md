@@ -99,15 +99,6 @@ this list and keep it in sync.
 
 **Deferred — intended, but not built yet (do these as the project matures):**
 
-- **§11.2 / §11.3 Website + SEO** — there is no marketing `website/`, and the
-  SEO scaffolding (Open Graph / Twitter Card / JSON-LD, `sitemap.xml`,
-  `robots.txt`, `llms.txt`, the `check-seo` and `lighthouse` workflows /
-  `lighthouserc`) is absent. The deployed artifact is the app itself, served
-  via `pages.yml`; a prerendered marketing surface can be ported from
-  checklist later.
-- **§11.4 PWA completeness** — the offline `navigateFallback` is wired in
-  `vite.config.ts`, but there is no Lighthouse `pwa`-category gate
-  (`lighthouserc`, min score ≥ 0.9) in CI yet.
 - **§13.5 `prompts/`** — no versioned prompt library; nothing in the app uses
   one yet.
 - **§19.4 Central output module** — no `src/output` semantic logging helpers
@@ -116,6 +107,11 @@ this list and keep it in sync.
   as not-applicable rather than missing — revisit if a CLI/build tool is added.
 
 **Deliberate, permanent deviations (not bugs — don't "fix" these):**
+
+- **§11.3 SEO and the §11.4 Lighthouse gate** — no SEO and no size budgets, by
+  owner decision: the site is not meant to be found, so every page it emits
+  carries `<meta name="robots" content="noindex">`, and there is no sitemap,
+  structured data, `llms.txt`, Lighthouse gate or bundle-size ceiling.
 
 - **§3 README shape / §11.4.6 installability in the README** — `README.md` is
   a **contributor's** front page, not a product page: prerequisites, install,

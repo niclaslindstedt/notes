@@ -182,8 +182,8 @@ function emitPrecacheManifest(): Plugin {
 // privacy page there; the copied HTML loads the same hashed asset URLs
 // (they are origin-absolute), so no rewrite is needed. Runs late
 // (`enforce: "post"`) so the PWA plugin's manifest-link injection is
-// already baked into the source. When the SEO scaffolding lands (§11.2/3)
-// this is where a per-route <title>/canonical splice would slot in.
+// already baked into the source, and the copy carries index.html's robots
+// noindex with it.
 function emitPrivacyAlias(): Plugin {
   return {
     name: "emit-privacy-alias",
@@ -357,15 +357,11 @@ export default defineConfig({
     // So the wrappers get everything folded back into one chunk, exactly the
     // shape they ship today, and the splitting applies to the web build that
     // benefits from it.
-    //
-    // That one chunk is ~1.7 MB, over Vite's 500 kB warning — a limit about
-    // download size, which a bundle read off the device does not have. The
-    // wrappers' limit sits above the real size with room to grow, so the
-    // warning still fires if the bundle balloons.
     ...(isEmbedded && {
       rolldownOptions: { output: { codeSplitting: false } },
-      chunkSizeWarningLimit: 3000,
     }),
+    // No size budgets, by owner decision: this only keeps Vite's warning quiet.
+    chunkSizeWarningLimit: 100_000,
   },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),

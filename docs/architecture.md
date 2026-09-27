@@ -110,6 +110,6 @@ project name everywhere except the mobile build, which reads the
 
 This repo is a focused scaffold. The fuller machinery from `checklist` — the
 multi-palette theme engine and custom-theme editor, modals and the side menu,
-cloud-sync storage backends, the marketing `website/`, full SEO prerendering,
-and the release pipeline — is brought over incrementally via the
+cloud-sync storage backends, the marketing `website/`, and the release
+pipeline — is brought over incrementally via the
 `copy-feature` agent skill, adapted to the notes domain rather than pasted.

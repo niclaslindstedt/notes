@@ -16,7 +16,7 @@ description: "Use when notes may have drifted from OSS_SPEC.md. Fetches the late
 - **§13.5 `prompts/`** — notes has **no** `prompts/` directory, by design (deferred). Do **not** auto-create it; treat its absence as conformant.
 - **§19.4 central output module** — **N/A** for a browser PWA. notes logs to the devtools console, so there is no `src/output` module to add; treat as not-applicable, not missing.
 - **§20.2 test-file suffix** — notes uses the Vitest-idiomatic `*.test.ts` suffix under `tests/<concern>/`, a **deliberate, permanent** deviation. The pinned `validate.sh` flags it because it expects `_test`/`Test`; that is expected. Do **not** rename the tests.
-- **§11.2 / §11.3 website + SEO** and **§11.4 PWA Lighthouse gate** — deferred (no marketing `website/`, no SEO scaffolding, no Lighthouse `pwa` gate yet). Do not scaffold these unless the task is explicitly to close that deferral.
+- **§11.3 SEO** and **§11.4 PWA Lighthouse gate** — **dropped by owner decision**: no SEO and no size budgets, and every page carries a robots `noindex`. Do **not** scaffold SEO files, structured data, a sitemap, `llms.txt` or a Lighthouse gate.
 
 When you genuinely close a deferred item, delete its bullet from `AGENTS.md` in the same PR.
 
@@ -154,8 +154,8 @@ Skip any row that `AGENTS.md` marks as an intentional deviation (the §13.5 / §
 | §10.3 floating or under-pinned toolchain                        | Edit the workflow to pin the Node version at or above the minimum declared in the fetched `OSS_SPEC.md` §10.3 table                                                           |
 | §10.5 missing pin file / pin ↔ CI mismatch                      | Add or align `.nvmrc` with the Node version `ci.yml` installs                                                                                                                |
 | §11.1 missing `docs/` content                                  | Create the topic file, then hand off to `update-docs`                                                                                                                        |
-| §11.2/§11.3 website + SEO                                       | **Intentional deferral** (AGENTS.md) — do not scaffold unless explicitly tasked                                                                                              |
-| §11.4 PWA Lighthouse gate                                       | **Intentional deferral** (AGENTS.md) — do not add `lighthouserc`/the gate unless explicitly tasked                                                                           |
+| §11.2/§11.3 website + SEO                                       | **Dropped by owner decision** (AGENTS.md) — no SEO; the site carries `noindex`                                                                                               |
+| §11.4 PWA Lighthouse gate                                       | **Dropped by owner decision** (AGENTS.md) — no Lighthouse gate and no size budgets                                                                                           |
 | §13.5 `prompts/`                                                | **Intentional deferral** (AGENTS.md) — notes has no prompts; do **not** create `prompts/`                                                                                    |
 | §15 missing issue / PR templates                                | Create the templates under `.github/ISSUE_TEMPLATE/` or `.github/PULL_REQUEST_TEMPLATE.md`                                                                                    |
 | §19.4 central output module                                     | **Not applicable** to a browser PWA (AGENTS.md) — do **not** add `src/output`                                                                                                |
