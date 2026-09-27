@@ -18,7 +18,8 @@ import settings from "./settings.ts";
 import sync from "./sync.ts";
 
 export const sv: Catalog = {
-  achievements,
+  // Left out of the phone and desktop builds, as in `en/index.ts`.
+  achievements: __EMBEDDED__ ? ({} as Catalog["achievements"]) : achievements,
   app,
   changelog,
   common,

@@ -19,6 +19,9 @@ const pending = new Set<string>();
 const listeners = new Set<() => void>();
 
 export function unlock(id: string): void {
+  // The phone and desktop builds (`__EMBEDDED__`) have no achievements: every
+  // unlock is dropped here, so the call sites need no guard of their own.
+  if (__EMBEDDED__) return;
   if (id === "") return;
   if (pending.has(id)) return;
   pending.add(id);

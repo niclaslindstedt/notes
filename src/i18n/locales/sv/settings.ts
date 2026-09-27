@@ -21,13 +21,9 @@ const settings: SettingsCatalog = {
     languageTitle: "Språk",
     languageChoose: "Välj språk",
     languageHint: "Översätt gränssnittet mellan engelska och svenska.",
-    achievementsTitle: "Bedrifter",
     menuTitle: "Meny",
     developerTitle: "Utvecklare",
     language: "Språk",
-    disableAchievements: "Inaktivera bedrifter",
-    disableAchievementsHint:
-      "Sluta spåra bedrifter och dölj troféknappen. Bedrifter du redan låst upp behålls.",
     menuActivation: "Öppna menyn med",
     menuActivationHint:
       "Välj hur sidomenyn öppnas på den här enheten — tryck på den flytande knappen eller svep in från skärmkanten.",

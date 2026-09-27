@@ -26,13 +26,9 @@ const settings = {
     languageTitle: "Language",
     languageChoose: "Choose language",
     languageHint: "Translate the UI between English and Swedish.",
-    achievementsTitle: "Achievements",
     menuTitle: "Menu",
     developerTitle: "Developer",
     language: "Language",
-    disableAchievements: "Disable achievements",
-    disableAchievementsHint:
-      "Stop tracking achievements and hide the trophy button. Achievements you’ve already earned are kept.",
     menuActivation: "Open the menu with",
     menuActivationHint:
       "Choose how to open the side menu on this device — tap the floating button, or swipe in from the edge of the screen.",

@@ -473,11 +473,14 @@ export function HomePage() {
               Use the app in <em>English</em> or <em>Swedish</em> — it follows
               your device language by default and remembers your choice.
             </li>
-            <li>
-              Earn <em>achievements</em> as you discover features — an optional,
-              for-fun tour of everything the app can do, which you can switch
-              off whenever you like.
-            </li>
+            {/* The website's alone: no phone or desktop build has them. */}
+            {!__EMBEDDED__ && (
+              <li>
+                Earn <em>achievements</em> as you discover features — an
+                optional, for-fun tour of everything the app can do, which you
+                can switch off whenever you like.
+              </li>
+            )}
             <li>
               Install it as an app and keep using it offline — no connection
               required once it has loaded. There are also downloadable{" "}

@@ -19,7 +19,11 @@ import settings from "./settings.ts";
 import sync from "./sync.ts";
 
 export const en = {
-  achievements,
+  // The phone and desktop builds (`__EMBEDDED__`) ship without achievements,
+  // so their copy is left out of the bundle: the define folds this to `{}`
+  // and the minifier drops the module. The type is the full group either way,
+  // so `Catalog` and every `t()` key stay the same in both builds.
+  achievements: __EMBEDDED__ ? ({} as typeof achievements) : achievements,
   app,
   changelog,
   common,

@@ -190,7 +190,7 @@ const hasTwoScopedTransforms = (rules: readonly TransformRule[]) => {
   return scopes.size >= 2;
 };
 
-export const ACHIEVEMENTS: readonly Achievement[] = [
+const CATALOG: readonly Achievement[] = [
   // ──────────────────────────────────────────────────────────────
   // Beginner — "I just opened the app. What do I do?"
   // ──────────────────────────────────────────────────────────────
@@ -1108,10 +1108,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   },
 ] as const;
 
+// The phone and desktop builds (`__EMBEDDED__`) ship without achievements —
+// no Nird native build has them; the website does. The define folds this to
+// an empty catalog there, so no entry, predicate or id reaches those bundles.
+export const ACHIEVEMENTS: readonly Achievement[] = __EMBEDDED__ ? [] : CATALOG;
+
 // Catalog lookup by id. The watcher hands us ids from the bus and from
 // `deriveUnlocks`; both consult this map to skip ids that don't match a known
 // entry (forward compatibility for an older build reading newer data, or
-// typo-guarding manual `unlock` callers).
-export const ACHIEVEMENT_BY_ID: ReadonlyMap<string, Achievement> = new Map(
-  ACHIEVEMENTS.map((a) => [a.id, a]),
-);
+// typo-guarding manual `unlock` callers). Marked pure so a build that never
+// reads it — the phone and desktop apps, which ship without achievements —
+// drops the catalog along with it.
+export const ACHIEVEMENT_BY_ID: ReadonlyMap<string, Achievement> =
+  /* @__PURE__ */ new Map(ACHIEVEMENTS.map((a) => [a.id, a]));

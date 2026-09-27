@@ -12,6 +12,15 @@ const achievements = {
     unseenOne: "1 new achievement",
     unseenOther: "{n} new achievements",
   },
+  // The General settings tab's on/off switch. Kept in this group, not in
+  // `settings`, so every string the feature shows lives here — and a build
+  // without achievements (the phone and desktop apps) drops them together.
+  settings: {
+    title: "Achievements",
+    disable: "Disable achievements",
+    disableHint:
+      "Stop tracking achievements and hide the trophy button. Achievements you’ve already earned are kept.",
+  },
   unlockModal: {
     titleOne: "Achievement unlocked!",
     titleOther: "{n} achievements unlocked!",

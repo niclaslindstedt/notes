@@ -933,8 +933,9 @@ export function App() {
               <NamespacesModalHost storage={storage} />
               <SearchModalHost snapshot={sync.doc} onOpen={switchTo} />
               <ChangelogModalHost />
-              <AchievementsModalHost />
-              <AchievementsUnlockModalHost />
+              {/* The website's alone — see `src/achievements/index.ts`. */}
+              {!__EMBEDDED__ && <AchievementsModalHost />}
+              {!__EMBEDDED__ && <AchievementsUnlockModalHost />}
               <ConflictModal sync={sync} />
               {keepPromptNote && (
                 <DropzoneKeepModal

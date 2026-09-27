@@ -6191,6 +6191,17 @@ edit.
 
 ## Achievements
 
+**The website's alone.** No phone or desktop build carries achievements (a
+fleet decision for every Nird app). `__EMBEDDED__` (see [embedded
+builds](#embedded-wrapper-builds)) takes the feature out at compile time: the
+catalog folds to `[]`, `unlock()` drops every id, `useAchievementWatcher` is a
+no-op, the side-menu row, both modal hosts and the General settings switch are
+not rendered, the `achievements` i18n group (which also carries that switch's
+copy, `achievements.settings.*`) folds to `{}`, and the feature doc is left
+out of the changelog's glob. The persisted fields (`achievements`,
+`unseenAchievements`, `disableAchievements`) stay in the appearance document
+so a synced account keeps its trophies on the website.
+
 ### Achievement catalog
 
 `src/achievements/catalog.ts` (+ `types.ts`) — `ACHIEVEMENTS`, each entry an
@@ -6427,7 +6438,9 @@ are skipped, since nothing in a wrapper reads them. `usePwaUpdate`
 worker to register, and `SideMenuFooter` reads it to leave out the Donate
 entry: no build but the website may carry a payment link outside Apple's (App
 Store guideline 3.1.1). Being a compile-time constant, it drops the entry and
-its URL from the bundle rather than hiding them.
+its URL from the bundle rather than hiding them. The whole
+[achievements](#achievements) feature goes the same way — no Nird native build
+has achievements.
 
 ### Capabilities
 

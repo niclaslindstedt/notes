@@ -62,6 +62,16 @@ describe("GeneralSection", () => {
     expect(onUpdate).toHaveBeenCalledWith("disableAchievements", true);
   });
 
+  it("offers no achievements switch in the phone or desktop build", () => {
+    vi.stubGlobal("__EMBEDDED__", true);
+    try {
+      renderWithNav();
+      expect(screen.queryByLabelText("Disable achievements")).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("hides the menu-activation control outside a standalone mobile PWA", () => {
     mockStandalone.mockReturnValue(false);
     renderWithNav();

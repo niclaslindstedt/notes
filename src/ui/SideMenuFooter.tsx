@@ -24,7 +24,7 @@ const ABOUT_PLACEMENT: FloatingPlacement = {
 };
 
 // The relocated burger menu, pinned to the foot of the drawer: an optional
-// Donate (website only), the trophy (achievements), an "About" dropdown that folds away the
+// Donate and the trophy (achievements) — both website only — an "About" dropdown that folds away the
 // project links (What's new / privacy) above the build label, and Settings
 // pinned last under the thumb. Self-contained — the only thing it borrows from
 // the drawer is the `onClose` that retracts it behind a modal; the About
@@ -70,7 +70,9 @@ export function SideMenuFooter({ onClose }: { onClose: () => void }) {
             onClick={onClose}
           />
         )}
-        <AchievementsMenuItem onClose={onClose} />
+        {/* No achievements in the phone or desktop build (`__EMBEDDED__`),
+            compiled out like Donate above; the website keeps the row. */}
+        {!__EMBEDDED__ && <AchievementsMenuItem onClose={onClose} />}
         {/* About: a single row that reveals the project links in an upward-
             flipping dropdown (there's no room below at the foot of the drawer).
             It reads as a plain footer row — no chevron — and just toggles the

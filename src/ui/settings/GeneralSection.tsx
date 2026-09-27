@@ -55,14 +55,19 @@ export function GeneralSection({
         </p>
       </Section>
 
-      <Section title={t("settings.general.achievementsTitle")}>
-        <ToggleRow
-          label={t("settings.general.disableAchievements")}
-          hint={t("settings.general.disableAchievementsHint")}
-          checked={disableAchievements}
-          onChange={(v) => onUpdate("disableAchievements", v)}
-        />
-      </Section>
+      {/* Achievements are the website's alone: the phone and desktop builds
+          (`__EMBEDDED__`) compile the switch out with the rest of the
+          feature. */}
+      {!__EMBEDDED__ && (
+        <Section title={t("achievements.settings.title")}>
+          <ToggleRow
+            label={t("achievements.settings.disable")}
+            hint={t("achievements.settings.disableHint")}
+            checked={disableAchievements}
+            onChange={(v) => onUpdate("disableAchievements", v)}
+          />
+        </Section>
+      )}
 
       {standaloneMobile && (
         <Section title={t("settings.general.menuTitle")}>

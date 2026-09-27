@@ -4,7 +4,7 @@ import { lazyModal } from "./lazy-modal.tsx";
 
 // The four-tier catalogue tour, its glyph set, and its copy — opened from the
 // trophy button. Split off; see `lazy-modal.tsx`.
-const AchievementsModal = lazyModal(() =>
+const AchievementsModal = /* @__PURE__ */ lazyModal(() =>
   import("../../ui/achievements/AchievementsModal.tsx").then(
     (m) => m.AchievementsModal,
   ),

@@ -18,11 +18,19 @@ export {
 // Eagerly inline every `docs/features/*.md` as a raw string. The path is
 // relative to this file: `src/ui/changelog/` → repo root is three levels up,
 // then `docs/features/`.
-const rawDocs = import.meta.glob<string>("../../../docs/features/*.md", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-});
+//
+// The phone and desktop builds (`__EMBEDDED__`) have no achievements, so they
+// leave that feature's doc out; a "Learn more" link to a missing doc is inert.
+const rawDocs = __EMBEDDED__
+  ? import.meta.glob<string>(
+      ["../../../docs/features/*.md", "!**/achievements.md"],
+      { query: "?raw", import: "default", eager: true },
+    )
+  : import.meta.glob<string>("../../../docs/features/*.md", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    });
 
 export const FEATURE_DOCS: Record<string, FeatureDoc> =
   buildFeatureDocs(rawDocs);

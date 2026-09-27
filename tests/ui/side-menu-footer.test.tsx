@@ -129,6 +129,13 @@ describe("SideMenuFooter", () => {
     expect(screen.getByRole("menuitem", { name: "Achievements" })).toBeTruthy();
   });
 
+  it("has no achievements entry in the phone or desktop build", () => {
+    // No Nird native build carries achievements; the website keeps them.
+    vi.stubGlobal("__EMBEDDED__", true);
+    renderFooter();
+    expect(screen.queryByRole("menuitem", { name: "Achievements" })).toBeNull();
+  });
+
   // Edge-to-edge PWA: the drawer reserves no bottom safe-area inset, so the
   // footer owns its own breathing room and carries an extra 10px below the last
   // row (Settings) to stay a comfortable thumb reach above the screen edge.

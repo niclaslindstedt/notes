@@ -7,7 +7,7 @@ import { lazyModal } from "./lazy-modal.tsx";
 
 // Shares the glyph set and copy with the tour above, so it costs almost
 // nothing once either has been opened. Split off; see `lazy-modal.tsx`.
-const AchievementUnlockModal = lazyModal(() =>
+const AchievementUnlockModal = /* @__PURE__ */ lazyModal(() =>
   import("../../ui/achievements/AchievementUnlockModal.tsx").then(
     (m) => m.AchievementUnlockModal,
   ),

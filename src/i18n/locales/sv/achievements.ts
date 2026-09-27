@@ -6,6 +6,12 @@ const achievements: AchievementsCatalog = {
     unseenOne: "1 ny bedrift",
     unseenOther: "{n} nya bedrifter",
   },
+  settings: {
+    title: "Bedrifter",
+    disable: "Inaktivera bedrifter",
+    disableHint:
+      "Sluta spåra bedrifter och dölj troféknappen. Bedrifter du redan låst upp behålls.",
+  },
   unlockModal: {
     titleOne: "Bedrift upplåst!",
     titleOther: "{n} bedrifter upplåsta!",

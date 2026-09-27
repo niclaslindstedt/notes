@@ -110,11 +110,14 @@ export function PrivacyPage() {
             </li>
             <li>
               Your preferences — chosen theme and appearance, editor and export
-              settings, where the floating menu button rests, and which in-app
-              achievements you have unlocked. Each setting is stored at the
-              width you saved it at: for everyone using the account, for
-              everyone using one namespace, or for this device only. The
-              device-only ones are held in{" "}
+              settings, where the floating menu button rests
+              {/* Achievements are the website's alone (see `__EMBEDDED__`). */}
+              {__EMBEDDED__
+                ? ""
+                : ", and which in-app achievements you have unlocked"}
+              . Each setting is stored at the width you saved it at: for
+              everyone using the account, for everyone using one namespace, or
+              for this device only. The device-only ones are held in{" "}
               <code className="text-fg-bright">localStorage</code> and are never
               uploaded to any backend.
             </li>
