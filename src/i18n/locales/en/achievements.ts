@@ -494,7 +494,7 @@ const achievements = {
       name: "Safekeeping",
       condition: "Keep an attachment's file after erasing it from a note.",
       learnMore:
-        "Deleting an attachment's link out of a note doesn't reach into your Dropbox, Drive or notes folder and delete the file — the app asks first. Keep it and nothing is deleted: the note simply stops showing it, and pasting the link back brings the picture or file straight back.",
+        "Deleting an attachment's link out of a note doesn't reach into your Dropbox, Nextcloud or notes folder and delete the file — the app asks first. Keep it and nothing is deleted: the note simply stops showing it, and pasting the link back brings the picture or file straight back.",
     },
     cutout: {
       name: "Cutout",

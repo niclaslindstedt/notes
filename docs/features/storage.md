@@ -15,7 +15,13 @@ control. Open **Settings → Where your notes are stored** and pick one:
 - **Dropbox** — sign in through Dropbox's own screen
   and `notes` keeps your notes in that account from then on, ready to pick up on
   your next device. Each note is stored as a markdown file in the app's folder,
-  so you can read and edit them straight from Dropbox or Drive too.
+  so you can read and edit them straight from Dropbox too.
+- **Nextcloud** — a Nextcloud you run yourself. Give `notes` your server
+  address, your user name and an *app password* (the revocable credential
+  Nextcloud creates under Settings → Security), and it keeps one markdown file
+  per note in a folder of your account over WebDAV. Nothing goes through a
+  third party. On the web, your server has to allow this site's address to use
+  its WebDAV API — a setting you make once.
 - **iCloud Drive** — in the iPhone and iPad app only. Pick it and `notes`
   keeps your notes in its own folder in your iCloud Drive — **Notes** in the
   Files app — and iOS carries them to your other devices signed in to the same

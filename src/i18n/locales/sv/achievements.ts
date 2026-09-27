@@ -493,7 +493,7 @@ const achievements: AchievementsCatalog = {
       condition:
         "Behåll en bilagas fil efter att ha raderat den ur en anteckning.",
       learnMore:
-        "Att radera en bilagas länk ur en anteckning går inte in i din Dropbox, Drive eller anteckningsmapp och tar bort filen — appen frågar först. Behåll den så raderas ingenting: anteckningen slutar bara visa den, och klistrar du tillbaka länken är bilden eller filen där igen.",
+        "Att radera en bilagas länk ur en anteckning går inte in i din Dropbox, Nextcloud eller anteckningsmapp och tar bort filen — appen frågar först. Behåll den så raderas ingenting: anteckningen slutar bara visa den, och klistrar du tillbaka länken är bilden eller filen där igen.",
     },
     cutout: {
       name: "Urklipp",

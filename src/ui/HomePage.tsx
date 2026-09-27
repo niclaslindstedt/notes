@@ -283,13 +283,13 @@ export function HomePage() {
               archive, a spreadsheet…) appears as a chip you can click to
               download. They are saved as ordinary files in an{" "}
               <em>attachments</em> folder beside your notes, so this is
-              available when you sync to a local folder, Dropbox, or Google
-              Drive (see below). You can choose in Settings to collect images
-              and files in a block at the end of the note instead of inline.
-              Deleting an attachment&apos;s link out of a note never quietly
-              deletes the file: the app asks whether it should be removed from
-              your folder or cloud too, and if you keep it, pasting the link
-              back into the note brings the attachment straight back.
+              available when you sync to a local folder, Dropbox, iCloud Drive
+              or Nextcloud (see below). You can choose in Settings to collect
+              images and files in a block at the end of the note instead of
+              inline. Deleting an attachment&apos;s link out of a note never
+              quietly deletes the file: the app asks whether it should be
+              removed from your folder or cloud too, and if you keep it, pasting
+              the link back into the note brings the attachment straight back.
             </li>
             <li>
               Click an image in a note to <em>select</em> it, the way you select
