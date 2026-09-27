@@ -239,7 +239,7 @@ export function buildSeed(now: number = Date.now()): SeededNamespace[] {
             body: [
               "- Career: wants to lead the sync workstream — yes, hand it over",
               "- Feedback: more context in PR descriptions",
-              "- Follow up: conference budget for the autumn",
+              "- Follow up: conference budget for the fall",
             ].join("\n"),
           },
           {
@@ -359,7 +359,7 @@ export function buildSeed(now: number = Date.now()): SeededNamespace[] {
             body: [
               "# Japan itinerary",
               "",
-              "Two weeks, late October (autumn leaves 🍁).",
+              "Two weeks, late October (fall leaves 🍁).",
               "",
               "## Tokyo (4 nights)",
               "",

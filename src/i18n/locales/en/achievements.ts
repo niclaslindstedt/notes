@@ -149,13 +149,13 @@ const achievements = {
       name: "Swap meet",
       condition: "Replace some text from the find bar.",
       learnMore:
-        "Pressing the magnifier inside a note's find bar unfolds a second row: a field for what the matches should become, and the two buttons that apply it — one for the match you are standing on, one for every match at once. The search you already typed is the one it acts on, so crossing over costs nothing. Enter in the replace field replaces the current match and steps to the next, so a run of them is one key held down; Ctrl/Cmd+Enter does the lot. A replace is always a single undo away, however many lines it touched, and it is withheld on a read-only note along with every other edit.",
+        "Pressing the magnifier inside a note's find bar unfolds a second row: a field for what the matches should become, and the two buttons that apply it — one for the match you are standing on, one for every match at once. The search you already typed is the one it acts on, so crossing over costs nothing. Enter in the replace field replaces the current match and steps to the next, so a run of them is one key held down; Ctrl/Cmd+Enter does them all. A replace is always a single undo away, however many lines it touched, and it is withheld on a read-only note along with every other edit.",
     },
     dryRun: {
       name: "Dry run",
       condition: "Preview a replacement before applying it.",
       learnMore:
-        "The spectacles in the replace row show you what the replacement would write — and write nothing. Every line it would touch is listed, numbered the way the editor's gutter numbers them, with the text each match takes away struck through and the text arriving in its place lit up beside it, so the change reads in the context of the line rather than as an abstract count. The heading above says how many matches on how many lines, which is the answer you actually want before pressing Replace all on a long note. Nothing is committed until you press one of the buttons.",
+        "The glasses in the replace row show you what the replacement would write — and write nothing. Every line it would touch is listed, numbered the way the editor's gutter numbers them, with the text each match takes away struck through and the text arriving in its place lit up beside it, so the change reads in the context of the line rather than as an abstract count. The heading above says how many matches on how many lines, which is the answer you actually want before pressing Replace all on a long note. Nothing is committed until you press one of the buttons.",
     },
     starStruck: {
       name: "Star-struck",
@@ -167,7 +167,7 @@ const achievements = {
       name: "Under lock and key",
       condition: "Lock a note so it can't be edited.",
       learnMore:
-        "The eye button beside the star makes the open note read-only. A locked note takes no caret at all: tap into it on a phone and the keyboard stays down, click into it on a desktop and nothing starts blinking, so the note you keep open for reference can't be typed into by accident — or by a pocket. The buttons that would rewrite it go with the caret (formatting, cut, and the title field), while everything that only reads it carries on exactly as before: you can scroll it, select it, copy from it, search it, export it, star it and archive it. The checkboxes on task rows stay live, so a locked checklist can still be checked off while its wording stays put. The line-number gutter still works too, so pressing a number selects that whole line and the copy button slides out to take it. Press the eye again to unlock it. The lock travels with the note, so it is still locked on your other devices.",
+        "The eye button beside the star makes the open note read-only. A locked note takes no caret at all: tap into it on a phone and the keyboard stays down, click into it on a desktop and nothing starts blinking, so the note you keep open for reference can't be typed into by accident — or by a pocket. The buttons that would rewrite it go with the caret (formatting, cut, and the title field), while everything that only reads it works exactly as before: you can scroll it, select it, copy from it, search it, export it, star it and archive it. The checkboxes on task rows stay live, so a locked checklist can still be checked off while its wording stays put. The line-number gutter still works too, so pressing a number selects that whole line and the copy button slides out to take it. Press the eye again to unlock it. The lock travels with the note, so it is still locked on your other devices.",
     },
 
     // ── Intermediate ──────────────────────────────────────────────────
@@ -233,7 +233,7 @@ const achievements = {
       name: "Checked off",
       condition: "Check a checkbox off in a note.",
       learnMore:
-        "A list row written `- [ ] milk` renders as a real checkbox. Press it and the item is checked off there and then — the caret never moves onto the line, so nothing opens and no keyboard comes up on a phone. The tick is written straight into the Markdown as `- [x]`, so it travels with the note wherever it syncs. Enter on a task row opens the next one, always unticked.",
+        "A list row written `- [ ] milk` renders as a real checkbox. Press it and the item is checked off there and then — the caret never moves onto the line, so nothing opens and no keyboard comes up on a phone. The check is written straight into the Markdown as `- [x]`, so it travels with the note wherever it syncs. Enter on a task row opens the next one, always unchecked.",
     },
     plainText: {
       name: "Plain and simple",
@@ -335,7 +335,7 @@ const achievements = {
       name: "Out of thin air",
       condition: "Start a note by right-clicking empty space.",
       learnMore:
-        "On a computer, right-click anywhere empty — the overview around your notes, or the side menu below its rows — and pick New note. The new note opens with its name selected, so you can type it straight away.",
+        "On a computer, right-click anywhere empty — the overview around your notes, or the side menu below its rows — and pick New note. The new note opens with its name selected, so you can type it right away.",
     },
     copycat: {
       name: "Copycat",
@@ -383,7 +383,7 @@ const achievements = {
       name: "Shuffle up",
       condition: "Move selected lines up or down the note.",
       learnMore:
-        "Select whole lines — by hand, or by picking them in select mode — and two chevrons appear beside the formatting button. They shuffle what you have selected one row up or down the note, carrying the lines with them so a second press carries on where the first left off, which is how a list gets reordered without a single cut and paste. Lines that are not next to each other each swap with their own neighbor, and a run already at the top or bottom simply stays put. Alt+↑ and Alt+↓ do the same from the keyboard — the shortcut every code editor binds — and with nothing selected they move the line the cursor is on.",
+        "Select whole lines — by hand, or by picking them in select mode — and two chevrons appear beside the formatting button. They shuffle what you have selected one row up or down the note, carrying the lines with them so a second press picks up where the first left off, which is how a list gets reordered without a single cut and paste. Lines that are not next to each other each swap with their own neighbor, and a run already at the top or bottom simply stays put. Alt+↑ and Alt+↓ do the same from the keyboard — the shortcut every code editor binds — and with nothing selected they move the line the cursor is on.",
     },
     manyHands: {
       name: "Many hands",

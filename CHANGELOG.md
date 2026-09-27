@@ -74,10 +74,10 @@ predate the pipeline.
 - **Transform rules per namespace** — A Transform rule now belongs to a namespace — work and home can rewrite
   different things — with an **Applies to** picker on the rule and a scope chip
   in the list; existing rules keep running in every namespace.
-- **Sentences start with a capital** — The editor now writes the capital that opens a sentence — after a full stop,
-  question mark or exclamation mark, and at the start of a line — so the
-  capitalisation your keyboard stopped applying inside a note is back, and works
-  the same on a computer; turn it off with **Capitalise sentences** in
+- **Sentences start with a capital** — The editor now writes the capital that opens a sentence — after a period,
+  question mark or exclamation point, and at the start of a line — so the
+  capitalization your keyboard stopped applying inside a note is back, and works
+  the same on a computer; turn it off with **Capitalize sentences** in
   Settings → Editor.
 - **Favorite notes** — The star at the left of a note's header marks it a favorite and lifts it into a
   new **Favorites** section above the note list in the side menu — listed flat
@@ -222,7 +222,7 @@ predate the pipeline.
   the caret instead of jumping to the same spot no matter where you tapped.
 - **Edge swipes no longer open a note** — Swiping inward from the left or right screen edge is now reserved for the side
   menu, so it no longer opens or archives the note it passed over.
-- **Double-tapping space ends the sentence again** — Tapping space twice at the end of a word writes a full stop again — the note
+- **Double-tapping space ends the sentence again** — Tapping space twice at the end of a word writes a period again — the note
   editor now applies the shortcut itself, so it works the same on a phone, on a
   computer, and in the desktop and mobile apps.
 - **Pressing a line number while writing** — Pressing a line number in a note you are already editing now selects that line
@@ -262,7 +262,7 @@ predate the pipeline.
 - **Typing a dash and pressing Enter draws a divider** — A `-` typed on its own line now stays the divider it looks like and Enter moves
   on to the next line, instead of the dash being swallowed when the note has a
   list further up.
-- **Undoing a deletion brings the note's text back** — Undoing a deleted note — including the Undo on the toast that follows ticking a
+- **Undoing a deletion brings the note's text back** — Undoing a deleted note — including the Undo on the toast that follows checking a
   dropzone note off — restores it with everything that was written in it, rather
   than as an empty note.
 - **Export failure toast** — Exporting a note to PDF or MD from a page opened before the latest deploy no longer fails silently — the export menu now shows an "Export failed" toast with a Reload action instead.
@@ -436,7 +436,7 @@ predate the pipeline.
 - **Logs tab restyle** — The Logs settings tab now lists each entry as a card with a level-coloured left rail and the message on its own line, and filters by level through a dropdown.
 - **Archive is now a page** — The archive moved to the foot of the notes list with a count badge and opens as a full page (not a dialog), so you can swipe the side menu open over it; tapping an archived note shows it read-only with floating Restore and Delete actions, and Restore reopens it editable.
 - **Note titles head the page** — The note title now heads the editor beside the app glyph and the Back button is gone — return to the overview with the new "Show all" entry in the side menu, which keeps its list focused on your most recent notes.
-- **Tap a note title to select it** — Clicking or tabbing into a note's title now selects the whole title, so you can rename it by typing straight away instead of erasing it first.
+- **Tap a note title to select it** — Clicking or tabbing into a note's title now selects the whole title, so you can rename it by typing right away instead of erasing it first.
 - **New notes open ready to be named** — A new note opens with its title selected so you can rename it by just typing, and on folder/cloud backends its file isn't written until you leave the title — so it's created already bearing the right name instead of being saved under a default and renamed.
 - **Archive from the side menu** — Right-swipe a note in the side menu to archive it, mirroring the overview, and the editor drops its now-redundant top-right delete button.
 - **Transparent favicon** — The browser-tab favicon is now just the note glyph on a transparent background, with the dark backing square removed.
@@ -448,7 +448,7 @@ predate the pipeline.
 - **Custom copy-scope dropdown** — The Editor tab's copy-button behaviour picker is now a themed custom dropdown with full keyboard navigation, replacing the native select.
 - **Calmer note opening and centred titles** — Opening an existing note no longer pops the soft keyboard — focus stays out until you tap where to type — and a short note title is now vertically centred against the header icons, top-aligning only once it wraps onto a second line.
 - **Grouped editor settings** — The Editor settings tab now groups its controls into focused sections — New notes, Writing column, Markdown, Typing aids, and Copying — instead of one long list.
-- **One-tap delete in the side menu** — Deleting a note from the side menu no longer asks for a confirming second tap — the trash button a left swipe reveals deletes straight away, since deletions are undoable.
+- **One-tap delete in the side menu** — Deleting a note from the side menu no longer asks for a confirming second tap — the trash button a left swipe reveals deletes right away, since deletions are undoable.
 - **Undo / redo buttons** — The side menu's Undo and Redo now sit as a compact pair of side-by-side buttons pinned to the foot of the drawer, just above the Source link, so they stay within thumb's reach instead of taking two full rows in an Edit section.
 - **Image viewer gallery, swipe-to-dismiss, and tidy previews** — The full-size image viewer is now a gallery — swipe up or down (or tap the X, the backdrop, or Escape) to dismiss, and step through a note's images with the on-screen arrows, the arrow keys, or a left/right swipe, with the neighbouring images peeking in at the edges on a wide screen the way Finder does; deleting an image from a note now also removes its underlying attachment, and image markdown no longer clutters a note's preview in the overview.
 - **Desktop "New note" button** — On wider screens — where the side menu is docked as a permanent sidebar — the round floating (+) button now relaxes into a clearly-styled, in-flow "New note" pill, so it no longer reads as an awkward puck beside the pinned chrome; the circular floating action button is kept on narrow viewports.

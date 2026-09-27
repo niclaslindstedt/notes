@@ -88,7 +88,7 @@ const settings = {
       "Collect attached files (anything that isn't an image) in a block at the foot of the note instead of inline.",
     capitaliseSentences: "Capitalize sentences",
     capitaliseSentencesHint:
-      "Start every sentence with a capital as you type — after a period, question mark or exclamation point, and at the start of a line. Code blocks are left alone, and the capital is an ordinary edit, so Backspace or Undo takes it straight back off.",
+      "Start every sentence with a capital as you type — after a period, question mark or exclamation point, and at the start of a line. Code blocks are left alone, and the capital is an ordinary edit, so Backspace or Undo takes it right back off.",
     disableSpellcheck: "Disable spell check",
     disableSpellcheckHint:
       "Stop your device checking spelling as you type, hiding the red squiggles.",
@@ -245,7 +245,7 @@ const settings = {
     codeBackgroundCustom: "Custom",
     bullet: "Bullet",
     bulletHint:
-      "The bullet on a top-level list item ({name}). Nested levels carry on through the other glyphs, so each level stays distinct.",
+      "The bullet on a top-level list item ({name}). Nested levels continue through the other glyphs, so each level stays distinct.",
     bulletDisc: "Disc",
     bulletCircle: "Circle",
     bulletSquare: "Square",

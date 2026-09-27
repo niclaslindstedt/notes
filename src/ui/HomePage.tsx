@@ -206,7 +206,7 @@ export function HomePage() {
               <kbd>Shift</kbd>+<kbd>Tab</kbd> to pull it back out. Press{" "}
               <kbd>Enter</kbd> on an empty row to step back out of the list, or{" "}
               <kbd>Shift</kbd>+<kbd>Enter</kbd> to add another line to the point
-              you are already on. Quotes carry on the same way.
+              you are already on. Quotes continue the same way.
             </li>
             <li>
               Checklists you can actually check off. A row written{" "}
@@ -224,8 +224,8 @@ export function HomePage() {
               &mdash; by hand, or by picking them in select mode &mdash; and two
               chevrons appear beside the formatting button that shuffle what you
               have selected one row up or down the note. The lines stay
-              selected, so a second press carries on where the first left off,
-              and lines that are not next to each other each swap with their own
+              selected, so a second press picks up where the first left off, and
+              lines that are not next to each other each swap with their own
               neighbor. <kbd>Alt</kbd>+<kbd>&uarr;</kbd> and <kbd>Alt</kbd>+
               <kbd>&darr;</kbd> do the same from the keyboard &mdash; the
               shortcut every code editor binds &mdash; and with nothing selected
