@@ -41,8 +41,8 @@ predate the pipeline.
   puts the code — and nothing else — on your clipboard in one tap, without
   placing the cursor in the note; blocks gained rounded corners and a little
   breathing room at their top and bottom to hold it.
-- **Tickable checkboxes** — A list row written `- [ ] milk` now renders as a real checkbox you can press to
-  tick the item off — writing `- [x]` straight into the Markdown, without opening
+- **Tappable checkboxes** — A list row written `- [ ] milk` now renders as a real checkbox you can press to
+  check the item off — writing `- [x]` straight into the Markdown, without opening
   the editor or raising the keyboard.
 - **Desktop app for Windows, macOS, and Linux** — Every release now ships downloadable desktop builds — Windows, Linux, and macOS
   for both Intel and Apple Silicon — that run the same app in its own window
@@ -103,7 +103,7 @@ predate the pipeline.
   exporting carry on as before, and the line-number gutter still selects a line so
   you can copy it.
 - **Page-number style and position for the PDF export** — Settings → Export now chooses how an exported PDF writes its page number —
-  `2 of 7`, `2 / 7` or a bare `2` — and whether it sits left, centre or right in
+  `2 of 7`, `2 / 7` or a bare `2` — and whether it sits left, center or right in
   the bottom margin.
 - **Collapse the sidebar on desktop** — Bring the pointer to the docked sidebar's inner edge and a slim full-height
   strip appears with a chevron that folds the whole menu away — go back to that
@@ -254,7 +254,7 @@ predate the pipeline.
 - **The Export settings no longer blank out when you flip a toggle** — Tapping "Print the title" or "Number the pages" scrolled the settings dialog's
   own frame away and left an empty card behind, and the "Custom" code-background
   swatch is now the same size and shape as the presets beside it — showing the
-  selected ring when the fill is a colour of your own.
+  selected ring when the fill is a color of your own.
 - **Autocorrect keeps the bullet** — Letting the phone's keyboard correct the first word of a list item, heading or
   quote no longer takes the leading marker with it — `4. Somethign` now becomes
   `4. Something` instead of `Something`.
@@ -292,7 +292,7 @@ predate the pipeline.
 
 ### Changed
 
-- **Clearer nested-list bullets** — Nested bulleted lists in the live preview now draw `•`, `-`, and `+` by level, using characters the app font renders so the markers stay crisp and centred on every device.
+- **Clearer nested-list bullets** — Nested bulleted lists in the live preview now draw `•`, `-`, and `+` by level, using characters the app font renders so the markers stay crisp and centered on every device.
 - **Smoother scroll into focus** — Tapping a line or field on mobile now glides it clear of the soft keyboard instead of snapping, respecting the reduced-motion preference.
 - **Undo a paragraph sentence by sentence** — Undo in the note editor now steps back one finished sentence at a time instead of wiping a whole typing burst in one go, so a long paragraph can be walked back sentence by sentence — while the sentence you're still typing stays whole until you move on to the next.
 - **Undo/redo scrolls to the change** — Undo and redo now scroll the editor to the part of the note being reverted or re-applied, so a change that happened off screen is revealed instead of shifting out of sight.
@@ -326,7 +326,7 @@ predate the pipeline.
 ### Changed
 
 - **Editor selection & navigation** — Rebuilt the live-preview editor on a single editable surface so Select All grabs the whole note, arrow keys glide across wrapped lines, and you can select across lines on mobile.
-- **Sharper list and divider rendering** — Ordered lists now number themselves sequentially (1., 2., 3.) whatever digits you type, nested lists indent and rotate their markers by depth (numeric → a. → i. for numbered, • → ◦ → ▪ for bulleted, the top-level bullet drawn a little larger and vertically centred on its line), and a line that is just a single `-` renders as a horizontal divider.
+- **Sharper list and divider rendering** — Ordered lists now number themselves sequentially (1., 2., 3.) whatever digits you type, nested lists indent and rotate their markers by depth (numeric → a. → i. for numbered, • → ◦ → ▪ for bulleted, the top-level bullet drawn a little larger and vertically centered on its line), and a line that is just a single `-` renders as a horizontal divider.
 
 ### Fixed
 
@@ -373,7 +373,7 @@ predate the pipeline.
 
 ### Changed
 
-- **Compact folder picker on mobile** — The editor's folder picker now shows just its icon on phones to save header space, and the icon glows in the accent colour when a note is filed in a folder.
+- **Compact folder picker on mobile** — The editor's folder picker now shows just its icon on phones to save header space, and the icon glows in the accent color when a note is filed in a folder.
 
 ### Fixed
 
@@ -384,17 +384,17 @@ predate the pipeline.
 
 ### Added
 
-- **Namespaces** — Keep separate, self-contained groups of notes — switch between them from the side menu, give each its own icon and colour, and sync each to its own shareable folder. [Learn more](feature:namespaces)
+- **Namespaces** — Keep separate, self-contained groups of notes — switch between them from the side menu, give each its own icon and color, and sync each to its own shareable folder. [Learn more](feature:namespaces)
 - **Live Markdown editor** — Notes now render Markdown as you write — headings, bold, italics, lists, quotes, code, links and more format inline, while the line your cursor is on stays raw source so it's always editable, just like Obsidian.
 - **Editor settings** — A new Editor settings tab adjusts the writing-column margins, toggles word wrap (off scrolls long lines sideways instead), and turns live Markdown rendering on or off.
 - **Enter starts your first note** — On the empty notes screen, pressing Enter now creates your first note without reaching for the mouse.
 - **Showcase homepage** — A public landing page at `/home` that introduces the app, describes what it does, and explains why cloud sync may request access to your own Google Drive or Dropbox — with a link to the privacy policy.
 - **What's new dialog** — A "What's new" dialog in the side menu lists every shipped release from the changelog, and a release note's "Learn more" link opens the matching feature doc inline.
 - **Undo and redo** — Creating, editing, and deleting notes is now recorded on an undo timeline — step back and forth with Ctrl/⌘+Z (and Ctrl/⌘+Shift+Z or Ctrl+Y to redo) or the new Undo / Redo entries in the side menu, so an accidental deletion or a regretted change is one tap away from coming back.
-- **Update download hint** — The header "Notes" wordmark now fills with the accent colour from the bottom as a new build downloads, and the "new version is ready" prompt was slimmed to a single-line reload hint.
+- **Update download hint** — The header "Notes" wordmark now fills with the accent color from the bottom as a new build downloads, and the "new version is ready" prompt was slimmed to a single-line reload hint.
 - **Achievements** — Earn trophies as you discover features — a header button lights up with what you've unlocked, opens a four-tier tour of the whole catalog, and can be switched off in Settings. [Learn more](feature:achievements)
 - **Languages** — The whole interface now speaks English and Swedish — pick one in Settings → General and the app follows your choice (it defaults to your device language and is remembered on this device).
-- **Spell check & autocorrect toggles** — Settings → Editor adds two independent toggles — disable spell check (hides the red squiggles) and disable auto correct (stops mobile autocorrect and auto-capitalisation) — handy for code, structured notes, or another language.
+- **Spell check & autocorrect toggles** — Settings → Editor adds two independent toggles — disable spell check (hides the red squiggles) and disable auto correct (stops mobile autocorrect and auto-capitalization) — handy for code, structured notes, or another language.
 - **Each note has its own title field** — A note's title is now a dedicated field at the top of the editor — typed there rather than as the first body line, rendered like a heading, and stored as `title:` in the markdown frontmatter; existing notes have their first line lifted into it automatically.
 - **Logs settings tab** — Settings has a Logs tab — a live, filterable, copyable view of the app's own diagnostics (ported from budget), so a sync problem like a phantom "changed on another device" conflict can be captured on a phone and pasted straight into a bug report.
 - **Developer mode** — Settings → General now has a developer-mode switch that reveals a Developer tab for diagnostics; the Logs tab and across-reloads log capture only appear once developer mode is on.
@@ -425,32 +425,32 @@ predate the pipeline.
 
 - **Tabbed settings** — Settings now open on a General tab with Appearance and Storage as their own tabs, and the General tab can hide the floating menu button (an edge swipe opens the menu in its place) on installed mobile.
 - **Cloud sync status glyph and details modal** — The header sync chip is now a single cloud glyph that morphs with the save state (synced, unsaved, saving, offline, or a clear error), and tapping it opens a details modal that spells out what sync is doing, why it failed, and the buttons to fix it — reconnect, save now, reload, or open the backend's folder.
-- **Cloud sync command centre** — The cloud-sync glyph now always opens a redesigned details dialog that shows live activity (which files are uploading, encryption progress note-by-note), the backend and at-rest encryption state side by side, a compact reload control beside the status, and an always-available sync log you can read without turning on developer mode.
+- **Cloud sync command center** — The cloud-sync glyph now always opens a redesigned details dialog that shows live activity (which files are uploading, encryption progress note-by-note), the backend and at-rest encryption state side by side, a compact reload control beside the status, and an always-available sync log you can read without turning on developer mode.
 - **Centered new-note button** — The floating new-note (+) button is now horizontally centered at the bottom of the screen instead of anchored to the right.
 - **Privacy policy covers sync backends** — The privacy policy now describes the optional folder, Dropbox, and Google Drive sync backends, the OAuth scopes they request, the at-rest encryption option, and the offline cache.
 - **Namespace switcher affordance** — The Namespaces heading now uses a cogwheel for its manage action, and the active namespace is marked with a check.
 - **Icon-only editor header buttons** — The editor's Back and Delete actions are now compact glyph buttons matching the sync and achievements affordances.
-- **Clearer sync conflict prompt** — When the same notes change on two devices, the conflict prompt now summarises each copy side by side (note and word counts) and stays open until you pick a side, so a conflict can't be dismissed by accident.
-- **Section-divided General settings** — The General settings tab is now split into labelled cards, and the language picker shows the English and Swedish flags.
+- **Clearer sync conflict prompt** — When the same notes change on two devices, the conflict prompt now summarizes each copy side by side (note and word counts) and stays open until you pick a side, so a conflict can't be dismissed by accident.
+- **Section-divided General settings** — The General settings tab is now split into labeled cards, and the language picker shows the English and Swedish flags.
 - **Note files now live in a notes/ subfolder** — On the folder and cloud backends each note's markdown file is now stored under a `notes/` subfolder (`<namespace>/notes/` for a namespace you created), apart from the `settings.json` beside it — existing notes kept at the old location won't appear until their `.md` files are moved into the new folder.
-- **Logs tab restyle** — The Logs settings tab now lists each entry as a card with a level-coloured left rail and the message on its own line, and filters by level through a dropdown.
+- **Logs tab restyle** — The Logs settings tab now lists each entry as a card with a level-colored left rail and the message on its own line, and filters by level through a dropdown.
 - **Archive is now a page** — The archive moved to the foot of the notes list with a count badge and opens as a full page (not a dialog), so you can swipe the side menu open over it; tapping an archived note shows it read-only with floating Restore and Delete actions, and Restore reopens it editable.
 - **Note titles head the page** — The note title now heads the editor beside the app glyph and the Back button is gone — return to the overview with the new "Show all" entry in the side menu, which keeps its list focused on your most recent notes.
 - **Tap a note title to select it** — Clicking or tabbing into a note's title now selects the whole title, so you can rename it by typing right away instead of erasing it first.
 - **New notes open ready to be named** — A new note opens with its title selected so you can rename it by just typing, and on folder/cloud backends its file isn't written until you leave the title — so it's created already bearing the right name instead of being saved under a default and renamed.
 - **Archive from the side menu** — Right-swipe a note in the side menu to archive it, mirroring the overview, and the editor drops its now-redundant top-right delete button.
 - **Transparent favicon** — The browser-tab favicon is now just the note glyph on a transparent background, with the dark backing square removed.
-- **Achievements moved to the side menu** — The achievements trophy now lives as a row in the side menu — tinted once you've earned your first one, greyed out until then, with a badge counting unacknowledged unlocks.
+- **Achievements moved to the side menu** — The achievements trophy now lives as a row in the side menu — tinted once you've earned your first one, grayed out until then, with a badge counting unacknowledged unlocks.
 - **Compact cloud sync details modal** — The cloud-sync details modal now opens as a compact centered card instead of filling the whole screen on mobile, so its short status content no longer leaves a sea of dead space.
 - **Wrapping note titles** — A long note title now wraps onto further lines in the editor header instead of being cut off, with the copy and sync buttons pinned to the top.
 - **Menu activation control** — The installed mobile app now picks how the side menu opens — floating button or right-swipe — with a segmented toggle instead of a single on/off switch.
 - **Note glyph opens the menu** — Pressing the document glyph beside a note's title now opens the side menu, and the glyph sits vertically aligned with the title.
-- **Custom copy-scope dropdown** — The Editor tab's copy-button behaviour picker is now a themed custom dropdown with full keyboard navigation, replacing the native select.
-- **Calmer note opening and centred titles** — Opening an existing note no longer pops the soft keyboard — focus stays out until you tap where to type — and a short note title is now vertically centred against the header icons, top-aligning only once it wraps onto a second line.
+- **Custom copy-scope dropdown** — The Editor tab's copy-button behavior picker is now a themed custom dropdown with full keyboard navigation, replacing the native select.
+- **Calmer note opening and centered titles** — Opening an existing note no longer pops the soft keyboard — focus stays out until you tap where to type — and a short note title is now vertically centered against the header icons, top-aligning only once it wraps onto a second line.
 - **Grouped editor settings** — The Editor settings tab now groups its controls into focused sections — New notes, Writing column, Markdown, Typing aids, and Copying — instead of one long list.
 - **One-tap delete in the side menu** — Deleting a note from the side menu no longer asks for a confirming second tap — the trash button a left swipe reveals deletes right away, since deletions are undoable.
 - **Undo / redo buttons** — The side menu's Undo and Redo now sit as a compact pair of side-by-side buttons pinned to the foot of the drawer, just above the Source link, so they stay within thumb's reach instead of taking two full rows in an Edit section.
-- **Image viewer gallery, swipe-to-dismiss, and tidy previews** — The full-size image viewer is now a gallery — swipe up or down (or tap the X, the backdrop, or Escape) to dismiss, and step through a note's images with the on-screen arrows, the arrow keys, or a left/right swipe, with the neighbouring images peeking in at the edges on a wide screen the way Finder does; deleting an image from a note now also removes its underlying attachment, and image markdown no longer clutters a note's preview in the overview.
+- **Image viewer gallery, swipe-to-dismiss, and tidy previews** — The full-size image viewer is now a gallery — swipe up or down (or tap the X, the backdrop, or Escape) to dismiss, and step through a note's images with the on-screen arrows, the arrow keys, or a left/right swipe, with the neighboring images peeking in at the edges on a wide screen the way Finder does; deleting an image from a note now also removes its underlying attachment, and image markdown no longer clutters a note's preview in the overview.
 - **Desktop "New note" button** — On wider screens — where the side menu is docked as a permanent sidebar — the round floating (+) button now relaxes into a clearly-styled, in-flow "New note" pill, so it no longer reads as an awkward puck beside the pinned chrome; the circular floating action button is kept on narrow viewports.
 - **Settings save bar** — The settings dialog now previews appearance changes live and only applies them on Save, with a Reset to defaults / Cancel / Save footer matching the rest of the app.
 - **Encryption runs in the background** — Turning at-rest encryption on or off on a folder/cloud backend now converts your notes one at a time in the background — you can close settings right away, and the status flashes exactly which note and attachment it's working on if you keep it open. [Learn more](feature:per-note-encryption)
@@ -520,7 +520,7 @@ predate the pipeline.
 - **Side menu** — A navigation drawer — docked as a sidebar on wide screens, a drag-out floating button on phones — that lists your notes and links to settings, the source, and the privacy policy.
 - **Settings dialog** — A settings dialog opens from the side menu — a skeleton for now, ready to fill as preferences arrive.
 - **Privacy policy** — A privacy policy is now served at /privacy, spelling out that notes never leave your device.
-- **Theme & appearance** — Settings now has an Appearance panel: pick from eleven built-in themes (One Dark/Light, Dracula, Monokai, GitHub, Solarized, Quiet Light, Excel) or System, choose a font and text size, and build a fully custom theme with your own colours, corner radius, density, and reduced motion.
+- **Theme & appearance** — Settings now has an Appearance panel: pick from eleven built-in themes (One Dark/Light, Dracula, Monokai, GitHub, Solarized, Quiet Light, Excel) or System, choose a font and text size, and build a fully custom theme with your own colors, corner radius, density, and reduced motion.
 - **Storage backends** — Choose where your notes live — this device, a local folder of markdown files, or your own Dropbox or Google Drive — with optional passphrase encryption and offline editing. [Learn more](feature:storage)
 
 ### Changed
