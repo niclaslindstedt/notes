@@ -162,7 +162,11 @@ describe("the review notes are true of the build", () => {
   });
 
   itAuthored("says so, naming the bundled site", () => {
-    expect(NOTES).toMatch(/webroot\.zip/);
+    // Naming the bundle is the evidence for guideline 4.2 that the app is in
+    // the download, so the notes name the file a reviewer would find in it:
+    // `assets/webroot.zip`, which the wrapper unpacks and serves to the web
+    // view from a loopback server on the device.
+    expect(NOTES).toMatch(/assets\/webroot\.zip/);
   });
 
   it("is right that nothing is sold", () => {
