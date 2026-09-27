@@ -107,18 +107,25 @@ if (worker.length) {
 // `--skip-build` would copy — carries them. Looks for whatever
 // `VITE_DONATE_URL` this shell has set, the unlock notice's copy, and the
 // achievements feature page's path, which the changelog's doc glob spells out.
+//
+// Nor a link back to the source (owner decision D17): no GitHub repository,
+// issues, releases or sponsor link, and not the author's handle anywhere —
+// web-edition domain, package name or meta tag included. The website keeps
+// those; the app has none. Every file but a binary asset is read,
+// extensionless ones too, so nothing slips past on its suffix.
 const needles = [
   ["a Donate link", process.env.VITE_DONATE_URL?.trim()],
   ["the achievements", "Achievement unlocked"],
   ["the achievements feature page", "docs/features/achievements.md"],
+  ["a link back to the source", "niclaslindstedt"],
 ].filter(([, needle]) => needle);
 function textFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) return textFiles(path);
-    return /\.(html|js|mjs|css|json|webmanifest|txt|xml)$/.test(entry.name)
-      ? [path]
-      : [];
+    return /\.(png|ico|jpe?g|webp|gif|woff2?|ttf|otf)$/i.test(entry.name)
+      ? []
+      : [path];
   });
 }
 for (const path of textFiles(OUT_DIR)) {

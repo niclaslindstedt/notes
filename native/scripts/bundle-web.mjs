@@ -103,16 +103,24 @@ if (count === 0 || !files["index.html"]) {
  *  filled some other way — a website build copied in, then re-zipped with
  *  `--skip-build` — would carry them. Looks for whatever `VITE_DONATE_URL`
  *  this shell has set, the unlock notice's copy, and the achievements feature
- *  page's path, which the changelog's doc glob spells out. */
+ *  page's path, which the changelog's doc glob spells out.
+ *
+ *  Nor may it carry a link back to the source (owner decision D17): no GitHub
+ *  repository, issues, releases or sponsor link, and not the author's handle
+ *  anywhere — web-edition domain, package name or meta tag included. The
+ *  website keeps those; the app has none. Every file but a binary asset is
+ *  read, extensionless ones too, so nothing slips past on its suffix. */
+const BINARY = /\.(png|ico|jpe?g|webp|gif|woff2?|ttf|otf)$/i;
 function assertWebsiteOnlyAbsent(files) {
   const needles = [
     ["a Donate link", process.env.VITE_DONATE_URL?.trim()],
     ["the achievements", "Achievement unlocked"],
     ["the achievements feature page", "docs/features/achievements.md"],
+    ["a link back to the source", "niclaslindstedt"],
   ].filter(([, needle]) => needle);
   const decoder = new TextDecoder();
   for (const [path, bytes] of Object.entries(files)) {
-    if (!/\.(html|js|mjs|css|json|webmanifest|txt|xml)$/.test(path)) continue;
+    if (BINARY.test(path)) continue;
     const text = decoder.decode(bytes);
     const hit = needles.find(([, needle]) => text.includes(needle));
     if (hit) {

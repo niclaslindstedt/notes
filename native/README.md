@@ -30,7 +30,8 @@ can't do on its own:
 Everything else — the UI, storage (`localStorage`), Markdown editor, themes,
 cloud backends, encryption — is the web app, unchanged, except that the phone
 build leaves out what the website alone carries (the Donate row, the
-achievements). There is
+achievements, and any link back to the source: `scripts/bundle-web.mjs`
+refuses a webroot that spells `niclaslindstedt` anywhere). There is
 **no** duplicated presentation layer, and the iCloud store decides nothing: it
 moves the bytes the web app hands it, which are already sealed when encryption
 is on.
