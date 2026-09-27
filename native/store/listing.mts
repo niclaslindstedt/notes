@@ -192,7 +192,7 @@ export const RULES: StoreRules = {
   brand: {
     projectName: "Notes",
     publisher: "Agilator AB",
-    marketingUrl: "https://notes.niclaslindstedt.se/",
+    marketingUrl: "https://apps.agilator.se/notes/",
     // Generated from one row in agilatorab/apps — see that repository's
     // AGENTS.md. A policy that claims less than the app does is a compliance
     // problem rather than a typo, so the row changes in the same release the
