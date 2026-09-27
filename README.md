@@ -88,7 +88,6 @@ list, including `make icons` (regenerate the PWA icon set) and `make bump` /
 | `tests/`     | Vitest suites, `*.test.ts(x)`, mirroring the `src/` concerns.  |
 | `native/`    | Expo WebView wrapper (thin — see its README).                 |
 | `tauri/`     | Tauri desktop wrapper (thin — see its README).                |
-| `notesd/`    | The retired self-hosted sync daemon; the app no longer uses it. |
 
 Dependency direction is `app → ui → domain` and `app → storage → domain`;
 eslint enforces that nothing in `domain/` reaches for the DOM or the layers

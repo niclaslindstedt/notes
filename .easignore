@@ -1,7 +1,7 @@
 # What `eas build` leaves out of the upload. EAS reads this file from the
 # repository root, and when it exists it is used INSTEAD of every .gitignore
 # in the tree — so the rules below are the .gitignore files' own (root,
-# native/, notesd/), with one deliberate difference:
+# native/), with one deliberate difference:
 #
 #   native/assets/webroot.zip is NOT ignored here. It is the packed web app,
 #   built by `npm run bundle` in native/ (in CI, by
@@ -76,4 +76,3 @@ tauri/target/
 tauri/webroot/*
 !tauri/webroot/.gitkeep
 tauri/src-tauri/gen/
-notesd/target/

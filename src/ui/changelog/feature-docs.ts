@@ -19,16 +19,14 @@ export {
 // relative to this file: `src/ui/changelog/` → repo root is three levels up,
 // then `docs/features/`. A "Learn more" link to a doc left out is inert.
 //
-// - `notesd.md` is left out of every build: the notesd backend it describes
-//   was removed from the app.
-// - `achievements.md` is left out of the phone and desktop builds
-//   (`__EMBEDDED__`), which have no achievements; the website keeps it.
+// `achievements.md` is left out of the phone and desktop builds
+// (`__EMBEDDED__`), which have no achievements; the website keeps it.
 const rawDocs = __EMBEDDED__
   ? import.meta.glob<string>(
-      ["../../../docs/features/*.md", "!**/notesd.md", "!**/achievements.md"],
+      ["../../../docs/features/*.md", "!**/achievements.md"],
       { query: "?raw", import: "default", eager: true },
     )
-  : import.meta.glob<string>(["../../../docs/features/*.md", "!**/notesd.md"], {
+  : import.meta.glob<string>(["../../../docs/features/*.md"], {
       query: "?raw",
       import: "default",
       eager: true,
