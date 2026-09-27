@@ -410,7 +410,7 @@ reuse them rather than re-porting:
 
 `main.tsx` does a `location.pathname` suffix switch to mount `PrivacyPage`,
 and `vite.config.ts`'s `emitPrivacyAlias` mirrors `index.html` to
-`privacy/index.html`. notes has **no SEO**, by owner decision, so unlike
+`privacy/index.html`. notes' website is unlisted (§11.3.12, AGENTS.md), so unlike
 checklist this alias does NOT splice per-route `<title>`/canonical — it's a
 verbatim copy, and it inherits `index.html`'s robots `noindex`. Don't port a
 splice, a sitemap or JSON-LD from checklist.

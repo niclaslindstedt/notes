@@ -97,6 +97,11 @@ the remaining 12 are listed here so they're a deliberate, tracked backlog
 rather than an accidental gap. Re-run the validator after changing anything in
 this list and keep it in sync.
 
+The website is unlisted (§11.3.12), so §11.3's SEO mandates and the §11.4.7
+Lighthouse gate do not apply; every page it emits carries a robots `noindex`.
+
+oss-spec:unlisted-website: the web build is a testing surface; users install the app from its store listing
+
 **Deferred — intended, but not built yet (do these as the project matures):**
 
 - **§13.5 `prompts/`** — no versioned prompt library; nothing in the app uses
@@ -107,11 +112,6 @@ this list and keep it in sync.
   as not-applicable rather than missing — revisit if a CLI/build tool is added.
 
 **Deliberate, permanent deviations (not bugs — don't "fix" these):**
-
-- **§11.3 SEO and the §11.4 Lighthouse gate** — no SEO and no size budgets, by
-  owner decision: the site is not meant to be found, so every page it emits
-  carries `<meta name="robots" content="noindex">`, and there is no sitemap,
-  structured data, `llms.txt`, Lighthouse gate or bundle-size ceiling.
 
 - **§3 README shape / §11.4.6 installability in the README** — `README.md` is
   a **contributor's** front page, not a product page: prerequisites, install,

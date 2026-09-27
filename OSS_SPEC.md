@@ -1,7 +1,7 @@
 ---
 title: Open Source Project Bootstrap Specification
 description: A prescriptive, language-agnostic specification for bootstrapping a new open source project with the licensing, documentation, automation, governance, and release plumbing that users and contributors expect from a well-run OSS codebase.
-version: 2.9.0
+version: 2.12.0
 ---
 
 # Open Source Project Bootstrap Specification
@@ -204,6 +204,9 @@ guidance. It must live at the repository root and cover:
   website must be regenerated whenever source-derived content changes.
 - **Maintenance skills** — a pointer to §21 describing the agent
   skills the project ships for keeping drift-prone artifacts in sync.
+- **Scientific references** (§24 projects only) — where the
+  references registry lives, the `[ref:<id>]` tag syntax, and the test
+  that keeps the two in step.
 
 ### 7.1 Tool-specific files as symlinks
 
@@ -869,6 +872,13 @@ descriptions, schema.org types, and keywords must be tailored to the
 project's audience, but the *structure* applies to every website that
 follows this spec.
 
+The one exception is a website that exists only as a **testing
+surface** — a web build of an app that users find and install through
+some other channel, such as an app store. Such a project declares its
+website *unlisted* (§11.3.12); §11.3.1–§11.3.11 then do not apply, and
+§11.3.12 requires the opposite signal instead: every page asks search
+engines not to index it.
+
 #### 11.3.1 Prerendered HTML body — never an empty SPA shell
 
 Every public URL the website serves must return HTML whose `<body>`
@@ -1082,7 +1092,8 @@ Achieved through:
 
 Two workflows guard the SEO surfaces, separate from the unit-test
 pipeline (§10). Both are required (§19) alongside `pages.yml` for any
-spec-conforming project.
+spec-conforming project, except one whose website is unlisted
+(§11.3.12).
 
 **`seo` — structural assertions.** A Node/TypeScript script
 (`website/scripts/check-seo.{ts,mjs}`) walks every HTML file under
@@ -1144,6 +1155,68 @@ The README's badge row (§3) carries `ci`, `seo` (the structural
 check from §11.3.10), `pages` (deploy status), and `license`. The
 two quality-gate badges sit next to each other so a single glance at
 the README answers "is the discoverability surface healthy".
+
+#### 11.3.12 Unlisted websites — a testing surface, not a public site
+
+Some projects deploy a website that nobody is meant to find. The
+typical case is an app whose real distribution is an app store: the
+web build is deployed so maintainers and testers can try every commit
+on a real device, but a user who searches for the app should land on
+its store listing, not on the web build. For such a project the rest
+of §11.3 is actively harmful — a sitemap, `llms.txt`, and structured
+data invite crawlers to index a surface that competes with the real
+listing.
+
+**Declaring it.** The project declares its website unlisted with a
+marker line anywhere in `AGENTS.md` (§7), in the same form as the
+§20.5.1 exception marker:
+
+```text
+oss-spec:unlisted-website: <reason>
+```
+
+The reason is required and must be non-empty — say why the site is
+not meant to be found (for example, "the web build is a testing
+surface; users install the app from its store listing"). `AGENTS.md`
+is the place because it is the file every contributor and agent reads
+first, so the exemption is visible where the project's other
+deviations are explained. A marker without a reason does not count.
+
+**What no longer applies.** For an unlisted website, §11.3.1–§11.3.11
+do not apply: no prerendering or per-route SEO `<head>` mandate, no
+JSON-LD, no sitemap, no `llms.txt`, no feeds or per-item OG images,
+no page-weight budget, no `seo` or `lighthouse` workflow, no
+`lighthouserc` config, and no `seo` badge in the README. §11.4.7
+(the Lighthouse PWA category) falls away with the Lighthouse workflow
+it extends. The rest of §11 still applies: the site is built from
+source and deployed on every push (§10.4, §11.2), a web app is still
+a complete PWA (§11.4.1–§11.4.6, §11.4.8), and slots still work as
+in §11.5.
+
+**What is required instead.**
+
+- Every page the site serves must carry
+  `<meta name="robots" content="noindex">` (`noindex,nofollow` is
+  also acceptable). This is the signal that keeps the site out of
+  search results, and it is the one the validator checks for.
+- `robots.txt`, if the site ships one, must allow crawling
+  (`User-agent: *` / `Allow: /`) and must not `Disallow: /`. A crawler
+  that is forbidden to fetch a page never reads its `noindex`, and a
+  URL it finds through an external link can still be indexed without
+  its content — so blocking crawling defeats the purpose.
+- The site should not ship a `sitemap.xml`, an `llms.txt`, JSON-LD,
+  or a `<link rel="canonical">`. Each of them asks to be indexed and
+  contradicts the `noindex`.
+
+Open Graph and Twitter Card tags may stay: they only shape the
+preview when someone shares a link, which testers still do.
+
+The deterministic conformance check (§19) reads the marker and, when
+it is present, skips the §11.3 scaffolding check, the `seo.yml` /
+`lighthouse.yml` workflow requirement, and the §11.4.7 Lighthouse PWA
+assertion. In their place it requires a robots `noindex` meta tag in
+the website's source and reports any `robots.txt` that disallows the
+whole site.
 
 ### 11.4 Progressive Web App requirements
 
@@ -1316,6 +1389,9 @@ projects that opt into PWA. The `lighthouserc.json` config asserts
 fail CI. The same workflow already gates SEO and performance; adding
 the PWA category is a one-line config change.
 
+A project whose website is unlisted (§11.3.12) has no Lighthouse
+workflow, so this subsection does not apply to it.
+
 #### 11.4.8 Disjoint scopes for preview deployments (recommended)
 
 Projects that publish a preview slot alongside production (e.g. `/`
@@ -1380,7 +1456,8 @@ Only the production slot is indexable and only the production slot
 carries the analytics tracker (§11.3, §11.3.10). Secondary slots must
 ship `noindex,nofollow` so search engines never index a second copy
 of the app, and must omit the tracker so dogfooding and review traffic
-never pollute production metrics. Each slot is otherwise a complete,
+never pollute production metrics. When the website is unlisted
+(§11.3.12), no slot is indexable: production ships `noindex` too. Each slot is otherwise a complete,
 independently installable PWA with disjoint identity per §11.4.8.
 
 #### 11.5.2 One deploy, several packages
@@ -2107,13 +2184,13 @@ the code, improved over time, and re-run on demand.
 Agent skills live at:
 
 ```
-.agent/skills/<skill-name>/SKILL.md
+.agents/skills/<skill-name>/SKILL.md
 ```
 
-`.agent/` is the generic, tool-neutral home for any file an AI coding
+`.agents/` is the generic, tool-neutral home for any file an AI coding
 agent needs but a human typically does not. Tool-specific directories
 (e.g. `.claude/skills/` for Claude Code) must be **symbolic links** to
-`.agent/skills/` so that any tool which discovers skills from a fixed
+`.agents/skills/` so that any tool which discovers skills from a fixed
 path sees the same canonical set. This is the same single-source-of-
 truth rule as §7.1.
 
@@ -2121,7 +2198,7 @@ Required directory symlinks:
 
 | Link path            | Tool          | Target            |
 |----------------------|---------------|-------------------|
-| `.claude/skills`     | Claude Code   | `../.agent/skills`|
+| `.claude/skills`     | Claude Code   | `../.agents/skills`|
 
 Additional tool-specific paths may be added as support lands, but every
 such path must be a symlink — editing skills through a tool-specific
@@ -2177,7 +2254,7 @@ Every `SKILL.md` must contain:
 Each skill directory must contain a `.last-updated` file:
 
 ```
-.agent/skills/<skill-name>/.last-updated
+.agents/skills/<skill-name>/.last-updated
 ```
 
 It holds a single line: the git commit hash of the last successful run
@@ -2230,7 +2307,7 @@ Y" bug report.
 In addition to the per-artifact skills above, every project must ship a
 **`maintenance`** skill whose sole job is to dispatch to the individual
 `update-*` skills in the correct order and aggregate their output.
-`.agent/skills/maintenance/SKILL.md` is the entry point for any agent
+`.agents/skills/maintenance/SKILL.md` is the entry point for any agent
 that wants to bring the whole repository back into sync without first
 diagnosing *which* artifact is stale.
 
@@ -2271,7 +2348,7 @@ other skills, runs them in order, aggregates the combined diff, and
 The `AGENTS.md` file (§7) must include a **Maintenance skills** section
 that lists every skill the project ships and describes when each one
 should run. This is the discovery surface for agents that do not yet
-autoload skills from `.agent/skills/`.
+autoload skills from `.agents/skills/`.
 
 ## 22. Bootstrap checklist
 
@@ -2329,13 +2406,13 @@ checked before the first public tag.
 [ ] Central output module, no raw print statements       (§19.4)
 [ ] Always-on debug log file                             (§19.2)
 [ ] --debug flag for verbose terminal output             (§19.3)
-[ ] .agent/skills/update-readme/ with SKILL.md +
+[ ] .agents/skills/update-readme/ with SKILL.md +
     .last-updated                                       (§21.5)
-[ ] .agent/skills/update-docs/ with SKILL.md +
+[ ] .agents/skills/update-docs/ with SKILL.md +
     .last-updated                                       (§21.5)
-[ ] .agent/skills/maintenance/ umbrella skill routing
+[ ] .agents/skills/maintenance/ umbrella skill routing
     to every update-* skill                             (§21.6)
-[ ] .claude/skills symlinked to ../.agent/skills         (§21.2)
+[ ] .claude/skills symlinked to ../.agents/skills         (§21.2)
 [ ] AGENTS.md documents maintenance skills                (§21.8)
 
 CLI projects additionally:
@@ -2349,8 +2426,15 @@ CLI projects additionally:
     <name> --examples                                   (§12.4)
 [ ] CI check: manpage ↔ flag parity                     (§12.3)
 [ ] CI snapshot test: --help-agent / --debug-agent      (§12.1, §12.2)
-[ ] .agent/skills/update-manpages/ with SKILL.md +
+[ ] .agents/skills/update-manpages/ with SKILL.md +
     .last-updated                                       (§21.5)
+
+Projects whose purpose rests on scientific claims (§24.1) additionally:
+
+[ ] docs/references.json registry, complete per entry   (§24.2)
+[ ] [ref:<id>] tags beside every cited number; tags and
+    registry agree                                      (§24.3)
+[ ] References shown to users, read from the registry   (§24.4)
 ```
 
 A repository that satisfies this checklist has the foundational
@@ -2375,7 +2459,7 @@ The tailoring pass MUST operate only on the **scaffolding layer**:
 - `README.md`
 - `AGENTS.md` (and leave its symlinks alone — §7.1)
 - `docs/**`
-- `.agent/skills/**`
+- `.agents/skills/**`
 - `.github/workflows/**`, `.github/ISSUE_TEMPLATE/**`,
   `.github/PULL_REQUEST_TEMPLATE.md`
 - `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`
@@ -2442,4 +2526,280 @@ proposals.
     is skipped                                             (§23.4)
 [ ] Tailoring prompt under prompts/<name>/<major>_<minor>_<patch>.md
     with YAML front matter                                 (§23.5)
+```
+
+---
+
+## 24. Scientific references — the registry behind every claim
+
+### 24.1 Scope — when this section applies
+
+**If the project exists to compute, show, or act on a scientific
+claim, every number that claim rests on must be traceable to a
+published source.** This section applies to projects whose *main
+purpose* depends on the literature being right:
+
+- health, medical, and wellbeing apps — a symptom or growth tracker, a
+  dosage or nutrition calculator, a sleep or fertility app, anything
+  that compares a person's data against a recommendation or a norm;
+- tools and libraries that implement a published scientific algorithm,
+  model, or standard — a clinical score, an epidemiological estimator,
+  a z-score against a reference population, a psychometric scale, a
+  physical or chemical model whose constants come from a paper;
+- apps whose output is itself a scientific claim — an emissions or
+  exposure calculator, an evidence summary, a diet or training plan
+  justified by studies;
+- health logs that do little more than record — a medication or
+  symptom diary — once they derive a figure by a published definition
+  (an adherence share, a cycle day, a phase of the cycle) or bundle
+  published reference data (product strengths from a medicines
+  register). The figure is still a claim: a user reads "92% adherent"
+  as a statement about their treatment.
+
+It does **not** apply when citations are incidental to the project's
+purpose: a sorting library that links the paper its algorithm came
+from, a game with a physics engine, a CLI that quotes an RFC. The
+discriminator is intent, as in §11.4: if a user would be *misled* by a
+wrong constant — because the project's whole point is to tell them
+something about their health, their environment, or the world — §24
+applies; if a wrong constant is just a bug, it does not.
+
+Projects opt in by adding the registry (§24.2). The validator treats the
+presence of `docs/references.json` or of any citation tag (§24.3) in the
+source tree as opt-in, and from then on requires the whole shape. A
+project that makes scientific claims **without** a registry is out of
+conformance even though no deterministic check can see it; that
+judgement is part of the agent review (§24.8).
+
+### 24.2 The registry — `docs/references.json`
+
+Every source the project's numbers, thresholds, algorithms, and
+user-facing claims rest on lives in **one machine-readable file**,
+`docs/references.json`, keyed by a stable id:
+
+```json
+{
+  "references": {
+    "galland-2012": {
+      "evidence": "systematic-review",
+      "authors": ["Galland BC", "Taylor BJ", "Elder DE", "Herbison P"],
+      "title": "Normal sleep patterns in infants and children: a systematic review of observational studies",
+      "container": "Sleep Medicine Reviews",
+      "year": 2012,
+      "volume": "16",
+      "issue": "3",
+      "pages": "213–222",
+      "doi": "10.1016/j.smrv.2011.06.001",
+      "language": "en",
+      "quotes": [
+        {
+          "text": "≈6 months 12.9 (8.8–17.0)",
+          "at": "table 2, sleep duration in hours per 24 h"
+        }
+      ],
+      "supports": "The observed range of total sleep at each age.",
+      "usedBy": ["src/sleep.ts"]
+    }
+  }
+}
+```
+
+The file is JSON so that every language, the validator, and a build
+step can read it without a parser of its own. Its top level is an
+object with a `references` object; anything else at the top level
+(a `$comment`, a `$schema`) is ignored.
+
+**Ids** are kebab-case (`^[a-z0-9]+(-[a-z0-9]+)*$`) and stable: an id is
+the name code cites, so renaming one is a change to every file that
+cites it, and a removed id is never reused for a different source.
+The convention is `<first-author-or-organization>-<year>` with a
+disambiguating suffix when needed.
+
+**Required fields** of every entry:
+
+| Field | What it holds |
+|---|---|
+| `title` | The source's title, as published. |
+| `year` | Year of publication, as an integer. |
+| `authors` **or** `organization` | A non-empty list of authors (`"Surname Initials"`), or the publishing body for guidelines and health-service pages. |
+| `doi`, `url`, **or** `isbn` | At least one way to find the source again. A `doi` is bare (`10.xxxx/…`, no resolver prefix); a `url` is `https://`. |
+| `evidence` | The kind of evidence, from the vocabulary below. |
+| `quotes` | A non-empty list of `{ "text": …, "at"?: … }` — the **verbatim** words, table cells, or equations the project's numbers were taken from, in the source's own language, with `at` locating them (page, table, section). |
+| `supports` | One or two sentences: what the project uses this source for. |
+| `usedBy` | The repository-relative paths of every file that cites the entry (§24.3), and only those. |
+
+**Optional fields:** `container` (journal, publisher, or site),
+`volume`, `issue`, `pages`, `language` (a BCP 47 tag — the language
+of the quotes), `accessed` (`YYYY-MM-DD`; **should** be set for any
+entry cited by `url` alone, since web pages change), and `note` (errata,
+discrepancies between the abstract and the tables, why one edition
+was chosen over another).
+
+Two optional fields serve the in-product view (§24.4), and have a
+shape the validator checks when they are present:
+
+| Field | What it holds |
+|---|---|
+| `summary` | The line a *user* reads about what in the product rests on the source — `supports` is written for a contributor — keyed by BCP 47 language tag, one non-empty string per language the UI speaks: `{ "en": "…", "sv": "…" }`. |
+| `topics` | A non-empty list of kebab-case names for the parts of the product the entry is listed under on the references screen — its screens, trackers, or models (`["sleep"]`, `["cycle", "fertility"]`). The project owns the vocabulary. |
+
+A project may add further fields of its own, and the validator ignores
+them. A project that shows `summary` or groups by `topics` **should**
+require them on every entry in its own test (§24.3), so the view never
+falls back to a contributor's sentence or leaves a source ungrouped.
+
+**Evidence vocabulary.** `evidence` is one of:
+
+| Value | Use for |
+|---|---|
+| `guideline` | An official recommendation from a public-health body or professional society (WHO, a national agency, a clinical guideline). |
+| `consensus` | A consensus or position statement from an expert panel. |
+| `systematic-review` | A systematic review, with or without meta-analysis. |
+| `meta-analysis` | A meta-analysis published on its own. |
+| `randomized-trial` | A randomized controlled trial. |
+| `cohort` | A cohort or other longitudinal observational study. |
+| `clinical-study` | Any other primary clinical or observational study. |
+| `review` | A narrative (non-systematic) review. |
+| `method` | The paper that defines an algorithm, model, statistical method, or measurement standard the code implements. |
+| `dataset` | Published reference data — growth tables, population norms, constants. |
+| `health-service` | Practitioner guidance from a health service or public information site, where no primary source is published. |
+
+The vocabulary exists so a reader can weigh a claim at a glance: a
+wake window from a health-service page and a sleep duration from a
+systematic review are not the same kind of fact, and the project must
+not present them as if they were.
+
+### 24.3 Citation tags — `[ref:<id>]` beside the number
+
+Code cites a registry entry with a **citation tag**, `[ref:<id>]`, in
+the comment beside the number, threshold, table, or algorithm it
+supports:
+
+```ts
+/** Recommended total sleep per 24 hours, in hours: 12–16 at 4–12
+ *  months, 11–14 at 1–2 years [ref:who-2019-under5]. */
+```
+
+A claim that reaches the user as copy rather than as code — a sentence
+in a string catalog, a tooltip, a help page generated from source —
+carries its tag in a comment above the string. The prose around the
+tag may say as much as the author likes; the tag is what makes the
+citation checkable.
+
+**A design choice is not a claim, and must not be dressed as one.** A
+model has constants no paper supplies — a smoothing kernel, a prior's
+strength, a clamp on how far one kind of evidence may move a result, a
+minimum sample before a figure is shown. They carry no tag; their
+comment says why the value was chosen and says plainly that it is a
+choice. Where a choice is *derived from* a published number — a
+window sized to cover a phase whose length a study reports — the
+published number is tagged, and the comment shows the step from it to
+the choice. Where the code deliberately departs from a source — a
+margin tighter than a textbook rule because the readings were cleaned
+first — the tag stays on the source and the comment names the
+departure and the reason. A reader must be able to tell, at every
+number, which of the three it is.
+
+The validator counts tags in the §20.5 source tree: non-test files
+(§20.2) with a source extension under `src/` or `lib/`, outside
+`tests/` and the usual build and vendor directories. It enforces:
+
+1. **Every tag resolves** — each `[ref:<id>]` names an entry in the
+   registry.
+2. **Every entry is cited** — an entry no source file tags is either a
+   leftover or a claim that lost its citation.
+3. **`usedBy` is exact** — each entry's `usedBy` lists precisely the
+   files that tag it, so a reader of the registry can go straight to
+   the code a source feeds.
+4. **Every entry is complete** — the required fields of §24.2 are
+   present and well-formed.
+
+A project **should** mirror these four rules in its own test suite
+(e.g. `tests/references_test.<ext>`) so a contributor sees the failure
+locally before CI runs the validator.
+
+### 24.4 Surfacing the references to users
+
+**The people a project makes claims to must be able to read its
+sources.** The registry is not only documentation for contributors:
+
+- A project with a user interface (a web app, a mobile or desktop
+  app, a TUI) **must** ship an in-product view — an About,
+  Sources, or References screen — that lists every registry entry
+  with its citation, a link to the DOI or URL, its evidence kind, and
+  what the project uses it for (its `summary` in the UI's language
+  when it has one, else `supports`). It **should** also let the user
+  read the entry's `quotes`, so the claim can be checked against the
+  source's own words without leaving the product. It must be reachable from the
+  settings or about surface without an account and without a network
+  call: the references are bundled with the app, like any other data
+  the app reads. Links out to the sources are user-initiated
+  navigation, never prefetched.
+- A library or CLI **must** publish the registry as a rendered page
+  (`docs/references.md` generated from it, or a page on the §11.2
+  website), and a CLI **should** expose it from the command line (a
+  `references` subcommand, or a `docs references` topic per §12.3).
+
+In every case the view reads the registry — directly, through a
+module that imports it, or through a file generated from it at build
+time — and **never a hand-maintained copy**. The validator checks that
+at least one non-test source or build file reads `references.json`.
+
+### 24.5 Claims, not authority
+
+A project under §24 compares the user's data with published
+recommendations; it is not a clinician, and its copy must not imply
+that it is. Output outside a reference range is framed as a reason to
+look, not a verdict. Health projects **must** carry a plain-language
+disclaimer on the same surface as the references (§24.4) saying what
+the project is and is not, and **should** name, next to each
+assessment, the source it was compared against.
+
+### 24.6 Changing a claim
+
+A change to a cited number is a change to a claim the project makes to
+its users. In the same pull request:
+
+- update the value next to its tag, and the entry's `quotes` so they
+  still contain the words the new value was taken from;
+- add an entry (and a tag) for every new source, and remove the entry
+  for a source no longer cited;
+- update the documentation topic that explains the number (the
+  `docs/` page the AGENTS.md sync table names).
+
+**Never invent a reference, a DOI, or a quote.** An automated fixer
+(such as `oss-spec fix`) may correct `usedBy` lists mechanically, but a
+missing entry, an empty `quotes` list, or an unresolved tag is left for
+a human who has read the source.
+
+### 24.7 AGENTS.md integration
+
+A project under §24 documents the registry in `AGENTS.md` (§7): where
+it lives, the tag syntax, the evidence vocabulary, which test enforces
+it, and a row in the "Documentation sync points" table ("A `[ref:<id>]`
+tag anywhere → `docs/references.json`, the entry, its quotes, and its
+`usedBy`"). The "Where new code goes" table routes "a change to a
+recommendation or threshold" to the module that holds it, next to its
+tag, plus the registry entry.
+
+### 24.8 Checklist
+
+```
+[ ] docs/references.json with a `references` object keyed
+    by kebab-case ids                                      (§24.2)
+[ ] Every entry has title, year, authors/organization,
+    doi/url/isbn, evidence, verbatim quotes, supports,
+    and usedBy                                             (§24.2)
+[ ] summary / topics, where used, in shape on every entry  (§24.2)
+[ ] Every number, threshold, and algorithm tagged with
+    [ref:<id>] beside it; design choices say they are
+    choices, and departures from a source say so           (§24.3)
+[ ] Tags and registry agree: every tag resolves, every
+    entry is cited, usedBy is exact                        (§24.3)
+[ ] A project test enforces the same rules                 (§24.3)
+[ ] In-product references view (apps) or generated
+    references page (libraries/CLIs), read from the
+    registry                                               (§24.4)
+[ ] Disclaimer beside the references (health projects)     (§24.5)
+[ ] AGENTS.md documents the registry and its sync points   (§24.7)
 ```
