@@ -1,8 +1,9 @@
 # notes — native app (thin WebView wrapper)
 
-A **thin** React Native (Expo) shell around the **notes** web PWA. It embeds a
-compiled copy of the web app and loads it offline from local files inside a
-single full-screen WebView. Everything the user sees is the web app; the
+A **thin** React Native (Expo) shell around the **notes** web PWA. It packs a
+compiled copy of the web app into the binary and serves it, offline, from a
+loopback server on the device — `http://localhost:8311` — to a single
+full-screen WebView. Everything the user sees is the web app; the
 wrapper exists only to add the capabilities a WebView can't provide.
 
 [`RELEASING.md`](RELEASING.md) is the step-by-step for building and submitting
@@ -22,14 +23,15 @@ can't do on its own:
    reaching it safely requires pinning its SPKI SHA-256 fingerprint, which a
    browser can't do but native code can.
 3. **QR camera scan** — reading a notesd daemon's pairing QR needs reliable
-   camera access, which iOS WKWebView can't grant a `file://` page.
+   camera access, which the WebView doesn't dependably grant a page.
 4. **iCloud Drive** (iOS) — a web page has no way to write into the user's
    iCloud Drive. The wrapper offers a small file store (list, read, write,
    remove) inside the app's own container, `iCloud.se.agilator.notes`, and the
    web app's directory adapter drives it like any other folder.
-5. **Dropbox sign-in** — the page is loaded over `file://`, which no OAuth
-   provider will redirect back to. The wrapper offers an authentication
-   session instead (see [Signing in to Dropbox](#signing-in-to-dropbox)).
+5. **Dropbox sign-in** — a provider will neither show its consent page inside
+   an embedded WebView nor redirect back into one. The wrapper offers an
+   authentication session instead (see
+   [Signing in to Dropbox](#signing-in-to-dropbox)).
 
 Everything else — the UI, storage (`localStorage`), Markdown editor, themes,
 cloud backends, encryption, achievements — is the web app, unchanged. There is
@@ -40,20 +42,32 @@ is on.
 ## How it's built and loaded
 
 ```
-make build-native          # from the repo root: VITE_TARGET=native vite build → native/web/
-cd native && npx expo prebuild   # copies native/web/ into the binary (see plugins/with-web-bundle.js)
+make native-bundle         # from the repo root: build:native → native/web/ → native/assets/webroot.zip
 ```
 
-- `make build-native` builds the web app with a **relative asset base**
-  (`./assets/...`, so it resolves under a `file://` origin) and the **service
-  worker disabled** (offline is already guaranteed by the local bundle; app
-  updates ride store releases). Output goes to `native/web/` (git-ignored).
-- The Expo config plugin [`plugins/with-web-bundle.js`](plugins/with-web-bundle.js)
-  copies `native/web/` into the binary at prebuild: `assets/web/` on Android
-  (loaded from `file:///android_asset/web/index.html`) and a bundle folder
-  reference on iOS (loaded from `web/index.html` under `Paths.bundle`).
-- [`src/WebViewHost.tsx`](src/WebViewHost.tsx) renders the WebView and wires
-  the message bridge. On iOS the WebView runs edge to edge and the page pads
+- [`scripts/bundle-web.mjs`](scripts/bundle-web.mjs) runs `make build-native`'s
+  build (`VITE_TARGET=native`: a **relative asset base**, the **service worker
+  disabled**, no Donate link, one chunk — offline is already guaranteed by the
+  local bundle and app updates ride store releases) into `native/web/`, then
+  packs it into **`assets/webroot.zip`** (deterministic, git-ignored). Metro
+  ships the zip as an asset ([`metro.config.js`](metro.config.js)).
+- [`src/local-server.ts`](src/local-server.ts) unzips it into the app's
+  document directory on the first launch of each build and serves it with
+  lighttpd (`@dr.pogodin/react-native-static-server`) on the loopback
+  interface only, at **`http://localhost:8311`** — notes' own port on the
+  fleet's ladder (8312, 8313 if it is taken). The port never moves: the origin
+  is what `localStorage`, and so every note on the device, is keyed by. It is
+  `localhost`, not `127.0.0.1`, because App Transport Security blocks the
+  latter from WKWebView; [`app.config.js`](app.config.js) excepts `localhost`
+  from ATS, and `expo-build-properties` permits cleartext and raises Android's
+  minSdk to 28 for the server.
+- [`src/WebViewHost.tsx`](src/WebViewHost.tsx) starts the server (a spinner
+  meanwhile, a failure screen with **Try again** if it cannot bind), renders
+  the WebView and wires the message bridge. Before the page's scripts run it
+  unregisters any service worker ([`src/shell.ts`](src/shell.ts)), so a
+  worker could never keep serving an old build after a store update. Any
+  navigation off the loopback origin opens in the system browser; Android's
+  back button walks the page's history. On iOS the WebView runs edge to edge and the page pads
   itself around the notch and the home indicator with
   `env(safe-area-inset-*)`, as the installed PWA does; on Android the frame
   keeps the page below the status bar and clear of any cutout. The status bar
@@ -135,9 +149,9 @@ spelled the same in every place — is pinned from the root suite by
 ## Signing in to Dropbox
 
 The web app signs in to Dropbox with a PKCE redirect: it sends the page to
-Dropbox and Dropbox sends it back to the page's own URL. Here that URL is
-`file:///…/web/index.html` — no provider will register it, and the providers
-refuse to show consent inside an embedded WebView anyway. So the wrapper
+Dropbox and Dropbox sends it back to the page's own URL. Inside the app that
+cannot work — the providers refuse to show consent inside an embedded WebView,
+and a redirect completed in the system browser lands there, not in the app. So the wrapper
 offers an **authentication session** — `ASWebAuthenticationSession` on iOS, a
 Custom Tab on Android, both through `expo-web-browser`'s
 `openAuthSessionAsync` — a browser sheet over the app that closes the moment
@@ -169,26 +183,50 @@ back to `dev.local.notes` — so the store build returns on
 (see [`RELEASING.md`](RELEASING.md#dropbox)). A dev build returns on
 `dev.local.notes://oauth`, which a Dropbox app used for development has to
 list too. The key reaches the bundle as `VITE_DROPBOX_APP_KEY` at
-`make build-native` time; without it the app offers no Dropbox at all.
+`make native-bundle` time; without it the app offers no Dropbox at all.
 
 `tests/platform/auth-session.test.ts` runs the injected script against the
 framework's own validation and pins the scheme to the bundle id.
 
+## Self-hosted sync from the phone
+
+The page's origin in the app is `http://localhost:8311`, a real origin rather
+than the `null` one a `file://` page had. What that means for the two
+self-hosted backends:
+
+- **notesd** is untouched by it. Its requests never leave from the page: they
+  go over the bridge to the native `pinned-fetch` module, which makes them
+  from native code, so there is no browser origin, no preflight and no CORS on
+  that path at all.
+- **Nextcloud** is reached with the page's own `fetch`, so it is a
+  cross-origin request like the website's: the server has to answer the
+  preflight for WebDAV (`GET`, `PROPFIND`, `MKCOL`, `PUT`, `DELETE`, with the
+  `Authorization`, `Depth` and `Content-Type` headers). The origin to allow is now exactly
+  **`http://localhost:8311`** — no longer `null`, which a server had to allow
+  for every `file://` page and sandboxed frame at once. Expose `ETag` too, or
+  the app re-lists after each save instead of reading the new revision off
+  the response. The connect form's check (`verifyNextcloudConnection`)
+  explains a refusal. Use HTTPS: App Transport Security stays on, with the
+  exception for `localhost` and the `NSAllowsLocalNetworking` every wrapper in
+  the fleet declares.
+
+Neither has been tried end to end on a device since the move from `file://`.
+
 ## Running it
 
-Because the app embeds native modules (WebView + pinning + iCloud), it needs a
-**dev client / prebuild** — it does not run in Expo Go.
+Because the app embeds native modules (WebView + static server + pinning +
+iCloud), it needs a **dev client / prebuild** — it does not run in Expo Go.
 
 ```sh
+make native-install    # from the repo root: npm ci in native/
+make native-bundle     # build the web app and pack native/assets/webroot.zip
 cd native
-npm ci
-make build-native   # (from repo root) produce native/web/ first
-npx expo prebuild
-npx expo run:ios     # or: npx expo run:android
+npx expo run:ios       # or: npx expo run:android (npm run ios / android bundle first)
 ```
 
-Type-check the native shell:
+Check the native shell:
 
 ```sh
-npm run typecheck
+make native-typecheck
+make native-doctor     # expo-doctor
 ```

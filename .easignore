@@ -3,13 +3,16 @@
 # in the tree — so the rules below are the .gitignore files' own (root,
 # native/, notesd/), with one deliberate difference:
 #
-#   native/web/ is NOT ignored here. It is the embedded web app, built by
-#   `make build-native` (in CI, by .github/workflows/native-build.yml, which
-#   bakes the Dropbox key into it) and copied into the binary at prebuild by
-#   native/plugins/with-web-bundle.js. It is gitignored because it is build
-#   output; left out of the upload, prebuild on the EAS worker fails.
+#   native/assets/webroot.zip is NOT ignored here. It is the packed web app,
+#   built by `npm run bundle` in native/ (in CI, by
+#   .github/workflows/native-build.yml, which bakes the Dropbox key into it)
+#   and required by native/src/local-server.ts. It is gitignored because it is
+#   build output; left out of the upload, the EAS worker fails at "Unable to
+#   resolve module ../assets/webroot.zip".
 #
-# Keep this in step with the .gitignore files when they change.
+# Keep this in step with the .gitignore files when they change. Check with
+#   (cd native && npx eas-cli build:inspect -p ios -s archive -o <dir>)
+# that the archive holds native/assets/webroot.zip.
 
 # Common
 .DS_Store
@@ -49,6 +52,8 @@ public/workbox-*.js
 native/android/
 native/ios/
 native/.metro-health-check*
+# The unzipped web build webroot.zip is packed from; only the zip goes up.
+native/web/
 native/package-lock.json
 
 # Transient release artifacts

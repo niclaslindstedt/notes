@@ -13,7 +13,7 @@
 // files from GitHub Pages under three deploy slots, so a `/note/<id>` path
 // would 404 on a cold load (nothing rewrites it to `index.html`); a hash is
 // never sent to the server, so `…/#/n/<ns>/<id>` resolves on any slot, from a
-// file:// bundle inside the native wrapper, and offline from the service
+// bundle the native wrapper serves on the device, and offline from the service
 // worker. It also stays out of every request, so a note id is never logged by
 // a server the way a path would be.
 //

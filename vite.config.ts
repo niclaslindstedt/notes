@@ -258,8 +258,9 @@ export default defineConfig({
     injectAppName(),
     VitePWA({
       // The wrapper builds embed the bundle locally, so the service worker
-      // is redundant (assets are already on-device) and would misbehave off a
-      // `file://` / private-scheme origin — disable it there entirely.
+      // is redundant (assets are already on-device), would misbehave off the
+      // desktop's private-scheme origin, and would outlive a store update on
+      // the phone's fixed loopback one — disable it there entirely.
       disable: isEmbedded,
       // `UpdateToast` registers the SW itself via `workbox-window` (so it
       // can pass `updateViaCache: "none"`) and the new build parks in the
@@ -349,10 +350,9 @@ export default defineConfig({
     // modal hosts do the same, so the browser downloads a fraction of the app
     // on first paint. An embedded build has nothing to gain from that — the
     // whole bundle is already on the device, loaded off local files with no
-    // network in front of it — and something to lose: the native WebView
-    // serves the page from a `file://` origin, where dynamic `import()` is not
-    // dependably permitted. A failure there is a blank app, on the platform
-    // this project treats as primary.
+    // network in front of it — and something to lose: the desktop shell serves
+    // the page from a private-scheme origin, where dynamic `import()` is not
+    // dependably permitted. A failure there is a blank app.
     //
     // So the wrappers get everything folded back into one chunk, exactly the
     // shape they ship today, and the splitting applies to the web build that

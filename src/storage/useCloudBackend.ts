@@ -155,10 +155,11 @@ export function useCloudBackend({
 
   const connectDropbox = useCallback(async () => {
     const m = await import("./dropbox/index.ts");
-    // The phone app: its page is a `file://` one no redirect can land on, so
-    // the wrapper offers an authentication session instead — asked for as a
-    // capability, never as a platform. The sheet hands the redirect back and
-    // the tokens land right here. Closing the sheet is not an error.
+    // The phone app: its page sits in an embedded WebView no redirect can
+    // land in, so the wrapper offers an authentication session instead —
+    // asked for as a capability, never as a platform. The sheet hands the
+    // redirect back and the tokens land right here. Closing the sheet is not
+    // an error.
     const authSession = getAuthSessionHost();
     if (authSession) {
       try {

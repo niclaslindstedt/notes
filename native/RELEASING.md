@@ -4,9 +4,10 @@ This is the step-by-step for shipping the Expo app in this directory to
 **Apple's App Store** and **Google Play**. It builds the native binary with
 [EAS Build](https://docs.expo.dev/build/introduction/) and uploads it with
 [EAS Submit](https://docs.expo.dev/submit/introduction/). The app is a **thin
-WebView wrapper** that embeds the compiled web PWA and loads it offline; see
-[`README.md`](README.md). Run `make build-native` (from the repo root) before
-`eas build` / `expo prebuild` so the embedded bundle in `native/web/` exists.
+WebView wrapper** that packs the compiled web PWA into the binary and serves
+it from a loopback server on the device; see [`README.md`](README.md). Run
+`make native-bundle` (from the repo root) before `eas build` / `expo prebuild`
+so `native/assets/webroot.zip` exists.
 
 [`app.config.js`](app.config.js) resolves the store identity from three build
 variables rather than hard-coding it:
@@ -91,7 +92,7 @@ whose key is the `VITE_DROPBOX_APP_KEY` secret and add
 `se.agilator.notes://oauth` under **Settings → OAuth 2 → Redirect URIs**,
 exactly as written. The CI build bakes that key (and `VITE_DROPBOX_APP_FOLDER`)
 into the embedded bundle; a local build needs them in the environment of
-`make build-native`. Without the key the app offers no Dropbox at all.
+`make native-bundle`. Without the key the app offers no Dropbox at all.
 
 To check it on a device: Settings → Storage → Dropbox opens Dropbox in a sheet
 over the app (not in Safari); approving closes the sheet and connects, and
@@ -219,12 +220,12 @@ configured on the EAS project (Apple App Store Connect credentials managed by
 EAS; a Google Play service-account key uploaded to EAS or committed as
 described above).
 
-**What it runs.** It installs the web app's dependencies, runs
-`npm run build:native` with the `VITE_DROPBOX_APP_KEY` /
-`VITE_DROPBOX_APP_FOLDER` secrets so the embedded bundle carries the Dropbox
+**What it runs.** It installs the web app's and the wrapper's dependencies,
+runs `npm run bundle` in `native/` with the `VITE_DROPBOX_APP_KEY` /
+`VITE_DROPBOX_APP_FOLDER` secrets so the packed bundle carries the Dropbox
 key, and only then queues `eas build`. The bundle rides the upload: EAS leaves
 out whatever the repository-root [`.easignore`](../.easignore) lists, and that
-file — unlike `native/.gitignore` — keeps `native/web/`.
+file — unlike `native/.gitignore` — keeps `native/assets/webroot.zip`.
 
 **Dispatch it** from the *Actions → Native build* tab (or `gh workflow run
 native-build.yml`) with:

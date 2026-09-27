@@ -1,4 +1,4 @@
-.PHONY: demo build build-native test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump store-preflight store-metadata store-upload tauri tauri-bundle tauri-clean tauri-fast tauri-fmt tauri-fmt-check tauri-install tauri-lint tauri-package tauri-package-debug tauri-test
+.PHONY: demo build build-native native-install native-bundle native-typecheck native-doctor native-prebuild test lint fmt fmt-check icons dev dev-seed preview clean install changelog bump store-preflight store-metadata store-upload tauri tauri-bundle tauri-clean tauri-fast tauri-fmt tauri-fmt-check tauri-install tauri-lint tauri-package tauri-package-debug tauri-test
 
 install:
 	npm ci
@@ -22,10 +22,38 @@ build:
 	npm run build
 
 # Build the app for embedding in the native WebView wrapper: relative asset
-# base, no service worker, output to native/web/ (copied into the binary at
-# prebuild). See native/README.md.
+# base, no service worker, output to native/web/ — which `make native-bundle`
+# packs into native/assets/webroot.zip. See native/README.md.
 build-native:
 	npm run build:native
+
+# --- the native wrapper (native/) -------------------------------------------
+#
+# A thin Expo/React Native shell that serves this web app from a loopback
+# server on the device, in a WebView. It has its OWN dependency tree —
+# `make install` at the root does not touch it — so every target here reaches
+# in with `--prefix native`. Store builds run on EAS, by manual dispatch:
+# .github/workflows/native-build.yml; see native/RELEASING.md.
+
+native-install:
+	npm --prefix native ci
+
+# Build the web app and pack it into native/assets/webroot.zip — the copy the
+# wrapper serves. Required before any native build; CI does it for you.
+native-bundle:
+	npm --prefix native run bundle
+
+native-typecheck:
+	npm --prefix native run typecheck
+
+native-doctor:
+	npm --prefix native run doctor
+
+# Regenerate native/ios and native/android from app.config.js and the config
+# plugins. Both are gitignored build output — this is only for inspecting what
+# the plugins produce.
+native-prebuild:
+	npm --prefix native run prebuild
 
 preview:
 	npm run preview

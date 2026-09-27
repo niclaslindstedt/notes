@@ -56,7 +56,7 @@ offline behaviour is exercised against `preview`, never `dev`.
 The two wrappers embed a build of their own:
 
 ```sh
-make build-native    # → native/web/, then see native/README.md
+make native-bundle   # → native/assets/webroot.zip, then see native/README.md
 make tauri-bundle    # → tauri/webroot/, then see tauri/README.md
 ```
 

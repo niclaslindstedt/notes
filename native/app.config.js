@@ -114,6 +114,19 @@ module.exports = {
             NSUbiquitousContainerName: ICLOUD_FOLDER_NAME,
           },
         },
+        // The bundled build is served over plain HTTP on the loopback
+        // interface (`src/local-server.ts`). ATS stays ON — only `localhost`
+        // is excepted for cleartext, as in every wrapper in the fleet.
+        NSAppTransportSecurity: {
+          NSAllowsArbitraryLoads: false,
+          NSAllowsLocalNetworking: true,
+          NSExceptionDomains: {
+            localhost: {
+              NSExceptionAllowsInsecureHTTPLoads: true,
+              NSIncludesSubdomains: false,
+            },
+          },
+        },
       },
     },
     android: {
@@ -127,7 +140,13 @@ module.exports = {
       bundler: "metro",
     },
     plugins: [
-      "./plugins/with-web-bundle.js",
+      // The bundled static server (lighttpd, via
+      // @dr.pogodin/react-native-static-server) needs Android minSdk 28, and
+      // the loopback origin is plain HTTP, so cleartext has to be permitted.
+      [
+        "expo-build-properties",
+        { android: { minSdkVersion: 28, usesCleartextTraffic: true } },
+      ],
       [
         "expo-camera",
         {

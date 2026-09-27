@@ -13,8 +13,9 @@
 //     which is a wrapper question — and it is how the desktop build gets
 //     cloud sync despite failing the one above.
 //   - **Auth-session OAuth** needs a host that can open a sign-in sheet and
-//     catch a redirect to the app's own URL scheme — the phone wrapper, which
-//     loads the page over `file://` and so fails the redirect question too.
+//     catch a redirect to the app's own URL scheme — the phone wrapper, whose
+//     embedded WebView no provider will show consent in or redirect back to,
+//     so it fails the redirect question too.
 //   - **SPKI-pinned fetch** needs native code, which is a wrapper question.
 //
 // Answering each of them at its own call site is how they drift apart, and it
@@ -69,10 +70,11 @@ export interface Capabilities {
    * True only in the browser, and not for want of trying elsewhere:
    * `redirectUri()` (`src/storage/oauth-pkce.ts`) is built from
    * `window.location`, so in the desktop shell it is `notes://localhost` (or
-   * `http://notes.localhost`), and in the phone wrapper — which loads the
-   * embedded bundle over `file://` — a `file:///…/index.html` with a `null`
-   * origin. No provider will register either as a redirect URI, so the flow
-   * cannot be completed rather than merely being unconfigured.
+   * `http://notes.localhost`), and in the phone wrapper — which serves the
+   * embedded bundle from a loopback server — `http://localhost:8311`, an
+   * origin inside an embedded WebView that a provider will neither show its
+   * consent page in nor redirect back to. So the flow cannot be completed
+   * rather than merely being unconfigured.
    */
   redirectOauth: boolean;
 

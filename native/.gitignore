@@ -5,9 +5,9 @@ web-build/
 /ios/
 /android/
 
-# The embedded web bundle, produced by `make build-native` (relative-base,
-# service-worker-free copy of the web app) and copied into the binary at
-# prebuild. Generated, never tracked.
+# The web build the wrapper packs, produced by `make build-native`
+# (relative-base, service-worker-free copy of the web app) and zipped into
+# assets/webroot.zip by `npm run bundle`. Generated, never tracked.
 web/
 
 # Secrets — never commit store credentials
@@ -15,3 +15,9 @@ play-service-account.json
 *.p8
 *.p12
 *.keystore
+
+# The packed web build, produced by `npm run bundle` (scripts/bundle-web.mjs)
+# from web/ above. Generated, never committed — but it MUST exist before a
+# build or the wrapper ships with no app inside it. The root `.easignore` is
+# what keeps it in the EAS upload; CI regenerates it (native-build.yml).
+assets/webroot.zip

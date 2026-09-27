@@ -10,8 +10,9 @@ this repo. `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, `GEMINI.md`, and
 desktop. It runs entirely in the browser and is served as static files —
 there is **no backend**. Notes are persisted to `localStorage`. A React
 Native (Expo) app lives under [`native/`](native/README.md) — a **thin
-WebView wrapper** that embeds the compiled web app (built by `make
-build-native`) and loads it offline from local files. It adds only the
+WebView wrapper** that packs the compiled web app into the binary (`make
+native-bundle` → `native/assets/webroot.zip`) and serves it offline from a
+loopback server on the device, `http://localhost:8311`. It adds only the
 capabilities a WebView can't provide: native haptics and SPKI-pinned HTTPS
 for the self-hosted **notesd** backend, bridged over `postMessage` through
 [`src/platform/native-bridge.ts`](src/platform/native-bridge.ts), and on iOS
@@ -450,9 +451,9 @@ lands back in everyone's first download:
 **The wrappers opt out of all of it.** `vite.config.ts` sets
 `inlineDynamicImports` for the embedded builds: `native/` and `tauri/` ship
 the bundle on the device with no network in front of it, so splitting buys them
-nothing, and the native WebView serves the page from a `file://` origin where
-dynamic `import()` is not dependably permitted. One chunk there, split on the
-web.
+nothing, and the desktop shell serves the page from a private-scheme origin
+where dynamic `import()` is not dependably permitted. One chunk there, split on
+the web.
 
 ### The renderer is Preact, but the imports still say `react`
 
@@ -680,8 +681,8 @@ inert on the web; plus, on iOS, an iCloud Drive file store the page finds as a
 provider (`src/platform/icloud-host.ts`) and drives through the same directory
 adapter as every other folder backend — the store lists, reads, writes and
 removes files, and decides nothing; and an authentication session for signing
-in to Dropbox, because a `file://` page has no origin a provider can redirect
-back to. The wrapper installs it at `window.__ossAuthSession`
+in to Dropbox, because a provider will neither show consent inside an
+embedded WebView nor redirect back into one. The wrapper installs it at `window.__ossAuthSession`
 (`native/src/authSessionBridge.ts`), opens the consent page in
 `expo-web-browser`'s `openAuthSessionAsync` and hands back the URL the sheet
 closed on; the PKCE verifier, the `state` check and the token exchange stay in

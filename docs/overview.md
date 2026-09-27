@@ -4180,8 +4180,8 @@ The URL rides in the **hash**, not the path:
 A path would 404 on a cold load — the app is static files under three
 [deploy slots](../AGENTS.md) with nothing rewriting `/note/<id>` to
 `index.html` — while a hash is never sent to the server, so a link resolves on
-any slot, offline from the service worker, and from the `file://` bundle inside
-the native wrapper. It also keeps note ids out of every request (and every
+any slot, offline from the service worker, and from the bundle the native
+wrapper serves on the device. It also keeps note ids out of every request (and every
 server log). `routeToHash` / `hashToRoute` are the pure pair; an address the
 app never wrote (hand-edited, or from a future version) parses to `null` and is
 ignored rather than guessed at.
@@ -5227,7 +5227,8 @@ failures that are really *setup* problems are explained in the form: a rejected
 app password, and a server that won't answer this origin's cross-origin
 request. (Nextcloud sends no CORS headers for WebDAV by default; allowing the
 app's origin is a one-off server-side setting the user, who administers the
-server, makes.) Without that probe the first sign of either would be a silent
+server, makes. In the phone app that origin is `http://localhost:8311` — see
+`native/README.md`, "Self-hosted sync from the phone".) Without that probe the first sign of either would be a silent
 "offline" on a backend the user believes is connected.
 
 ### notesd backend
@@ -6415,9 +6416,11 @@ when the bundle is being built for one of the two wrappers that ship the app as
 a downloadable binary: `VITE_TARGET=native` (the React Native WebView shell in
 `native/`) or `VITE_SHELL_BUILD=on` (the Tauri desktop shell in `tauri/`). It
 flips three things at once: the asset base becomes relative (`./`) so
-`/assets/...` URLs resolve under a `file://` or private-scheme origin; VitePWA
-is disabled, because offline is already guaranteed by the on-device bundle and
-a service worker has no HTTP origin to attach to; and the sidecar emitters
+`/assets/...` URLs resolve under the desktop's private-scheme origin (and
+under the phone's loopback one, `http://localhost:8311`, where the wrapper
+serves `native/assets/webroot.zip`); VitePWA is disabled, because offline is
+already guaranteed by the on-device bundle and a worker on the phone's fixed
+origin would keep serving an old build after a store update; and the sidecar emitters
 (`version.json`, `precache-manifest.json`, the `/privacy` and `/home` aliases)
 are skipped, since nothing in a wrapper reads them. `usePwaUpdate`
 (`src/pwa/usePwaUpdate.ts`) reads `__EMBEDDED__` to know there is no service
@@ -6606,7 +6609,7 @@ mid-session.
 `inlineDynamicImports` for the embedded builds, so `native/` and `tauri/`
 emit exactly one chunk, the shape they have always shipped. Splitting is a
 network optimisation and a wrapper has no network — it loads the bundle off the
-device — while the native WebView serves the page from a `file://` origin,
+device — while the desktop shell serves the page from a private-scheme origin,
 where dynamic `import()` is not dependably permitted. The trade is that the
 Swedish catalogue, which the web fetches only when the language is switched,
 rides along in the wrapper bundle.

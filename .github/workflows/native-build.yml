@@ -21,8 +21,9 @@ name: Native build
 # A `production` build with any of them missing fails in app.config.js rather
 # than uploading a binary under the wrong identity.
 #
-# The embedded web app is built HERE, before `eas build`, and rides the upload
-# (the root .easignore keeps the gitignored native/web/ in it). That is where
+# The embedded web app is built and packed HERE, before `eas build`, and rides
+# the upload as native/assets/webroot.zip (the root .easignore keeps the
+# gitignored zip in it). That is where
 # VITE_DROPBOX_APP_KEY / VITE_DROPBOX_APP_FOLDER (secrets, optional) reach the
 # bundle: unset, the app offers no Dropbox; set, the Dropbox app must list
 # <APP_BUNDLE_ID>://oauth — se.agilator.notes://oauth — as a redirect URI
@@ -74,18 +75,25 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      # The wrapper has no UI of its own — it loads this bundle, and a build
-      # without it fails at prebuild (plugins/with-web-bundle.js). .npmrc
-      # authenticates the @niclaslindstedt scope through GITHUB_PAT.
+      # The wrapper has no UI of its own — it serves this bundle, and a build
+      # uploaded without it fails at "Unable to resolve module
+      # ../assets/webroot.zip". It has to be packed BEFORE `eas build`, because
+      # the upload is what carries native/assets/webroot.zip to the EAS worker;
+      # the root .easignore keeps that artifact in the upload despite being
+      # gitignored. .npmrc authenticates the @niclaslindstedt scope through
+      # GITHUB_PAT.
       - name: Install the web app's dependencies
         working-directory: .
         run: npm ci
         env:
           GITHUB_PAT: ${{ secrets.GITHUB_PAT || secrets.GITHUB_TOKEN }}
 
-      - name: Build the embedded web app
-        working-directory: .
-        run: npm run build:native
+      # From the committed lockfile, so EAS builds what CI checked.
+      - name: Install the wrapper's dependencies
+        run: npm ci
+
+      - name: Bundle the web app into the wrapper
+        run: npm run bundle -- --profile "${{ inputs.profile }}"
         env:
           # The same Dropbox app as the website's. The phone app signs in
           # through an authentication session that returns on
@@ -99,12 +107,6 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-
-      # From the committed lockfile, so EAS builds what CI checked. It only
-      # needs its own deps: the shared core it imports from ../src is
-      # framework-free and dependency-light (React only, pinned here).
-      - name: Install dependencies
-        run: npm ci
 
       # No submit: fire the build and return. --no-wait lets the runner exit
       # while EAS builds in the cloud, so we don't pay for idle Actions
