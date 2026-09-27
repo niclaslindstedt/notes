@@ -20,14 +20,14 @@ The current docs surface:
 
 ## Tracking mechanism
 
-`.agent/skills/update-docs/.last-updated` contains the git commit hash from the last successful run. Empty means "never run" — fall back to the repository's initial commit.
+`.agents/skills/update-docs/.last-updated` contains the git commit hash from the last successful run. Empty means "never run" — fall back to the repository's initial commit.
 
 ## Discovery process
 
 1. Read the baseline:
 
    ```sh
-   BASELINE=$(cat .agent/skills/update-docs/.last-updated)
+   BASELINE=$(cat .agents/skills/update-docs/.last-updated)
    ```
 
 2. List commits since the baseline:
@@ -70,7 +70,7 @@ Extend this table every time you find a new source file that feeds the docs.
 - [ ] Run `make lint` and `make test`
 - [ ] Write the new baseline:
 
-      git rev-parse HEAD > .agent/skills/update-docs/.last-updated
+      git rev-parse HEAD > .agents/skills/update-docs/.last-updated
 
 ## Verification
 

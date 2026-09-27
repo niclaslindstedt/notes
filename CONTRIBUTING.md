@@ -79,7 +79,7 @@ Update the docs in the same PR as the code:
 
 Most features come from
 [`checklist`](https://github.com/niclaslindstedt/checklist). Use the
-`copy-feature` agent skill (`.agent/skills/copy-feature/`) rather than copying
+`copy-feature` agent skill (`.agents/skills/copy-feature/`) rather than copying
 by hand — it adapts the feature to the notes domain and keeps patterns
 consistent.
 

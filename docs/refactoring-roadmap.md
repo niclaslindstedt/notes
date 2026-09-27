@@ -2,7 +2,7 @@
 
 The single source of truth for what this codebase considers a code smell
 worth fixing. It is maintained by the `refactor` agent skill
-(`.agent/skills/refactor/`), which works it in three modes — **Work**
+(`.agents/skills/refactor/`), which works it in three modes — **Work**
 (land the highest-leverage pending item), **Explore** (survey for new
 smells and append them), and **Clear** (reset the findings to a blank
 slate).

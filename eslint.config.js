@@ -9,7 +9,7 @@ import globals from "globals";
 
 export default [
   {
-    // `.agent/skills/**` holds agent skill playbooks and their helper
+    // `.agents/skills/**` holds agent skill playbooks and their helper
     // scripts. They are optional tooling — not app source — and may import
     // packages the repo doesn't install, so they're out of scope for the
     // app linter.
@@ -22,7 +22,7 @@ export default [
       "dist/**",
       "node_modules/**",
       "dev-dist/**",
-      ".agent/**",
+      ".agents/**",
       "native/**",
       // The desktop shell's own trees: Rust build output, and the site copied
       // in from `dist/` (both gitignored — see tauri/README.md).

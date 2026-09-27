@@ -14,7 +14,7 @@ native/modules/**/android
 # Prose and hand-authored docs are managed by humans / the maintenance
 # skills, not reflowed by Prettier.
 **/*.md
-.agent
+.agents
 .github
 # The desktop shell's build output and the site copied into it.
 tauri/target/

@@ -816,7 +816,7 @@ vite-plugin-pwa; checklist still renders with React where notes has moved to
 Preact) and
 the same `OSS_SPEC.md` conventions. Most features, looks, modals, and buttons
 will be ported from there over time. **Use the `copy-feature` agent skill**
-(`.agent/skills/copy-feature/`) to do this — it clones checklist, studies the
+(`.agents/skills/copy-feature/`) to do this — it clones checklist, studies the
 target feature in place, and adapts it to fit the notes domain rather than
 pasting it verbatim.
 
@@ -836,7 +836,7 @@ pasting it verbatim.
 | Build/test commands               | `README.md`, `CONTRIBUTING.md`, here  |
 | The `src/` layout or boundaries   | This file's Architecture summary, `docs/architecture.md` |
 | A user-facing concept, component, or term (added, renamed, or a new word the user uses) | `docs/dictionary.md` (the term → file row) **and** `docs/overview.md` (the term's description) — both in the same PR. See "Finding your way around the code". |
-| The `copy-feature` skill behaviour| `.agent/skills/copy-feature/SKILL.md` |
+| The `copy-feature` skill behaviour| `.agents/skills/copy-feature/SKILL.md` |
 | A user-visible feature            | a fragment in `.changes/unreleased/`, and the `/home` showcase (`src/ui/HomePage.tsx`) |
 | A user-facing feature / surface (shipped or removed) | **Add (or retire) a matching achievement** in the same PR — see "Achievements". Every feature is also an unlockable trophy. |
 | What data the app reads/writes/sends, or an OAuth scope | `src/ui/HomePage.tsx` **and** `src/ui/PrivacyPage.tsx` |
@@ -883,9 +883,9 @@ across devices on the cloud/folder backends.
 
 ## Maintenance skills
 
-Agent skills live under `.agent/skills/` (with `.claude/skills` symlinked to
+Agent skills live under `.agents/skills/` (with `.claude/skills` symlinked to
 it). Each has a `SKILL.md` and a `.last-updated` marker. Most were ported from
-checklist's `.agent/skills/` and adapted to the notes domain.
+checklist's `.agents/skills/` and adapted to the notes domain.
 
 **Drift-sync skills** (the `maintenance` umbrella dispatches these in order):
 

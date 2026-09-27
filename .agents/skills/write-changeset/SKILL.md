@@ -71,7 +71,7 @@ would surface a non-event in the changelog).
    in-flight features:
 
    ```sh
-   .agent/skills/write-changeset/list-fragments.sh
+   .agents/skills/write-changeset/list-fragments.sh
    ```
 
    The script prints **every** `.changes/unreleased/*.md` file with its
@@ -91,7 +91,7 @@ would surface a non-event in the changelog).
    listing for `folder`; if it touches "the sync chip", grep for `sync`:
 
    ```sh
-   .agent/skills/write-changeset/list-fragments.sh | grep -i -C2 '<feature-noun>'
+   .agents/skills/write-changeset/list-fragments.sh | grep -i -C2 '<feature-noun>'
    ```
 
    A hit means the feature is almost certainly in-flight (step 3 of the
@@ -117,7 +117,7 @@ Walk these in order; stop at the first match.
 
 1. **Does the diff hit only paths in the skip-list (`SKIP_PATTERNS` in
    `scripts/release/check-changeset.mjs`)?** The skip-list is: `tests/`,
-   `.github/`, `.agent/`, `.claude/`, `.changes/`, `docs/`, `scripts/`,
+   `.github/`, `.agents/`, `.claude/`, `.changes/`, `docs/`, `scripts/`,
    `Makefile`, any `*.md`, `.nvmrc`, `.editorconfig`, `.prettierrc*`,
    `.prettierignore`, `.gitignore`, `.gitattributes`, `eslint.config.js`,
    `vite.config.ts`, `tsconfig*.json`, `package-lock.json`. — **No

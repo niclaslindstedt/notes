@@ -14,7 +14,7 @@
 // Run:
 //
 //   npm run dev &                              # leave running in the background
-//   node .agent/skills/design/screenshot.mjs   # captures the recipe at every viewport
+//   node .agents/skills/design/screenshot.mjs   # captures the recipe at every viewport
 //
 // Then `Read` the PNGs written under /tmp/design-*.png, tweak code,
 // rerun. Vite HMR picks up edits without a rebuild so each loop is

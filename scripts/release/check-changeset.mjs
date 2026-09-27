@@ -39,7 +39,7 @@ if (Array.isArray(labels) && labels.includes("no-changelog")) {
 const SKIP_PATTERNS = [
   /^tests\//,
   /^\.github\//,
-  /^\.agent\//,
+  /^\.agents\//,
   /^\.claude\//,
   /^\.changes\//,
   /^docs\//,

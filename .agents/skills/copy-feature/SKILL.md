@@ -39,9 +39,9 @@ Run the helper script — it puts checklist's working tree under `/tmp` and
 prints the path:
 
 ```sh
-node .agent/skills/copy-feature/clone-sibling.mjs checklist  # -> /tmp/checklist
+node .agents/skills/copy-feature/clone-sibling.mjs checklist  # -> /tmp/checklist
 # optional 2nd/3rd args: a destination and a ref
-node .agent/skills/copy-feature/clone-sibling.mjs checklist /tmp/checklist some-branch
+node .agents/skills/copy-feature/clone-sibling.mjs checklist /tmp/checklist some-branch
 ```
 
 > The siblings (checklist / budget) are public repositories under
