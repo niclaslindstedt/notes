@@ -1,3 +1,4 @@
+// oss-spec:allow-large-file: split when next touched; known deviation by owner decision
 // Wraps any `FileStore` into a `StorageAdapter`, storing the document as a
 // folder of individual files (one per note). This is the single place the
 // file-based backends — local folder and Dropbox — share, so the

@@ -1,3 +1,4 @@
+// oss-spec:allow-large-file: split when next touched; known deviation by owner decision
 import {
   useEffect,
   useId,
