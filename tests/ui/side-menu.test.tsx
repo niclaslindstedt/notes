@@ -281,6 +281,34 @@ describe("SideMenu — listing every note", () => {
     }
   });
 
+  it("scrolls the active note, and the row after it, into view", async () => {
+    // jsdom lays nothing out, so give every note row a 40px slot by its place
+    // in the list and the scroll area a 200px window at the top of the page.
+    const rects = vi
+      .spyOn(Element.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: Element) {
+        const id = this.getAttribute("data-note-row");
+        const index = id ? Number(id.slice(1)) : 0;
+        const top = id ? index * 40 : 0;
+        return { top, height: id ? 40 : 200 } as DOMRect;
+      });
+    const clientHeight = vi
+      .spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockReturnValue(200);
+    try {
+      renderMenu({ open: true }, { notes: many, activeNoteId: "n12" });
+      const list = screen
+        .getByText("Note 12")
+        .closest<HTMLElement>(".overflow-y-auto")!;
+      // Row 12 spans 480–520; the row after it ends at 560, so the 200px view
+      // has to start at 360.
+      await vi.waitFor(() => expect(list.scrollTop).toBe(360));
+    } finally {
+      rects.mockRestore();
+      clientHeight.mockRestore();
+    }
+  });
+
   it("keeps a newly created note listed whatever its title sorts as", () => {
     // "zulu" sorts last alphabetically and is the newest by timestamp — the
     // exact note the old cap dropped under the `name` sort key.

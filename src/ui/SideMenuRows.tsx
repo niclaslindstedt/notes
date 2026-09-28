@@ -395,6 +395,9 @@ export function FolderEditRow({
   );
 }
 
+// Carries a note row's id (see `NavItem`'s `noteId`).
+export const NOTE_ROW_ATTR = "data-note-row";
+
 export function NavItem({
   icon,
   label,
@@ -404,6 +407,7 @@ export function NavItem({
   badge,
   trailing,
   onClick,
+  noteId,
   dropId,
   isDropTarget = false,
   onDragOver,
@@ -425,6 +429,9 @@ export function NavItem({
   // Optional trailing element (e.g. the green encryption lock on a note row).
   trailing?: ReactNode;
   onClick: () => void;
+  // The note this row opens, tagged onto the button as `data-note-row` so the
+  // drawer can find the active note's row and scroll it into view.
+  noteId?: string;
   // Drop-target wiring: a `data-note-drop` key (so the touch drag layer
   // hit-tests it) plus the desktop HTML5 handlers and a highlight flag. Used
   // to make a namespace row or the Archive row accept a dragged note.
@@ -441,6 +448,7 @@ export function NavItem({
       aria-current={active ? "page" : undefined}
       disabled={disabled}
       onClick={onClick}
+      {...(noteId !== undefined ? { [NOTE_ROW_ATTR]: noteId } : {})}
       {...(dropId !== undefined ? { [NOTE_DROP_ATTR]: dropId } : {})}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}

@@ -33,6 +33,7 @@ import {
 import { useDraggableMenuButton } from "./hooks/useDraggableMenuButton.ts";
 import { useDrawerSwipeClose } from "./hooks/useDrawerSwipeClose.ts";
 import { useEdgeHover } from "./hooks/useEdgeHover.ts";
+import { useRevealActiveNote } from "./hooks/useRevealActiveNote.ts";
 import { useDesktopPointer, useMediaQuery } from "./hooks/useMediaQuery.ts";
 import {
   CogIcon,
@@ -491,6 +492,9 @@ export function SideMenu({
       prev.has(revealFolderId) ? prev : new Set(prev).add(revealFolderId),
     );
   }, [drawerShowing, revealFolderId]);
+  // …and bring the active note's row (and the one after it) into view.
+  const listRef = useRef<HTMLDivElement>(null);
+  useRevealActiveNote(listRef, activeNoteId, drawerShowing, loading);
 
   const onRight = position.side === "right";
 
@@ -568,6 +572,7 @@ export function SideMenu({
         }
         label={noteTitle(note)}
         active={note.id === activeNoteId}
+        noteId={note.id}
         indent={indent}
         trailing={
           // The upload spinner wins over the lock: a note being written isn't
@@ -714,6 +719,7 @@ export function SideMenu({
           the foot of the drawer when the list is short, which is what the
           island's own `mt-auto` used to do on its own. */}
       <DeadSpaceMenu
+        containerRef={listRef}
         className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"
         onNewNote={() => {
           onAddNote();
