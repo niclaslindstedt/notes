@@ -108,7 +108,7 @@ if (worker.length) {
 // `VITE_DONATE_URL` this shell has set, the unlock notice's copy, and the
 // achievements feature page's path, which the changelog's doc glob spells out.
 //
-// Nor a link back to the source (owner decision D17): no GitHub repository,
+// Nor a link back to the source (by owner decision): no GitHub repository,
 // issues, releases or sponsor link, and not the author's handle anywhere —
 // web-edition domain, package name or meta tag included. The website keeps
 // those; the app has none. Every file but a binary asset is read,
