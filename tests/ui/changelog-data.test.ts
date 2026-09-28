@@ -21,11 +21,10 @@ describe("changelog feature links", () => {
     ).toBe("**Self-hosted sync** — Pair a server.");
   });
 
-  // notesd was removed, so its history entries stay but point nowhere.
-  it("offers no link to the removed notesd feature page", () => {
-    expect(FEATURE_DOCS.notesd).toBeUndefined();
+  // A removed feature's history entries stay, but a Learn more link never
+  // points at a feature page that is no longer bundled.
+  it("offers a Learn more link only to a bundled feature page", () => {
     const items = CHANGELOG.flatMap((r) => r.sections.flatMap((s) => s.items));
-    expect(items.some((i) => i.includes("feature:notesd"))).toBe(false);
     for (const item of items) {
       for (const [, slug] of item.matchAll(/\(feature:([^)\s]+)\)/g)) {
         expect(FEATURE_DOCS[slug!]).toBeDefined();

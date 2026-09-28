@@ -1092,8 +1092,8 @@ const CATALOG: readonly Achievement[] = [
         // Count against the catalog length minus one (this entry itself), so
         // unlocking every *other* achievement fires it without a
         // self-referential loop. Only ids still in the catalog count: a
-        // retired achievement someone earned (`selfHoster`, from the notesd
-        // backend) stays in their map but is no step towards this one.
+        // retired achievement someone earned (one whose feature was removed)
+        // stays in their map but is no step towards this one.
         const totalOthers = ACHIEVEMENTS.length - 1;
         const earned = (unlocked: Record<string, number>) =>
           Object.keys(unlocked).filter((id) => ACHIEVEMENT_BY_ID.has(id))

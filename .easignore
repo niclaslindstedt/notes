@@ -71,7 +71,7 @@ play-service-account.json
 *.p12
 *.keystore
 
-# The desktop shell's and the daemon's build output
+# The desktop shell's build output
 tauri/target/
 tauri/webroot/*
 !tauri/webroot/.gitkeep

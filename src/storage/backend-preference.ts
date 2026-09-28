@@ -37,15 +37,10 @@ const DROPBOX_TOKEN_KEY = "notes:dropbox:token";
 // Long-lived companion to the short-lived access token. Stored under its own
 // key so a legacy install (access token only) round-trips unchanged.
 const DROPBOX_REFRESH_KEY = "notes:dropbox:refresh";
-// Dropbox is gone as a backend. The key stays named so a token a device
+// A cloud backend that was removed. The key stays named so a token a device
 // may still hold can be cleared rather than left sitting in storage.
 const RETIRED_GDRIVE_TOKEN_KEY = "notes:gdrive:token";
 const NEXTCLOUD_CONFIG_KEY = "notes:nextcloud:config";
-// notesd, the self-hosted daemon, is gone as a backend. Both keys stay named
-// so a device that was paired with one is cleared rather than left holding a
-// device key: the stored choice and the pairing (endpoint, key, SPKI pin).
-const RETIRED_NOTESD_BACKEND = "notesd";
-const RETIRED_NOTESD_CONFIG_KEY = "notes:notesd:config";
 // The account-wide encryption flag written before encryption became a
 // per-namespace decision. Still read as the fallback for a namespace that has
 // no setting of its own — see `getEncryption`.
@@ -86,17 +81,8 @@ export function getBackend(): BackendId {
   if (raw === "folder") return "folder";
   if (raw === "icloud") return "icloud";
   if (raw === "nextcloud") return "nextcloud";
-  // A device that synced with notesd opens on this browser's own notes, as if
-  // sync were off, and forgets the pairing it held.
-  if (raw === RETIRED_NOTESD_BACKEND) forgetRetiredNotesd();
   // Any unknown / missing value falls through to the browser backend.
   return "browser";
-}
-
-/** Clear what a device paired with the retired notesd daemon still holds. */
-export function forgetRetiredNotesd(): void {
-  if (read(BACKEND_KEY) === RETIRED_NOTESD_BACKEND) clear(BACKEND_KEY);
-  clear(RETIRED_NOTESD_CONFIG_KEY);
 }
 
 export function setBackend(backend: BackendId): void {

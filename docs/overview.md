@@ -3969,8 +3969,7 @@ stand-down set `refresh` uses — dropping the update (rather than clobbering) i
 anything is unsaved, and no-opping when the etag hasn't actually moved (our own
 write echoing back, or a sibling namespace's revision bump). It still fires the
 `liveSync` trophy when a pushed change lands. No backend advertises `watch`
-today (the notesd daemon was the one that did, and it is gone); the seam stays
-for a backend with a real push channel.
+today; the seam stays for a backend with a real push channel.
 
 ### Save hold
 
@@ -5103,9 +5102,8 @@ operations. The adapter is memoised so it doesn't churn each render.
 chosen `BackendId` (`browser` / `folder` / `dropbox` / `icloud` / `nextcloud`),
 the cloud tokens, the Nextcloud connection, and the encryption mode. These are device-local (never in the synced
 document, which would create a bootstrap loop) and read on boot before any
-backend resolves. A device still set to `notesd` — the self-hosted daemon
-backend, since removed — opens on `browser`, as if sync were off, and
-`getBackend` clears that choice and the pairing it held (`forgetRetiredNotesd`).
+backend resolves. A stored value that names no backend this build knows
+opens on `browser`, as if sync were off.
 
 ### Active note cursor
 
@@ -6550,7 +6548,7 @@ which returns `null` until the module lands; every non-browser arm of
 on the browser store meanwhile — the *same* fall-through it already takes while
 a Dropbox token is being read or a folder grant probed, which is why nothing
 downstream needed a new not-ready state. Verbs that run on a gesture — connect,
-remove a namespace, publish a daemon — use a local `await import()` instead.
+remove a namespace — use a local `await import()` instead.
 Three things have to answer at boot and were split into their own small modules
 so they can: `cache/offline-error.ts` (the `instanceof` check in
 [`UnlockGate`](#unlock-gate)), `dropbox/pending.ts` (is an OAuth redirect
