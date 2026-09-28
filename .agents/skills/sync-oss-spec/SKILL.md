@@ -84,9 +84,9 @@ fi
      [ -d "$d" ] || echo "MISSING-DIR: $d"
    done
 
-   # §10.1/§10.3/§10.4 — required workflows for notes. There is NO
-   # version-bump.yml in this repo; releases are dispatched via release.yml.
-   for w in ci.yml release.yml pages.yml; do
+   # §10.1/§10.3/§10.4 — required workflows for notes. version-bump.yml
+   # previews the bump and dispatches release.yml, which tags.
+   for w in ci.yml version-bump.yml release.yml pages.yml; do
      [ -f ".github/workflows/$w" ] || echo "MISSING-WORKFLOW: $w"
    done
 
@@ -159,7 +159,7 @@ Skip any row that `AGENTS.md` marks as an intentional deviation (the §13.5 / §
 | §7.1 a tool-specific guidance file is not a symlink             | Replace the regular file with `ln -s AGENTS.md <path>` (or `ln -s ../AGENTS.md .github/copilot-instructions.md`). The five symlinks are `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, `GEMINI.md`, `.github/copilot-instructions.md` |
 | §8.4 missing `CHANGELOG.md`                                     | Create an empty Keep-a-Changelog-formatted file; do **not** hand-author entries                                                                                              |
 | §9 Makefile target missing                                      | Add the missing target to `Makefile` and verify it runs end-to-end (notes targets: `install`, `dev`, `build`, `preview`, `test`, `lint`, `fmt`, `fmt-check`, `icons`, `changelog`, `clean`) |
-| §10.1/§10.3/§10.4 missing workflow                              | Create `.github/workflows/<file>.yml`. Required for notes: `ci.yml`, `release.yml`, `pages.yml` (there is no `version-bump.yml`)                                              |
+| §10.1/§10.3/§10.4 missing workflow                              | Create `.github/workflows/<file>.yml`. Required for notes: `ci.yml`, `version-bump.yml`, `release.yml`, `pages.yml`                                                              |
 | §10.3 floating or under-pinned toolchain                        | Edit the workflow to pin the Node version at or above the minimum declared in the fetched `OSS_SPEC.md` §10.3 table                                                           |
 | §10.5 missing pin file / pin ↔ CI mismatch                      | Add or align `.nvmrc` with the Node version `ci.yml` installs                                                                                                                |
 | §11.1 missing `docs/` content                                  | Create the topic file, then hand off to `update-docs`                                                                                                                        |

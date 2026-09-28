@@ -342,7 +342,9 @@ fragment implies:
 
 Set `bump` to an explicit `patch` / `minor` / `major` on dispatch only to
 override that derivation. Preview the auto-derived bump locally with
-`make bump` (read-only).
+`make bump` (read-only). `.github/workflows/version-bump.yml` is §10.3's front
+door to the same run: it prints the derived bump and dispatches `release.yml`
+with it. It pushes no tag — `release.yml` stays the one place that tags.
 
 The workflow collates `.changes/unreleased/` into a dated `CHANGELOG.md`
 section, bumps `package.json`, tags `vX.Y.Z`, creates a **draft** GitHub

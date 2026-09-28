@@ -1,0 +1,45 @@
+name: version-bump
+
+# §10.3 — manual-only entry point that computes the next semver and kicks
+# off the release pipeline. In this repo the Release workflow (release.yml)
+# derives the version from the .changes/unreleased/ fragments and creates
+# the v* tag itself, so this workflow's job is to preview the derived bump
+# and chain into Release with it — a thin, auditable front door rather than
+# a second tag-pushing code path.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Bump kind. 'auto' derives it from the .changes/unreleased/ fragments."
+        required: true
+        default: "auto"
+        type: choice
+        options: [auto, patch, minor, major]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Preview derived bump
+        run: |
+          if [ "${{ inputs.bump }}" = "auto" ]; then
+            echo "Derived bump: $(node scripts/release/compute-bump.mjs)"
+          else
+            echo "Requested bump override: ${{ inputs.bump }}"
+          fi
+      - name: Dispatch Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run release.yml --ref main -f bump="${{ inputs.bump }}"
