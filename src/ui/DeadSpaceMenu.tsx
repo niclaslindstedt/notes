@@ -1,4 +1,9 @@
-import { useState, type MouseEvent, type ReactNode } from "react";
+import {
+  useState,
+  type MouseEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 import {
   ActionMenuList,
@@ -34,12 +39,15 @@ export function DeadSpaceMenu({
   onNewNote,
   onNewDropzone,
   className,
+  containerRef,
   children,
 }: {
   onNewNote: () => void;
   /** Offered as a second entry when dropzone notes are available. */
   onNewDropzone?: () => void;
   className?: string;
+  /** The wrapping element — the side menu scrolls it to the active note. */
+  containerRef?: RefObject<HTMLDivElement>;
   children: ReactNode;
 }) {
   const t = useT();
@@ -78,7 +86,7 @@ export function DeadSpaceMenu({
     });
 
   return (
-    <div className={className} onContextMenu={onContextMenu}>
+    <div ref={containerRef} className={className} onContextMenu={onContextMenu}>
       {children}
       {point && (
         <FloatingPanel

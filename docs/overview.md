@@ -5788,6 +5788,19 @@ different folder. The [docked sidebar](#pinned-sidebar) never opens, so there it
 runs as the active note changes instead. A note pointing at a folder the
 registry no longer has renders ungrouped, so there is nothing to reveal for it.
 
+A long list would still open at its top with the active note below the fold, so
+the drawer then **scrolls the active row into view** too, with the row after it
+showing (and the row before it, when it scrolls up to reach one) —
+`useRevealActiveNote` (`src/ui/hooks/useRevealActiveNote.ts`) over the pure
+`revealScrollTop` (`src/ui/reveal-scroll.ts`). A row already on screen with
+that context leaves the scroll where it is, and the last row in the list simply
+scrolls as far as the list goes. Rows are found by the `data-note-row` id
+`NavItem` carries; a starred note is found in Favorites first, the copy nearer
+the top. It waits a frame, so it measures the list after the folder above has
+sprung open, and runs on the same occasions as that effect — the drawer
+appearing, the active note changing while it shows, and the list finishing its
+first load — never on a folder toggled by hand.
+
 How the folders and loose notes are ordered is two appearance preferences (see
 [appearance store](#appearance-store)). **`folderPlacement`** is `top`
 (folders pinned above the loose notes — the historical layout) or `mixed`
