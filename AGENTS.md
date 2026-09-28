@@ -300,6 +300,11 @@ What this means when you touch the code:
   `%APP_NAME%` substituted into `index.html` by the `inject-app-name` plugin).
   That is also why the header wordmark is not an i18n string: it is a proper
   noun, identical in every language.
+- **The phone bundle is built with it.** `native/scripts/bundle-web.mjs`
+  reads `APP_DISPLAY_NAME` from the environment or `native/.env` and hands it
+  to `build:native`, so the header says what the icon says; `native-build.yml`
+  forwards the secret to that step, and a `production` bundle without it
+  refuses (`native/scripts/listing-name.mjs`).
 - **Only `VITE_TARGET=native` reads `APP_DISPLAY_NAME`.** `vite.config.ts`
   gates it on the target, so the web and desktop builds cannot pick up a
   listing name even if the variable happens to be exported. Don't remove that

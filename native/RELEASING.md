@@ -14,7 +14,7 @@ variables rather than hard-coding it:
 
 | Variable           | Fills                                                  |
 | ------------------ | ------------------------------------------------------ |
-| `APP_DISPLAY_NAME` | `expo.name` — the listing name and the name under the icon |
+| `APP_DISPLAY_NAME` | `expo.name` — the listing name and the name under the icon; and the header of the bundled web app |
 | `APP_BUNDLE_ID`    | `ios.bundleIdentifier` and `android.package`            |
 | `EAS_PROJECT_ID`   | `extra.eas.projectId` — the Expo project to build against |
 
@@ -24,6 +24,13 @@ EAS environment variable on the EAS project, because EAS resolves
 `app.config.js` again on its own builders. Unset, each falls back to a local
 development default so `expo start` still works — and a `production` build
 throws in `app.config.js` rather than uploading under the wrong identity.
+
+`APP_DISPLAY_NAME` is read once more, by `npm run bundle`
+([`scripts/bundle-web.mjs`](scripts/bundle-web.mjs)), because the bundled web
+app spells the name out in its header and `<title>`: from the environment
+first, then `native/.env`, the way Expo reads it for `app.config.js`. Unset, it
+is the project name ("Notes"); `--profile production` refuses without it, and
+a re-zip whose `index.html` is titled otherwise is refused too.
 
 None of the three is in the tree; read the current values from the repository
 secrets or from App Store Connect / the Play Console, and don't paste them
@@ -221,9 +228,9 @@ EAS; a Google Play service-account key uploaded to EAS or committed as
 described above).
 
 **What it runs.** It installs the web app's and the wrapper's dependencies,
-runs `npm run bundle` in `native/` with the `VITE_DROPBOX_APP_KEY` /
-`VITE_DROPBOX_APP_FOLDER` secrets so the packed bundle carries the Dropbox
-key, and only then queues `eas build`. The bundle rides the upload: EAS leaves
+runs `npm run bundle` in `native/` with the `APP_DISPLAY_NAME`,
+`VITE_DROPBOX_APP_KEY` and `VITE_DROPBOX_APP_FOLDER` secrets so the packed
+bundle carries the listing name and the Dropbox key, and only then queues `eas build`. The bundle rides the upload: EAS leaves
 out whatever the repository-root [`.easignore`](../.easignore) lists, and that
 file — unlike `native/.gitignore` — keeps `native/assets/webroot.zip`.
 

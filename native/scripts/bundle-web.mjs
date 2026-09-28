@@ -6,7 +6,9 @@
 //
 // The web build is `npm run build:native` at the repo root
 // (`VITE_TARGET=native`, output `native/web/`): the build that carries the
-// listing name (`APP_DISPLAY_NAME`), has no service worker, no Donate link and
+// listing name (`APP_DISPLAY_NAME`, from the environment or `native/.env`,
+// handed to the build here and required for `--profile production` — see
+// `listing-name.mjs`), has no service worker, no Donate link and
 // no achievements (both the website's alone, and refused below if they show
 // up), and folds into one chunk — see `vite.config.ts`. Its relative asset base
 // resolves under the loopback origin exactly as it does anywhere else. If the
@@ -37,6 +39,9 @@ import { fileURLToPath } from "node:url";
 
 import { zipSync } from "fflate";
 
+import { nativeEnv } from "../../scripts/lib/store-env.mjs";
+import { listingName, titledWith } from "./listing-name.mjs";
+
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO_DIR = resolve(APP_DIR, "..");
 const WEB_DIR = join(APP_DIR, "web");
@@ -51,12 +56,28 @@ const profile =
   process.env.EAS_BUILD_PROFILE ??
   "preview";
 
+// The listing name, read the way the store tooling reads it: the environment
+// first, then `native/.env` (which Expo loads for `app.config.js` too, so the
+// name under the icon and the one in the header come from the same place).
+const displayName = listingName(
+  nativeEnv(REPO_DIR).value("APP_DISPLAY_NAME"),
+  profile,
+);
+console.log(
+  displayName
+    ? `• the app calls itself "${displayName}" (APP_DISPLAY_NAME)`
+    : "• no APP_DISPLAY_NAME — the app calls itself by the project name",
+);
+
 if (!skipBuild) {
   console.log(
     `• building the web app (npm run build:native) — profile ${profile}…`,
   );
+  const buildEnv = { ...process.env, APP_DISPLAY_NAME: displayName };
+  if (!displayName) delete buildEnv.APP_DISPLAY_NAME;
   execFileSync(NPM, ["run", "build:native"], {
     cwd: REPO_DIR,
+    env: buildEnv,
     stdio: "inherit",
     // npm on Windows is a batch shim, which Node cannot execute directly.
     shell: WINDOWS,
@@ -134,6 +155,20 @@ function assertWebsiteOnlyAbsent(files) {
 }
 
 assertWebsiteOnlyAbsent(files);
+
+// The header is the listing's name, not whatever `native/web/` was last built
+// with: a re-zip of a bundle built for another name (or none) would ship an app
+// whose header disagrees with its icon.
+if (
+  displayName &&
+  !titledWith(new TextDecoder().decode(files["index.html"]), displayName)
+) {
+  throw new Error(
+    `native/web/index.html is not titled "${displayName}" — it was built ` +
+      `without this APP_DISPLAY_NAME. Rebuild through this script (drop ` +
+      `--skip-build).`,
+  );
+}
 
 // Deterministic zip: every entry pinned to the ZIP epoch (1980-01-01), so the
 // artifact is reproducible instead of drifting with the clock.

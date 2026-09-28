@@ -95,6 +95,10 @@ jobs:
       - name: Bundle the web app into the wrapper
         run: npm run bundle -- --profile "${{ inputs.profile }}"
         env:
+          # The listing name is the app's header too, not only the name under
+          # the icon: the web build spells it out, so it has to be here as
+          # well as on `eas build`. A production bundle refuses without it.
+          APP_DISPLAY_NAME: ${{ secrets.APP_DISPLAY_NAME }}
           # The same Dropbox app as the website's. The phone app signs in
           # through an authentication session that returns on
           # <APP_BUNDLE_ID>://oauth, which that app must list.
