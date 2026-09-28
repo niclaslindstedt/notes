@@ -41,6 +41,7 @@ import { zipSync } from "fflate";
 
 import { nativeEnv } from "../../scripts/lib/store-env.mjs";
 import { listingName, titledWith } from "./listing-name.mjs";
+import { serviceWorkerFiles } from "./service-worker.mjs";
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO_DIR = resolve(APP_DIR, "..");
@@ -155,6 +156,19 @@ function assertWebsiteOnlyAbsent(files) {
 }
 
 assertWebsiteOnlyAbsent(files);
+
+// No service worker (the website's `sw.js` and its workbox runtime): the phone
+// app changes only when the store delivers a new build, and a worker in the
+// WebView would keep serving the copy it cached. `build:native` leaves it out;
+// a website build copied in would not.
+const worker = serviceWorkerFiles(Object.keys(files));
+if (worker.length > 0) {
+  throw new Error(
+    `native/web/ carries a service worker (${worker.join(", ")}) — the ` +
+      `phone app must not. Rebuild through this script (drop --skip-build) ` +
+      `so VITE_TARGET=native leaves it out.`,
+  );
+}
 
 // The header is the listing's name, not whatever `native/web/` was last built
 // with: a re-zip of a bundle built for another name (or none) would ship an app
