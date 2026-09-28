@@ -8,7 +8,7 @@ export { unlock } from "./bus.ts";
 export { deriveUnlocks } from "./derive.ts";
 export type { AchievementWatcher } from "./useAchievementWatcher.ts";
 // The phone and desktop builds (`__EMBEDDED__`) ship without achievements —
-// no Nird native build has them (the website does). The watcher is swapped for
+// no phone or desktop build has them (the website does). The watcher is swapped for
 // a no-op at compile time, so it, the catalog and the predicates it reads
 // never reach those bundles.
 export const useAchievementWatcher: typeof watchAchievements = __EMBEDDED__

@@ -119,8 +119,8 @@ if (count === 0 || !files["index.html"]) {
 }
 
 /** Refuse a webroot that carries what only the website may: a Donate link
- *  (App Store guideline 3.1.1) or the achievements, which no Nird native build
- *  has. `build:native` compiles both out (`__EMBEDDED__`); a `native/web/`
+ *  (App Store guideline 3.1.1) or the achievements, which no phone or desktop
+ *  build has. `build:native` compiles both out (`__EMBEDDED__`); a `native/web/`
  *  filled some other way — a website build copied in, then re-zipped with
  *  `--skip-build` — would carry them. Looks for whatever `VITE_DONATE_URL`
  *  this shell has set, the unlock notice's copy, and the achievements feature

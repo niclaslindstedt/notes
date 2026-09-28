@@ -15,8 +15,8 @@ describe("achievements unlock bus", () => {
   });
 
   it("drops every unlock in the phone and desktop build", () => {
-    // `__EMBEDDED__` is a compile-time define in a real build; no Nird native
-    // build carries achievements, so nothing is ever queued there.
+    // `__EMBEDDED__` is a compile-time define in a real build; no phone or
+    // desktop build carries achievements, so nothing is ever queued there.
     vi.stubGlobal("__EMBEDDED__", true);
     unlock("firstNote");
     expect(drain()).toEqual([]);

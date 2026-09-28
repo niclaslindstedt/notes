@@ -130,7 +130,7 @@ describe("SideMenuFooter", () => {
   });
 
   it("has no achievements entry in the phone or desktop build", () => {
-    // No Nird native build carries achievements; the website keeps them.
+    // No phone or desktop build carries achievements; the website keeps them.
     vi.stubGlobal("__EMBEDDED__", true);
     renderFooter();
     expect(screen.queryByRole("menuitem", { name: "Achievements" })).toBeNull();

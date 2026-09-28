@@ -372,8 +372,8 @@ export default defineConfig({
     // talk to there, and compiles out the side menu's Donate entry — no build
     // but the website may carry a payment link outside Apple's (App Store
     // guideline 3.1.1) — and the achievements feature (its menu row, modals,
-    // unlock toasts, settings switch, watcher and copy), which no Nird native
-    // build carries.
+    // unlock toasts, settings switch, watcher and copy), which no phone or
+    // desktop build carries.
     __EMBEDDED__: JSON.stringify(isEmbedded),
   },
   test: {

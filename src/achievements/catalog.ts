@@ -1107,7 +1107,7 @@ const CATALOG: readonly Achievement[] = [
 ] as const;
 
 // The phone and desktop builds (`__EMBEDDED__`) ship without achievements —
-// no Nird native build has them; the website does. The define folds this to
+// no phone or desktop build has them; the website does. The define folds this to
 // an empty catalog there, so no entry, predicate or id reaches those bundles.
 export const ACHIEVEMENTS: readonly Achievement[] = __EMBEDDED__ ? [] : CATALOG;
 

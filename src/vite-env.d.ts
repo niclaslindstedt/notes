@@ -11,7 +11,7 @@ declare const __APP_NAME__: string;
 // WebView shell (`VITE_TARGET=native`) and the Tauri desktop shell
 // (`VITE_SHELL_BUILD=on`); false on the web. Gates paths that assume a
 // service worker / HTTP origin, and leaves out the side menu's Donate entry
-// and the whole achievements feature (no Nird native build has achievements).
+// and the whole achievements feature (no phone or desktop build has achievements).
 declare const __EMBEDDED__: boolean;
 
 interface ImportMetaEnv {

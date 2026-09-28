@@ -6110,9 +6110,8 @@ edit.
 
 ## Achievements
 
-**The website's alone.** No phone or desktop build carries achievements (a
-fleet decision for every Nird app). `__EMBEDDED__` (see [embedded
-builds](#embedded-wrapper-builds)) takes the feature out at compile time: the
+**The website's alone.** No phone or desktop build carries achievements.
+`__EMBEDDED__` (see [embedded builds](#embedded-wrapper-builds)) takes the feature out at compile time: the
 catalog folds to `[]`, `unlock()` drops every id, `useAchievementWatcher` is a
 no-op, the side-menu row, both modal hosts and the General settings switch are
 not rendered, the `achievements` i18n group (which also carries that switch's
@@ -6384,8 +6383,8 @@ worker to register, and `SideMenuFooter` reads it to leave out the Donate
 entry: no build but the website may carry a payment link outside Apple's (App
 Store guideline 3.1.1). Being a compile-time constant, it drops the entry and
 its URL from the bundle rather than hiding them. The whole
-[achievements](#achievements) feature goes the same way — no Nird native build
-has achievements.
+[achievements](#achievements) feature goes the same way — no phone or desktop
+build has achievements.
 
 ### Capabilities
 

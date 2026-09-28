@@ -102,7 +102,7 @@ if (worker.length) {
 
 // Nor may the desktop app carry what only the website may: a Donate link (the
 // same rule as the App Store's guideline 3.1.1, kept for every store) or the
-// achievements, which no Nird native build has. `VITE_SHELL_BUILD` compiles
+// achievements, which no phone or desktop build has. `VITE_SHELL_BUILD` compiles
 // both out (`__EMBEDDED__`); a `dist/` left by a website build — which
 // `--skip-build` would copy — carries them. Looks for whatever
 // `VITE_DONATE_URL` this shell has set, the unlock notice's copy, and the
