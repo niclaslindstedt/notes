@@ -76,7 +76,7 @@ doesn't have to.
 
 ## Conventions
 
-Fleet guidelines: APP_GUIDELINES 1.0.1
+Fleet guidelines: APP_GUIDELINES 1.1.0
 
 The layout, automation and release flow described in this file are the ones
 the repository keeps. A few are deliberate and easy to "fix" by mistake:
