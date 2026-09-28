@@ -1,23 +1,10 @@
 // Expo app config.
 //
 // Executable rather than a static `app.json` because the values that identify
-// this app IN THE STORES are not checked in. The repository is the project;
-// the store listing is a deployment of it, and a deployment's coordinates
-// belong in configuration, not in source. Three of them are read from build
-// variables here:
-//
-//   APP_DISPLAY_NAME  the listing name, and the name shown under the icon
-//   APP_BUNDLE_ID     iOS bundle identifier + Android package name — the
-//                     latter is literally the Play Store URL, so it is the
-//                     most public of the three
-//   EAS_PROJECT_ID    the Expo project this builds against
-//
-// Each lives as a repository secret (which `.github/workflows/native-build.yml`
-// forwards) AND as an EAS environment variable on the EAS project, because EAS
-// resolves this file again on its own builders. Unset, each falls back to a
-// local development default below, so a plain checkout still runs `expo start`
-// — but a store build with them unset is wrong, which `assertConfigured` makes
-// loud rather than silent.
+// this app IN THE STORES are not checked in: the listing name, the bundle id
+// and the EAS project arrive as build variables, resolved in
+// `./identifiers.js`, which also throws for a `production` build with any of
+// them missing.
 //
 // `slug` stays literal: it is the project's own name, not a listing
 // coordinate, and EAS resolves the project by slug.
@@ -29,48 +16,20 @@
 // APP_BUNDLE_ID like the identifiers do: `se.agilator.notes` in the store
 // build, `dev.local.notes` in a plain checkout, never a committed literal.
 
-const PROJECT_NAME = "Notes";
+const {
+  PROJECT_NAME,
+  DISPLAY_NAME,
+  BUNDLE_ID,
+  EAS_PROJECT_ID,
+  ICLOUD_CONTAINER,
+} = require("./identifiers.js");
 
-/** Reverse-DNS id used only by local/dev builds; never submitted. */
-const DEV_BUNDLE_ID = "dev.local.notes";
-
-const DISPLAY_NAME = process.env.APP_DISPLAY_NAME?.trim() || PROJECT_NAME;
-const BUNDLE_ID = process.env.APP_BUNDLE_ID?.trim() || DEV_BUNDLE_ID;
-const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID?.trim();
-
-// THE iCLOUD CONTAINER IS NOT THE BUNDLE ID, and deriving it from one would be
-// a mistake. It names a container, registered once in the developer portal and
-// addressed by the app and its native module; the listing it ships under is
-// not its business. Deriving it would mean a plain checkout addressing
-// `iCloud.dev.local.notes` while the module's Swift — which cannot read a
-// build variable — said something else, and a store pointed at the wrong
-// container syncs nothing while reporting success.
-//
-// So it is committed, identical in every build, and spelled the same in
-// `modules/icloud-store/index.ts` and its Swift. The root test suite
-// (`tests/platform/icloud-host.test.ts`) fails if the three drift apart.
-const ICLOUD_CONTAINER = "iCloud.se.agilator.notes";
-
-// What the container's folder is called in the Files app. The project's plain
-// name, not the listing name: it is the one string of the arrangement a user
-// sees, and it must not move between releases. `ICLOUD_FOLDER_NAME` in
-// `src/storage/icloud/index.ts` shows the same name in the sync details.
+// What the iCloud container's folder is called in the Files app. The
+// project's plain name, not the listing name: it is the one string of the
+// arrangement a user sees, and it must not move between releases.
+// `ICLOUD_FOLDER_NAME` in `src/storage/icloud/index.ts` shows the same name in
+// the sync details.
 const ICLOUD_FOLDER_NAME = PROJECT_NAME;
-
-// A `production` build is one headed for a store, so the fallbacks above are
-// not good enough: fail here rather than uploading a binary under the dev
-// bundle id or the project name. EAS sets EAS_BUILD_PROFILE on its builders.
-if (process.env.EAS_BUILD_PROFILE === "production") {
-  for (const name of ["APP_DISPLAY_NAME", "APP_BUNDLE_ID", "EAS_PROJECT_ID"]) {
-    if (!process.env[name]?.trim()) {
-      throw new Error(
-        `${name} is not set. A production build needs it — set it as an EAS ` +
-          `environment variable on the EAS project (and as a repository ` +
-          `variable for the Native build workflow). See RELEASING.md.`,
-      );
-    }
-  }
-}
 
 module.exports = {
   expo: {

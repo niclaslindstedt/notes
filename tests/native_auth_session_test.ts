@@ -63,22 +63,25 @@ function run(script: string, win: FakeWindow): void {
 
 const require = createRequire(import.meta.url);
 const CONFIG = require.resolve("../native/app.config.js");
+const IDENTIFIERS = require.resolve("../native/identifiers.js");
 
 /** The Expo `scheme` app.config.js resolves to under `bundleId` (unset: a
- *  plain checkout). Loaded fresh, because the config reads the environment
- *  once, at require time. */
+ *  plain checkout). Loaded fresh, with the identifiers it reads, because they
+ *  read the environment once, at require time. */
 function schemeFor(bundleId: string | undefined): unknown {
   const saved = process.env.APP_BUNDLE_ID;
   if (bundleId === undefined) delete process.env.APP_BUNDLE_ID;
   else process.env.APP_BUNDLE_ID = bundleId;
   try {
     delete require.cache[CONFIG];
+    delete require.cache[IDENTIFIERS];
     const config = require(CONFIG) as { expo: { scheme?: unknown } };
     return config.expo.scheme;
   } finally {
     if (saved === undefined) delete process.env.APP_BUNDLE_ID;
     else process.env.APP_BUNDLE_ID = saved;
     delete require.cache[CONFIG];
+    delete require.cache[IDENTIFIERS];
   }
 }
 
