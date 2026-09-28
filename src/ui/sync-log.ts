@@ -1,4 +1,5 @@
 import type { LogEntry } from "../dev/logger.ts";
+import { formatClockTime } from "../i18n/clock.ts";
 
 // The data side of the sync-details modal's sync log: which logger scopes make
 // up the cloud-sync story, how far back a copy reaches, and how a line reads
@@ -61,12 +62,9 @@ export function entriesInRange(
   return entries.filter((e) => e.ts >= cutoff);
 }
 
+/** A log entry's time of day, on the device's clock (12- or 24-hour). */
 export function formatLogTime(ts: number): string {
-  const d = new Date(ts);
-  const h = String(d.getHours()).padStart(2, "0");
-  const m = String(d.getMinutes()).padStart(2, "0");
-  const s = String(d.getSeconds()).padStart(2, "0");
-  return `${h}:${m}:${s}`;
+  return formatClockTime(ts, { seconds: true });
 }
 
 export function formatLogLine(entry: LogEntry): string {

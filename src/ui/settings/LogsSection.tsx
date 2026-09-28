@@ -5,9 +5,9 @@ import {
   clearLogs,
   getLogs,
   subscribeToLogs,
-  type LogEntry,
   type LogLevel,
 } from "../../dev/logger.ts";
+import { formatLogLine, formatLogTime } from "../sync-log.ts";
 import { Field, Section } from "./shared.tsx";
 
 // The Logs settings tab, modelled on checklist's Logs tab: a live, filterable
@@ -170,18 +170,6 @@ export function LogsSection() {
       </div>
     </Section>
   );
-}
-
-function formatLogTime(ts: number): string {
-  const d = new Date(ts);
-  const h = String(d.getHours()).padStart(2, "0");
-  const m = String(d.getMinutes()).padStart(2, "0");
-  const s = String(d.getSeconds()).padStart(2, "0");
-  return `${h}:${m}:${s}`;
-}
-
-function formatLogLine(entry: LogEntry): string {
-  return `${formatLogTime(entry.ts)} [${entry.scope}] ${entry.level.toUpperCase()} ${entry.message}`;
 }
 
 function levelClass(level: LogLevel): string {

@@ -352,6 +352,7 @@ Honour these when naming a new file, key, or string.
 | **i18n runtime** / **`t()`** / **translation lookup**      | `useT`, `tFor`, `MessageKey`, `Catalog` (`src/i18n/index.ts`). [→](overview.md#i18n-runtime)                 |
 | **Language root** / **first-paint language gate**          | `LanguageRoot` (`src/i18n/LanguageRoot.tsx`); `readLanguagePreference` (`src/i18n/language-preference.ts`). [→](overview.md#language-root) |
 | **Locale helpers** / **detect language**                   | `Lang`, `SUPPORTED_LANGS`, `bcp47`, `detectInitialLanguage` (`src/i18n/locale.ts`). [→](overview.md#locale-helpers) |
+| **Device clock** / **12-hour clock** / **AM/PM** / **log timestamps** | `formatClockTime` (`src/i18n/clock.ts`); `formatLogTime`, `formatLogLine` (`src/ui/sync-log.ts`). [→](overview.md#device-clock) |
 | **Catalog namespaces** (`app`, `menu`, `sync`, …)          | `src/i18n/locales/{en,sv}/<ns>.ts`. [→](overview.md#catalog-namespaces)                                       |
 
 ## PWA, dev, and build

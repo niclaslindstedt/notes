@@ -1,10 +1,11 @@
 import { Component, useState, type ErrorInfo, type ReactNode } from "react";
 
-import { createLogger, getLogs, type LogEntry } from "../dev/logger.ts";
+import { createLogger, getLogs } from "../dev/logger.ts";
 import { useT } from "../i18n/index.ts";
 import { writeClipboard } from "./clipboard.ts";
 import { Button } from "./form/Button.tsx";
 import { CheckIcon, CopyIcon, RestoreIcon } from "./icons.tsx";
+import { formatLogLine } from "./sync-log.ts";
 
 const log = createLogger("crash");
 
@@ -158,12 +159,4 @@ function crashReport(error: Error, componentStack: string): string {
   const entries = getLogs().slice(-REPORT_LOG_ENTRIES);
   if (entries.length > 0) parts.push(entries.map(formatLogLine).join("\n"));
   return parts.join("\n\n");
-}
-
-function formatLogLine(entry: LogEntry): string {
-  const d = new Date(entry.ts);
-  const time = [d.getHours(), d.getMinutes(), d.getSeconds()]
-    .map((n) => String(n).padStart(2, "0"))
-    .join(":");
-  return `${time} [${entry.scope}] ${entry.level.toUpperCase()} ${entry.message}`;
 }

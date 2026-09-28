@@ -4,6 +4,7 @@ import { useT } from "../../i18n/index.ts";
 import { Button } from "../form/Button.tsx";
 import { CloseIcon, ShieldIcon } from "../icons.tsx";
 import { Modal } from "../Modal.tsx";
+import { formatLogTime } from "../sync-log.ts";
 
 // The full log behind the encryption status bar. The status line in the
 // Storage tab only flashes the step it's on; when a turn-on / turn-off fails,
@@ -111,12 +112,4 @@ export function EncryptionLogModal({ open, entries, onClose }: Props) {
       </footer>
     </Modal>
   );
-}
-
-function formatLogTime(ts: number): string {
-  const d = new Date(ts);
-  const h = String(d.getHours()).padStart(2, "0");
-  const m = String(d.getMinutes()).padStart(2, "0");
-  const s = String(d.getSeconds()).padStart(2, "0");
-  return `${h}:${m}:${s}`;
 }

@@ -3801,7 +3801,9 @@ litter the list. Blank notes are hidden from the visible `notes` set but live in
 
 `noteTitle` (`src/domain/note.ts`) returns the title or a fallback;
 `defaultNoteTitle` applies the user's `DefaultTitleScheme` (`none` /
-`dateTime` / `numbered`) on creation. The scheme is an editor setting.
+`dateTime` / `numbered`) on creation. The scheme is an editor setting. The
+`dateTime` stamp is `YYYY-MM-DD HH:mm` on every device, whatever its locale's
+clock (see [Device clock](#device-clock) for why).
 
 ### Preview
 
@@ -6191,7 +6193,25 @@ first-paint hydration.
 
 `src/i18n/locale.ts` — the framework-free `Lang` (`en` | `sv`),
 `SUPPORTED_LANGS`, `bcp47`, and `detectInitialLanguage`, shared with the React
-Native app.
+Native app. `bcp47` names the language the catalog is written in for `<html
+lang>`: `en-US` (the English catalog is American English) and `sv-SE`.
+
+### Device clock
+
+`src/i18n/clock.ts` — `formatClockTime` writes a time of day the way the
+**device's** locale does, not the app language's: `7:26:05 AM` where it keeps a
+12-hour clock (en-US), `07:26:05` where it keeps a 24-hour one (sv-SE, en-GB).
+The clock is a regional format rather than a translation — an American and a
+Briton read the same English catalog and expect different clocks. It stamps
+every log line: the [sync log](#sync-details-modal), the [Logs tab](#logs), the
+encryption log and the crash report (`formatLogTime` / `formatLogLine` in
+`src/ui/sync-log.ts`, shared by all four).
+
+A time that is *stored or compared* does not follow it. The `dateTime`
+[default title](#default-title) and the [dropzone](#dropzone)'s name keep their
+fixed `YYYY-MM-DD HH:mm` form, because `isDropzoneNamed` re-derives the name
+from `createdAt` on whichever device looks — a locale-dependent stamp would read
+as "renamed by the user" on a device with another clock.
 
 ### Catalog namespaces
 

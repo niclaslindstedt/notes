@@ -7,11 +7,12 @@ export type Lang = "en" | "sv";
 
 export const SUPPORTED_LANGS: readonly Lang[] = ["en", "sv"];
 
-// Map "en" → "en-GB" and "sv" → "sv-SE" so any future Intl formatter (and
-// the `<html lang>` attribute the language root sets) picks a concrete
-// locale rather than guessing.
+// Map "en" → "en-US" and "sv" → "sv-SE": the language the catalog is written
+// in, for the `<html lang>` attribute the language root sets. The English
+// catalog is American English. Regional FORMATS (the clock, dates) follow the
+// device's locale instead — see `clock.ts`.
 export function bcp47(lang: Lang): string {
-  return lang === "sv" ? "sv-SE" : "en-GB";
+  return lang === "sv" ? "sv-SE" : "en-US";
 }
 
 // Consulted only when no preference is stored yet. Anything whose

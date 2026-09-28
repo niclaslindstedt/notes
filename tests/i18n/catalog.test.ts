@@ -85,7 +85,7 @@ describe("i18n runtime", () => {
   });
 
   it("maps language codes to concrete BCP-47 locales", () => {
-    expect(bcp47("en")).toBe("en-GB");
+    expect(bcp47("en")).toBe("en-US");
     expect(bcp47("sv")).toBe("sv-SE");
   });
 
