@@ -124,13 +124,6 @@ oss-spec:unlisted-website: the web build is a testing surface; users install the
   `update-readme` and `sync-oss-spec` must keep it that way rather than
   restoring the §3 product sections.
 
-- **§20.2 Test file suffix** — tests use the Vitest-idiomatic `*.test.ts`
-  suffix under `tests/<concern>/`, matching checklist exactly. The pinned
-  `validate.sh` (spec 2.8.0) flags this because it expects a
-  `_test` / `Test` / `Tests` suffix, but mirroring checklist's convention is
-  the higher priority here. If the test layout is ever reorganized, keep it in
-  lockstep with checklist, not with the validator.
-
 When you close any deferred item above, delete its bullet here in the same PR.
 
 ## Build and test commands
@@ -824,7 +817,11 @@ pasting it verbatim.
 
 ## Test conventions
 
-- Tests live under `tests/`, named `*.test.ts` / `*.test.tsx`.
+- Tests live under `tests/<concern>/`, named `*.test.ts` / `*.test.tsx`,
+  matching checklist. Nothing sits at the top level of `tests/`: OSS_SPEC
+  §20.2's validator reads that level and wants a `_test` / `Test` stem there,
+  so a new suite goes in the concern directory it checks (the store listing's
+  is `tests/store/`).
 - They run under vitest. Domain/storage tests run in the default `node`
   environment; a UI test opts into jsdom with a `// @vitest-environment jsdom`
   docblock at the top of the file.

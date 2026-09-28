@@ -55,7 +55,7 @@ App Store Connect truncates silently.
 | `review.notes` | 2–4000                                      |
 
 It also refuses a keyword the title or subtitle already spends, and it and
-`tests/store-listing.test.ts` check the review notes against the build — they
+`tests/store/listing.test.ts` check the review notes against the build — they
 are the guideline 4.2 argument that this app is not a browser pointed at a
 website.
 

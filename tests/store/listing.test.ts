@@ -25,8 +25,8 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { RULES } from "../native/store/listing.mts";
-import * as skeleton from "../native/store/copy.example.mts";
+import { RULES } from "../../native/store/listing.mts";
+import * as skeleton from "../../native/store/copy.example.mts";
 // A tool repo has no identity module: the brand-shaped facts are stated in
 // the listing itself (`RULES.brand`), and the LISTING NAME arrives as
 // APP_DISPLAY_NAME like every other deployment coordinate.
@@ -35,7 +35,7 @@ const APP_TITLE =
 const PUBLISHER = RULES.brand.publisher;
 const PRIVACY_URL = RULES.brand.privacyUrl;
 
-const root = join(import.meta.dirname, "..");
+const root = join(import.meta.dirname, "..", "..");
 const read = (...parts: string[]) => readFileSync(join(root, ...parts), "utf8");
 
 // THE COPY IS NOT COMMITTED, so this suite reads whichever module is present:
@@ -49,7 +49,7 @@ const read = (...parts: string[]) => readFileSync(join(root, ...parts), "utf8");
 //
 // IT MUST NOT NAME `copy.mts` IN A LITERAL IMPORT, and that cost a red CI.
 // TypeScript resolves the specifier of a dynamic `import()` exactly as it
-// resolves a static one, so `await import("../native/store/copy.mts")` inside a
+// resolves a static one, so `await import("../../native/store/copy.mts")` inside a
 // try/catch typechecks fine on the machine that HAS the file and fails on every
 // clone with `TS2307: Cannot find module`. Locally green, CI red — which is the
 // standing hazard of a gitignored SOURCE module: this checkout is not a clone,
