@@ -1,4 +1,4 @@
-// oss-spec:allow-large-file: split when next touched; known deviation by owner decision
+// guidelines:allow-large-file: split when next touched; known deviation by owner decision
 // The achievement catalog — the single source of truth for which features
 // are unlockable, what tier each sits in, which glyph it wears, and how its
 // unlock fires. Display copy (name / condition / optional learnMore) lives in

@@ -6328,8 +6328,7 @@ ring buffer (bounded ~500 entries); when capture is on it mirrors to
 / `clearLogs` back the [Logs tab](#logs); the storage backends log their sync
 diagnostics through it.
 
-`src/output.ts` is the semantic front for it (OSS_SPEC §19.4's central output
-module): `status`, `info`, `warn`, `error` and `header` write under the `app`
+`src/output.ts` is the semantic front for it (the central output module): `status`, `info`, `warn`, `error` and `header` write under the `app`
 scope, so a line that is not a backend's own sync diagnostic has one place to
 go rather than a bare `console.*` call the phone never shows.
 

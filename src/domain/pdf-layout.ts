@@ -1,4 +1,4 @@
-// oss-spec:allow-large-file: split when next touched; known deviation by owner decision
+// guidelines:allow-large-file: split when next touched; known deviation by owner decision
 // Lays a note out on paper: a note in, a list of pages of drawing operations
 // out. This is the typesetter — where every decision about *where a thing goes*
 // is made. What turns those operations into an actual PDF file is

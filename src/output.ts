@@ -1,4 +1,4 @@
-// The central output module (OSS_SPEC §19.4): the semantic helpers a
+// The central output module: the semantic helpers a
 // user-facing diagnostic line goes through instead of a bare `console.*`
 // call. They write into the in-app logger (`src/dev/logger.ts`), which has no
 // console sink and keeps a bounded buffer the Logs tab reads (mirrored to

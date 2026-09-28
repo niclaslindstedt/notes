@@ -115,7 +115,6 @@ reporting a vulnerability.
 - [Architecture](docs/architecture.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [`AGENTS.md`](AGENTS.md) — guidance for AI coding agents
-- [`OSS_SPEC.md`](OSS_SPEC.md) — the spec this repo follows
 
 ## License
 

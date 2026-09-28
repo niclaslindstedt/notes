@@ -5,9 +5,7 @@ description: "Use when README.md may be stale. Discovers commits since the last 
 
 # Updating the README
 
-**Governing spec sections:** §3 (`README.md` — required sections and content), §21.5 (this skill is mandated because `README.md` is a drift-prone artifact).
-
-`README.md` is the primary user-facing documentation for notes. Per §3 of `OSS_SPEC.md` it must cover the project description, installation, a quick-start, usage, a contribution pointer, license, and a link to `OSS_SPEC.md`. notes is a **browser PWA, not a CLI** — there are no flags or subcommands to tabulate. It goes stale whenever a build/test command, a storage backend, a supported browser/platform, an install step, or a headline feature changes without a matching edit.
+`README.md` is the **contributor's** front page for notes: one line on what the project is, then prerequisites, install, run, build, the quality gates, the source layout, configuration, contributing, where the docs are, and the license. It deliberately carries no feature tour, no price and no "install it to your home screen" pitch — the product surface is described by `src/ui/HomePage.tsx` and `docs/`, and the README does not duplicate it. Its badge row is `ci` + `license` only. It goes stale whenever a build/test command, a prerequisite, the source layout, a configuration knob or a docs page changes without a matching edit.
 
 ## Tracking mechanism
 
@@ -43,25 +41,23 @@ description: "Use when README.md may be stale. Discovers commits since the last 
 | ------------------------------------------------------------------ | -------------------------------------------------------- |
 | What the app is / its headline behaviour                           | **Project description** / intro                          |
 | `Makefile`, `package.json` scripts                                 | **Build & test commands** (the `make …` table)           |
-| `src/storage/**` — a new or changed backend, encryption, offline   | **Features** / **Storage** list                          |
-| A new user-facing feature (editor, namespaces, theming, …)         | **Features** list                                        |
-| Browser/platform support (e.g. File System Access API gating)      | **Supported browsers / platforms** list                 |
-| Install / PWA install steps, `.nvmrc`, prerequisites               | **Install** / **Install as a PWA** / **Quick start**     |
+| Install steps, `.nvmrc`, prerequisites                             | **Prerequisites** / **Install**                          |
 | License change                                                     | **License** section, badges                              |
-| A move of `OSS_SPEC.md` or the conformance posture                 | The **link to `OSS_SPEC.md`**                            |
+| A `src/` directory added, moved or removed                         | **Layout** table                                         |
+| A page added to or removed from `docs/`                            | **Documentation** list                                   |
 
 Extend this table every time you find a new source-of-truth file that feeds the README.
 
-## Required sections (§3)
+## Required sections
 
-Keep the README covering, at minimum: a project description, install instructions, a quick start, a usage/features overview, a pointer to `CONTRIBUTING.md`, the license, and a link to `OSS_SPEC.md`. For notes, "usage" is framed as PWA surfaces (what the app does, how you store notes, how you install it) rather than CLI invocations.
+Keep the README covering, at minimum: what the project is, prerequisites, install, run, build, the quality gates, the source layout, a pointer to `AGENTS.md` and `CONTRIBUTING.md`, the docs list, and the license. Do not add product sections (features, usage tour, install-as-an-app) — they belong to `src/ui/HomePage.tsx` and `docs/`.
 
 ## Update checklist
 
 - [ ] Read baseline from `.last-updated` and run `git log` / `git diff --name-only`
 - [ ] Read the current `README.md`
 - [ ] Walk the mapping table and update each affected section
-- [ ] Confirm every required §3 section is still present
+- [ ] Confirm every required section is still present
 - [ ] Verify every shell example is still valid (`npm run …` / `make …`)
 - [ ] Run `make lint` and `make test`
 - [ ] Write the new baseline:

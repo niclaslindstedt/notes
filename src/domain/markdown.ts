@@ -1,4 +1,4 @@
-// oss-spec:allow-large-file: split when next touched; known deviation by owner decision
+// guidelines:allow-large-file: split when next touched; known deviation by owner decision
 // A small, dependency-free Markdown parser. Pure functions over strings —
 // no DOM, no I/O — so it stays in `domain/` and is cheap to unit-test. It
 // powers the live-preview editor (`src/ui/MarkdownEditor.tsx`), which renders

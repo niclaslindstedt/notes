@@ -1,4 +1,4 @@
-// oss-spec:allow-large-file: split when next touched; known deviation by owner decision
+// guidelines:allow-large-file: split when next touched; known deviation by owner decision
 import {
   useCallback,
   useEffect,

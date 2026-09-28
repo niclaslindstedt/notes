@@ -5,8 +5,6 @@ description: "Use when files under docs/ may be stale. Discovers commits since t
 
 # Updating the Docs
 
-**Governing spec sections:** §11.1 (`docs/` directory — the required conceptual docs tree), §21.5 (this skill is mandated because `docs/` is a drift-prone artifact).
-
 The `docs/` directory contains conceptual documentation for notes. Unlike the README (overview) or the in-app copy, `docs/` explains _why_ and _how_ in depth. It goes stale whenever a user-visible behaviour, a configuration knob, a storage backend, or a supported surface changes without a matching edit. notes is a **browser PWA, not a CLI** — there are no exit codes or command flags to document; the surfaces are the appearance/theme settings, the storage backends, the namespace model, and the PWA install/update lifecycle.
 
 The current docs surface:

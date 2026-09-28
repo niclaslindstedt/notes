@@ -53,8 +53,8 @@ them at any severity when touching the file anyway.
 Patterns observed to rate consistently (capture them so the next agent
 doesn't re-derive):
 
-- A non-test source file **over the 1000-line cap** (OSS_SPEC §20.5) with
-  no `oss-spec:allow-large-file:` opt-out is a standing split-by-concern
+- A non-test source file **over the 1000-line cap** with
+  no `guidelines:allow-large-file:` opt-out is a standing split-by-concern
   candidate. Severity tracks how far over the cap and how many distinct
   concerns are tangled — multi-concern files near 2× the cap land in the
   7–8 band; a modestly-over file with clean internal seams sits at 5–6.

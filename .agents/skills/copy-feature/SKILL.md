@@ -7,7 +7,7 @@ description: "Use whenever you want to bring a feature, look, modal, button, com
 
 This notes app is deliberately modelled on
 [`checklist`](https://github.com/niclaslindstedt/checklist): same stack (Vite +
-React 19 + Tailwind v4 + `vite-plugin-pwa` + Vitest), same `OSS_SPEC.md`
+React 19 + Tailwind v4 + `vite-plugin-pwa` + Vitest), same repository
 conventions, same `src/`-by-concern layout, same CSS-variable token vocabulary.
 checklist is the mature sibling; notes grows by porting its features across one
 at a time. This skill is the procedure for doing that **well** — adapting a
@@ -410,7 +410,7 @@ reuse them rather than re-porting:
 
 `main.tsx` does a `location.pathname` suffix switch to mount `PrivacyPage`,
 and `vite.config.ts`'s `emitPrivacyAlias` mirrors `index.html` to
-`privacy/index.html`. notes' website is unlisted (§11.3.12, AGENTS.md), so unlike
+`privacy/index.html`. notes' website is unlisted (AGENTS.md → Conventions), so unlike
 checklist this alias does NOT splice per-route `<title>`/canonical — it's a
 verbatim copy, and it inherits `index.html`'s robots `noindex`. Don't port a
 splice, a sitemap or JSON-LD from checklist.
