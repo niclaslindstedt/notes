@@ -74,53 +74,31 @@ If the user uses a term you can't find in `docs/dictionary.md` and can't infer
 from filenames, ask before guessing — then record the answer so the next agent
 doesn't have to.
 
-## OSS Spec conformance
+## Conventions
 
-This repository follows [`OSS_SPEC.md`](OSS_SPEC.md) for project layout,
-documentation, automation, and governance. A copy of the spec lives at the
-repository root so contributors and agents can consult it without leaving the
-repo. When in doubt about a layout, naming, or workflow decision, consult the
-relevant section of `OSS_SPEC.md`.
+Fleet guidelines: APP_GUIDELINES 1.0.1
 
-The repo was bootstrapped against the spec and is being brought into full
-conformance incrementally. Run the validator to see the current gap:
+The layout, automation and release flow described in this file are the ones
+the repository keeps. A few are deliberate and easy to "fix" by mistake:
 
-```sh
-bash /path/to/oss-spec/scripts/validate.sh .
-```
-
-### Deviations from OSS_SPEC
-
-These are the spec items this repo does **not** satisfy yet, and why. The
-initial scaffold took the project from 31 structural violations down to 12;
-the remaining 12 are listed here so they're a deliberate, tracked backlog
-rather than an accidental gap. Re-run the validator after changing anything in
-this list and keep it in sync.
-
-The website is unlisted (§11.3.12), so §11.3's SEO mandates and the §11.4.7
-Lighthouse gate do not apply; every page it emits carries a robots `noindex`.
-
-oss-spec:unlisted-website: the web build is a testing surface; users install the app from its store listing
-
-**Deferred — intended, but not built yet (do these as the project matures):**
-
-- **§13.5 `prompts/`** — no versioned prompt library; nothing in the app uses
-  one yet.
-
-**Deliberate, permanent deviations (not bugs — don't "fix" these):**
-
-- **§3 README shape / §11.4.6 installability in the README** — `README.md` is
-  a **contributor's** front page, not a product page: prerequisites, install,
-  run, build, the quality gates, the source layout, and where the docs are.
-  It deliberately carries no "Why?" bullets, no feature or usage tour, no
-  examples pointer, and no "add it to your home screen" paragraph — the
-  product surface is described by `src/ui/HomePage.tsx` (the `/home` showcase,
-  which is also what Google's OAuth verification reads) and by `docs/`, and
-  the README does not duplicate it. Its badge row is `ci` + `license` only.
-  `update-readme` and `sync-oss-spec` must keep it that way rather than
-  restoring the §3 product sections.
-
-When you close any deferred item above, delete its bullet here in the same PR.
+- **The website is unlisted.** The web build is a testing surface; people get
+  the app from its store listing. Every page the site emits carries a robots
+  `noindex`, and there is no SEO scaffolding — no sitemap, `llms.txt`,
+  structured data, canonical links or Lighthouse gate, and no page-weight or
+  chunk budgets.
+- **`README.md` is a contributor's front page**, not a product page:
+  prerequisites, install, run, build, the quality gates, the source layout,
+  and where the docs are. It carries no feature or usage tour, no price and
+  no "add it to your home screen" paragraph — the product surface is
+  described by `src/ui/HomePage.tsx` (the `/home` showcase) and by `docs/`,
+  and the README does not duplicate it. Its badge row is `ci` + `license`
+  only. `update-readme` keeps it that way.
+- **No prompt library and no man pages.** The app ships no AI and has no
+  command line, so there is no `prompts/` or `man/` directory.
+- **A source file stays under 1000 lines.** A file that cannot yet be split
+  carries `guidelines:allow-large-file: <reason>` in a comment in its first
+  lines, and is split by concern when next touched (see
+  `docs/refactoring-roadmap.md`).
 
 ## Build and test commands
 
@@ -158,7 +136,7 @@ wrappers are thin"). There is no injected global and no Tauri command.
 build like the native one (`isEmbedded` in `vite.config.ts`): no service
 worker, no update prompt, no Donate entry (a payment link outside Apple's is
 an App Store rejection, and the website alone keeps it), and no achievements
-(no Nird native build has them; see "Achievements" in `docs/overview.md`),
+(no phone or desktop build has them; see "Achievements" in `docs/overview.md`),
 and no link back to the source — no GitHub repository, issues, releases or
 sponsor link, nor the author's handle anywhere in the bundle (owner decision
 D17; both bundle scripts refuse a webroot that carries `niclaslindstedt`). A desktop build updates by being replaced. The package's
@@ -205,7 +183,7 @@ packaging time (`tauri/scripts/package.mjs`), like the phone app's. See
   carrying over only the device's `notes/…` look (theme, layout, language), so
   nothing is read from or written to the device's notes and connecting a
   storage backend is refused. Every date is relative to the moment it opens.
-  `tests/dev/demo.test.ts` holds it to the app's own document format and to
+  `tests/demo_test.ts` holds it to the app's own document format and to
   each store frame's premise — change a note a frame stages and that test
   says so. Dev tooling: no UI surface, no changeset.
 
@@ -336,7 +314,7 @@ fragment implies:
 
 Set `bump` to an explicit `patch` / `minor` / `major` on dispatch only to
 override that derivation. Preview the auto-derived bump locally with
-`make bump` (read-only). `.github/workflows/version-bump.yml` is §10.3's front
+`make bump` (read-only). `.github/workflows/version-bump.yml` is the front
 door to the same run: it prints the derived bump and dispatches `release.yml`
 with it. It pushes no tag — `release.yml` stays the one place that tags.
 
@@ -425,7 +403,7 @@ lands back in everyone's first download:
   `import()`, because the app opens on the browser backend and stays there
   unless someone connects something. The render path reaches them through
   `useRemoteBackends`; verbs that run on a gesture (connect, delete a
-  namespace, publish a daemon) use a local `await import()`. **Never import
+  namespace) use a local `await import()`. **Never import
   `remote-backends.ts` statically** — one static edge folds the whole family
   back into the first paint. The things that must answer at boot were split
   into their own small modules for exactly this reason:
@@ -555,7 +533,7 @@ product decision):
 
 The source tree under `src/` is organized by concern, not by file type:
 
-- `src/output.ts` — the central output module (OSS_SPEC §19.4):
+- `src/output.ts` — the central output module:
   `status` / `info` / `warn` / `error` / `header`, written into the in-app
   logger (`src/dev/logger.ts`) rather than the console. A new diagnostic line
   goes through it.
@@ -689,12 +667,12 @@ the page (the framework's `runAuthSessionAuth`, via
 `connectDropboxAuthSession` in `src/storage/dropbox/index.ts`). Its redirect
 URI is `<bundle id>://oauth` — the Expo `scheme` is the bundle id, so
 `se.agilator.notes://oauth` in the store build — and the Dropbox app must list
-it; `tests/platform/auth-session.test.ts` pins the property, event and
+it; `tests/native_auth_session_test.ts` pins the property, event and
 scheme. And the share sheet for an export: a download goes nowhere in a
 WebView, so every export in `src/` goes through the framework's `saveFile`,
 and the wrapper advertises the `save-file` capability in `window.__ossShell`
 (`native/src/saveFileBridge.ts`) and hands the file to `expo-sharing`
-(`native/src/saveFile.ts`); `tests/platform/save-file.test.ts` pins the
+(`native/src/saveFile.ts`); `tests/native_save_file_test.ts` pins the
 contract against the framework's names. Never call a download of your own
 (an anchor at a `blob:` URL) from `src/`. For `tauri/` the list is **one item long**: a loopback HTTP
 listener for one OAuth redirect, because a web page cannot hold a listening
@@ -795,8 +773,8 @@ each its own component in `src/ui/` mounted by the path switch in
 (`/preview/home`, `/branch/privacy`, …), and their links resolve off
 `import.meta.env.BASE_URL` so every slot stays self-contained.
 
-- **`/privacy`** (`PrivacyPage.tsx`) — the privacy policy. This is the URL
-  given on the Google OAuth consent screen.
+- **`/privacy`** (`PrivacyPage.tsx`) — the privacy policy the app itself
+  links to.
 - **`/home`** (`HomePage.tsx`) — the public **showcase / landing page**. It is
   the homepage the Dropbox app listing points at for the Dropbox
   scope, so it must keep meeting that bar: accurately identify the app and the
@@ -810,8 +788,8 @@ each its own component in `src/ui/` mounted by the path switch in
 > change a user-facing feature — and *especially* anything that touches what
 > data the app reads/writes or which OAuth scope or third party it talks to —
 > update `HomePage.tsx` in the same PR so the description stays accurate and
-> complete. An out-of-date homepage is a failed Google verification, not just
-> stale copy. The same applies to `PrivacyPage.tsx` for anything that changes
+> complete. An out-of-date homepage misdescribes the app to whoever reviews
+> its Dropbox access, not just stale copy. The same applies to `PrivacyPage.tsx` for anything that changes
 > what is stored or sent.
 
 ## Bringing features over from checklist
@@ -819,8 +797,7 @@ each its own component in `src/ui/` mounted by the path switch in
 This app is modelled on [`checklist`](https://github.com/niclaslindstedt/checklist),
 which shares the same conventions and a near-identical stack (Vite + Tailwind +
 vite-plugin-pwa; checklist still renders with React where notes has moved to
-Preact) and
-the same `OSS_SPEC.md` conventions. Most features, looks, modals, and buttons
+Preact) and the same repository conventions. Most features, looks, modals, and buttons
 will be ported from there over time. **Use the `copy-feature` agent skill**
 (`.agents/skills/copy-feature/`) to do this — it clones checklist, studies the
 target feature in place, and adapts it to fit the notes domain rather than
@@ -828,11 +805,20 @@ pasting it verbatim.
 
 ## Test conventions
 
-- Tests live under `tests/<concern>/`, named `*.test.ts` / `*.test.tsx`,
-  matching checklist. Nothing sits at the top level of `tests/`: OSS_SPEC
-  §20.2's validator reads that level and wants a `_test` / `Test` stem there,
-  so a new suite goes in the concern directory it checks (the store listing's
-  is `tests/store/`).
+- Tests live in their own files under `tests/`, never inline in `src/`. A
+  suite for one concern goes in `tests/<concern>/`, named `*.test.ts` /
+  `*.test.tsx` (the store listing's is `tests/store/`).
+- The suites that pin the app's edges sit at the top level of `tests/` with a
+  `_test` stem: the presentation demo (`tests/demo_test.ts`, including the
+  walk over every day of a year) and the phone shell's bridges and bundle
+  (`tests/native_<bridge>_test.ts` — one per `native/src/*Bridge.ts`, which
+  imports that bridge and pins its names from both sides). A new native
+  bridge gets one there in the same PR.
+- Run all of them with `make test` (`npx vitest run`), one file with
+  `npx vitest run tests/demo_test.ts`. Use the Node in `.nvmrc` (from nvm):
+  a newer Node's own `localStorage` breaks jsdom. The root install
+  (`npm ci`) is all they need; `native/` is not installed for them — they
+  import only the shell's plain-TypeScript bridges, never its Expo half.
 - They run under vitest. Domain/storage tests run in the default `node`
   environment; a UI test opts into jsdom with a `// @vitest-environment jsdom`
   docblock at the top of the file.
@@ -899,10 +885,8 @@ checklist's `.agents/skills/` and adapted to the notes domain.
 
 **Drift-sync skills** (the `maintenance` umbrella dispatches these in order):
 
-- `maintenance` — the §21.6 umbrella: decides which sync skills are stale,
+- `maintenance` — the umbrella: decides which sync skills are stale,
   runs each in order, and leaves one combined PR.
-- `sync-oss-spec` — fetch the latest `OSS_SPEC.md` and bring the repo back into
-  conformance, honouring the tracked deviations above.
 - `update-docs` — bring `docs/*.md` (and `docs/features/*.md`) back in sync
   with the source of truth.
 - `update-readme` — bring `README.md` back in sync with the current surface.
