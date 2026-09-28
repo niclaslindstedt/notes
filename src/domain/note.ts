@@ -122,7 +122,7 @@ export function createNote(now: number = Date.now()): Note {
 // Return a copy of `note` with a new body and a bumped `updatedAt`. Erasing an
 // attachment's `![](attachments/…)` / `[file](attachments/…)` reference from
 // the body leaves the attachment on the note **deliberately**: the file lives
-// on the user's own Dropbox / Drive / folder, and deleting it there is not
+// on the user's own Dropbox / iCloud / folder, and deleting it there is not
 // something a keystroke gets to decide. The app asks instead (see
 // `app/use-attachment-erasure.ts`), and only an explicit "yes" reaches
 // `dropAttachments`. An attachment the body no longer references simply stops

@@ -14,7 +14,6 @@ import { formatClockTime } from "../i18n/clock.ts";
 export const SYNC_LOG_SCOPES: ReadonlySet<string> = new Set([
   "notes-sync",
   "dropbox",
-  "gdrive",
   "icloud",
   "nextcloud",
   "folder",

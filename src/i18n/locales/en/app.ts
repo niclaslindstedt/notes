@@ -89,7 +89,6 @@ const app = {
       browser: "this device",
       folder: "your notes folder",
       dropbox: "Dropbox",
-      gdrive: "Dropbox",
       icloud: "iCloud Drive",
       nextcloud: "Nextcloud",
     },

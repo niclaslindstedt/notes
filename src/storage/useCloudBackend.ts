@@ -125,9 +125,8 @@ export function useCloudBackend({
     [selectBackend],
   );
 
-  // Complete a Dropbox OAuth redirect on boot. Dropbox uses a popup
-  // (resolved inline in `connectGdrive`), so only Dropbox lands back here
-  // with a `?code=`. `selectBackend` is a stable callback, so this still runs
+  // Complete a Dropbox OAuth redirect on boot: on the web, signing in to
+  // Dropbox leaves the page and lands back here with a `?code=`. `selectBackend` is a stable callback, so this still runs
   // once on mount; a re-run would be a no-op since the code is consumed and
   // cleaned from the URL on first completion.
   useEffect(() => {

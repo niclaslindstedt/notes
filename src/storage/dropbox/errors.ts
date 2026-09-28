@@ -1,10 +1,9 @@
-// The Dropbox mirror of gdrive's `gdriveError` (`../gdrive/drive-fs.ts`):
-// build the Error to throw for a non-ok Dropbox response, so the eight-odd
+// Build the Error to throw for a non-ok Dropbox response, so the eight-odd
 // `throw new Error("Dropbox <op> failed: <status> <body>")` sites across the
 // file store, attachment store, list walk, and namespace delete don't each
 // hand-roll the message.
 //
-// Tuned to Dropbox's semantics rather than gdrive's uniform mapping:
+// Tuned to Dropbox's semantics:
 //   - 401 never reaches here — the authed fetch (`createAuthedFetch`) handles
 //     it via silent refresh and throws AuthError itself, so there is no 401
 //     branch.

@@ -372,7 +372,7 @@ function createNextcloudAttachmentStore(
 /**
  * Build a Nextcloud adapter for one namespace. `crypto` is the injected session
  * passphrase, threaded into the directory adapter so notes and attachments are
- * sealed per file at rest — exactly like the folder / Dropbox / Drive backends.
+ * sealed per file at rest — exactly like the folder and Dropbox backends.
  */
 export function createNextcloudAdapter(
   config: NextcloudConfig,

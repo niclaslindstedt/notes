@@ -92,8 +92,8 @@ export interface Capabilities {
    *
    * A provider still has to carry the loopback URIs on its redirect
    * allowlist, so this says the flow *can complete here*, not that every
-   * backend is registered for it — see `dropboxAvailable` / `gdriveAvailable`
-   * in `src/storage/useStorageBackend.ts` for which ones are.
+   * backend is registered for it — see `dropboxAvailable`
+   * in `src/storage/useStorageBackend.ts` for whether Dropbox is.
    */
   loopbackOauth: boolean;
 

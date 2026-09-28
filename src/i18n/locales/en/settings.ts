@@ -311,7 +311,6 @@ const settings = {
     backendBrowser: "This device",
     backendFolder: "Local folder",
     backendDropbox: "Dropbox",
-    backendGoogleDrive: "Dropbox",
     browserHint:
       "Notes live in this browser only. They stay on this device and aren't shared with your other devices.",
     folderConnected:
@@ -325,8 +324,6 @@ const settings = {
     dropboxUnconnected: "Sign in to keep your notes in your own Dropbox.",
     dropboxWaiting:
       "Finish signing in to Dropbox in your browser, then come back here.",
-    gdriveConnected: "Your notes sync to a folder in your Dropbox.",
-    gdriveUnconnected: "Sign in to keep your notes in your own Dropbox.",
     backendICloud: "iCloud Drive",
     icloudConnected:
       "Your notes sync through your iCloud Drive — find them in the Files app, in the “{folder}” folder.",

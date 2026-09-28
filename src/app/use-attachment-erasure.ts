@@ -3,7 +3,7 @@
 // Deleting an `![](attachments/…)` / `[file](attachments/…)` reference out of
 // the body is an edit of the text, and it takes effect immediately — the
 // thumbnail or chip stops rendering. What it deliberately does *not* do is
-// reach into the user's Dropbox / Drive / Nextcloud / notes folder and delete
+// reach into the user's Dropbox / iCloud / Nextcloud / notes folder and delete
 // the file, because that file is theirs and a backspace is not consent. So the
 // app asks: **"Remove attachment from <backend> too?"**
 //

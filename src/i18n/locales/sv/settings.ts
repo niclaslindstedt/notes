@@ -306,7 +306,6 @@ const settings: SettingsCatalog = {
     backendBrowser: "Den här enheten",
     backendFolder: "Lokal mapp",
     backendDropbox: "Dropbox",
-    backendGoogleDrive: "Dropbox",
     browserHint:
       "Anteckningar finns bara i den här webbläsaren. De stannar på den här enheten och delas inte med dina andra enheter.",
     folderConnected:
@@ -322,9 +321,6 @@ const settings: SettingsCatalog = {
       "Logga in för att behålla dina anteckningar i din egen Dropbox.",
     dropboxWaiting:
       "Slutför inloggningen till Dropbox i webbläsaren och kom sedan tillbaka hit.",
-    gdriveConnected: "Dina anteckningar synkas till en mapp i din Dropbox.",
-    gdriveUnconnected:
-      "Logga in för att behålla dina anteckningar i din egen Dropbox.",
     backendICloud: "iCloud Drive",
     icloudConnected:
       "Dina anteckningar synkas via din iCloud Drive — du hittar dem i appen Filer, i mappen ”{folder}”.",

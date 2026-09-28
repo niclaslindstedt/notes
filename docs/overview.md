@@ -5062,7 +5062,7 @@ subscribe) through `watchUploads` on the adapter contract — the push-based
 sibling of the pull-based `getEncryptionStatus`. The set clears in a `finally`,
 so a failed write (conflict, offline, throttle) never leaves a note stuck
 spinning. `watchUploads` is forwarded through the offline-cache wrapper
-(`src/storage/cache/index.ts`) and carried verbatim by the Dropbox / Drive /
+(`src/storage/cache/index.ts`) and carried verbatim by the Dropbox /
 Nextcloud / folder adapters (each returns the directory adapter directly); the local browser
 backend doesn't implement it (one synchronous blob, nothing to watch).
 `useUploadStatus` (`src/app/use-upload-status.ts`) subscribes to the active
@@ -5211,7 +5211,7 @@ client opens directly in the [folder backend](#folder-backend). Attachments are
 real files, and at-rest encryption composes **per file inside** the directory
 adapter via the injected `DirectoryCrypto`. Being a network backend it is
 wrapped in the [offline cache](#offline-cache) in `useBackendSelection`, exactly
-like Dropbox and Drive.
+like Dropbox.
 
 There is **no OAuth**: the credential is an **app password** — the per-client
 secret Nextcloud mints under Settings → Security, revocable on its own — sent as
@@ -5378,9 +5378,9 @@ and reads error bodies safely.
 ### OAuth
 
 `src/storage/oauth-pkce.ts` — the shared PKCE helpers (`startAuth`,
-`completeAuth`, `refreshAccessToken`) used by Dropbox (redirect) and Google
-(popup). Each provider has its own `OAuthConfig` and `sessionStorage` verifier
-key so parallel flows don't race; the redirect URI is derived from the current
+`completeAuth`, `refreshAccessToken`) Dropbox signs in through. A provider
+has its own `OAuthConfig` and `sessionStorage` verifier key, so two flows
+never race; the redirect URI is derived from the current
 origin+pathname so every deploy slot round-trips to itself.
 `src/encoding/base64url.ts` is the URL-safe encoder for the verifier/challenge.
 
@@ -6415,15 +6415,14 @@ four things that actually differ:
 - **`redirectOauth`** — whether a redirect-based OAuth flow can complete on
   this origin. False on the desktop: `redirectUri()`
   (`src/storage/oauth-pkce.ts`) is built from `window.location`, so it is
-  `notes://app` there, and no provider will register a custom scheme (Google
-  rejects non-`https` outright).
+  `notes://app` there, and no provider will register a custom scheme.
 - **`loopbackOauth`** — whether the redirect can be caught on a
   [loopback listener](#loopback-oauth) instead. True only on the desktop, and
   complementary to the flag above by construction: it is what gives that
   surface cloud sync despite failing it.
 
-`useStorageBackend` reads all four of its availability flags from here
-(`dropboxAvailable`, `gdriveAvailable`, `folderAvailable`)
+`useStorageBackend` reads its availability flags from here
+(`dropboxAvailable`, `folderAvailable`)
 rather than re-deriving each at its own call site. That centralisation is the
 point: before it, the desktop build offered no cloud sync and the reason looked
 like the packaging job not passing `VITE_DROPBOX_APP_KEY` /
@@ -6431,12 +6430,8 @@ a missing client id, when the real reason was that the redirect could never
 land. The module lives in `src/`, not in a wrapper: the page works its surface
 out from what it can observe, and no shell tells it anything.
 
-Note that `dropboxAvailable` and `gdriveAvailable` are no longer the same
-expression. Dropbox takes either OAuth flow, so it is offered wherever one of
-them works. Drive signs in through Google Identity Services' popup rather than
-the shared PKCE helpers, and the loopback flow would additionally need a Google
-OAuth client of the **Desktop app** type — a different registration from the
-web client — so it stays gated on `redirectOauth` alone.
+Dropbox takes any of the OAuth flows, so it is offered wherever one of them
+works.
 
 ### Loopback OAuth
 
@@ -6646,17 +6641,15 @@ reasons in AGENTS.md's "The shared framework" section.
 ### Home page
 
 `HomePage` (`src/ui/HomePage.tsx`) — the English-only public showcase / landing
-page served at `/home` (and aliased per deploy slot). It doubles as the homepage
-Google's OAuth verification requires, so it must accurately identify the app and
-its verified domain, fully describe what the app does, and transparently explain
-every reason the app requests user data (the opt-in cloud backends and their
-exact scopes). Keep it in sync with the product in the same PR as any
+page served at `/home` (and aliased per deploy slot). It must accurately identify
+the app, fully describe what the app does, and transparently explain every
+reason the app requests user data (the opt-in cloud backends and their exact
+scopes). Keep it in sync with the product in the same PR as any
 feature/data-access change. Mounted by the [path switch](#entry-point--path-switch).
 
 ### Privacy page
 
 `PrivacyPage` (`src/ui/PrivacyPage.tsx`) — the English-only privacy policy
-served at `/privacy`, the URL given on the Google OAuth consent screen. It
-covers storage, network requests, the optional sync backends and their scopes,
+served at `/privacy`. It covers storage, network requests, the optional sync backends and their scopes,
 encryption, and the absence of cookies/analytics. Keep it accurate to what the
 app stores or sends.

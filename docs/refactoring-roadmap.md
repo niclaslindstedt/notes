@@ -64,8 +64,7 @@ doesn't re-derive):
   `fetch` through the backend's **public** store factory
   (`createXSettingsStore` reaches `read`/`write`/`401`/`429`), then
   extract the duplicated machinery into a dedicated module and unit-test
-  that seam directly (the gdrive `drive-fs.ts` and Dropbox `list.ts`
-  precedents). The refactor should *close* the coverage gap, not inherit
+  that seam directly (the Dropbox `list.ts` precedent). The refactor should *close* the coverage gap, not inherit
   it — a manual smoke test against a real account stays a nice-to-have,
   not the only safety net.
 
@@ -121,14 +120,12 @@ _(none)_
   <op> failed: <status> <body>")` sites across the file store, attachment
   store, list walk (`list.ts`), and namespace delete each hand-rolled the
   message; the two upload paths additionally mapped 429 → `RateLimitError`.
-  All now throw through `dropboxError(op, res, { rateLimit? })` — the
-  Dropbox mirror of `gdriveError`. Kept **bit-identical, not** unified with
-  gdrive's uniform mapping: 401 is still handled upstream in
+  All now throw through `dropboxError(op, res, { rateLimit? })`. Kept
+  **bit-identical**: 401 is still handled upstream in
   `createAuthedFetch` (never reaches the helper, so no 401 branch), and
   only the upload paths pass `rateLimit: true` — a 429 on read/list/delete
-  stays a plain labelled failure exactly as before (adopting gdrive's
-  always-map-429 would have been a behaviour change, out of scope for a
-  refactor). Pinned before/after via the settings-store scripted-fetch
+  stays a plain labelled failure exactly as before (mapping every 429
+  would have been a behaviour change, out of scope for a refactor). Pinned before/after via the settings-store scripted-fetch
   tests (download/upload/429/generic messages) and a direct helper unit
   test (`tests/storage/dropbox-errors.test.ts`, incl. the "429 without
   the flag stays generic" preservation case). `dropbox/index.ts` dropped
@@ -189,30 +186,6 @@ _(none)_
   and re-queued at severity 5 (see Pending). The reversal from the
   roadmap's "selection seam first" plan was deliberate: the move verbs
   are leaf consumers, so they were the cleaner first cut.
-- **2026-07 — gdrive list pagination (was severity 9; shipped as a `fix:`
-  PR, user-authorized behaviour change).** `createDriveFolderFs`'s shared
-  `search` now passes `pageSize=1000` and follows `nextPageToken` until
-  the listing is exhausted, so namespaces or attachment trees with more
-  files than one Drive page no longer silently truncate (previously a
-  data-loss shape: truncated listings read as remote deletions). Covered
-  by scripted-fetch pagination tests in
-  `tests/storage/gdrive-drive-fs.test.ts`; still worth a manual smoke
-  test against a real Drive account with >100 files in one folder.
-- **2026-07 — gdrive folder-plumbing dedup (was severity 6, slightly
-  wider than catalogued).** The ~130 lines of folder bookkeeping
-  duplicated between the file store and attachment store
-  (`authHeader`, `search`, `createFolder`, `resolveDirId`, `dirAndName`)
-  now live once in `src/storage/gdrive/drive-fs.ts`
-  (`createDriveFolderFs`, per-store folder-id caches preserved);
-  `gdrive/index.ts` dropped 795 → 555 lines. The store request sequence
-  was pinned with scripted-fetch tests **before** the refactor
-  (`tests/storage/gdrive-store.test.ts`) and the newly-reachable seam got
-  direct tests (`tests/storage/gdrive-drive-fs.test.ts`) — gdrive
-  coverage went from zero to 96% on the shared module. A third partial
-  copy of the lookup inside `deleteGdriveNamespace` was deliberately left:
-  its error labels (`namespace delete (lookup)`) are intentionally
-  distinct and it omits response headers, so folding it in would change
-  error semantics — rated 2, not queued.
 
 ---
 

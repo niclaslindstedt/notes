@@ -7,8 +7,7 @@
 // UTF-8 markdown, this moves an image's bytes. Paths are POSIX-style and
 // relative to the backend's `attachments/` root — `<note-name>/<filename>` —
 // and each backend roots its own store there (the local folder's
-// `attachments/` directory, Dropbox's `/attachments`, Drive's `attachments`
-// app subfolder), the same way the settings / namespace stores root at the
+// `attachments/` directory, Dropbox's `/attachments`), the same way the settings / namespace stores root at the
 // app-folder root.
 //
 // Attachments are content-addressed by a unique filename (a random prefix per

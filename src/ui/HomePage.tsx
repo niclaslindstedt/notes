@@ -1,8 +1,7 @@
 // Standalone marketing / showcase homepage, served at `/home` (see
 // `app/main.tsx`'s path switch and the `emit-home-alias` plugin in
-// `vite.config.ts`). This is the public landing page a first-time visitor —
-// or a Google OAuth verification reviewer — sees without installing or
-// signing into anything: it names the app, describes everything it does,
+// `vite.config.ts`). This is the public landing page a first-time visitor
+// sees without installing or signing into anything: it names the app, describes everything it does,
 // states plainly why it ever asks for access to a cloud account, and links
 // to the privacy policy. It is English-only by design, mirroring
 // `PrivacyPage`.

@@ -59,7 +59,7 @@ export function SyncIndicator({
   // Re-issue the active backend's grant. On the web Dropbox redirects away, so
   // the promise resolves as the page leaves and the boot effect completes the
   // round-trip; on the desktop it runs the loopback flow and rejects on
-  // failure, like Drive and the picked folder, so the modal's button can
+  // failure, like the picked folder, so the modal's button can
   // surface it.
   const reconnect = (): Promise<void> => {
     if (storage.backend === "dropbox") return storage.connectDropbox();

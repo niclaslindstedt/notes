@@ -35,7 +35,7 @@ const root = createRoot(rootEl);
 const path = window.location.pathname.replace(/\/$/, "");
 
 // The standalone `/privacy` and `/home` pages are crawlable, English-only
-// surfaces (the privacy policy and the Google-verification showcase), so they
+// surfaces (the privacy policy and the showcase home page), so they
 // render outside `LanguageRoot` and aren't translated. They render no state
 // and can't throw, so they need no error boundary either — which is why each
 // is a bare `render` rather than going through `mountApp`.

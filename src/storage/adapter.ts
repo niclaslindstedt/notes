@@ -16,7 +16,7 @@ export type StoredSnapshot = {
   text: string;
 
   // Opaque, adapter-defined token used for optimistic concurrency. Dropbox
-  // returns a `rev`, Drive a version, a folder's aggregate mtime works too.
+  // returns a `rev`, Nextcloud an ETag, a folder's aggregate mtime works too.
   // The caller hands it back unchanged on the next save so the adapter can
   // refuse to overwrite a newer remote revision. Local backends leave it
   // undefined — nothing else writes the same key.

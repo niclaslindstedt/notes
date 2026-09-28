@@ -1,7 +1,7 @@
 // A root-scoped settings store: reads and writes the app's appearance
 // settings as a single JSON file at the **app-folder root** — the scoped app
-// folder a backend owns (Dropbox's `Apps/<app>/`, Drive's `notes/`, the
-// picked local directory). It sits beside the note markdown files, so the
+// folder a backend owns (Dropbox's `Apps/<app>/`, the picked local
+// directory). It sits beside the note markdown files, so the
 // one settings file travels with the synced/shared folder and lands on every
 // device that connects the backend.
 //

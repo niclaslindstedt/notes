@@ -1,5 +1,5 @@
-// Small HTTP helpers shared by the cloud storage adapters (Dropbox, Google
-// Drive) and the OAuth PKCE flow. Keeping them in one place stops each
+// Small HTTP helpers shared by the cloud storage adapters (Dropbox,
+// Nextcloud) and the OAuth PKCE flow. Keeping them in one place stops each
 // adapter from re-implementing the same defensive response handling — and
 // means a fix (a new fallback, a header quirk) lands once for every backend.
 

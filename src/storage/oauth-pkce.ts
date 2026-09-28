@@ -43,10 +43,9 @@ export async function challengeFor(verifier: string): Promise<string> {
 // where the PKCE verifier (stashed under the preview's sessionStorage key) is
 // invisible and auth completion bails.
 //
-// The trailing slash is trimmed: Google's OAuth client config rejects
-// redirect URIs that end in `/`, and Dropbox accepts either form, so the
-// slash-less spelling is the only one that satisfies both. `/` maps to the
-// bare origin, `/preview/` maps to `<origin>/preview`.
+// The trailing slash is trimmed, so the URI has one spelling whether or not
+// the page's path ends in `/` — the one the app registration lists. `/` maps
+// to the bare origin, `/preview/` maps to `<origin>/preview`.
 export function redirectUri(): string {
   const pathname = window.location.pathname.replace(/\/+$/, "");
   return `${window.location.origin}${pathname}`;

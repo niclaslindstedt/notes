@@ -7,14 +7,13 @@
 //
 // Paths are POSIX-style and relative to the backend's app-folder root (a
 // note's `<stem>.md`, or `notes.json`). Each store prepends its own root:
-// the folder backend the picked handle, Dropbox the app folder, Drive the
-// `notes/` app folder.
+// the folder backend the picked handle, Dropbox the app folder.
 
 /** A file's path plus an opaque per-file revision used to detect drift. */
 export type FileEntry = {
   path: string;
   // Backend-defined token that changes when the file's bytes change: a
-  // folder mtime, a Dropbox `rev`, a Drive version. Used only to build the
+  // folder mtime, a Dropbox `rev`, a Nextcloud ETag. Used only to build the
   // directory's aggregate revision — never interpreted.
   rev?: string;
 };
@@ -27,7 +26,7 @@ export interface FileStore {
   /**
    * Write (create or overwrite) one file, returning the same per-file
    * revision `list()` would report for the bytes just written — Dropbox's new
-   * `rev`, Drive's bumped `version`, the folder's fresh `lastModified`. The
+   * `rev`, the folder's fresh `lastModified`. The
    * directory adapter uses it to build the post-save aggregate revision
    * *without* a follow-up `list()`, whose cloud endpoints lag a write by a
    * moment and would otherwise stamp a stale revision the next save misreads

@@ -1,7 +1,7 @@
 // A root-scoped namespace-registry store: reads and writes the device's
 // list of namespaces as a single JSON file at the **app-folder root** — the
-// scoped app folder a backend owns (Dropbox's `Apps/<app>/`, Drive's
-// `notes/`, the picked local directory). It sits beside `settings.json` and
+// scoped app folder a backend owns (Dropbox's `Apps/<app>/`, the picked
+// local directory). It sits beside `settings.json` and
 // the per-namespace folders, so the namespace list travels with the
 // synced/shared folder and lands on every device that connects the backend.
 //

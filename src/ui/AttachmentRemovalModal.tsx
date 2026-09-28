@@ -11,7 +11,7 @@ import { Modal } from "./Modal.tsx";
 //
 // Deleting an attachment's reference out of a note is an edit of the text and
 // takes effect at once. The *file* is a separate thing living in the user's own
-// Dropbox / Drive / Nextcloud / notes folder, and this is the app asking
+// Dropbox / iCloud / Nextcloud / notes folder, and this is the app asking
 // permission before touching it — so the destructive answer is the secondary
 // button and every way of dismissing the dialog (backdrop, Escape) keeps the
 // file. Keeping it is not a deferral: the attachment stays on the note, so

@@ -37,9 +37,6 @@ const DROPBOX_TOKEN_KEY = "notes:dropbox:token";
 // Long-lived companion to the short-lived access token. Stored under its own
 // key so a legacy install (access token only) round-trips unchanged.
 const DROPBOX_REFRESH_KEY = "notes:dropbox:refresh";
-// A cloud backend that was removed. The key stays named so a token a device
-// may still hold can be cleared rather than left sitting in storage.
-const RETIRED_GDRIVE_TOKEN_KEY = "notes:gdrive:token";
 const NEXTCLOUD_CONFIG_KEY = "notes:nextcloud:config";
 // The account-wide encryption flag written before encryption became a
 // per-namespace decision. Still read as the fallback for a namespace that has
@@ -128,10 +125,6 @@ export function setDropboxRefreshToken(token: string): void {
 
 export function clearDropboxRefreshToken(): void {
   clear(DROPBOX_REFRESH_KEY);
-}
-
-export function clearRetiredGdriveToken(): void {
-  clear(RETIRED_GDRIVE_TOKEN_KEY);
 }
 
 export function getNextcloudConfig(): NextcloudConfig | null {
