@@ -18,6 +18,10 @@
 //      its consent page inside an embedded WebView nor redirect back into
 //      one; the session's sheet returns on `<bundle id>://oauth` instead.
 //      The page asks whether each provider is there, never where it is running.
+//   4. the share sheet for an export: the shell advertises the framework's
+//      `save-file` capability in `window.__ossShell` (`SAVE_FILE_DESCRIPTOR`),
+//      and `saveFile` in the page posts the file here instead of downloading
+//      it — a download goes nowhere in a WebView (`saveFile*.ts`).
 //
 // See `native/README.md` for the message protocol and the web-side seams in
 // `src/platform/native-bridge.ts` and `src/platform/icloud-host.ts`.
@@ -52,7 +56,9 @@ import {
 } from "./authSessionBridge";
 import { useNativeTheme } from "./nativeTheme";
 import { startLocalServer, type LocalServer } from "./local-server";
-import { SERVICE_WORKER_TEARDOWN, staysInApp } from "./shell";
+import { answerSaveFile } from "./saveFile";
+import { SAVE_FILE_DESCRIPTOR, isSaveFileRequest } from "./saveFileBridge";
+import { SERVICE_WORKER_TEARDOWN, isInPageUrl, staysInApp } from "./shell";
 
 // Parse a message body for the iCloud check. The other bridge parses its own;
 // anything that is not JSON is simply not an iCloud request.
@@ -154,6 +160,9 @@ export default function WebViewHost() {
     (request: WebViewNavigation) => {
       if (!origin) return false;
       if (staysInApp(request.url, origin)) return true;
+      // A `blob:` or `data:` URL exists only in the page; an export reaches
+      // the share sheet through `saveFile` instead.
+      if (isInPageUrl(request.url)) return false;
       void Linking.openURL(request.url).catch(() => {});
       return false;
     },
@@ -227,10 +236,11 @@ export default function WebViewHost() {
             contentInsetAdjustmentBehavior="never"
             automaticallyAdjustContentInsets={false}
             // Before the page's own scripts run: the service-worker teardown
-            // (see `./shell.ts`), and the iCloud and sign-in providers, so the
+            // (see `./shell.ts`), the iCloud and sign-in providers, so the
             // storage picker can offer iCloud Drive and Dropbox on the first
-            // render. The providers are guarded against a second injection.
-            injectedJavaScriptBeforeContentLoaded={`${SERVICE_WORKER_TEARDOWN}\n${ICLOUD_SCRIPT}\n${AUTH_SESSION_SCRIPT}`}
+            // render, and the `save-file` capability `saveFile` reads. All
+            // are guarded against a second injection.
+            injectedJavaScriptBeforeContentLoaded={`${SERVICE_WORKER_TEARDOWN}\n${ICLOUD_SCRIPT}\n${AUTH_SESSION_SCRIPT}\n${SAVE_FILE_DESCRIPTOR}`}
             // The theme reporter (see `./nativeTheme.ts`), once the page has
             // painted and its theme engine has set `data-theme`.
             injectedJavaScript={injectedJavaScript}
@@ -250,6 +260,14 @@ export default function WebViewHost() {
               }
               if (isAuthSessionRequest(parsed)) {
                 void signIn(parsed.id, parsed.url);
+                return;
+              }
+              if (isSaveFileRequest(parsed)) {
+                // An export. The sheet stays up as long as the user leaves
+                // it; the page's promise settles when it closes.
+                void answerSaveFile(parsed, (script) =>
+                  webView.current?.injectJavaScript(script),
+                );
                 return;
               }
               handleBridgeMessage(raw);

@@ -5,8 +5,15 @@
 // The pure parts live elsewhere: `buildCopyText` (`src/ui/copy-note.ts`) builds
 // the clipboard/Markdown text, `layoutPdf` (`src/domain/pdf-layout.ts`)
 // paginates the note, and `buildPdf` (`./pdf-document.ts`) writes the file.
-// What's here is the glue: filenames, the download anchor, and resolving a
+// What's here is the glue: filenames, handing the file over, and resolving a
 // note's image attachments to bytes the PDF can carry.
+//
+// Handing it over is the framework's `saveFile`: a download in a browser, the
+// share sheet in the phone app, whose WebView cannot download (the shell
+// advertises the `save-file` capability — `native/src/saveFileBridge.ts`). The
+// page never asks where it runs; `saveFile` reads the capability.
+
+import { saveFile } from "@niclaslindstedt/oss-framework/files";
 
 import {
   attachmentFilenameFromHref,
@@ -52,33 +59,25 @@ export function exportFileStem(note: Note): string {
 }
 
 /**
- * Download the open note as a `.md` file. The bytes are the ones the file /
+ * Save the open note as a `.md` file. The bytes are the ones the file /
  * cloud backends store (`noteToMarkdown`), YAML front matter and all, so an
  * exported note dropped into a synced folder — or into another Markdown app —
  * round-trips rather than arriving stripped of its metadata.
+ *
+ * Resolves false when the share sheet reported a failure, so the button can
+ * say so; a browser download cannot fail visibly and resolves true.
  */
-export function downloadMarkdown(note: Note): void {
-  download(
-    new Blob([noteToMarkdown(note)], { type: "text/markdown;charset=utf-8" }),
-    `${exportFileStem(note)}.md`,
-  );
-}
-
-/** Offer a blob as a file the browser saves. */
-function download(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
+export async function downloadMarkdown(note: Note): Promise<boolean> {
   try {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.rel = "noopener";
-    // Firefox only follows a click on an anchor that is in the document.
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  } finally {
-    // Held one turn: revoking synchronously races the download in WebKit.
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    await saveFile({
+      text: noteToMarkdown(note),
+      filename: `${exportFileStem(note)}.md`,
+      mimeType: "text/markdown;charset=utf-8",
+    });
+    return true;
+  } catch (err) {
+    console.warn("[export] markdown failed", err);
+    return false;
   }
 }
 
@@ -87,7 +86,8 @@ function download(blob: Blob, filename: string): void {
  *
  * The file is built in the page rather than through the print dialog, which is
  * what keeps the URL and the date off the foot of every sheet and turns the
- * export into an ordinary download. See `src/domain/pdf-layout.ts` for the why.
+ * export into an ordinary download (the share sheet in the phone app). See
+ * `src/domain/pdf-layout.ts` for the why.
  *
  * Image attachments are fetched and measured first — a note loaded from a
  * file/cloud backend carries its attachments' metadata but not their bytes, and
@@ -125,7 +125,7 @@ export async function exportPdf(
       pageNumberOf,
     });
     if (!blob) return false;
-    download(blob, `${exportFileStem(note)}.pdf`);
+    await saveFile({ blob, filename: `${exportFileStem(note)}.pdf` });
     return true;
   } catch (err) {
     console.warn("[export] pdf failed", err);

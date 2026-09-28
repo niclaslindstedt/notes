@@ -14,7 +14,7 @@ and the Play Console, not in this repository.
 ## Why a wrapper (and why it's thin)
 
 The web app is a local-first PWA that already runs great on mobile. Shipping it
-through the stores as a native binary buys three things the browser/WebView
+through the stores as a native binary buys four things the browser/WebView
 can't do on its own:
 
 1. **Haptics** — iOS WKWebView ignores `navigator.vibrate` entirely.
@@ -26,6 +26,9 @@ can't do on its own:
    an embedded WebView nor redirect back into one. The wrapper offers an
    authentication session instead (see
    [Signing in to Dropbox](#signing-in-to-dropbox)).
+4. **Exports** — a download goes nowhere in a WebView. The wrapper hands an
+   exported note (`.md`, PDF) or a file attachment to the share sheet instead
+   (see [Exports](#exports)).
 
 Everything else — the UI, storage (`localStorage`), Markdown editor, themes,
 cloud backends, encryption — is the web app, unchanged, except that the phone
@@ -63,7 +66,8 @@ make native-bundle         # from the repo root: build:native → native/web/ �
   the WebView and wires the message bridge. Before the page's scripts run it
   unregisters any service worker ([`src/shell.ts`](src/shell.ts)), so a
   worker could never keep serving an old build after a store update. Any
-  navigation off the loopback origin opens in the system browser; Android's
+  navigation off the loopback origin opens in the system browser, except a
+  `blob:` or `data:` URL, which exists only in the page and is refused; Android's
   back button walks the page's history. On iOS the WebView runs edge to edge and the page pads
   itself around the notch and the home indicator with
   `env(safe-area-inset-*)`, as the installed PWA does; on Android the frame
@@ -159,6 +163,37 @@ list too. The key reaches the bundle as `VITE_DROPBOX_APP_KEY` at
 
 `tests/platform/auth-session.test.ts` runs the injected script against the
 framework's own validation and pins the scheme to the bundle id.
+
+## Exports
+
+A browser export is a download: an anchor clicked at a `blob:` or `data:` URL.
+In the WebView that goes nowhere. So the wrapper implements the framework's
+**`save-file`** contract (`docs/native-shell.md` in oss-framework), and every
+export in the page — the note as `.md` or PDF (`src/ui/export/export-note.ts`)
+and a file attachment's chip (`src/ui/attachments/FileAttachment.tsx`) — goes
+through the framework's `saveFile`:
+
+```
+saveFile({ text | blob, filename, mimeType })       (oss-framework)
+   │  window.__ossShell.capabilities has "save-file" — set before the page
+   │  loads by SAVE_FILE_DESCRIPTOR (src/saveFileBridge.ts)
+   ▼
+postMessage { type: "oss-framework/save-file", id, filename, mimeType, base64 }
+   ▼
+WebViewHost.tsx → src/saveFile.ts → cache/exports/<id>/<name> → Sharing.shareAsync
+   │  the user saves to Files, mails it, AirDrops it — or closes the sheet
+   ▼
+injectJavaScript: "oss-framework/save-file-result" { id, ok }
+```
+
+Without the descriptor the page keeps downloading, so the website and the
+desktop app behave as they always did. `src/saveFileBridge.ts` is import-free
+and pinned from the root suite (`tests/platform/save-file.test.ts`, a whole
+round trip against a stand-in page); `src/saveFile.ts` is the
+`expo-file-system` / `expo-sharing` half. Only the latest export stays on
+disk, in the cache the next export clears, and the bytes are never logged.
+
+It has not been tried on a device yet.
 
 ## Nextcloud from the phone
 

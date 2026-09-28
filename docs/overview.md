@@ -2219,7 +2219,8 @@ Rendering goes through `AttachmentsProvider` (`src/ui/attachments/`): an `image`
 `InlineImage` thumbnail (`useThumbnail` downscales via canvas, cached by
 filename); a `link` node whose href points into `attachments/` resolves to a
 `FileAttachment` chip (`FileTypeIcon`, `file-icons.tsx`, maps the extension to
-one of a handful of type glyphs). `ImageViewer` shows the original image — on a click
+one of a handful of type glyphs), which saves the file through `saveFile` — a
+download, or the share sheet in the phone app. `ImageViewer` shows the original image — on a click
 where the note can't be edited, and on a click of the already-[selected
 image](#image-selection) where it can — the provider tracks the **index** of the
 open image into the note's
@@ -2470,6 +2471,15 @@ server has since replaced — or the PDF writer reports failure, the PDF/MD rows
 raise a failure [toast](#toast) with a **Reload** action instead of silently
 doing nothing: a reload gets a fresh page whose chunk URLs match what the
 server actually serves.
+
+**In the phone app an export opens the share sheet.** A download goes nowhere
+in the app's WebView, so the file leaves through the framework's `saveFile`:
+a download in a browser, and in a shell that advertises the `save-file`
+capability — the phone app does — the bytes go to the shell, which offers them
+to the share sheet (Files, Mail, another app). The page never asks where it
+runs. The same goes for a [file attachment](#attachments)'s chip. A share the
+shell reports as failed raises the failure toast too. See
+[`native/README.md`](../native/README.md#exports).
 
 #### Why the app writes the PDF itself
 

@@ -1,4 +1,4 @@
-// The wrapper's two decisions about the page it hosts, as plain values.
+// The wrapper's decisions about the page it hosts, as plain values.
 //
 // Import-free on purpose, like `scriptText.ts`: the root test suite pins both
 // against an install with no `expo` in it (`tests/platform/native-shell.test.ts`).
@@ -51,4 +51,15 @@ export function staysInApp(url: string, origin: string): boolean {
   if (url === origin) return true;
   const rest = url.startsWith(origin) ? url.charAt(origin.length) : "";
   return rest === "/" || rest === "?" || rest === "#";
+}
+
+/**
+ * Whether a navigation is to a URL that exists only inside the page — `blob:`
+ * or `data:`. The WebView must not follow it, and the system browser could not
+ * open it either, so it is refused rather than handed to `Linking`. Every
+ * export goes through the framework's `saveFile` and the share sheet (see
+ * `saveFileBridge.ts`), so nothing should navigate there at all.
+ */
+export function isInPageUrl(url: string): boolean {
+  return /^(blob|data):/i.test(url);
 }

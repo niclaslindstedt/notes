@@ -690,7 +690,13 @@ the page (the framework's `runAuthSessionAuth`, via
 URI is `<bundle id>://oauth` — the Expo `scheme` is the bundle id, so
 `se.agilator.notes://oauth` in the store build — and the Dropbox app must list
 it; `tests/platform/auth-session.test.ts` pins the property, event and
-scheme. For `tauri/` the list is **one item long**: a loopback HTTP
+scheme. And the share sheet for an export: a download goes nowhere in a
+WebView, so every export in `src/` goes through the framework's `saveFile`,
+and the wrapper advertises the `save-file` capability in `window.__ossShell`
+(`native/src/saveFileBridge.ts`) and hands the file to `expo-sharing`
+(`native/src/saveFile.ts`); `tests/platform/save-file.test.ts` pins the
+contract against the framework's names. Never call a download of your own
+(an anchor at a `blob:` URL) from `src/`. For `tauri/` the list is **one item long**: a loopback HTTP
 listener for one OAuth redirect, because a web page cannot hold a listening
 socket — the flow RFC 8252 prescribes for native apps, and the only way the
 desktop build gets cloud sync at all (its `notes:` origin is not a redirect

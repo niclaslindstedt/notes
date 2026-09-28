@@ -11,7 +11,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { SERVICE_WORKER_TEARDOWN, staysInApp } from "../../native/src/shell.ts";
+import {
+  SERVICE_WORKER_TEARDOWN,
+  isInPageUrl,
+  staysInApp,
+} from "../../native/src/shell.ts";
 
 const ORIGIN = "http://localhost:8311";
 
@@ -102,5 +106,17 @@ describe("the loopback origin", () => {
   // exception is declared for `localhost` in `native/app.config.js`.
   it("addresses the server as localhost", () => {
     expect(source).toMatch(/const HOSTNAME = "localhost";/);
+  });
+});
+
+describe("isInPageUrl", () => {
+  it("refuses the URLs that exist only inside the page", () => {
+    // An export reaches the share sheet through `saveFile`; a stray `blob:` or
+    // `data:` navigation must not reach the system browser, which cannot open
+    // it anyway.
+    expect(isInPageUrl("blob:http://localhost:8311/1")).toBe(true);
+    expect(isInPageUrl("DATA:application/pdf;base64,JVBERi0=")).toBe(true);
+    expect(isInPageUrl(`${ORIGIN}/`)).toBe(false);
+    expect(isInPageUrl("https://example.com/")).toBe(false);
   });
 });

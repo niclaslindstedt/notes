@@ -169,7 +169,7 @@ describe("ExportButton", () => {
   });
 
   it("shows no toast when an export succeeds", async () => {
-    const downloadMarkdown = vi.fn();
+    const downloadMarkdown = vi.fn(() => Promise.resolve(true));
     vi.doMock(EXPORT_NOTE, () => ({
       exportPdf: vi.fn(() => Promise.resolve(true)),
       downloadMarkdown,

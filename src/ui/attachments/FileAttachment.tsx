@@ -1,5 +1,7 @@
 import { type MouseEvent as ReactMouseEvent } from "react";
 
+import { dataUrlToBlob, saveFile } from "@niclaslindstedt/oss-framework/files";
+
 import { type Attachment } from "../../domain/attachment.ts";
 import { useAttachmentsContext } from "./context.ts";
 import { useAttachmentData } from "./fetch-context.ts";
@@ -8,7 +10,9 @@ import { FileTypeIcon } from "./file-icons.tsx";
 // The inline representation of a non-image file attachment: a compact chip
 // carrying the file's type icon and its name. Unlike an image (which previews
 // as a thumbnail and opens in the viewer) a file has no preview — clicking the
-// chip downloads it. Rendered in place of a `[file](attachments/…)` link node
+// chip saves it, through the framework's `saveFile`: a download in a browser,
+// the share sheet in the phone app, where following the chip's `data:` link
+// goes nowhere. The link stays for what a browser offers on it (Save Link As). Rendered in place of a `[file](attachments/…)` link node
 // once the reference resolves to one of the note's attachments, and reused in
 // the collected end-of-note block when file attachments are placed there.
 
@@ -35,7 +39,12 @@ export function FileAttachment({ attachment, srcOffset }: Props) {
       onMouseDown={(e: ReactMouseEvent<HTMLElement>) => e.stopPropagation()}
       onClick={(e: ReactMouseEvent<HTMLElement>) => {
         e.stopPropagation();
-        if (!data) e.preventDefault();
+        e.preventDefault();
+        const blob = dataUrlToBlob(data);
+        if (!blob) return;
+        void saveFile({ blob, filename: attachment.filename }).catch(
+          (err: unknown) => console.warn("[attachments] save failed", err),
+        );
       }}
       title={attachment.filename}
       className="my-1 inline-flex max-w-full cursor-pointer items-center gap-2 overflow-hidden rounded-[var(--radius)] border border-line bg-surface-2 px-2.5 py-1.5 align-top text-sm text-fg no-underline transition hover:border-accent focus-visible:ring-2 focus-visible:ring-fg focus-visible:outline-none"

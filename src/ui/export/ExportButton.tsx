@@ -133,8 +133,9 @@ export function ExportButton({
     setBusy("md");
     try {
       const mod = await import("./export-note.ts");
-      mod.downloadMarkdown(note);
-      unlock("takeaway");
+      // False when the phone app's share sheet reported a failure.
+      if (await mod.downloadMarkdown(note)) unlock("takeaway");
+      else reportFailed();
     } catch (err) {
       console.warn("[export] loading the export module failed", err);
       reportFailed();
