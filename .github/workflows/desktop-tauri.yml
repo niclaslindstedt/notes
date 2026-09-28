@@ -153,7 +153,8 @@ jobs:
           # macOS signing exactly as release.yml does it — so a dispatch here
           # rehearses the certificate and the notarization credentials without
           # tagging a version. No certificate means the ad-hoc signature, which
-          # is the minimum an arm64 app needs to run at all.
+          # is the minimum an arm64 app needs to run at all. package-desktop
+          # hands the six to .github/actions/apple-signing on the macOS runner.
           mac-certificate: ${{ secrets.MAC_CSC_LINK }}
           mac-certificate-password: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
           mac-sign-identity: ${{ secrets.MAC_SIGN_IDENTITY }}

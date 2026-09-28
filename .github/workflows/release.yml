@@ -283,7 +283,8 @@ jobs:
           # is not a download at all. Tauri therefore signs AD HOC with no
           # certificate: the app runs natively and the user answers one
           # Gatekeeper prompt. Set the six secrets (tauri/README.md) and the
-          # same job signs with the Developer ID and notarizes.
+          # same job signs with the Developer ID and notarizes: package-desktop
+          # hands them to .github/actions/apple-signing on the macOS runner.
           mac-certificate: ${{ secrets.MAC_CSC_LINK }}
           mac-certificate-password: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
           mac-sign-identity: ${{ secrets.MAC_SIGN_IDENTITY }}
