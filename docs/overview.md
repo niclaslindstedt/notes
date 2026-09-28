@@ -4279,8 +4279,8 @@ holds only the stateful container that composes them.
 `useDraggableMenuButton` (`src/ui/hooks/useDraggableMenuButton.ts`) and
 `src/ui/sideMenuPosition.ts` — the rounded menu button pinned to either screen
 edge. A tap toggles the drawer; a drag repositions it and snaps to the nearer
-edge, persisting the spot. On a standalone mobile PWA the General-tab
-menu-activation segmented control can swap it (`showButton` in
+edge, persisting the spot. On a standalone mobile PWA, or in the phone app,
+the General-tab menu-activation segmented control can swap it (`showButton` in
 `nav-context.ts`) for the [edge swipe](#edge-swipe-to-open).
 
 ### Edge swipe to open
@@ -4832,7 +4832,7 @@ still reads as encrypted bytes. It is `aria-hidden`; the surrounding
 `GeneralSection` (`src/ui/settings/GeneralSection.tsx`) — the language picker,
 the toggle that disables achievements (and hides the trophy button), a
 segmented control choosing how the side menu is opened (floating button vs.
-edge swipe; mobile PWA only), and the dev-mode toggle.
+edge swipe; mobile PWA and phone app only), and the dev-mode toggle.
 
 ### Appearance settings
 
@@ -6294,10 +6294,14 @@ committing their output alongside.
 
 ### Standalone detection
 
-`isStandaloneMobile` / `useStandaloneMobile` (`src/pwa/standalone.ts`) — detects
-an installed PWA on mobile (`(display-mode: standalone)` on Android,
-`navigator.standalone` on iOS, gated by a mobile UA). Used to enable the
-hide-the-button + edge-swipe navigation.
+`isStandaloneMobile` / `useStandaloneMobile` (`src/pwa/standalone.ts`, a
+re-export of the framework's) — detects a screen with no browser chrome on
+mobile: an installed PWA (`(display-mode: standalone)` on Android,
+`navigator.standalone` on iOS) or the phone app's native shell
+(`window.ReactNativeWebView` or a `window.__ossShell` descriptor), gated by a
+mobile UA. Used to enable the hide-the-button + edge-swipe navigation. It also
+fires the "Home screen" trophy, which the phone app never records: no
+embedded build carries achievements.
 
 ### Dev mode
 

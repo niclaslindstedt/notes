@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/preact";
 
 import { RowActionMenu } from "../../src/ui/RowActionMenu.tsx";
 import { resetBus } from "../../src/achievements/bus.ts";
@@ -105,5 +111,51 @@ describe("RowActionMenu", () => {
     fireEvent.keyDown(menu, { key: "ArrowDown" });
     fireEvent.keyDown(menu, { key: "Enter" });
     expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it("swallows the click that ends a long press held well past the delay", () => {
+    // Touch: `useDesktopPointer()` reads a coarse pointer, so the row opens
+    // its menu from a long press rather than a right-click.
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: false,
+        media: "",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      })),
+    );
+    vi.useFakeTimers();
+    try {
+      const open = vi.fn();
+      render(
+        <RowActionMenu
+          ariaLabel="Note actions"
+          actions={[{ label: "Archive", onSelect: vi.fn() }]}
+        >
+          <button type="button" onClick={open}>
+            Open note
+          </button>
+        </RowActionMenu>,
+      );
+      const row = screen.getByText("Open note");
+      fireEvent.pointerDown(row, { button: 0, pointerId: 1 });
+      // Held for 1.5 s: the menu opened at the delay, and the finger is still
+      // down long after. Before framework 3.12 the swallow of the trailing
+      // click had lapsed by now, and the lift tapped the row.
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+      expect(screen.getByRole("menu", { name: "Note actions" })).toBeTruthy();
+      fireEvent.pointerUp(row, { pointerId: 1 });
+      fireEvent.click(row);
+      expect(open).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

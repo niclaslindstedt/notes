@@ -39,7 +39,8 @@ app  ──▶  ui  ──▶  domain
   palettes the tokens resolve to.
 - **`src/pwa/`** — `usePwaUpdate.ts` registers the service worker via
   `workbox-window` and drives the prompt-style update lifecycle;
-  `standalone.ts` detects the installed-PWA-on-mobile context.
+  `standalone.ts` re-exports the framework's detection of the
+  installed-PWA-or-phone-app-on-mobile context.
 - **`src/ui/`** — presentational components (e.g. `UpdateToast.tsx`).
 - **`src/app/`** — `App.tsx` (the list ↔ editor shell), `main.tsx` (the entry
   point), and `use-notes.ts` (the store hook the component tree binds to).
