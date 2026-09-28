@@ -194,5 +194,5 @@ Check the native shell:
 
 ```sh
 make native-typecheck
-make native-doctor     # expo-doctor
+make native-doctor     # expo-doctor (CI runs it too)
 ```

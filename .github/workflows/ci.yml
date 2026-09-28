@@ -41,7 +41,9 @@ jobs:
   # dependency tree, so nothing in the `build` job above touches it. This job
   # is the guard that it still installs from its lockfile and that its
   # sources still compile — cheap, because it never builds a native binary;
-  # that only happens on manual dispatch (see native-build.yml).
+  # that only happens on manual dispatch (see native-build.yml). expo-doctor
+  # checks the dependency tree against the Expo SDK it pins, which is what an
+  # EAS build would otherwise find out minutes into a paid run.
   native:
     runs-on: ubuntu-latest
     defaults:
@@ -56,6 +58,7 @@ jobs:
           cache-dependency-path: native/package-lock.json
       - run: npm ci
       - run: npm run typecheck
+      - run: npx --yes expo-doctor
 
   changeset:
     # Enforces that every PR touching user-visible code drops a
