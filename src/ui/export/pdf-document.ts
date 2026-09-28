@@ -15,6 +15,7 @@
 // with the same function, or a Cyrillic line would be measured as one font and
 // drawn in another.
 
+import { createLogger } from "../../dev/logger.ts";
 import {
   layoutPdf,
   type DrawOp,
@@ -30,7 +31,7 @@ import {
 } from "../../domain/pdf.ts";
 import type { CompiledTransform } from "../../domain/transform.ts";
 
-const logScope = "export";
+const log = createLogger("export");
 
 /** What the writer needs beyond the note itself. */
 export type PdfBuildInput = {
@@ -299,7 +300,7 @@ function paintOp(
         doc.addImage(image.dataUrl, op.x, op.y, op.width, op.height);
       } catch (err) {
         // A picture in a format jsPDF can't read must not cost the document.
-        console.warn(`[${logScope}] image skipped`, err);
+        log.warn("image skipped", err);
       }
       return;
     }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { unlock } from "../../achievements/index.ts";
+import { createLogger } from "../../dev/logger.ts";
 import type { CopyScope, Note } from "../../domain/note.ts";
 import type { CompiledTransform } from "../../domain/transform.ts";
 import { useT } from "../../i18n/index.ts";
@@ -21,6 +22,8 @@ import {
   SpinnerIcon,
 } from "../icons.tsx";
 import { Toast } from "../Toast.tsx";
+
+const log = createLogger("export");
 
 // The export button: the up arrow in the note header's action cluster, opening
 // a menu of the three ways a note leaves the app.
@@ -122,7 +125,7 @@ export function ExportButton({
       if (ok) unlock("printPress");
       else reportFailed();
     } catch (err) {
-      console.warn("[export] loading the export module failed", err);
+      log.warn("loading the export module failed", err);
       reportFailed();
     } finally {
       setBusy(null);
@@ -137,7 +140,7 @@ export function ExportButton({
       if (await mod.downloadMarkdown(note)) unlock("takeaway");
       else reportFailed();
     } catch (err) {
-      console.warn("[export] loading the export module failed", err);
+      log.warn("loading the export module failed", err);
       reportFailed();
     } finally {
       setBusy(null);

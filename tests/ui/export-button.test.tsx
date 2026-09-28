@@ -10,6 +10,7 @@ import {
 } from "@testing-library/preact";
 import type { ReactNode } from "react";
 
+import { clearLogs, getLogs } from "../../src/dev/logger.ts";
 import type { Note } from "../../src/domain/note.ts";
 import { ExportButton } from "../../src/ui/export/ExportButton.tsx";
 import { NavContext, type NavContextValue } from "../../src/ui/nav-context.ts";
@@ -135,7 +136,7 @@ describe("ExportButton", () => {
         "Failed to fetch dynamically imported module: export-note-C5VSQ-9U.js",
       );
     });
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    clearLogs();
     render(withNav(<ExportButton note={note} copyScope="body" />));
     openMenu();
     await act(async () => {
@@ -147,7 +148,11 @@ describe("ExportButton", () => {
     const toast = await screen.findByRole("status");
     expect(toast.textContent).toContain("Export failed");
     expect(screen.getByRole("button", { name: "Reload" })).toBeTruthy();
-    expect(warn).toHaveBeenCalled();
+    // The failure is in the in-app log, where "what did the app just do?" is
+    // answerable on the device.
+    expect(
+      getLogs().some((e) => e.level === "warn" && e.scope === "export"),
+    ).toBe(true);
   });
 
   it("raises the failure toast when the PDF export reports defeat", async () => {

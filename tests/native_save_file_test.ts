@@ -177,7 +177,6 @@ describe("an export in the phone app", () => {
   });
 
   it("reports a failed share, so the button can say so", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
     const posted = inShell();
     const done = downloadMarkdown(note);
     const request = await nextPost(posted);

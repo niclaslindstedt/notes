@@ -2,10 +2,13 @@ import { type MouseEvent as ReactMouseEvent } from "react";
 
 import { dataUrlToBlob, saveFile } from "@niclaslindstedt/oss-framework/files";
 
+import { createLogger } from "../../dev/logger.ts";
 import { type Attachment } from "../../domain/attachment.ts";
 import { useAttachmentsContext } from "./context.ts";
 import { useAttachmentData } from "./fetch-context.ts";
 import { FileTypeIcon } from "./file-icons.tsx";
+
+const log = createLogger("attachments");
 
 // The inline representation of a non-image file attachment: a compact chip
 // carrying the file's type icon and its name. Unlike an image (which previews
@@ -43,7 +46,7 @@ export function FileAttachment({ attachment, srcOffset }: Props) {
         const blob = dataUrlToBlob(data);
         if (!blob) return;
         void saveFile({ blob, filename: attachment.filename }).catch(
-          (err: unknown) => console.warn("[attachments] save failed", err),
+          (err: unknown) => log.warn("save failed", err),
         );
       }}
       title={attachment.filename}

@@ -21,12 +21,15 @@ import {
   referencedAttachments,
   type Attachment,
 } from "../../domain/attachment.ts";
+import { createLogger } from "../../dev/logger.ts";
 import type { PdfSettings } from "../../domain/pdf.ts";
 import type { CompiledTransform } from "../../domain/transform.ts";
 import type { Note } from "../../domain/note.ts";
 import { noteToMarkdown } from "../../storage/markdown/codec.ts";
 import type { AttachmentFetcher } from "../attachments/fetch-context.ts";
 import type { LoadedImage } from "./pdf-document.ts";
+
+const log = createLogger("export");
 
 /**
  * The filename an exported note is offered under: a slug of its title, or
@@ -76,7 +79,7 @@ export async function downloadMarkdown(note: Note): Promise<boolean> {
     });
     return true;
   } catch (err) {
-    console.warn("[export] markdown failed", err);
+    log.warn("markdown failed", err);
     return false;
   }
 }
@@ -128,7 +131,7 @@ export async function exportPdf(
     await saveFile({ blob, filename: `${exportFileStem(note)}.pdf` });
     return true;
   } catch (err) {
-    console.warn("[export] pdf failed", err);
+    log.warn("pdf failed", err);
     return false;
   }
 }
