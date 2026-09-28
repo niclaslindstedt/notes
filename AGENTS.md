@@ -106,10 +106,6 @@ oss-spec:unlisted-website: the web build is a testing surface; users install the
 
 - **§13.5 `prompts/`** — no versioned prompt library; nothing in the app uses
   one yet.
-- **§19.4 Central output module** — no `src/output` semantic logging helpers
-  (`status` / `warn` / `info` / `header` / `error`). This is a CLI-oriented
-  requirement; a browser PWA logs to the devtools console, so this is treated
-  as not-applicable rather than missing — revisit if a CLI/build tool is added.
 
 **Deliberate, permanent deviations (not bugs — don't "fix" these):**
 
@@ -554,6 +550,10 @@ product decision):
 
 The source tree under `src/` is organized by concern, not by file type:
 
+- `src/output.ts` — the central output module (OSS_SPEC §19.4):
+  `status` / `info` / `warn` / `error` / `header`, written into the in-app
+  logger (`src/dev/logger.ts`) rather than the console. A new diagnostic line
+  goes through it.
 - `src/app/` — the root component (`App.tsx`), the entry point
   (`main.tsx`), and top-level state hooks (`use-notes.ts`).
 - `src/domain/` — pure functions over the note model (`note.ts`), a

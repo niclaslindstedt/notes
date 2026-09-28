@@ -43,6 +43,8 @@ app  ──▶  ui  ──▶  domain
 - **`src/ui/`** — presentational components (e.g. `UpdateToast.tsx`).
 - **`src/app/`** — `App.tsx` (the list ↔ editor shell), `main.tsx` (the entry
   point), and `use-notes.ts` (the store hook the component tree binds to).
+- **`src/output.ts`** — the central output module: `status` / `info` / `warn`
+  / `error` / `header`, written into the in-app logger (`src/dev/logger.ts`).
 
 Below all of these sits **`@niclaslindstedt/oss-framework`** (GitHub
 Packages; `.npmrc` + `GITHUB_PAT`), the shared package extracted from
