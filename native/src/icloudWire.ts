@@ -2,7 +2,7 @@
 // iCloud.
 //
 // This module exists to stay IMPORT-FREE, and that is its whole job. The root
-// `tsc` type-checks `tests/`, `tests/platform/icloud-host.test.ts` imports
+// `tsc` type-checks `tests/`, `tests/native_icloud_test.ts` imports
 // `icloudBridge.ts`, and a root `npm ci` does not install `native/`'s own
 // dependencies — so anything reachable from that test which imports
 // `expo` turns a fully-installed machine green and CI red.

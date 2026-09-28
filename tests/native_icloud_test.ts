@@ -22,7 +22,7 @@ import {
   METHODS,
   isICloudRequest,
   resolveScript,
-} from "../../native/src/icloudBridge.ts";
+} from "../native/src/icloudBridge.ts";
 import {
   ICLOUD_HOST_EVENT,
   ICLOUD_HOST_METHODS,
@@ -30,11 +30,11 @@ import {
   getICloudHost,
   parseICloudEntries,
   parseICloudStatus,
-} from "../../src/platform/icloud-host.ts";
-import { ICLOUD_FOLDER_NAME } from "../../src/storage/icloud/constants.ts";
+} from "../src/platform/icloud-host.ts";
+import { ICLOUD_FOLDER_NAME } from "../src/storage/icloud/constants.ts";
 
 const CONTAINER = "iCloud.se.agilator.notes";
-const root = new URL("../../", import.meta.url);
+const root = new URL("../", import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), "utf8");
 
 afterEach(() => {
@@ -165,9 +165,7 @@ describe("parsing a host's answers", () => {
 
 describe("the iCloud container", () => {
   // `app.config.js` is CommonJS and reads the environment, as EAS does.
-  const config = createRequire(import.meta.url)(
-    "../../native/app.config.js",
-  ) as {
+  const config = createRequire(import.meta.url)("../native/app.config.js") as {
     expo: {
       ios: {
         bundleIdentifier: string;

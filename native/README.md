@@ -120,7 +120,7 @@ and offers the backend only when one is there. The wrapper installs it:
 
 The contract — property, event, method list, script safety, and the container
 spelled the same in every place — is pinned from the root suite by
-`tests/platform/icloud-host.test.ts`.
+`tests/native_icloud_test.ts`.
 
 ## Signing in to Dropbox
 
@@ -161,7 +161,7 @@ back to `dev.local.notes` — so the store build returns on
 list too. The key reaches the bundle as `VITE_DROPBOX_APP_KEY` at
 `make native-bundle` time; without it the app offers no Dropbox at all.
 
-`tests/platform/auth-session.test.ts` runs the injected script against the
+`tests/native_auth_session_test.ts` runs the injected script against the
 framework's own validation and pins the scheme to the bundle id.
 
 ## Exports
@@ -188,7 +188,7 @@ injectJavaScript: "oss-framework/save-file-result" { id, ok }
 
 Without the descriptor the page keeps downloading, so the website and the
 desktop app behave as they always did. `src/saveFileBridge.ts` is import-free
-and pinned from the root suite (`tests/platform/save-file.test.ts`, a whole
+and pinned from the root suite (`tests/native_save_file_test.ts`, a whole
 round trip against a stand-in page); `src/saveFile.ts` is the
 `expo-file-system` / `expo-sharing` half. Only the latest export stays on
 disk, in the cache the next export clears, and the bytes are never logged.

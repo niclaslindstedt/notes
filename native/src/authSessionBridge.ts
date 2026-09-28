@@ -27,7 +27,7 @@
 // Same shape as `icloudBridge.ts`: this file exports STRINGS for the page
 // (dependency-free, ES5-ish — nothing in them is transpiled) plus the pure
 // narrowing and settling helpers. It is exercised from the root test suite
-// (`tests/platform/auth-session.test.ts`), so it imports nothing that reaches
+// (`tests/native_auth_session_test.ts`), so it imports nothing that reaches
 // `expo`.
 
 import { escapeForScript } from "./scriptText";

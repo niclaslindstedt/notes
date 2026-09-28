@@ -1,21 +1,18 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 
-import { carriesOver, demoStorage, MemoryStorage } from "../../src/dev/demo.ts";
-import { buildDemo, DEMO_NAMESPACES } from "../../src/dev/demoData.ts";
-import { classifyLines } from "../../src/domain/markdown.ts";
-import type { Note } from "../../src/domain/note.ts";
-import { findHits, isPatternValid } from "../../src/domain/note-find.ts";
-import { replaceAll } from "../../src/domain/note-replace.ts";
-import {
-  compileTransforms,
-  transformHits,
-} from "../../src/domain/transform.ts";
+import { carriesOver, demoStorage, MemoryStorage } from "../src/dev/demo.ts";
+import { buildDemo, DEMO_NAMESPACES } from "../src/dev/demoData.ts";
+import { classifyLines } from "../src/domain/markdown.ts";
+import type { Note } from "../src/domain/note.ts";
+import { findHits, isPatternValid } from "../src/domain/note-find.ts";
+import { replaceAll } from "../src/domain/note-replace.ts";
+import { compileTransforms, transformHits } from "../src/domain/transform.ts";
 import {
   namespaceLocalKey,
   parseNamespaces,
-} from "../../src/storage/namespaces.ts";
-import { parse, serialize } from "../../src/storage/serialize.ts";
+} from "../src/storage/namespaces.ts";
+import { parse, serialize } from "../src/storage/serialize.ts";
 
 const NOW = Date.UTC(2026, 8, 26, 9, 41);
 const DAY = 24 * 60 * 60 * 1000;
@@ -173,6 +170,87 @@ describe("the frames' premises", () => {
     for (const { namespace } of DEMO_NAMESPACES) {
       expect(namespace.glyph).toBeTruthy();
       expect(namespace.color).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+});
+
+// The demo is never dated: whatever day and hour it opens on, it is the same
+// notebook, with nothing written after the moment it opens. Walk every day of
+// a year, at several local wall-clock hours of each, and hold each frame's
+// premise there — not only at the one moment the screenshots are taken.
+describe("a year of opening the demo", () => {
+  const HOURS: [number, number][] = [
+    [0, 5],
+    [6, 30],
+    [9, 41],
+    [13, 0],
+    [18, 15],
+    [23, 55],
+  ];
+  const moments: number[] = [];
+  for (let day = 0; day < 365; day++) {
+    for (const [h, m] of HOURS) {
+      moments.push(new Date(2027, 0, 1 + day, h, m).getTime());
+    }
+  }
+
+  // The order the list shows, most recently edited first, and each note's
+  // offsets from the moment the demo opens.
+  const shape = (d: typeof demo, now: number) =>
+    d.namespaces.map((n) =>
+      [...n.snapshot.notes]
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .map((x) => [x.title, now - x.createdAt, now - x.updatedAt]),
+    );
+  const expected = shape(demo, NOW);
+
+  it("walks every day of the year", () => {
+    expect(moments).toHaveLength(365 * HOURS.length);
+  });
+
+  it("is the same notebook, stamped at or before the moment it opens", () => {
+    for (const now of moments) {
+      const d = buildDemo(now);
+      expect(shape(d, now)).toEqual(expected);
+      for (const { snapshot } of d.namespaces) {
+        for (const n of snapshot.notes) {
+          expect(n.createdAt).toBeLessThanOrEqual(n.updatedAt);
+          expect(n.updatedAt).toBeLessThanOrEqual(now);
+          for (const c of n.comments ?? []) {
+            expect(c.createdAt).toBeLessThanOrEqual(now);
+            expect(c.createdAt).toBeGreaterThanOrEqual(n.createdAt);
+          }
+        }
+        for (const f of snapshot.folders ?? []) {
+          for (const n of snapshot.notes.filter((x) => x.folderId === f.id)) {
+            expect(f.createdAt).toBeLessThanOrEqual(n.createdAt);
+          }
+        }
+      }
+    }
+  });
+
+  it("holds every frame's premise on every day", () => {
+    for (const now of moments) {
+      const d = buildDemo(now);
+      const notes = d.namespaces.flatMap((n) => n.snapshot.notes);
+      const find = (title: string) => notes.find((n) => n.title === title)!;
+      const nas = find("NAS rebuild");
+      expect(nas.favorite).toBe(true);
+      // The editor frame opens on the note edited last in its namespace.
+      const personal = d.namespaces[0]!.snapshot.notes.filter(
+        (n) => !n.archived,
+      );
+      expect(Math.max(...personal.map((n) => n.updatedAt))).toBe(nas.updatedAt);
+      const retro = find("Retro — sprint 41");
+      expect(
+        findHits(retro.body!, "^TODO\\((\\w+)\\): (.+)$", { regex: true }),
+      ).toHaveLength(4);
+      for (const { namespace, snapshot } of d.namespaces) {
+        expect(parse(d.storage[namespaceLocalKey(namespace.slug)]!)).toEqual(
+          snapshot,
+        );
+      }
     }
   });
 });

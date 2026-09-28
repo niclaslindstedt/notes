@@ -17,7 +17,7 @@
 //
 // Same shape as `icloudBridge.ts`: this file holds the page-facing strings and
 // the pure narrowing and settling helpers, is exercised from the root test
-// suite (`tests/platform/save-file.test.ts`), and so imports nothing that
+// suite (`tests/native_save_file_test.ts`), and so imports nothing that
 // reaches `expo`. The effect lives in `saveFile.ts`.
 
 /** The message the page posts. The FRAMEWORK's name (`SAVE_FILE_MESSAGE` in

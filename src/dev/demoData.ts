@@ -5,7 +5,7 @@
 // nearly every note written to be read at a glance on a phone.
 //
 // It is written for the store frames first, so several notes carry a premise
-// a frame stages — `tests/dev/demo.test.ts` holds them to it:
+// a frame stages — `tests/demo_test.ts` holds them to it:
 //
 // - "NAS rebuild" (Personal › Homelab, a favorite) is the live-preview
 //   editor at its best: headings, a half-ticked checklist, inline code, a

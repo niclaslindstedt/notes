@@ -26,18 +26,15 @@ import {
   bareName,
   isSaveFileRequest,
   saveFileResultScript,
-} from "../../native/src/saveFileBridge.ts";
-import type { Note } from "../../src/domain/note.ts";
-import { noteToMarkdown } from "../../src/storage/markdown/codec.ts";
-import {
-  downloadMarkdown,
-  exportPdf,
-} from "../../src/ui/export/export-note.ts";
-import { DEFAULT_PDF_SETTINGS } from "../../src/domain/pdf.ts";
+} from "../native/src/saveFileBridge.ts";
+import type { Note } from "../src/domain/note.ts";
+import { noteToMarkdown } from "../src/storage/markdown/codec.ts";
+import { downloadMarkdown, exportPdf } from "../src/ui/export/export-note.ts";
+import { DEFAULT_PDF_SETTINGS } from "../src/domain/pdf.ts";
 
 // The PDF writer is jsPDF, which jsdom cannot drive; what is under test is
 // where its bytes go.
-vi.mock("../../src/ui/export/pdf-document.ts", () => ({
+vi.mock("../src/ui/export/pdf-document.ts", () => ({
   buildPdf: vi.fn(() =>
     Promise.resolve(new Blob(["%PDF-1.7"], { type: "application/pdf" })),
   ),

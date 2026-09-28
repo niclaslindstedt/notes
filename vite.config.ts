@@ -381,7 +381,7 @@ export default defineConfig({
     // `// @vitest-environment jsdom` docblock at the top of the file.
     environment: "node",
     globals: true,
-    include: ["tests/**/*.test.{ts,tsx}"],
+    include: ["tests/**/*.test.{ts,tsx}", "tests/*_test.{ts,tsx}"],
     server: {
       deps: {
         // Vitest externalises `node_modules` by default, which means Node —

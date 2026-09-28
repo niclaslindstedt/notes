@@ -27,7 +27,7 @@ import {
   authSessionScript,
   isAuthSessionRequest,
   redirectUriFor,
-} from "../../native/src/authSessionBridge.ts";
+} from "../native/src/authSessionBridge.ts";
 
 const REDIRECT = redirectUriFor("se.agilator.notes");
 
@@ -62,7 +62,7 @@ function run(script: string, win: FakeWindow): void {
 }
 
 const require = createRequire(import.meta.url);
-const CONFIG = require.resolve("../../native/app.config.js");
+const CONFIG = require.resolve("../native/app.config.js");
 
 /** The Expo `scheme` app.config.js resolves to under `bundleId` (unset: a
  *  plain checkout). Loaded fresh, because the config reads the environment
