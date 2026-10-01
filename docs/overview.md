@@ -1865,7 +1865,11 @@ Lists, unlike quotes, are **not sticky** — an endless column of empty bullets
 is nobody's intent. Enter on an **empty item** ends the list instead of opening
 another: one press pulls a nested item back out a level (`  - ` → `- `), the
 next clears the row to a blank line, so repeated Enter walks out of the list
-the same way Tab walked into it. This is decided **before** the Shift+Enter
+the same way Tab walked into it. A row stepping out lands in the **outer**
+list, so it takes the marker of the item it was nested under
+(`parentItemAt`) rather than keeping its own: a numbered sub-list under a
+bullet walks back out to a bullet, a bulleted one under `2.` to `3.`, and one
+under a task item to an empty `[ ]` box. This is decided **before** the Shift+Enter
 branch below, so an empty item ends the list whether or not Shift is held —
 there is no content for a continuation row to hang under, and on a phone this
 is the one row where the modifier is least trustworthy (see the soft-break
