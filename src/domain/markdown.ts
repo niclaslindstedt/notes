@@ -449,10 +449,11 @@ function numberLists(blocks: LineBlock[]): void {
 }
 
 // Leading-whitespace width in columns (space = 1, tab advances to the next
-// multiple of four). Only used for the relative depth comparison in
-// `numberLists`, so the exact tab stop matters little — what matters is that a
-// more-indented line always measures wider.
-function leadingIndent(raw: string): number {
+// multiple of four). Only used for relative depth comparisons — here in
+// `numberLists`, and by Enter's walk out of a nested list (`newlineFor`) — so
+// the exact tab stop matters little; what matters is that a more-indented line
+// always measures wider.
+export function leadingIndent(raw: string): number {
   let cols = 0;
   for (const ch of raw) {
     if (ch === " ") cols += 1;

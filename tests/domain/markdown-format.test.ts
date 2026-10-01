@@ -528,6 +528,41 @@ describe("newlineFor", () => {
     });
   });
 
+  it("takes the outer list's marker when stepping out of a nested one", () => {
+    const steps = (line: string) => ({ kind: "replaceLine", line });
+    // A numbered sub-list under a bullet walks back out to a bullet...
+    expect(enterAt("- a\n  1. b\n  2. ", 2, 5)).toEqual(steps("- "));
+    expect(enterAt("* a\n  1. b\n  2. ", 2, 5)).toEqual(steps("* "));
+    // ...a bulleted one under a number to the outer list's next number...
+    expect(enterAt("1. a\n   - b\n   - ", 2, 5)).toEqual(steps("2. "));
+    expect(enterAt("3) a\n  - b\n  - ", 2, 4)).toEqual(steps("4) "));
+    // ...and one under a task item to an empty box.
+    expect(enterAt("- [x] a\n  1. b\n  2. ", 2, 5)).toEqual(steps("- [ ] "));
+  });
+
+  it("finds the outer item past deeper rows, blanks and continuation rows", () => {
+    const steps = (line: string) => ({ kind: "replaceLine", line });
+    expect(enterAt("- a\n  1. b\n    - c\n\n      more\n  2. ", 5, 5)).toEqual(
+      steps("- "),
+    );
+    // Two levels deep, the row steps out to the middle list's marker.
+    expect(enterAt("- a\n  1. b\n    - c\n    - ", 3, 6)).toEqual(
+      steps("  2. "),
+    );
+  });
+
+  it("joins the outer item whatever indent the nested list was typed at", () => {
+    const steps = (line: string) => ({ kind: "replaceLine", line });
+    expect(enterAt("- a\n      1. b\n      2. ", 2, 9)).toEqual(steps("- "));
+  });
+
+  it("just outdents a nested empty item with no list above it", () => {
+    expect(enterAt("prose\n  1. ", 1, 5)).toEqual({
+      kind: "replaceLine",
+      line: "1. ",
+    });
+  });
+
   it("reads an emptied `- ` row under a list as a bullet, not a divider", () => {
     expect(enterAt("- a\n- ", 1, 2)).toEqual({ kind: "replaceLine", line: "" });
     expect(enterAt("- a\n\n- ", 2, 2)).toEqual({

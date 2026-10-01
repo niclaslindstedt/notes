@@ -18,6 +18,7 @@
 
 import {
   classifyLines,
+  leadingIndent,
   parseInline,
   type BlockKind,
   type InlineNode,
@@ -322,6 +323,11 @@ export function newlineFor(
   // `shiftKey` — so on a phone the empty row is *always* the case where the
   // modifier is least trustworthy and the way out matters most.
   if (item.content === "") {
+    // Stepping out lands the row in the *outer* list, so it takes that list's
+    // marker rather than keeping its own: a numbered sub-list under a bullet
+    // walks back out to a bullet, not to a stray number among the bullets.
+    const parent = parentItemAt(blocks, index);
+    if (parent) return { kind: "replaceLine", line: nextMarker(parent) };
     const outdented = outdentLine(item.prefix);
     return {
       kind: "replaceLine",
@@ -333,10 +339,40 @@ export function newlineFor(
   if (soft) {
     return { kind: "insert", text: `\n${item.prefix.replace(/\S/g, " ")}` };
   }
-  const marker = item.ordered
+  return { kind: "insert", text: `\n${nextMarker(item)}` };
+}
+
+/** The marker of the item after `item`: the same one, a number bumped by one. */
+function nextMarker(item: ListItem): string {
+  return item.ordered
     ? item.prefix.replace(/\d+/, (n) => String(Number.parseInt(n, 10) + 1))
     : item.prefix;
-  return { kind: "insert", text: `\n${marker}` };
+}
+
+/**
+ * The item `blocks[index]` is nested under — the nearest list item above it
+ * with a shallower indent, which is the outer item a nested row joins when
+ * Enter walks it out a level (the same nesting `numberLists` renders). Deeper
+ * or sibling rows, blank lines and indented continuation rows are stepped
+ * over; any other line ends the list, and so does reaching the top: null.
+ */
+function parentItemAt(
+  blocks: readonly LineBlock[],
+  index: number,
+): ListItem | null {
+  const indent = leadingIndent(blocks[index]?.raw ?? "");
+  for (let i = index - 1; i >= 0 && indent > 0; i -= 1) {
+    const block = blocks[i];
+    if (!block || block.kind === "blank") continue;
+    const width = leadingIndent(block.raw);
+    if (block.kind === "ul" || block.kind === "ol") {
+      if (width < indent) return listItemAt(blocks, i);
+      continue;
+    }
+    if (block.kind === "paragraph" && width > 0) continue;
+    return null;
+  }
+  return null;
 }
 
 /**
