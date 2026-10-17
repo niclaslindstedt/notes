@@ -5,10 +5,12 @@
   },
   "build": {
     "development": {
+      "node": "24.21.0",
       "developmentClient": true,
       "distribution": "internal"
     },
     "preview": {
+      "node": "24.21.0",
       "distribution": "internal",
       "ios": {
         "simulator": true
@@ -18,6 +20,7 @@
       }
     },
     "production": {
+      "node": "24.21.0",
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
