@@ -23,11 +23,10 @@ name: Native build
 #
 # The embedded web app is built and packed HERE, before `eas build`, and rides
 # the upload as native/assets/webroot.zip (the root .easignore keeps the
-# gitignored zip in it). That is where
-# VITE_DROPBOX_APP_KEY / VITE_DROPBOX_APP_FOLDER (secrets, optional) reach the
-# bundle: unset, the app offers no Dropbox; set, the Dropbox app must list
-# <APP_BUNDLE_ID>://oauth — se.agilator.notes://oauth — as a redirect URI
-# (native/RELEASING.md).
+# gitignored zip in it). The phone app offers no Dropbox, so no Dropbox key
+# or folder is passed to that step: its build (`VITE_TARGET=native`) ignores
+# them even when set and lists no Dropbox option. The website and the desktop
+# app keep Dropbox (pages.yml, release.yml).
 
 on:
   workflow_dispatch:
@@ -99,11 +98,6 @@ jobs:
           # the icon: the web build spells it out, so it has to be here as
           # well as on `eas build`. A production bundle refuses without it.
           APP_DISPLAY_NAME: ${{ secrets.APP_DISPLAY_NAME }}
-          # The same Dropbox app as the website's. The phone app signs in
-          # through an authentication session that returns on
-          # <APP_BUNDLE_ID>://oauth, which that app must list.
-          VITE_DROPBOX_APP_KEY: ${{ secrets.VITE_DROPBOX_APP_KEY }}
-          VITE_DROPBOX_APP_FOLDER: ${{ secrets.VITE_DROPBOX_APP_FOLDER }}
 
       # Installs the pinned eas-cli and authenticates it with EXPO_TOKEN so
       # the eas commands below run non-interactively.

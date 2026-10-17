@@ -22,10 +22,11 @@ can't do on its own:
    iCloud Drive. The wrapper offers a small file store (list, read, write,
    remove) inside the app's own container, `iCloud.se.agilator.notes`, and the
    web app's directory adapter drives it like any other folder.
-3. **Dropbox sign-in** — a provider will neither show its consent page inside
-   an embedded WebView nor redirect back into one. The wrapper offers an
+3. **An OAuth sign-in sheet** — a provider will neither show its consent page
+   inside an embedded WebView nor redirect back into one. The wrapper offers an
    authentication session instead (see
-   [Signing in to Dropbox](#signing-in-to-dropbox)).
+   [Signing in to Dropbox](#signing-in-to-dropbox)). The phone app offers no
+   Dropbox, so its bundle does not use it today.
 4. **Exports** — a download goes nowhere in a WebView. The wrapper hands an
    exported note (`.md`, PDF) or a file attachment to the share sheet instead
    (see [Exports](#exports)).
@@ -124,6 +125,14 @@ spelled the same in every place — is pinned from the root suite by
 
 ## Signing in to Dropbox
 
+**The phone app offers no Dropbox.** Its bundle is built with
+`VITE_TARGET=native`, which leaves the Dropbox option, its texts and its key
+out (`DROPBOX_IN_BUILD` in `src/storage/cloud-configured.ts`); it syncs through
+iCloud Drive and Nextcloud. An install that chose Dropbox under an earlier build
+opens on the device's own store. The website and the desktop app keep Dropbox.
+The authentication session below stays in the wrapper, and stays pinned by its
+test, for a provider that needs one.
+
 The web app signs in to Dropbox with a PKCE redirect: it sends the page to
 Dropbox and Dropbox sends it back to the page's own URL. Inside the app that
 cannot work — the providers refuse to show consent inside an embedded WebView,
@@ -158,8 +167,8 @@ back to `dev.local.notes` — so the store build returns on
 **`se.agilator.notes://oauth`**, and the Dropbox app must list exactly that
 (see [`RELEASING.md`](RELEASING.md#dropbox)). A dev build returns on
 `dev.local.notes://oauth`, which a Dropbox app used for development has to
-list too. The key reaches the bundle as `VITE_DROPBOX_APP_KEY` at
-`make native-bundle` time; without it the app offers no Dropbox at all.
+list too. The phone bundle takes no `VITE_DROPBOX_APP_KEY`: `native-build.yml`
+passes none, and `VITE_TARGET=native` ignores one set locally.
 
 `tests/native_auth_session_test.ts` runs the injected script against the
 framework's own validation and pins the scheme to the bundle id.

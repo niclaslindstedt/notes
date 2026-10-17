@@ -12,10 +12,12 @@ control. Open **Settings → Where your notes are stored** and pick one:
   them on GitHub, or keep the folder in git. Available in Chromium-based
   browsers (Chrome, Edge, Brave, Arc); hidden where the File System Access API
   isn't supported.
+<!-- dropbox -->
 - **Dropbox** — sign in through Dropbox's own screen
   and `notes` keeps your notes in that account from then on, ready to pick up on
   your next device. Each note is stored as a markdown file in the app's folder,
   so you can read and edit them straight from Dropbox too.
+<!-- /dropbox -->
 - **Nextcloud** — a Nextcloud you run yourself. Give `notes` your server
   address, your user name and an *app password* (the revocable credential
   Nextcloud creates under Settings → Security), and it keeps one markdown file
@@ -67,6 +69,7 @@ devices. They're kept as plain
 JSON even when the notes are encrypted — theme choices aren't secret, and
 keeping them readable is what lets the unlock screen render in your theme.
 
+<!-- dropbox -->
 ## Configuring the cloud backends
 
 The Dropbox options only appear when their app credentials are
@@ -88,3 +91,4 @@ automatically, so each `npm run build` step in `.github/workflows/pages.yml`
 maps them into its `env:`. If you add a new build step or workflow that ships a
 deploy, map them there too or that build will silently disable the cloud
 backends.
+<!-- /dropbox -->

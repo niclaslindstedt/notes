@@ -10,6 +10,8 @@ import {
   type FeatureDoc,
 } from "@niclaslindstedt/oss-framework/changelog";
 
+import { DROPBOX_IN_BUILD } from "../../storage/cloud-configured.ts";
+
 export {
   parseFeatureDoc,
   type FeatureDoc,
@@ -32,5 +34,20 @@ const rawDocs = __EMBEDDED__
       eager: true,
     });
 
-export const FEATURE_DOCS: Record<string, FeatureDoc> =
-  buildFeatureDocs(rawDocs);
+// A doc's lines between `<!-- dropbox -->` and `<!-- /dropbox -->` describe
+// Dropbox, which the phone build doesn't offer: that build drops them, and
+// every other build drops only the two markers, which the doc renderer would
+// otherwise print as text.
+const DROPBOX_BLOCK = /^<!-- dropbox -->\n([\s\S]*?)^<!-- \/dropbox -->\n?/gm;
+
+export function forThisBuild(md: string, dropbox = DROPBOX_IN_BUILD): string {
+  return md.replace(DROPBOX_BLOCK, (_block, inner: string) =>
+    dropbox ? inner : "",
+  );
+}
+
+export const FEATURE_DOCS: Record<string, FeatureDoc> = buildFeatureDocs(
+  Object.fromEntries(
+    Object.entries(rawDocs).map(([path, md]) => [path, forThisBuild(md)]),
+  ),
+);

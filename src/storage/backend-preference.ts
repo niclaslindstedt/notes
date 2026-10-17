@@ -5,6 +5,7 @@
 // holds the bytes). A single-user model — notes has no accounts.
 
 import { createLogger } from "../dev/logger.ts";
+import { DROPBOX_IN_BUILD } from "./cloud-configured.ts";
 
 const log = createLogger("backend-pref");
 
@@ -74,7 +75,10 @@ function clear(key: string): void {
 
 export function getBackend(): BackendId {
   const raw = read(BACKEND_KEY);
-  if (raw === "dropbox") return "dropbox";
+  // The phone build offers no Dropbox. An install that chose it under an
+  // earlier build opens on this device's store instead, as any backend that
+  // can't be reached here does; the choice stays stored, untouched.
+  if (raw === "dropbox") return DROPBOX_IN_BUILD ? "dropbox" : "browser";
   if (raw === "folder") return "folder";
   if (raw === "icloud") return "icloud";
   if (raw === "nextcloud") return "nextcloud";

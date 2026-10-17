@@ -200,7 +200,7 @@ export function buildSeed(now: number = Date.now()): SeededNamespace[] {
             created: 0,
             body: [
               "**Yesterday:** finished the migration runner tests.",
-              "**Today:** namespace reconcile on the Dropbox backend.",
+              "**Today:** namespace reconcile on the Nextcloud backend.",
               "**Blockers:** waiting on design for the empty state.",
             ].join("\n"),
           },
@@ -217,7 +217,7 @@ export function buildSeed(now: number = Date.now()): SeededNamespace[] {
               "",
               '- [ ] Conflict resolution UX ("keep mine" / "keep theirs")',
               "- [ ] Retry with backoff on the cloud backends",
-              "- [x] Offline mirror for Dropbox",
+              "- [x] Offline mirror for Nextcloud",
               "",
               "## 2. Onboarding",
               "",

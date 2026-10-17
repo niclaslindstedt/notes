@@ -43,7 +43,7 @@ there rather than shipping under the wrong identity.
 | `APP_DISPLAY_NAME`        | secret   | `native-build.yml` — the store listing's name.       |
 | `APP_BUNDLE_ID`           | secret   | `native-build.yml` — iOS bundle identifier / Android package name. |
 | `EAS_PROJECT_ID`          | secret   | `native-build.yml` — the Expo project to build against. |
-| `VITE_DROPBOX_APP_KEY`    | secret   | Dropbox backend (public PKCE app key) — the Pages builds, and `native-build.yml`, which bakes it into the phone app's embedded bundle. |
+| `VITE_DROPBOX_APP_KEY`    | secret   | Dropbox backend (public PKCE app key) — the Pages builds and the desktop app (`release.yml`). Not `native-build.yml`: the phone app offers no Dropbox, and its build (`VITE_TARGET=native`) ignores the key even when one is set. |
 | `VITE_DROPBOX_APP_FOLDER` | secret   | Dropbox app-folder name — same two places.           |
 | `VITE_DONATE_URL`         | secret   | Optional donate row in the side menu — the Pages builds only. The phone and desktop builds compile the row out (`__EMBEDDED__`) whatever it says: a payment link outside Apple's is an App Store rejection (guideline 3.1.1). |
 | `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `MAC_SIGN_IDENTITY`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | secret | macOS signing and notarization of the desktop app — see [`tauri/README.md`](../tauri/README.md). |
@@ -52,15 +52,17 @@ there rather than shipping under the wrong identity.
 ### Dropbox redirect URIs
 
 Dropbox matches redirect URIs exactly, so the Dropbox app whose key is
-`VITE_DROPBOX_APP_KEY` lists every one the three surfaces sign in through
-(App Console → Settings → OAuth 2 → Redirect URIs):
+`VITE_DROPBOX_APP_KEY` lists every one the two surfaces that offer it sign in
+through (App Console → Settings → OAuth 2 → Redirect URIs):
 
 - the website's deployed origins, without a trailing slash (the redirect flow);
 - `http://127.0.0.1:53682/`, `:53683/` and `:53684/` for the desktop app (the
-  loopback flow — see `tauri/shell/src/oauth.rs`);
-- `se.agilator.notes://oauth` for the phone app — `<APP_BUNDLE_ID>://oauth`,
-  the authentication session's return address (see
-  [native/README.md](../native/README.md#signing-in-to-dropbox)).
+  loopback flow — see `tauri/shell/src/oauth.rs`).
+
+The phone app offers no Dropbox, so it needs no redirect URI there. Its
+authentication session (`<APP_BUNDLE_ID>://oauth`, see
+[native/README.md](../native/README.md#signing-in-to-dropbox)) stays in the
+wrapper for a provider that needs one.
 
 ## PWA manifest
 

@@ -18,9 +18,12 @@ capabilities a WebView can't provide: native haptics, bridged over
 [`src/platform/native-bridge.ts`](src/platform/native-bridge.ts), and on iOS
 an **iCloud Drive** file store the page finds as a provider on `window`
 ([`src/platform/icloud-host.ts`](src/platform/icloud-host.ts)), plus an
-**authentication session** for the Dropbox sign-in the page finds at
+**authentication session** for an OAuth sign-in the page finds at
 `window.__ossAuthSession` (the framework's `getAuthSessionHost`) — the page
-asks whether each capability is present, never where it is running. It no longer
+asks whether each capability is present, never where it is running. The phone
+app offers no Dropbox (`DROPBOX_IN_BUILD` in `src/storage/cloud-configured.ts`
+is false under `VITE_TARGET=native`), so its bundle leaves that session unused;
+the website and the desktop app keep Dropbox. It no longer
 imports the web source; the storage logic, encryption included, stays in the
 embedded app, and the iCloud store only moves the bytes it is handed.
 
@@ -76,7 +79,7 @@ doesn't have to.
 
 ## Conventions
 
-Fleet guidelines: APP_GUIDELINES 1.2.0
+Fleet guidelines: APP_GUIDELINES 2.0.0
 
 The layout, automation and release flow described in this file are the ones
 the repository keeps. A few are deliberate and easy to "fix" by mistake:

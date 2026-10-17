@@ -15,12 +15,17 @@ declare const __APP_NAME__: string;
 declare const __EMBEDDED__: boolean;
 
 interface ImportMetaEnv {
+  // `native` in the phone app's bundle (`npm run build:native`), unset
+  // elsewhere. Read by `src/storage/cloud-configured.ts`: the phone build
+  // offers no Dropbox.
+  readonly VITE_TARGET?: string;
   // Optional donate link surfaced in the side menu — the website's only; the
   // wrapper builds (`__EMBEDDED__`) compile the entry out. A blank / unset
   // value hides the entry entirely (set it at build time, e.g. in CI).
   readonly VITE_DONATE_URL?: string;
   // Public Dropbox app key for the Dropbox storage backend's PKCE flow.
-  // Unset disables the Dropbox option in the storage picker. Set it at
+  // Unset disables the Dropbox option in the storage picker; the phone
+  // build ignores it and lists no Dropbox option at all. Set it at
   // build time (`.env.local` for dev, a CI secret for production).
   readonly VITE_DROPBOX_APP_KEY?: string;
   // Folder name on the Dropbox app registration's "App folder" permission

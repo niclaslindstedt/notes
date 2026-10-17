@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 
 import { useT } from "../../i18n/index.ts";
 import type { BackendId } from "../../storage/backend-preference.ts";
+import { DROPBOX_IN_BUILD } from "../../storage/cloud-configured.ts";
 import type {
   EncryptionProgress,
   UseStorageBackend,
@@ -93,11 +94,17 @@ export function StorageSection({ storage, conversion }: Props) {
       label: t("settings.storage.backendFolder"),
       disabled: !folderAvailable,
     },
-    {
-      value: "dropbox",
-      label: t("settings.storage.backendDropbox"),
-      disabled: !dropboxAvailable,
-    },
+    // The phone build offers no Dropbox: not greyed out, simply not listed.
+    // Elsewhere it is listed, and greyed out where it can't be connected.
+    ...(DROPBOX_IN_BUILD
+      ? [
+          {
+            value: "dropbox" as const,
+            label: t("settings.storage.backendDropbox"),
+            disabled: !dropboxAvailable,
+          },
+        ]
+      : []),
     // iCloud Drive is offered wherever a host provides it — the iOS app does,
     // a browser never can. The page asks whether the capability is there, not
     // where it is running, so the option simply isn't listed elsewhere.

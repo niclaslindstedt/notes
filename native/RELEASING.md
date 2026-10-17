@@ -90,20 +90,14 @@ old one — it is set once.
 
 ### Dropbox
 
-The app signs in to Dropbox through an in-app authentication session that
-returns on **`se.agilator.notes://oauth`** — `<APP_BUNDLE_ID>://oauth`, since
-the app's URL scheme is its bundle id (see
-[README → Signing in to Dropbox](README.md#signing-in-to-dropbox)). In the
-[Dropbox App Console](https://www.dropbox.com/developers/apps), open the app
-whose key is the `VITE_DROPBOX_APP_KEY` secret and add
-`se.agilator.notes://oauth` under **Settings → OAuth 2 → Redirect URIs**,
-exactly as written. The CI build bakes that key (and `VITE_DROPBOX_APP_FOLDER`)
-into the embedded bundle; a local build needs them in the environment of
-`make native-bundle`. Without the key the app offers no Dropbox at all.
+The phone app offers no Dropbox: it syncs through iCloud Drive and Nextcloud.
+Its bundle is built with `VITE_TARGET=native`, which leaves the Dropbox option,
+its texts and its key out whatever the environment says, and the CI build
+passes no Dropbox secret (see
+[README → Signing in to Dropbox](README.md#signing-in-to-dropbox)). Nothing in
+the Dropbox App Console needs the app's `se.agilator.notes://oauth`.
 
-To check it on a device: Settings → Storage → Dropbox opens Dropbox in a sheet
-over the app (not in Safari); approving closes the sheet and connects, and
-closing the sheet instead leaves nothing connected and shows no error.
+To check it on a device: Settings → Storage has no Dropbox option.
 
 ## 1. Set the marketing version
 
@@ -170,8 +164,7 @@ the `preview` profile (Android APK / iOS simulator build) instead.
    1024×500 feature graphic, ≥2 phone screenshots, content-rating
    questionnaire, and the **Data safety** form. Declare: no data collected by
    us; notes live on-device by default, and cloud sync happens only when the
-   user opts into a backend (their own Dropbox, or a
-   Nextcloud they run). Point the privacy-policy URL at the deployed
+   user opts into a backend (a Nextcloud they run). Point the privacy-policy URL at the deployed
    app's `/privacy` page (the host is the `PAGES_CNAME` repository secret —
    see `docs/configuration.md`).
 
@@ -189,7 +182,7 @@ the `preview` profile (Android APK / iOS simulator build) instead.
 3. Complete the App Store Connect listing: description, keywords, screenshots
    for the required device sizes (6.7", 6.5", and iPad since
    `ios.supportsTablet` is true), the **App Privacy** "nutrition label" (no
-   tracking; any cloud sync is into the user's own iCloud Drive, Dropbox or
+   tracking; any cloud sync is into the user's own iCloud Drive or
    Nextcloud), and the privacy-policy URL above. Then submit for
    review.
 
@@ -200,8 +193,8 @@ the `preview` profile (Android APK / iOS simulator build) instead.
    > app **bundled for offline use** (no network required — a genuine
    > local-first native experience, not a thin shell over a live URL), and it
    > adds **native capabilities the web can't**: real haptics, an **iCloud
-   > Drive** folder of plain markdown files in the Files app, and a native
-   > sign-in sheet for Dropbox. Those native integrations are the "minimum
+   > Drive** folder of plain markdown files in the Files app, and the share
+   > sheet for exports. Those native integrations are the "minimum
    > functionality" argument; state them explicitly.
 
 ## 6. Subsequent releases
@@ -228,9 +221,9 @@ EAS; a Google Play service-account key uploaded to EAS or committed as
 described above).
 
 **What it runs.** It installs the web app's and the wrapper's dependencies,
-runs `npm run bundle` in `native/` with the `APP_DISPLAY_NAME`,
-`VITE_DROPBOX_APP_KEY` and `VITE_DROPBOX_APP_FOLDER` secrets so the packed
-bundle carries the listing name and the Dropbox key, and only then queues `eas build`. The bundle rides the upload: EAS leaves
+runs `npm run bundle` in `native/` with the `APP_DISPLAY_NAME` secret so the
+packed bundle carries the listing name — and no Dropbox secret, since the phone
+app offers no Dropbox — and only then queues `eas build`. The bundle rides the upload: EAS leaves
 out whatever the repository-root [`.easignore`](../.easignore) lists, and that
 file — unlike `native/.gitignore` — keeps `native/assets/webroot.zip`.
 

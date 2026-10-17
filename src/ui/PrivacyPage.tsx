@@ -4,17 +4,19 @@
 // analytics — by default everything stays in the browser. Two things reach
 // anyone else: the opt-in sync backends (a picked local folder, the user's own
 // Dropbox), which this policy describes in full because the Dropbox app's
-// listing points at it, and the inline
+// listing points at it — the phone app's copy leaves Dropbox out, since that
+// build offers none (`DROPBOX_IN_BUILD`) — and the inline
 // YouTube player a link in a note renders as, which fetches a poster frame
 // from YouTube and the player itself only once it is played.
 // It is English-only by design (a legal page, not chrome), mirroring
 // checklist's PrivacyPage.
+import { DROPBOX_IN_BUILD } from "../storage/cloud-configured.ts";
 import { ArrowLeftIcon } from "./icons.tsx";
 
 // Last meaningful change to the policy text below. Bump this whenever the
 // wording is edited — it renders verbatim at the top of the page and is the
 // only line readers have to look at to see how fresh the policy is.
-const LAST_UPDATED = "2026-09-23";
+const LAST_UPDATED = "2026-10-17";
 
 // Where a reader takes a question about this policy. A mailbox rather than a
 // tracker, so the policy stands on its own and does not send readers off to
@@ -56,11 +58,11 @@ export function PrivacyPage() {
           <p>
             You may <span className="text-fg-bright">optionally</span> turn on
             sync to a storage location <em>you</em> control — a local folder on
-            your computer, your own Dropbox, your own iCloud Drive (in the
-            iPhone and iPad app), or a Nextcloud you run yourself — so the same
-            notes appear on more than one device. Even then your notes go only
-            to that location in your own account; the project authors never
-            receive your notes in any configuration. The{" "}
+            your computer, {DROPBOX_IN_BUILD && "your own Dropbox, "}your own
+            iCloud Drive (in the iPhone and iPad app), or a Nextcloud you run
+            yourself — so the same notes appear on more than one device. Even
+            then your notes go only to that location in your own account; the
+            project authors never receive your notes in any configuration. The{" "}
             <a className="text-link hover:underline" href="#cloud-sync">
               Optional sync
             </a>{" "}
@@ -166,14 +168,26 @@ export function PrivacyPage() {
             are ever loaded.
           </p>
           <p>
-            If you opt in to Dropbox sync, the app additionally talks directly
-            from your browser to that provider&apos;s own API to sign you in and
-            to read and write your notes. Those requests go to the provider, not
-            to us. If you opt in to Nextcloud sync, the same is true of the
-            server address you enter: the app talks to that server and to no one
-            else. iCloud Drive sync makes no network requests of the app&apos;s
-            own: it writes files into a folder on the device, and iOS carries
-            them to your other devices through your Apple Account. See{" "}
+            {DROPBOX_IN_BUILD ? (
+              <>
+                If you opt in to Dropbox sync, the app additionally talks
+                directly from your browser to that provider&apos;s own API to
+                sign you in and to read and write your notes. Those requests go
+                to the provider, not to us. If you opt in to Nextcloud sync, the
+                same is true of the server address you enter: the app talks to
+                that server and to no one else.
+              </>
+            ) : (
+              <>
+                If you opt in to Nextcloud sync, the app additionally talks
+                directly to the server address you enter, to read and write your
+                notes, and to no one else. Those requests go to that server, not
+                to us.
+              </>
+            )}{" "}
+            iCloud Drive sync makes no network requests of the app&apos;s own:
+            it writes files into a folder on the device, and iOS carries them to
+            your other devices through your Apple Account. See{" "}
             <em>Optional sync</em> below.
           </p>
         </Section>
@@ -238,18 +252,21 @@ export function PrivacyPage() {
               markdown files. Nothing is sent over the network; the data never
               leaves your machine.
             </li>
-            <li>
-              <span className="text-fg-bright">Dropbox.</span> The app uses an
-              app-scoped folder, so it can only read and write inside its own
-              dedicated folder — never the rest of your Dropbox. Sign-in uses
-              Dropbox&apos;s OAuth flow (PKCE), and the resulting token is held
-              only in this browser. In the downloadable desktop app, sign-in
-              opens in your normal browser instead and Dropbox returns you to a
-              listener the app opens on your own machine (
-              <code className="text-fg-bright">127.0.0.1</code>, reachable from
-              nowhere else) for the moment the sign-in takes; it receives the
-              sign-in result and nothing else, and closes immediately after.
-            </li>
+            {DROPBOX_IN_BUILD && (
+              <li>
+                <span className="text-fg-bright">Dropbox.</span> The app uses an
+                app-scoped folder, so it can only read and write inside its own
+                dedicated folder — never the rest of your Dropbox. Sign-in uses
+                Dropbox&apos;s OAuth flow (PKCE), and the resulting token is
+                held only in this browser. In the downloadable desktop app,
+                sign-in opens in your normal browser instead and Dropbox returns
+                you to a listener the app opens on your own machine (
+                <code className="text-fg-bright">127.0.0.1</code>, reachable
+                from nowhere else) for the moment the sign-in takes; it receives
+                the sign-in result and nothing else, and closes immediately
+                after.
+              </li>
+            )}
             <li>
               <span className="text-fg-bright">
                 iCloud Drive (iPhone and iPad app).

@@ -4886,7 +4886,8 @@ Save.
 
 `StorageSection` (`src/ui/settings/StorageSection.tsx`) — the radio picker for
 the backend (This device / Local folder / Dropbox / Nextcloud, plus iCloud
-Drive in the iPhone and iPad app) with connect buttons — iCloud Drive's needs
+Drive in the iPhone and iPad app, whose build lists no Dropbox — see the
+[Dropbox backend](#dropbox-backend)) with connect buttons — iCloud Drive's needs
 nothing from the user and connects on the pick, or explains how to sign in to
 iCloud when the container can't be reached; Nextcloud's is an inline
 form (server, user name, app password, folder) rather than a button, since it
@@ -5107,7 +5108,8 @@ chosen `BackendId` (`browser` / `folder` / `dropbox` / `icloud` / `nextcloud`),
 the cloud tokens, the Nextcloud connection, and the encryption mode. These are device-local (never in the synced
 document, which would create a bootstrap loop) and read on boot before any
 backend resolves. A stored value that names no backend this build knows
-opens on `browser`, as if sync were off.
+opens on `browser`, as if sync were off — and so does a stored `dropbox` in the
+phone app's build, which offers no Dropbox.
 
 ### Active note cursor
 
@@ -5168,6 +5170,16 @@ full-page-redirect [OAuth](#oauth) flow and refresh tokens for silent re-auth on
 and lists the namespace's notes folder recursively so notes filed into a
 [folder subdirectory](#folders-sidecar) are found. Built on the
 [directory adapter](#directory-adapter).
+
+The website and the desktop app offer it; **the phone app does not**.
+`DROPBOX_IN_BUILD` (`src/storage/cloud-configured.ts`) is false under
+`VITE_TARGET=native`, and Vite folds every branch behind it: the storage picker
+lists no Dropbox (not greyed out — absent), the key is empty even when one is
+set, the privacy page leaves the Dropbox paragraphs out, and the feature docs
+drop their `<!-- dropbox -->` blocks (`forThisBuild` in
+`src/ui/changelog/feature-docs.ts`). An install that chose Dropbox under an
+earlier build opens on the device's own store, as for any backend this build
+can't reach (`getBackend`).
 
 ### iCloud Drive backend
 
@@ -6435,7 +6447,8 @@ land. The module lives in `src/`, not in a wrapper: the page works its surface
 out from what it can observe, and no shell tells it anything.
 
 Dropbox takes any of the OAuth flows, so it is offered wherever one of them
-works.
+works — except in the phone app's build, which offers no Dropbox at all (see
+the [Dropbox backend](#dropbox-backend)).
 
 ### Loopback OAuth
 
