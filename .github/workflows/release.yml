@@ -300,14 +300,18 @@ jobs:
 
       # Whatever this platform's bundler produced, BY EXTENSION — a step that
       # listed filenames would silently upload nothing the day a target changed
-      # its suffix, and `if-no-files-found` has no equivalent here.
+      # its suffix, and `if-no-files-found` has no equivalent here. `find`, not
+      # a `**` glob: macOS's /bin/bash is 3.2, which has no globstar.
       - name: Attach to the release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          shopt -s nullglob globstar
-          assets=(tauri/target/release/bundle/**/*.{dmg,deb,AppImage,exe,msi})
+          assets=()
+          while IFS= read -r f; do assets+=("$f"); done < <(
+            find tauri/target/release/bundle -type f \( -name '*.dmg' -o -name '*.deb' \
+              -o -name '*.AppImage' -o -name '*.exe' -o -name '*.msi' \)
+          )
           if [ ${#assets[@]} -eq 0 ]; then
             echo "::error::${{ matrix.target }} produced no distributable files"
             ls -R tauri/target/release/bundle || true
