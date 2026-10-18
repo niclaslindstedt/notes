@@ -60,8 +60,8 @@ export function HomePage() {
             <span className="text-fg-bright">notes</span> is a free Progressive
             Web App (PWA) for writing and organizing notes. It runs entirely in
             your browser and can be installed to your home screen so it opens
-            like a native app and works fully offline. There is no account to
-            create and nothing to pay for — open the page and start writing.
+            like a native app and works fully offline. There is nothing to sign
+            up for and nothing to pay for — open the page and start writing.
           </p>
           <p>
             It is <span className="text-fg-bright">local-first</span>: by

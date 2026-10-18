@@ -61,18 +61,18 @@ export function PrivacyPage() {
             <p>
               <span className="text-fg-bright">notes</span> is a local-first
               note-taking app that runs entirely on your device. There is no
-              backend of our own, no account, no cookies, and no analytics or
-              tracking. By default your notes are stored only on your device and
-              never leave it.
+              backend of our own, nothing to sign up for, no cookies, and no
+              analytics or tracking. By default your notes are stored only on
+              your device and never leave it.
             </p>
           ) : (
             <p>
               <span className="text-fg-bright">notes</span> is a local-first
               note-taking app served as a static site at{" "}
               <span className="text-fg-bright">{host}</span>. It runs entirely
-              in your browser. There is no backend of our own, no account, no
-              cookies, and no analytics or tracking. By default your notes are
-              stored only on your device and never leave it.
+              in your browser. There is no backend of our own, nothing to sign
+              up for, no cookies, and no analytics or tracking. By default your
+              notes are stored only on your device and never leave it.
             </p>
           )}
           <p>

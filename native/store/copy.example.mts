@@ -61,7 +61,7 @@ export const APPLE_INFO: Record<string, AppleInfo> = { "en-US": EN_US };
  * this one is not a browser pointed at a website. The generator checks the
  * real notes against the build — see the `store-listing` skill.
  */
-export const APPLE_REVIEW_NOTES = `REVIEW NOTES — no account is needed; what
+export const APPLE_REVIEW_NOTES = `REVIEW NOTES — no sign-in is needed; what
 the app does; that the whole app ships inside the binary and works in airplane
 mode (guideline 4.2); what the native layer adds; that nothing is sold and no
 data is collected; which permission, if any, the app asks for and why; and
