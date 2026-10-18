@@ -181,8 +181,11 @@ the pin when `.nvmrc` moves.
 ## 5. Apple App Store submission
 
 1. In **App Store Connect**, create the app once and note its **Apple ID**
-   (the numeric `ascAppId`). Fill `appleId`, `ascAppId`, and `appleTeamId`
-   in `eas.json` → `submit.production.ios` (or pass them at submit time).
+   (the numeric `ascAppId`). `eas.json` → `submit.production.ios` already
+   carries the team's `appleTeamId`; add the record's `ascAppId` there once it
+   exists. `appleId` (the Apple Account's email) stays out of the repository:
+   EAS asks for it at submit time, or an App Store Connect API key stands in
+   for it.
 2. Submit the build:
    ```sh
    eas submit --platform ios --profile production --latest
