@@ -5,7 +5,7 @@
 // holds the bytes). A single-user model — notes has no accounts.
 
 import { createLogger } from "../dev/logger.ts";
-import { DROPBOX_IN_BUILD } from "./cloud-configured.ts";
+import { DROPBOX_IN_BUILD, FOLDER_IN_BUILD } from "./cloud-configured.ts";
 
 const log = createLogger("backend-pref");
 
@@ -79,7 +79,9 @@ export function getBackend(): BackendId {
   // earlier build opens on this device's store instead, as any backend that
   // can't be reached here does; the choice stays stored, untouched.
   if (raw === "dropbox") return DROPBOX_IN_BUILD ? "dropbox" : "browser";
-  if (raw === "folder") return "folder";
+  // Nor does it offer the local folder, which its WebView could never pick, so
+  // a phone install's notes were on this device all along: read it as such.
+  if (raw === "folder") return FOLDER_IN_BUILD ? "folder" : "browser";
   if (raw === "icloud") return "icloud";
   if (raw === "nextcloud") return "nextcloud";
   // Any unknown / missing value falls through to the browser backend.

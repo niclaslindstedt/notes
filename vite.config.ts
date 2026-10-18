@@ -241,6 +241,29 @@ function injectAppName(): Plugin {
   };
 }
 
+// The phone app's page head describes the phone app alone. The checked-in
+// shell's description calls the app a PWA and its comments talk about browser
+// tabs and the web edition — true of the website, not of an app from the
+// store — so the phone build (`VITE_TARGET=native`) carries a description of
+// its own and no HTML comments at all. The website's and the desktop app's
+// head are left as written.
+const isPhone = process.env.VITE_TARGET === "native";
+const PHONE_DESCRIPTION = "A local-first app for taking notes.";
+
+function phonePageHead(): Plugin {
+  return {
+    name: "phone-page-head",
+    transformIndexHtml(html) {
+      return html
+        .replace(/<!--[\s\S]*?-->\s*/g, "")
+        .replace(
+          /(<meta\s+name="description"\s+content=")[^"]*(")/,
+          `$1${PHONE_DESCRIPTION}$2`,
+        );
+    },
+  };
+}
+
 export default defineConfig({
   base,
   plugins: [
@@ -256,6 +279,7 @@ export default defineConfig({
     preact(),
     tailwindcss(),
     injectAppName(),
+    isPhone && phonePageHead(),
     VitePWA({
       // The wrapper builds embed the bundle locally, so the service worker
       // is redundant (assets are already on-device), would misbehave off the

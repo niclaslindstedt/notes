@@ -5,18 +5,28 @@
 // anyone else: the opt-in sync backends (a picked local folder, the user's own
 // Dropbox), which this policy describes in full because the Dropbox app's
 // listing points at it — the phone app's copy leaves Dropbox out, since that
-// build offers none (`DROPBOX_IN_BUILD`) — and the inline
+// build offers none (`DROPBOX_IN_BUILD`), nor a local folder
+// (`FOLDER_IN_BUILD`) — and the inline
 // YouTube player a link in a note renders as, which fetches a poster frame
 // from YouTube and the player itself only once it is played.
 // It is English-only by design (a legal page, not chrome), mirroring
 // checklist's PrivacyPage.
-import { DROPBOX_IN_BUILD } from "../storage/cloud-configured.ts";
+//
+// The phone app's copy (`PHONE_BUILD`) is true of the phone app alone: it
+// names no other edition — no website, browser, desktop app or web host — and
+// says what happens on the device instead. The website's and the desktop
+// app's copy is the full one.
+import { PHONE_BUILD } from "../build-env.ts";
+import {
+  DROPBOX_IN_BUILD,
+  FOLDER_IN_BUILD,
+} from "../storage/cloud-configured.ts";
 import { ArrowLeftIcon } from "./icons.tsx";
 
 // Last meaningful change to the policy text below. Bump this whenever the
 // wording is edited — it renders verbatim at the top of the page and is the
 // only line readers have to look at to see how fresh the policy is.
-const LAST_UPDATED = "2026-10-17";
+const LAST_UPDATED = "2026-10-18";
 
 // Where a reader takes a question about this policy. A mailbox rather than a
 // tracker, so the policy stands on its own and does not send readers off to
@@ -47,22 +57,34 @@ export function PrivacyPage() {
         </header>
 
         <Section title="Summary">
-          <p>
-            <span className="text-fg-bright">notes</span> is a local-first
-            note-taking app served as a static site at{" "}
-            <span className="text-fg-bright">{host}</span>. It runs entirely in
-            your browser. There is no backend of our own, no account, no
-            cookies, and no analytics or tracking. By default your notes are
-            stored only on your device and never leave it.
-          </p>
+          {PHONE_BUILD ? (
+            <p>
+              <span className="text-fg-bright">notes</span> is a local-first
+              note-taking app that runs entirely on your device. There is no
+              backend of our own, no account, no cookies, and no analytics or
+              tracking. By default your notes are stored only on your device and
+              never leave it.
+            </p>
+          ) : (
+            <p>
+              <span className="text-fg-bright">notes</span> is a local-first
+              note-taking app served as a static site at{" "}
+              <span className="text-fg-bright">{host}</span>. It runs entirely
+              in your browser. There is no backend of our own, no account, no
+              cookies, and no analytics or tracking. By default your notes are
+              stored only on your device and never leave it.
+            </p>
+          )}
           <p>
             You may <span className="text-fg-bright">optionally</span> turn on
-            sync to a storage location <em>you</em> control — a local folder on
-            your computer, {DROPBOX_IN_BUILD && "your own Dropbox, "}your own
-            iCloud Drive (in the iPhone and iPad app), or a Nextcloud you run
-            yourself — so the same notes appear on more than one device. Even
-            then your notes go only to that location in your own account; the
-            project authors never receive your notes in any configuration. The{" "}
+            sync to a storage location <em>you</em> control —{" "}
+            {FOLDER_IN_BUILD && "a local folder on your computer, "}
+            {DROPBOX_IN_BUILD && "your own Dropbox, "}your own iCloud Drive (
+            {PHONE_BUILD ? "on iPhone and iPad" : "in the iPhone and iPad app"}
+            ), or a Nextcloud you run yourself — so the same notes appear on
+            more than one device. Even then your notes go only to that location
+            in your own account; the project authors never receive your notes in
+            any configuration. The{" "}
             <a className="text-link hover:underline" href="#cloud-sync">
               Optional sync
             </a>{" "}
@@ -81,18 +103,26 @@ export function PrivacyPage() {
         </Section>
 
         <Section title="What the app stores">
-          <p>
-            On your device, inside your browser&apos;s{" "}
-            <code className="text-fg-bright">localStorage</code> for the origin{" "}
-            <span className="text-fg-bright">{host}</span>, the app keeps:
-          </p>
+          {PHONE_BUILD ? (
+            <p>On your device, in the app&apos;s own storage, the app keeps:</p>
+          ) : (
+            <p>
+              On your device, inside your browser&apos;s{" "}
+              <code className="text-fg-bright">localStorage</code> for the
+              origin <span className="text-fg-bright">{host}</span>, the app
+              keeps:
+            </p>
+          )}
           <ul className="ml-5 list-disc space-y-1">
             <li>
               The text of your notes and when each was created and edited.
             </li>
             <li>
-              Any images and files you attach to a note. On a local folder or
-              cloud backend these are written in an{" "}
+              Any images and files you attach to a note. On{" "}
+              {FOLDER_IN_BUILD
+                ? "a local folder or cloud backend"
+                : "a cloud backend"}{" "}
+              these are written in an{" "}
               <code className="text-fg-bright">attachments</code> folder beside
               your notes — as ordinary files, or, when encryption is on, as
               individually encrypted blobs under opaque names. They are read
@@ -101,7 +131,7 @@ export function PrivacyPage() {
               anywhere other than the sync backend you chose. Removing an
               attachment&apos;s link from a note does not by itself delete the
               file: the app asks first, and the file is only deleted from your
-              folder or cloud if you say so.
+              {FOLDER_IN_BUILD ? " folder or cloud" : " cloud"} if you say so.
             </li>
             <li>
               Your <em>namespaces</em> — the named buckets you group notes into,
@@ -119,54 +149,90 @@ export function PrivacyPage() {
                 : ", and which in-app achievements you have unlocked"}
               . Each setting is stored at the width you saved it at: for
               everyone using the account, for everyone using one namespace, or
-              for this device only. The device-only ones are held in{" "}
-              <code className="text-fg-bright">localStorage</code> and are never
-              uploaded to any backend.
+              for this device only. The device-only ones are held{" "}
+              {PHONE_BUILD ? (
+                "on the device"
+              ) : (
+                <>
+                  in <code className="text-fg-bright">localStorage</code>
+                </>
+              )}{" "}
+              and are never uploaded to any backend.
             </li>
             <li>
               If you turn on an optional sync backend, the small amount of
-              configuration it needs to reconnect (for example, which folder you
-              picked or an access token your cloud provider issued to this
-              browser).
+              configuration it needs to reconnect (
+              {PHONE_BUILD
+                ? "for example, the address of your Nextcloud and the app password you gave it"
+                : "for example, which folder you picked or an access token your cloud provider issued to this browser"}
+              ).
             </li>
           </ul>
           <p>
-            This data is stored as plain JSON on your own device. Clearing your
-            browser&apos;s site data for this origin erases the local copy
-            permanently — if you have not enabled sync, there is no copy
-            elsewhere to restore from.
+            This data is stored as plain JSON on your own device.{" "}
+            {PHONE_BUILD
+              ? "Deleting the app"
+              : "Clearing your browser's site data for this origin"}{" "}
+            erases the local copy permanently — if you have not enabled sync,
+            there is no copy elsewhere to restore from.
           </p>
-          <p>
-            Exporting a note keeps it on your device unless you send it on. The
-            PDF export typesets and writes the file in the page itself and saves
-            it to your downloads folder; the Markdown export writes a file to
-            the same place. In the phone app both open the share sheet instead,
-            and the file goes only where you send it from there. The clipboard
-            export writes to your clipboard. None of the three uploads,
-            converts, or transmits anything on its own.
-          </p>
-          <p>
-            While a note is open, the address bar shows a link to it — the
-            note&apos;s identifier and the namespace it lives in, after the{" "}
-            <code className="text-fg-bright">#</code>. A fragment after the{" "}
-            <code className="text-fg-bright">#</code> is never sent to any
-            server by any browser, so it is not transmitted or logged anywhere;
-            it does reach your browser&apos;s own history, so anyone with access
-            to this browser can see it there. The link opens the note only on a
-            device that already holds it — it publishes nothing.
-          </p>
+          {PHONE_BUILD ? (
+            <p>
+              Exporting a note keeps it on your device unless you send it on.
+              The PDF export typesets and writes the file in the app itself;
+              both it and the Markdown export open the share sheet, and the file
+              goes only where you send it from there. The clipboard export
+              writes to your clipboard. None of the three uploads, converts, or
+              transmits anything on its own.
+            </p>
+          ) : (
+            <p>
+              Exporting a note keeps it on your device unless you send it on.
+              The PDF export typesets and writes the file in the page itself and
+              saves it to your downloads folder; the Markdown export writes a
+              file to the same place. In the phone app both open the share sheet
+              instead, and the file goes only where you send it from there. The
+              clipboard export writes to your clipboard. None of the three
+              uploads, converts, or transmits anything on its own.
+            </p>
+          )}
+          {/* The phone app has no address bar to show a note's link in. */}
+          {!PHONE_BUILD && (
+            <p>
+              While a note is open, the address bar shows a link to it — the
+              note&apos;s identifier and the namespace it lives in, after the{" "}
+              <code className="text-fg-bright">#</code>. A fragment after the{" "}
+              <code className="text-fg-bright">#</code> is never sent to any
+              server by any browser, so it is not transmitted or logged
+              anywhere; it does reach your browser&apos;s own history, so anyone
+              with access to this browser can see it there. The link opens the
+              note only on a device that already holds it — it publishes
+              nothing.
+            </p>
+          )}
         </Section>
 
         <Section title="Network requests">
-          <p>
-            With no sync backend enabled, and no YouTube link in the note you
-            are looking at, the app makes no third-party network calls. The only
-            requests your browser makes are to fetch the app&apos;s own static
-            files (HTML, JavaScript, CSS, fonts, and icons) from its origin, and
-            once loaded it works fully offline as an installed PWA. No fonts,
-            analytics scripts, error-reporting services, or advertising networks
-            are ever loaded.
-          </p>
+          {PHONE_BUILD ? (
+            <p>
+              With no sync backend enabled, and no YouTube link in the note you
+              are looking at, the app makes no network calls at all. Everything
+              it shows — its text, fonts and icons — is part of the app and is
+              served on the device, so it works fully offline. No fonts,
+              analytics scripts, error-reporting services, or advertising
+              networks are ever loaded.
+            </p>
+          ) : (
+            <p>
+              With no sync backend enabled, and no YouTube link in the note you
+              are looking at, the app makes no third-party network calls. The
+              only requests your browser makes are to fetch the app&apos;s own
+              static files (HTML, JavaScript, CSS, fonts, and icons) from its
+              origin, and once loaded it works fully offline as an installed
+              PWA. No fonts, analytics scripts, error-reporting services, or
+              advertising networks are ever loaded.
+            </p>
+          )}
           <p>
             {DROPBOX_IN_BUILD ? (
               <>
@@ -201,12 +267,14 @@ export function PrivacyPage() {
           </p>
           <ul className="ml-5 list-disc space-y-2">
             <li>
-              While such a note is on screen, your browser fetches that
+              While such a note is on screen,{" "}
+              {PHONE_BUILD ? "the app fetches" : "your browser fetches"} that
               video&apos;s <span className="text-fg-bright">poster image</span>{" "}
               from <code className="text-fg-bright">i.ytimg.com</code>. Like any
-              image request it tells Google your IP address and browser; the
-              request is sent without a referrer, so it does not say which page
-              you are on.
+              image request it tells Google your IP address and{" "}
+              {PHONE_BUILD ? "device" : "browser"}; the request is sent without
+              a referrer, so it does not say which{" "}
+              {PHONE_BUILD ? "note" : "page"} you are on.
             </li>
             <li>
               The{" "}
@@ -217,8 +285,9 @@ export function PrivacyPage() {
               <code className="text-fg-bright">youtube-nocookie.com</code>,
               Google&apos;s privacy-enhanced host, which does not set
               advertising cookies for browsing a video. Once playing, YouTube
-              may store playback data in your browser and receives the usual
-              information about the request; that part is covered by{" "}
+              may store playback data{" "}
+              {PHONE_BUILD ? "in the app" : "in your browser"} and receives the
+              usual information about the request; that part is covered by{" "}
               <a
                 href="https://policies.google.com/privacy"
                 className="text-link hover:underline"
@@ -244,14 +313,17 @@ export function PrivacyPage() {
             local-only at any time:
           </p>
           <ul className="ml-5 list-disc space-y-2">
-            <li>
-              <span className="text-fg-bright">Local folder.</span> Using your
-              browser&apos;s File System Access API, you grant the app access to
-              a folder you pick on your own computer. Your notes are written
-              there as ordinary <code className="text-fg-bright">.md</code>{" "}
-              markdown files. Nothing is sent over the network; the data never
-              leaves your machine.
-            </li>
+            {FOLDER_IN_BUILD && (
+              <li>
+                <span className="text-fg-bright">Local folder.</span> Using your
+                browser&apos;s File System Access API, you grant the app access
+                to a folder you pick on your own computer. Your notes are
+                written there as ordinary{" "}
+                <code className="text-fg-bright">.md</code> markdown files.
+                Nothing is sent over the network; the data never leaves your
+                machine.
+              </li>
+            )}
             {DROPBOX_IN_BUILD && (
               <li>
                 <span className="text-fg-bright">Dropbox.</span> The app uses an
@@ -269,7 +341,9 @@ export function PrivacyPage() {
             )}
             <li>
               <span className="text-fg-bright">
-                iCloud Drive (iPhone and iPad app).
+                {PHONE_BUILD
+                  ? "iCloud Drive (iPhone and iPad)."
+                  : "iCloud Drive (iPhone and iPad app)."}
               </span>{" "}
               The app writes your notes as ordinary{" "}
               <code className="text-fg-bright">.md</code> files into its own
@@ -278,8 +352,9 @@ export function PrivacyPage() {
               rest of your iCloud Drive — and needs no sign-in of its own: iOS
               syncs the folder to the other devices signed in to your Apple
               Account, under Apple&apos;s privacy policy. The project authors
-              receive nothing and hold no token for it. The website and the
-              desktop app do not offer this option.
+              receive nothing and hold no token for it.
+              {!PHONE_BUILD &&
+                " The website and the desktop app do not offer this option."}
             </li>
             <li>
               <span className="text-fg-bright">Nextcloud.</span> You enter the
@@ -287,13 +362,17 @@ export function PrivacyPage() {
               <span className="text-fg-bright">app password</span> — the
               single-purpose credential Nextcloud creates under Settings →
               Security, which you can revoke there at any time without changing
-              your account password. It is stored only in this browser and sent
-              only to that server, over its own HTTPS connection, to read and
-              write one folder of markdown notes in your account. No third-party
+              your account password. It is stored only{" "}
+              {PHONE_BUILD ? "on this device" : "in this browser"} and sent only
+              to that server, over its own HTTPS connection, to read and write
+              one folder of markdown notes in your account. No third-party
               provider is involved and there is no sign-in flow through anyone
-              else. Reaching a Nextcloud from a web page also requires that
-              server to permit this site&apos;s address to use its WebDAV API,
-              which is a setting you make on your own server.
+              else. Reaching a Nextcloud from{" "}
+              {PHONE_BUILD
+                ? "the app also requires that server to permit the app"
+                : "a web page also requires that server to permit this site's address"}{" "}
+              to use its WebDAV API, which is a setting you make on your own
+              server.
             </li>
           </ul>
           <p>
@@ -307,9 +386,10 @@ export function PrivacyPage() {
           </p>
           <p>
             When a cloud backend is active the app also keeps an offline mirror
-            of the synced bytes in this browser&apos;s storage, so you can read
-            and edit while disconnected; it reconciles with your provider when
-            the connection returns.
+            of the synced bytes{" "}
+            {PHONE_BUILD ? "on this device" : "in this browser's storage"}, so
+            you can read and edit while disconnected; it reconciles with your
+            provider when the connection returns.
           </p>
         </Section>
 
@@ -319,19 +399,20 @@ export function PrivacyPage() {
             is chosen per namespace, so one namespace can be sealed while
             another stays readable, and each sealed namespace has its own
             passphrase. When enabled, each note and each attachment in that
-            namespace is compressed and then encrypted in your browser with
-            AES-GCM before it is written — every note becomes its own encrypted
-            file and every attachment its own encrypted blob, stored under
-            opaque names so the title, filename, and which attachments belong to
-            which note are not visible in the folder or cloud. A small index of
-            note titles and previews is stored the same way — encrypted, under
-            an opaque name — so the app can list your notes quickly without
-            decrypting every one; each note&apos;s body is decrypted only when
-            you open it. The bytes stored remotely, and in the offline mirror,
-            are ciphertext. The passphrase stays on your device and is never
-            sent anywhere; if you lose it, the notes cannot be recovered. A
-            namespace PIN is a separate and much weaker thing: it gates opening
-            a namespace on this device, but its verifier is stored beside the
+            namespace is compressed and then encrypted{" "}
+            {PHONE_BUILD ? "on your device" : "in your browser"} with AES-GCM
+            before it is written — every note becomes its own encrypted file and
+            every attachment its own encrypted blob, stored under opaque names
+            so the title, filename, and which attachments belong to which note
+            are not visible in the folder or cloud. A small index of note titles
+            and previews is stored the same way — encrypted, under an opaque
+            name — so the app can list your notes quickly without decrypting
+            every one; each note&apos;s body is decrypted only when you open it.
+            The bytes stored remotely, and in the offline mirror, are
+            ciphertext. The passphrase stays on your device and is never sent
+            anywhere; if you lose it, the notes cannot be recovered. A namespace
+            PIN is a separate and much weaker thing: it gates opening a
+            namespace on this device, but its verifier is stored beside the
             namespace where anyone with access to the account can read it, and
             the notes behind it are not encrypted. Encryption is what protects a
             namespace&apos;s contents.
@@ -340,15 +421,23 @@ export function PrivacyPage() {
 
         <Section title="Cookies">
           <p>
-            The app sets no cookies. All persistence uses{" "}
-            <code className="text-fg-bright">localStorage</code>. Playing an
-            embedded YouTube video loads a player from Google&apos;s cookie-free
-            host, which may still keep playback data in your browser — see{" "}
+            The app sets no cookies.{" "}
+            {PHONE_BUILD ? (
+              "Everything it keeps is in its own storage on the device."
+            ) : (
+              <>
+                All persistence uses{" "}
+                <code className="text-fg-bright">localStorage</code>.
+              </>
+            )}{" "}
+            Playing an embedded YouTube video loads a player from Google&apos;s
+            cookie-free host, which may still keep playback data{" "}
+            {PHONE_BUILD ? "in the app" : "in your browser"} — see{" "}
             <em>Embedded YouTube videos</em> above.
           </p>
         </Section>
 
-        <Section title="Web analytics">
+        <Section title={PHONE_BUILD ? "Analytics" : "Web analytics"}>
           <p>
             None. The app does not load any analytics or behavioral-tracking
             SDK, and the project authors collect no usage statistics from it.
@@ -356,22 +445,31 @@ export function PrivacyPage() {
         </Section>
 
         <Section title="Server logs">
-          <p>
-            The website is served by{" "}
-            <strong className="text-fg-bright">GitHub Pages</strong>. GitHub may
-            collect standard request metadata (IP address, user agent, request
-            path) for operating the service. This is covered by{" "}
-            <a
-              href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
-              className="text-link hover:underline"
-            >
-              GitHub&apos;s privacy statement
-            </a>
-            . The app from the App Store or Google Play carries its own copy of
-            the site and serves it on the device, so opening it sends no such
-            request. The project authors do not run an additional logging
-            service.
-          </p>
+          {PHONE_BUILD ? (
+            <p>
+              The app carries everything it shows and serves it on the device,
+              so opening it sends no request to any server, and there is no
+              server log of it. The project authors do not run any logging
+              service.
+            </p>
+          ) : (
+            <p>
+              The website is served by{" "}
+              <strong className="text-fg-bright">GitHub Pages</strong>. GitHub
+              may collect standard request metadata (IP address, user agent,
+              request path) for operating the service. This is covered by{" "}
+              <a
+                href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+                className="text-link hover:underline"
+              >
+                GitHub&apos;s privacy statement
+              </a>
+              . The app from the App Store or Google Play carries its own copy
+              of the site and serves it on the device, so opening it sends no
+              such request. The project authors do not run an additional logging
+              service.
+            </p>
+          )}
         </Section>
 
         <Section title="Children">

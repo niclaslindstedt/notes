@@ -307,12 +307,18 @@ const settings = {
     backendTitle: "Where your notes are stored",
     backendBlurb:
       "Notes are saved as one markdown file per note. Keep them on this device, in a local folder you pick, or in your own cloud — they never touch a server of ours.",
+    // The phone app's, which offers no local folder (`FOLDER_IN_BUILD`).
+    backendBlurbNoFolder:
+      "Notes are saved as one markdown file per note. Keep them on this device or in your own cloud — they never touch a server of ours.",
     backendAria: "Storage backend",
     backendBrowser: "This device",
     backendFolder: "Local folder",
     backendDropbox: "Dropbox",
     browserHint:
       "Notes live in this browser only. They stay on this device and aren't shared with your other devices.",
+    // The phone app's, which is not a browser to the person using it.
+    deviceHint:
+      "Notes stay on this device only and aren't shared with your other devices.",
     folderConnected:
       "Your notes are saved as markdown files in the folder you picked.",
     folderUnconnected: "Pick a folder to keep your notes in as markdown files.",

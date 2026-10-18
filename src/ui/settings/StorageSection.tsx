@@ -1,8 +1,12 @@
 import { useMemo, useState, type FormEvent } from "react";
 
+import { PHONE_BUILD } from "../../build-env.ts";
 import { useT } from "../../i18n/index.ts";
 import type { BackendId } from "../../storage/backend-preference.ts";
-import { DROPBOX_IN_BUILD } from "../../storage/cloud-configured.ts";
+import {
+  DROPBOX_IN_BUILD,
+  FOLDER_IN_BUILD,
+} from "../../storage/cloud-configured.ts";
 import type {
   EncryptionProgress,
   UseStorageBackend,
@@ -24,7 +28,9 @@ import { ICLOUD_FOLDER_NAME } from "../../storage/icloud/constants.ts";
 import { Section } from "./shared.tsx";
 
 // Storage settings: pick the backend that persists the notes (this device /
-// local folder / Dropbox) and toggle at-rest encryption.
+// local folder / Dropbox / iCloud Drive / Nextcloud) and toggle at-rest
+// encryption. The phone app lists neither the local folder nor Dropbox
+// (`FOLDER_IN_BUILD`, `DROPBOX_IN_BUILD`).
 // Ported from checklist's storage tab, adapted to notes' account-less,
 // single-document model and inlined English strings (notes has no i18n layer).
 
@@ -89,11 +95,18 @@ export function StorageSection({ storage, conversion }: Props) {
     disabled?: boolean;
   }[] = [
     { value: "browser", label: t("settings.storage.backendBrowser") },
-    {
-      value: "folder",
-      label: t("settings.storage.backendFolder"),
-      disabled: !folderAvailable,
-    },
+    // The phone build offers no local folder, like Dropbox below: not greyed
+    // out, simply not listed. Elsewhere it is listed, and greyed out where the
+    // browser can't pick a folder.
+    ...(FOLDER_IN_BUILD
+      ? [
+          {
+            value: "folder" as const,
+            label: t("settings.storage.backendFolder"),
+            disabled: !folderAvailable,
+          },
+        ]
+      : []),
     // The phone build offers no Dropbox: not greyed out, simply not listed.
     // Elsewhere it is listed, and greyed out where it can't be connected.
     ...(DROPBOX_IN_BUILD
@@ -172,7 +185,11 @@ export function StorageSection({ storage, conversion }: Props) {
     <>
       <Section title={t("settings.storage.backendTitle")}>
         <p className="text-xs text-muted">
-          {t("settings.storage.backendBlurb")}
+          {t(
+            FOLDER_IN_BUILD
+              ? "settings.storage.backendBlurb"
+              : "settings.storage.backendBlurbNoFolder",
+          )}
         </p>
         <div
           role="radiogroup"
@@ -203,11 +220,15 @@ export function StorageSection({ storage, conversion }: Props) {
 
         {backend === "browser" && (
           <p className="text-xs text-muted">
-            {t("settings.storage.browserHint")}
+            {t(
+              PHONE_BUILD
+                ? "settings.storage.deviceHint"
+                : "settings.storage.browserHint",
+            )}
           </p>
         )}
 
-        {backend === "folder" && (
+        {FOLDER_IN_BUILD && backend === "folder" && (
           <div className="flex flex-col gap-2">
             <p className="text-xs text-muted">
               {folderReconnectNeeded

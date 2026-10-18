@@ -13,6 +13,8 @@
 
 import { createRoot } from "react-dom/client";
 
+import { PHONE_BUILD } from "../build-env.ts";
+
 import "../styles.css";
 // Only the latin + latin-ext subsets ship — the UI text lives entirely
 // within them, so the bare entrypoint (which also pulls cyrillic / greek /
@@ -43,7 +45,10 @@ if (path.endsWith("/privacy")) {
   void import("../ui/PrivacyPage.tsx").then(({ PrivacyPage }) => {
     root.render(<PrivacyPage />);
   });
-} else if (path.endsWith("/home")) {
+} else if (!PHONE_BUILD && path.endsWith("/home")) {
+  // The showcase is the website's — it introduces the web edition — and
+  // nothing in the phone app links to it, so the phone build
+  // (`PHONE_BUILD`) leaves it out: there `/home` is just the app.
   void import("../ui/HomePage.tsx").then(({ HomePage }) => {
     root.render(<HomePage />);
   });

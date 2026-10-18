@@ -4886,8 +4886,10 @@ Save.
 
 `StorageSection` (`src/ui/settings/StorageSection.tsx`) — the radio picker for
 the backend (This device / Local folder / Dropbox / Nextcloud, plus iCloud
-Drive in the iPhone and iPad app, whose build lists no Dropbox — see the
-[Dropbox backend](#dropbox-backend)) with connect buttons — iCloud Drive's needs
+Drive in the iPhone and iPad app, whose build lists neither the local folder nor
+Dropbox — see the [folder backend](#folder-backend) and the
+[Dropbox backend](#dropbox-backend) — and calls this device's store "this
+device", not "this browser") with connect buttons — iCloud Drive's needs
 nothing from the user and connects on the pick, or explains how to sign in to
 iCloud when the container can't be reached; Nextcloud's is an inline
 form (server, user name, app password, folder) rather than a button, since it
@@ -5159,6 +5161,16 @@ survives reloads, and the OS permission is re-confirmed each session
 adapter](#directory-adapter), with grouped notes filed into a real
 [folder subdirectory](#folders-sidecar); the store lists **recursively** so
 those nested notes are found, and each file's `lastModified` is its revision.
+
+The website and the desktop app offer it — greyed out where the browser has no
+directory picker; **the phone app does not**, since its WebView has none.
+`FOLDER_IN_BUILD` (`src/storage/cloud-configured.ts`) is false under
+`VITE_TARGET=native`, like `DROPBOX_IN_BUILD`: the storage picker lists no local
+folder (absent, not greyed out), its blurb names no folder
+(`settings.storage.backendBlurbNoFolder`), and the privacy page leaves the
+backend out. A phone install with the folder stored as its choice opens on the
+device's own store, where its notes were all along (`getBackend`); the stored
+choice is left alone.
 
 ### Dropbox backend
 
@@ -6662,7 +6674,10 @@ page served at `/home` (and aliased per deploy slot). It must accurately identif
 the app, fully describe what the app does, and transparently explain every
 reason the app requests user data (the opt-in cloud backends and their exact
 scopes). Keep it in sync with the product in the same PR as any
-feature/data-access change. Mounted by the [path switch](#entry-point--path-switch).
+feature/data-access change. Mounted by the [path switch](#entry-point--path-switch)
+— on the website and the desktop app only: it introduces the web edition and
+nothing in the phone app links to it, so the phone build (`PHONE_BUILD`) leaves
+it out and `/home` there is just the app.
 
 ### Privacy page
 
@@ -6670,3 +6685,11 @@ feature/data-access change. Mounted by the [path switch](#entry-point--path-swit
 served at `/privacy`. It covers storage, network requests, the optional sync backends and their scopes,
 encryption, and the absence of cookies/analytics. Keep it accurate to what the
 app stores or sends.
+
+The phone app's copy (`PHONE_BUILD` in `src/build-env.ts`) is true of the phone
+app alone: it names no other edition — no website, browser, desktop app, web
+host or local folder — and says what happens on the device instead (the app's
+own storage, the share sheet, no request to any server). The website's and the
+desktop app's copy is the full one. Change a passage in both when what it
+describes changes. The phone build's page head likewise carries a description
+of its own and no HTML comments (`phonePageHead` in `vite.config.ts`).

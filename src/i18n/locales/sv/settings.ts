@@ -302,12 +302,16 @@ const settings: SettingsCatalog = {
     backendTitle: "Var dina anteckningar lagras",
     backendBlurb:
       "Anteckningar sparas som en markdown-fil per anteckning. Behåll dem på den här enheten, i en mapp du väljer, eller i ditt eget moln — de rör aldrig en server hos oss.",
+    backendBlurbNoFolder:
+      "Anteckningar sparas som en markdown-fil per anteckning. Behåll dem på den här enheten eller i ditt eget moln — de rör aldrig en server hos oss.",
     backendAria: "Lagringsbackend",
     backendBrowser: "Den här enheten",
     backendFolder: "Lokal mapp",
     backendDropbox: "Dropbox",
     browserHint:
       "Anteckningar finns bara i den här webbläsaren. De stannar på den här enheten och delas inte med dina andra enheter.",
+    deviceHint:
+      "Anteckningar stannar bara på den här enheten och delas inte med dina andra enheter.",
     folderConnected:
       "Dina anteckningar sparas som markdown-filer i mappen du valde.",
     folderUnconnected:

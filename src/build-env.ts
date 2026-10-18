@@ -10,3 +10,12 @@ export const BUILD_LABEL: string = __BUILD_LABEL__;
 
 /** The app's display name (window title, header wordmark, installed tile). */
 export const APP_NAME: string = __APP_NAME__;
+
+/**
+ * Whether this is the phone app's bundle (`VITE_TARGET=native`, built by
+ * `native/scripts/bundle-web.mjs`). Its privacy page, its Storage settings
+ * and its page head describe that app alone, never the website or the desktop
+ * app, and it leaves the website's showcase page out. Vite inlines the
+ * comparison, so every branch behind it folds away at build time.
+ */
+export const PHONE_BUILD: boolean = import.meta.env.VITE_TARGET === "native";

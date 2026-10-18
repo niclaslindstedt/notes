@@ -16,6 +16,17 @@
  */
 export const DROPBOX_IN_BUILD = import.meta.env.VITE_TARGET !== "native";
 
+/**
+ * Whether this build offers the local folder at all. False in the phone app's
+ * bundle, like Dropbox: its WebView has no directory picker, so the option
+ * could only ever sit there greyed out. The storage picker leaves it out (not
+ * greyed out), and the privacy page does not describe it. The website and the
+ * desktop app keep it, greyed out where the browser can't pick a folder. A
+ * phone install with the folder stored as its choice opens on this device's
+ * store (`getBackend`).
+ */
+export const FOLDER_IN_BUILD = import.meta.env.VITE_TARGET !== "native";
+
 /** The Dropbox app key, empty when the build wasn't given one — or offers no Dropbox. */
 export const DROPBOX_APP_KEY = DROPBOX_IN_BUILD
   ? (import.meta.env.VITE_DROPBOX_APP_KEY ?? "")

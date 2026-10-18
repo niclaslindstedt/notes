@@ -129,7 +129,8 @@ spelled the same in every place — is pinned from the root suite by
 `VITE_TARGET=native`, which leaves the Dropbox option, its texts and its key
 out (`DROPBOX_IN_BUILD` in `src/storage/cloud-configured.ts`); it syncs through
 iCloud Drive and Nextcloud. An install that chose Dropbox under an earlier build
-opens on the device's own store. The website and the desktop app keep Dropbox.
+opens on the device's own store. It lists no local folder either
+(`FOLDER_IN_BUILD`, beside it): the WebView has no directory picker. The website and the desktop app keep Dropbox.
 The authentication session below stays in the wrapper, and stays pinned by its
 test, for a provider that needs one.
 
