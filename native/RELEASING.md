@@ -40,9 +40,10 @@ Build/submit profiles live in [`eas.json`](eas.json). Icons and the splash
 image live in [`assets/`](assets), rendered at 1024×1024 from the web app's
 source mark (`../public/favicon.svg`) — see "Artwork" below.
 
-> **License note.** The project is `PolyForm-Noncommercial-1.0.0`. Keep both
-> listings **free** and non-commercial — no paid app, no in-app purchases, no
-> ads — to stay within the license.
+> **License note.** The source is `PolyForm-Noncommercial-1.0.0`, which
+> governs what others may do with it. The copyright holder is not bound by it
+> and sells the App Store build: paid up front, with no in-app purchases and no
+> ads.
 
 ---
 
@@ -170,9 +171,10 @@ the pin when `.nvmrc` moves.
    1024×500 feature graphic, ≥2 phone screenshots, content-rating
    questionnaire, and the **Data safety** form. Declare: no data collected by
    us; notes live on-device by default, and cloud sync happens only when the
-   user opts into a backend (a Nextcloud they run). Point the privacy-policy URL at the deployed
-   app's `/privacy` page (the host is the `PAGES_CNAME` repository secret —
-   see `docs/configuration.md`).
+   user opts into a backend (a Nextcloud they run). Point the listing at:
+   - privacy policy: `https://apps.agilator.se/notes/privacy/`
+   - marketing / website: `https://apps.agilator.se/notes/`
+   - support: `https://apps.agilator.se/notes/support/`
 
 ## 5. Apple App Store submission
 
@@ -185,12 +187,20 @@ the pin when `.nvmrc` moves.
    ```
    This uploads to **TestFlight**. Add internal testers there to smoke-test
    before review.
-3. Complete the App Store Connect listing: description, keywords, screenshots
-   for the required device sizes (6.7", 6.5", and iPad since
-   `ios.supportsTablet` is true), the **App Privacy** "nutrition label" (no
-   tracking; any cloud sync is into the user's own iCloud Drive or
-   Nextcloud), and the privacy-policy URL above. Then submit for
-   review.
+3. Complete the App Store Connect listing: description, keywords, screenshots,
+   the **App Privacy** "nutrition label" (no tracking; any cloud sync is into
+   the user's own iCloud Drive or Nextcloud), and the URLs:
+   - privacy policy: `https://apps.agilator.se/notes/privacy/`
+   - marketing: `https://apps.agilator.se/notes/`
+   - support: `https://apps.agilator.se/notes/support/`
+
+   The required screenshot sizes are the 6.9″ iPhone (1320×2868) and, since
+   `ios.supportsTablet` is true, the 13″ iPad (2064×2752); App Store Connect
+   scales each down to the smaller devices in its family. They are produced
+   outside this repository and staged into `store/screenshots/` by the listing
+   tooling — see [`store/README.md`](store/README.md#the-screenshots). The
+   listing's What's New is the only release history the phone app has: it
+   carries no in-app What's new. Then submit for review.
 
    > **Guideline 4.2 ("minimum functionality").** Apple scrutinizes apps that
    > feel like a wrapped website, and this app **is** a WebView wrapper — so
