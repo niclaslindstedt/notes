@@ -121,7 +121,8 @@ if (count === 0 || !files["index.html"]) {
 
 /** Refuse a webroot that carries what only the website may: a Donate link
  *  (App Store guideline 3.1.1) or the achievements, which no phone or desktop
- *  build has. `build:native` compiles both out (`__EMBEDDED__`); a `native/web/`
+ *  build has — nor What's new, which the desktop app keeps and the phone app
+ *  does not (`CHANGELOG_IN_BUILD`). `build:native` compiles both out (`__EMBEDDED__`); a `native/web/`
  *  filled some other way — a website build copied in, then re-zipped with
  *  `--skip-build` — would carry them. Looks for whatever `VITE_DONATE_URL`
  *  this shell has set, the unlock notice's copy, and the achievements feature
@@ -139,6 +140,10 @@ function assertWebsiteOnlyAbsent(files) {
     ["the achievements", "Achievement unlocked"],
     ["the achievements feature page", "docs/features/achievements.md"],
     ["a link back to the source", "niclaslindstedt"],
+    // CHANGELOG.md's own header line: What's new, which the phone app does
+    // not carry (by owner decision — the App Store's What's New tells a phone
+    // what each update brought).
+    ["What's new (the release history)", "Keep a Changelog"],
   ].filter(([, needle]) => needle);
   const decoder = new TextDecoder();
   for (const [path, bytes] of Object.entries(files)) {

@@ -3,6 +3,8 @@
 // single `en` object to import. The `Catalog` type is derived here, then
 // consumed by `sv/index.ts` and the runtime in `src/i18n/index.ts`.
 
+import { CHANGELOG_IN_BUILD } from "../../../build-env.ts";
+
 import type { Widen } from "./_widen.ts";
 
 import achievements from "./achievements.ts";
@@ -25,7 +27,8 @@ export const en = {
   // so `Catalog` and every `t()` key stay the same in both builds.
   achievements: __EMBEDDED__ ? ({} as typeof achievements) : achievements,
   app,
-  changelog,
+  // Likewise the phone app, which has no What's new (`CHANGELOG_IN_BUILD`).
+  changelog: CHANGELOG_IN_BUILD ? changelog : ({} as typeof changelog),
   common,
   menu,
   namespace,

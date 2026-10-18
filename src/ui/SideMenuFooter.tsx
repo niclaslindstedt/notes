@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 
-import { BUILD_LABEL } from "../build-env.ts";
+import { BUILD_LABEL, CHANGELOG_IN_BUILD } from "../build-env.ts";
 import { useT } from "../i18n/index.ts";
 import { useModalDispatch } from "./modal-bus.ts";
 import { FloatingPanel } from "./FloatingPanel.tsx";
@@ -25,7 +25,7 @@ const ABOUT_PLACEMENT: FloatingPlacement = {
 
 // The relocated burger menu, pinned to the foot of the drawer: an optional
 // Donate and the trophy (achievements) — both website only — an "About" dropdown that folds away the
-// project links (What's new / privacy) above the build label, and Settings
+// project links (What's new — not in the phone app — and privacy) above the build label, and Settings
 // pinned last under the thumb. Self-contained — the only thing it borrows from
 // the drawer is the `onClose` that retracts it behind a modal; the About
 // dropdown's open state lives here.
@@ -107,15 +107,19 @@ export function SideMenuFooter({ onClose }: { onClose: () => void }) {
         placement={ABOUT_PLACEMENT}
         className="py-1"
       >
-        <MenuButton
-          icon={<SparklesIcon className="h-5 w-5" />}
-          label={t("menu.changelog")}
-          onClick={() => {
-            setAboutOpen(false);
-            onClose();
-            dispatch({ kind: "changelog" });
-          }}
-        />
+        {/* No What's new in the phone app (`CHANGELOG_IN_BUILD`): the App
+            Store's own What's New tells a phone what each update brought. */}
+        {CHANGELOG_IN_BUILD && (
+          <MenuButton
+            icon={<SparklesIcon className="h-5 w-5" />}
+            label={t("menu.changelog")}
+            onClick={() => {
+              setAboutOpen(false);
+              onClose();
+              dispatch({ kind: "changelog" });
+            }}
+          />
+        )}
         <MenuLink
           icon={<ShieldIcon className="h-5 w-5" />}
           label={t("menu.privacy")}

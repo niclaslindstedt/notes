@@ -19,3 +19,12 @@ export const APP_NAME: string = __APP_NAME__;
  * comparison, so every branch behind it folds away at build time.
  */
 export const PHONE_BUILD: boolean = import.meta.env.VITE_TARGET === "native";
+
+/**
+ * Whether this build carries What's new — the release history from
+ * CHANGELOG.md and the feature docs its Learn more links open. The phone app
+ * does not, by owner decision: the App Store's own What's New tells a phone
+ * what each update brought. So its side menu has no entry, its app no modal,
+ * and its bundle none of that text. The website and the desktop app keep it.
+ */
+export const CHANGELOG_IN_BUILD: boolean = !PHONE_BUILD;

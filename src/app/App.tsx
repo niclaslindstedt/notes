@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { unlock, useAchievementWatcher } from "../achievements/index.ts";
+import { CHANGELOG_IN_BUILD } from "../build-env.ts";
 import { useDevSeed } from "../dev/useDevSeed.ts";
 import {
   defaultNoteTitle,
@@ -932,7 +933,8 @@ export function App() {
               <SettingsModalHost storage={storage} conversion={encConversion} />
               <NamespacesModalHost storage={storage} />
               <SearchModalHost snapshot={sync.doc} onOpen={switchTo} />
-              <ChangelogModalHost />
+              {/* No What's new in the phone app (`CHANGELOG_IN_BUILD`). */}
+              {CHANGELOG_IN_BUILD && <ChangelogModalHost />}
               {/* The website's alone — see `src/achievements/index.ts`. */}
               {!__EMBEDDED__ && <AchievementsModalHost />}
               {!__EMBEDDED__ && <AchievementsUnlockModalHost />}

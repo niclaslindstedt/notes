@@ -2,6 +2,7 @@
 // English counterpart; the top-level `: Catalog` annotation here is the
 // belt-and-braces safety net against an accidentally-dropped namespace.
 
+import { CHANGELOG_IN_BUILD } from "../../../build-env.ts";
 import type { Catalog } from "../en/index.ts";
 
 import achievements from "./achievements.ts";
@@ -21,7 +22,7 @@ export const sv: Catalog = {
   // Left out of the phone and desktop builds, as in `en/index.ts`.
   achievements: __EMBEDDED__ ? ({} as Catalog["achievements"]) : achievements,
   app,
-  changelog,
+  changelog: CHANGELOG_IN_BUILD ? changelog : ({} as Catalog["changelog"]),
   common,
   menu,
   namespace,

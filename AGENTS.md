@@ -23,7 +23,10 @@ an **iCloud Drive** file store the page finds as a provider on `window`
 asks whether each capability is present, never where it is running. The phone
 app offers no Dropbox (`DROPBOX_IN_BUILD` in `src/storage/cloud-configured.ts`
 is false under `VITE_TARGET=native`), so its bundle leaves that session unused;
-the website and the desktop app keep Dropbox. It no longer
+the website and the desktop app keep Dropbox. Nor does it offer a local folder
+(`FOLDER_IN_BUILD`, beside it) or carry What's new (`CHANGELOG_IN_BUILD` in
+`src/build-env.ts`, by owner decision — the App Store's What's New stands in),
+and its privacy page and page head name no other edition (`PHONE_BUILD`). It no longer
 imports the web source; the storage logic, encryption included, stays in the
 embedded app, and the iCloud store only moves the bytes it is handed.
 

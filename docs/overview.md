@@ -4683,6 +4683,15 @@ new", listing every shipped release (newest first) from the parsed
 `[Learn more](feature:<slug>)` drills into a [feature doc](#feature-docs) in
 place, with a back button.
 
+The website and the desktop app carry it; **the phone app does not**, by owner
+decision — the App Store's own What's New tells a phone what each update
+brought. `CHANGELOG_IN_BUILD` (`src/build-env.ts`) is false under
+`VITE_TARGET=native`: the About dropdown has no What's new row,
+`ChangelogModalHost`'s loader folds to nothing, and the `changelog` string
+group is empty, so neither the modal, CHANGELOG.md nor the feature docs reach
+that bundle — `native/scripts/bundle-web.mjs` refuses a webroot that carries
+CHANGELOG.md's header line.
+
 The dialog's chrome (header, scroll panes, drill-down state) is app-side on top
 of the shared [`Modal`](#modal), **deliberately rather than** the framework's
 ready-made `ChangelogModal`: that one portals into a private overlay of its own,
