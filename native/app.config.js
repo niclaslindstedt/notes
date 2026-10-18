@@ -93,6 +93,9 @@ module.exports = {
             },
           },
         },
+        // Skips the App Store export-compliance prompt: the app uses only the
+        // encryption the operating system provides (HTTPS, iCloud, Web Crypto).
+        ITSAppUsesNonExemptEncryption: false,
       },
     },
     android: {

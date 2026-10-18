@@ -9,7 +9,9 @@ import { createRequire } from "node:module";
 
 import { describe, expect, it } from "vitest";
 
-type AppConfig = { expo: { version: string } };
+type AppConfig = {
+  expo: { version: string; ios: { infoPlist: Record<string, unknown> } };
+};
 
 describe("the phone app's version", () => {
   it("is the root package.json's", () => {
@@ -30,5 +32,14 @@ describe("the phone app's version", () => {
     };
     expect(eas.cli.appVersionSource).toBe("remote");
     expect(eas.build.production.autoIncrement).toBe(true);
+  });
+});
+
+describe("the phone app's export compliance", () => {
+  it("declares no non-exempt encryption, so the store asks no export question", () => {
+    const config = createRequire(import.meta.url)(
+      "../native/app.config.js",
+    ) as AppConfig;
+    expect(config.expo.ios.infoPlist.ITSAppUsesNonExemptEncryption).toBe(false);
   });
 });
