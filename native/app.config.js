@@ -31,11 +31,18 @@ const {
 // the sync details.
 const ICLOUD_FOLDER_NAME = PROJECT_NAME;
 
+// The marketing version — what the store shows — is the release's: the
+// Release workflow bumps the root package.json and tags `v<version>` from it,
+// so the phone app reads the same number rather than keeping one of its own.
+// EAS numbers each build itself (`appVersionSource: "remote"` and the
+// production profile's `autoIncrement` in eas.json).
+const { version: RELEASE_VERSION } = require("../package.json");
+
 module.exports = {
   expo: {
     name: DISPLAY_NAME,
     slug: "notes",
-    version: "0.1.0",
+    version: RELEASE_VERSION,
     orientation: "portrait",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,

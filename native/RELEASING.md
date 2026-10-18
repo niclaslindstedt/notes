@@ -102,8 +102,10 @@ To check it on a device: Settings → Storage has no Dropbox option.
 
 ## 1. Set the marketing version
 
-`app.config.js` → `expo.version` is the user-visible version (e.g. `1.0.0`). Bump
-it for each store release. The per-store build number is handled
+The user-visible version is the release's: `app.config.js` sets
+`expo.version` from the root `package.json`, which the **Release** workflow
+bumps when it tags `v<version>`. There is nothing to set here — cut the
+release first, then build from it. The per-store build number is handled
 automatically — `eas.json` sets `appVersionSource: "remote"` and the
 `production` profile has `autoIncrement: true`, so EAS increments the iOS
 build number and Android `versionCode` on every production build.
@@ -215,8 +217,9 @@ the pin when `.nvmrc` moves.
 
 ## 6. Subsequent releases
 
-Bump `expo.version` (step 1), `eas build --platform all --profile production`,
-then `eas submit --platform all --profile production --latest`. Build numbers
+Cut the release (its version is the app's, step 1), then
+`eas build --platform all --profile production` and
+`eas submit --platform all --profile production --latest`. Build numbers
 auto-increment, so no manual bookkeeping per store.
 
 ## Building from CI
